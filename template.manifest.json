@@ -1,0 +1,75 @@
+{
+  "templateVersion": "1.0.0",
+  "engine": "deepagents-app",
+  "framework": "deepagents-js",
+  "description": "DeepAgents ACP Application Agent Template — development environment for building scenario-specific AI agents integrated with nuwaclaw",
+
+  "zones": {
+    "protected": {
+      "paths": [
+        "src/runtime/"
+      ],
+      "description": "Infrastructure code — ACP server, platform client, config loader. Do not modify unless explicitly instructed.",
+      "enforcement": "permission-gate"
+    },
+    "ai-editable": {
+      "paths": [
+        "src/app/",
+        "prompts/",
+        "skills/"
+      ],
+      "description": "Business logic, prompts, and skills. AI and user can freely modify."
+    },
+    "user-editable": {
+      "paths": [
+        "config/"
+      ],
+      "description": "Configuration files. User and platform manage these."
+    }
+  },
+
+  "acceptance": {
+    "commands": [
+      "npm run build",
+      "npm run typecheck",
+      "npm run test",
+      "npm run test:acp-smoke"
+    ],
+    "description": "All acceptance commands must pass before the agent is considered ready for distribution."
+  },
+
+  "constraints": {
+    "promptSource": "acp-only",
+    "promptSourceDescription": "Target agent prompts come ONLY from ACP session metadata. Never hardcode in runtime.",
+
+    "toolPriority": [
+      "platform-mcp",
+      "builtin-custom",
+      "deepagents-builtin",
+      "write-code"
+    ],
+    "toolPriorityDescription": "When the AI needs a tool: check platform plugins first, then built-in tools, then write custom code as last resort.",
+
+    "variableCreation": "via-agent-variable-tool",
+    "variableCreationDescription": "When a custom tool needs external credentials, create an agent variable. User fills value via platform UI.",
+
+    "mcpMergeStrategy": "session-wins",
+    "mcpMergeDescription": "MCP config priority: session overrides > platform MCPs > default MCPs."
+  },
+
+  "requiredFiles": [
+    "src/index.ts",
+    "src/runtime/index.ts",
+    "src/app/tools/index.ts",
+    "config/app-agent.config.json",
+    "config/platform.json",
+    "agent-package.json",
+    "package.json"
+  ],
+
+  "distribution": {
+    "manifest": "agent-package.json",
+    "supportedSources": ["npm", "tgz", "git"],
+    "entryPoint": "dist/index.js"
+  }
+}

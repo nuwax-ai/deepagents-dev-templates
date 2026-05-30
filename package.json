@@ -1,0 +1,53 @@
+{
+  "name": "deepagents-dev-templates",
+  "version": "0.1.0",
+  "description": "DeepAgents ACP Application Agent Template Framework — a development environment for building scenario-specific AI agents that integrate with nuwaclaw via ACP protocol",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "deepagents-app": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js",
+    "start:acp": "tsx src/index.ts --acp",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:unit": "vitest run tests/unit",
+    "test:acp-smoke": "vitest run tests/acp-smoke",
+    "test:integration": "vitest run tests/integration",
+    "lint": "eslint src/ --ext .ts",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist/",
+    "package": "bash scripts/package.sh"
+  },
+  "dependencies": {
+    "deepagents": "^1.10.2",
+    "deepagents-acp": "latest",
+    "@langchain/core": "latest",
+    "@langchain/langgraph": "latest",
+    "zod": "^3.23.0",
+    "dotenv": "^16.4.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "tsx": "^4.19.0",
+    "vitest": "^2.0.0",
+    "@types/node": "^22.0.0",
+    "eslint": "^9.0.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "keywords": [
+    "deepagents",
+    "acp",
+    "ai-agent",
+    "langgraph",
+    "nuwaclaw",
+    "template"
+  ],
+  "license": "MIT"
+}

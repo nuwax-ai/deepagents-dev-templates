@@ -1,0 +1,41 @@
+{
+  "$schema": "./config-schema.json",
+  "agent": {
+    "name": "my-scenario-agent",
+    "description": "AI agent for [specific scenario]",
+    "version": "0.1.0"
+  },
+  "model": {
+    "provider": "anthropic",
+    "name": "claude-sonnet-4-6",
+    "settings": {
+      "temperature": 0
+    }
+  },
+  "mcp": {
+    "configPath": "./config/mcp.default.json",
+    "mergeStrategy": "session-wins"
+  },
+  "platform": {
+    "apiBaseUrl": "https://api.nuwax.com",
+    "agentId": "",
+    "spaceId": ""
+  },
+  "permissions": {
+    "interruptOn": ["write_file", "edit_file", "execute"],
+    "allowedPaths": ["src/app/", "prompts/", "skills/", "config/"],
+    "deniedPaths": ["src/runtime/"]
+  },
+  "skills": {
+    "directories": ["./skills/builtin/", "./skills/platform/"],
+    "progressiveLoading": true
+  },
+  "memory": {
+    "enabled": true,
+    "dir": "./.agent-memory"
+  },
+  "logging": {
+    "level": "info",
+    "structured": true
+  }
+}

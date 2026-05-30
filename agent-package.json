@@ -1,0 +1,54 @@
+{
+  "name": "deepagents-app-agent",
+  "version": "0.1.0",
+  "description": "AI application agent built with DeepAgents + ACP",
+  "engine": "deepagents-app",
+
+  "source": {
+    "type": "npm",
+    "package": "deepagents-dev-templates",
+    "registry": "https://registry.npmjs.org",
+    "version": "0.1.0"
+  },
+
+  "bin": {
+    "start": "dist/index.js"
+  },
+
+  "env": {
+    "required": [
+      "ANTHROPIC_API_KEY"
+    ],
+    "optional": [
+      "OPENAI_API_KEY",
+      "PLATFORM_API_TOKEN",
+      "PLATFORM_AGENT_ID",
+      "PLATFORM_SPACE_ID"
+    ]
+  },
+
+  "mcp": {
+    "servers": [
+      "context7"
+    ]
+  },
+
+  "platform": {
+    "agentId": "",
+    "spaceId": "",
+    "apiBaseUrl": "https://api.nuwax.com"
+  },
+
+  "checksum": {
+    "algorithm": "sha256",
+    "value": ""
+  },
+
+  "metadata": {
+    "templateVersion": "1.0.0",
+    "framework": "deepagents-js",
+    "deepagentsVersion": "^1.10.2",
+    "acpVersion": "latest",
+    "nodeVersion": ">=20.0.0"
+  }
+}

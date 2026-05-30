@@ -1,0 +1,17 @@
+{
+  "apiBaseUrl": "https://api.nuwax.com",
+  "agentId": "",
+  "spaceId": "",
+  "endpoints": {
+    "savePrompt": "/api/agents/{agentId}/prompt",
+    "queryPlugins": "/api/spaces/{spaceId}/plugins",
+    "bindComponent": "/api/agents/{agentId}/components",
+    "variables": "/api/agents/{agentId}/variables",
+    "executePlugin": "/api/plugins/{pluginId}/execute",
+    "debugSession": "/api/agents/{agentId}/debug-sessions"
+  },
+  "auth": {
+    "type": "bearer",
+    "tokenEnvVar": "PLATFORM_API_TOKEN"
+  }
+}
