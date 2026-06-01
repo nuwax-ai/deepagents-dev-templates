@@ -12,10 +12,14 @@ import type { PlatformClient } from "../../runtime/platform-client.js";
 /**
  * Create the platform_api tool bound to a specific PlatformClient instance.
  * Called from agent-factory at agent creation time.
+ * If platformClient is null, the tool returns a clear error for all operations.
  */
-export function createPlatformApiTool(platformClient: PlatformClient) {
+export function createPlatformApiTool(platformClient: PlatformClient | null) {
   return tool(
     async ({ operation, params }) => {
+      if (!platformClient) {
+        return "Error: Platform API not available. Set PLATFORM_AGENT_ID and PLATFORM_SPACE_ID env vars, or configure config.platform.agentId and config.platform.spaceId, to enable platform operations.";
+      }
       try {
         const p = params || {};
         switch (operation) {

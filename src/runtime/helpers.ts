@@ -25,7 +25,8 @@ import { logger } from "./logger.js";
  */
 export interface RuntimeContext {
   config: AppConfig;
-  platformClient: PlatformClient;
+  /** PlatformClient when platform credentials are configured, null in local-only mode */
+  platformClient: PlatformClient | null;
   mcpManager: MCPManager;
   variableManager: VariableManager;
   toolContext: ToolContext;
@@ -33,8 +34,12 @@ export interface RuntimeContext {
 }
 
 /**
- * Create the runtime context: PlatformClient, MCPManager, VariableManager,
- * the ToolContext that binds them to tools, and the tools array itself.
+ * Create the runtime context: PlatformClient (optional), MCPManager,
+ * VariableManager, the ToolContext that binds them to tools, and the tools array.
+ *
+ * PlatformClient is OPTIONAL — when both agentId and spaceId are empty,
+ * the agent runs in local-only mode. Platform-dependent tools will return
+ * clear error messages when invoked.
  */
 export function createRuntimeContext(
   config: AppConfig,
@@ -45,24 +50,20 @@ export function createRuntimeContext(
   const agentId = config.platform.agentId || sessionConfig?.agentId || "";
   const spaceId = config.platform.spaceId || sessionConfig?.spaceId || "";
 
-  // Validate required IDs to prevent malformed API URLs
-  if (!agentId) {
-    throw new Error(
-      "Platform agentId is required. Set PLATFORM_AGENT_ID env var or config.platform.agentId."
-    );
-  }
-  if (!spaceId) {
-    throw new Error(
-      "Platform spaceId is required. Set PLATFORM_SPACE_ID env var or config.platform.spaceId."
-    );
-  }
+  // Platform is optional — only create PlatformClient if both IDs are set
+  const hasPlatform = !!(agentId && spaceId);
+  const platformClient = hasPlatform
+    ? new PlatformClient({
+        apiBaseUrl: config.platform.apiBaseUrl,
+        agentId,
+        spaceId,
+        authToken: process.env.PLATFORM_API_TOKEN,
+      })
+    : null;
 
-  const platformClient = new PlatformClient({
-    apiBaseUrl: config.platform.apiBaseUrl,
-    agentId,
-    spaceId,
-    authToken: process.env.PLATFORM_API_TOKEN,
-  });
+  if (!hasPlatform) {
+    log.info("Platform credentials not provided — running in local-only mode");
+  }
 
   const mcpManager = new MCPManager({
     defaultConfigPath: config.mcp.configPath,
@@ -79,7 +80,8 @@ export function createRuntimeContext(
     });
   }
 
-  const variableManager = new VariableManager({ platformClient });
+  // VariableManager handles null platformClient (local-only mode)
+  const variableManager = new VariableManager({ platformClient: platformClient ?? undefined });
 
   const toolContext: ToolContext = {
     platformClient,
@@ -91,7 +93,8 @@ export function createRuntimeContext(
   const tools = createTools(toolContext);
 
   log.info("Runtime context created", {
-    agentId: config.platform.agentId || sessionConfig?.agentId || "(none)",
+    mode: hasPlatform ? "platform" : "local",
+    agentId: agentId || "(none)",
     mcpServers: mcpManager.listServers(),
     tools: tools.length,
   });

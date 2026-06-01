@@ -20,7 +20,8 @@ import type { MCPManager } from "../../runtime/mcp-manager.js";
 import type { VariableManager } from "../../runtime/variable-manager.js";
 
 export interface ToolContext {
-  platformClient: PlatformClient;
+  /** PlatformClient when platform credentials are configured, null in local-only mode */
+  platformClient: PlatformClient | null;
   mcpManager: MCPManager;
   variableManager: VariableManager;
 }

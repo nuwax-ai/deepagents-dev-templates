@@ -214,18 +214,30 @@ export class VariableManager {
    * Export all variables as environment variable mappings.
    * Useful for passing to MCP server configs or tool execution.
    * Honors env-var priority chain (same as get()).
+   *
+   * Includes both:
+   *  - Variables known to the manager (from platform or cache)
+   *  - Env vars matching the prefix that may not be in the variable registry
    */
   async toEnvMap(): Promise<Record<string, string>> {
     const variables = await this.list();
     const envMap: Record<string, string> = {};
 
+    // 1. Export known variables with env override
     for (const v of variables) {
-      // Check env var first (priority chain: env > cache > platform)
       const envValue = process.env[this.toEnvKey(v.name)];
-      const value = (envValue !== undefined) ? envValue : v.value;
-
+      const value = envValue !== undefined ? envValue : v.value;
       if (value !== undefined) {
         envMap[this.toEnvKey(v.name)] = value;
+      }
+    }
+
+    // 2. Also include env-only variables (not in the registry)
+    for (const [envKey, envValue] of Object.entries(process.env)) {
+      if (envKey.startsWith(this.envPrefix) && envValue !== undefined) {
+        if (!(envKey in envMap)) {
+          envMap[envKey] = envValue;
+        }
       }
     }
 
