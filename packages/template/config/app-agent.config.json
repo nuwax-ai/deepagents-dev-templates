@@ -32,7 +32,8 @@
   },
   "memory": {
     "enabled": true,
-    "dir": "./.agent-memory"
+    "dir": "./.agent-memory",
+    "addCacheControl": true
   },
   "logging": {
     "level": "info",

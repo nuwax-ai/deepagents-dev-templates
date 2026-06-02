@@ -8,7 +8,7 @@
 
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { type CreateDeepAgentParams, type FilesystemPermission } from "deepagents";
+import { type CreateDeepAgentParams, type FilesystemPermission, type AnyBackendProtocol, createMemoryMiddleware } from "deepagents";
 import type { StructuredTool } from "@langchain/core/tools";
 import type { AgentMiddleware } from "langchain";
 import { ChatAnthropic } from "@langchain/anthropic";
@@ -337,16 +337,31 @@ export function buildInterruptOn(tools: string[]): Record<string, boolean> {
 /**
  * Build common agent configuration parts used by both agent-factory and acp-server.
  * Returns an object with all the composed config fields needed for createDeepAgent().
+ *
+ * @param backend - FilesystemBackend for memory/skills middleware. Required for
+ *                  addCacheControl and explicit memory middleware creation.
  */
 export function buildAgentConfigParts(
   config: AppConfig,
   sessionConfig: ACPSessionConfig | undefined,
   workspaceRoot: string,
-  tools: StructuredTool[]
+  tools: StructuredTool[],
+  backend?: AnyBackendProtocol
 ) {
   // Build custom middleware array from config
   const middleware: AgentMiddleware[] = [];
   const mwConfig = config.middleware;
+
+  // Memory middleware — explicitly created with addCacheControl for Anthropic prompt caching.
+  // Falls back to the `memory` shortcut parameter when no backend is provided.
+  const memoryPaths = discoverMemoryFiles(workspaceRoot);
+  if (backend && memoryPaths.length > 0) {
+    middleware.push(createMemoryMiddleware({
+      backend,
+      sources: memoryPaths,
+      addCacheControl: config.memory.addCacheControl && config.model.provider === "anthropic",
+    }));
+  }
 
   if (mwConfig.stuckLoopDetection.enabled) {
     middleware.push(createStuckLoopMiddleware({
@@ -367,9 +382,9 @@ export function buildAgentConfigParts(
     systemPrompt: resolveSystemPrompt(config, sessionConfig, workspaceRoot),
     tools,
     skills: resolveSkillsPaths(config),
-    memory: discoverMemoryFiles(workspaceRoot).length > 0
-      ? discoverMemoryFiles(workspaceRoot)
-      : undefined,
+    // When backend is provided, memory is handled by explicit middleware above.
+    // Otherwise, fall back to the shortcut parameter (no addCacheControl).
+    memory: backend ? undefined : (memoryPaths.length > 0 ? memoryPaths : undefined),
     permissions: buildPermissions(config),
     interruptOn: buildInterruptOn(config.permissions.interruptOn),
     checkpointer: true,  // Enables LangGraph checkpointing for HITL + session persistence.

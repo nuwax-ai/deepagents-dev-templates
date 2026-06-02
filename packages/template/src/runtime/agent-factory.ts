@@ -65,7 +65,7 @@ export function createAppAgent(
   const backend = new FilesystemBackend({ rootDir: workspaceRoot });
 
   // 3. Build agent config using shared helper
-  const agentConfig = buildAgentConfigParts(config, sessionConfig, workspaceRoot, context.tools);
+  const agentConfig = buildAgentConfigParts(config, sessionConfig, workspaceRoot, context.tools, backend);
 
   // 4. Create the deep agent
   const agent = createDeepAgent({
@@ -101,7 +101,7 @@ export async function createAppAgentAsync(
   });
 
   const backend = new FilesystemBackend({ rootDir: workspaceRoot });
-  const agentConfig = buildAgentConfigParts(config, sessionConfig, workspaceRoot, context.tools);
+  const agentConfig = buildAgentConfigParts(config, sessionConfig, workspaceRoot, context.tools, backend);
   const agent = createDeepAgent({
     ...agentConfig,
     backend,

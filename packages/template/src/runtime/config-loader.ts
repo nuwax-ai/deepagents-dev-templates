@@ -66,6 +66,7 @@ export const SkillsConfigSchema = z.object({
 export const MemoryConfigSchema = z.object({
   enabled: z.boolean().default(true),
   dir: z.string().default("./.agent-memory"),
+  addCacheControl: z.boolean().default(true),
 });
 
 export const LoggingConfigSchema = z.object({
