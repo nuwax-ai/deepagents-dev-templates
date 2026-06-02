@@ -64,7 +64,8 @@ export function createCostTrackingMiddleware(options: CostTrackingOptions = {}) 
     wrapModelCall: async (request, handler) => {
       // Count input tokens before model call
       const messages = request.state?.messages ?? [];
-      const inputTokens = countTokensApproximately(messages as never[], request.tools as never[]);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const inputTokens = countTokensApproximately(messages as any[], request.tools as any[]);
 
       const response = await handler(request);
 
@@ -104,14 +105,4 @@ export function createCostTrackingMiddleware(options: CostTrackingOptions = {}) 
       return handler(request);
     },
   });
-}
-
-/**
- * Get the current token usage snapshot. Useful for external callers
- * that want to check usage after a run completes.
- */
-export function getCurrentUsage(): Readonly<TokenUsage> {
-  // This returns a snapshot — the actual counters are in the middleware closure.
-  // For external access, the middleware should be extended with a shared state object.
-  return { inputTokens: 0, outputTokens: 0, totalTokens: 0, modelCalls: 0, toolCalls: 0 };
 }

@@ -14,13 +14,19 @@
 
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import { readdirSync, readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { readdirSync, readFileSync, writeFileSync, mkdirSync, existsSync, unlinkSync } from "node:fs";
+import { resolve, basename } from "node:path";
 
 const CHECKPOINT_DIR = ".agent-checkpoints";
 
 function getCheckpointDir(): string {
   return resolve(process.cwd(), CHECKPOINT_DIR);
+}
+
+/** Sanitize checkpoint ID to prevent path traversal */
+function sanitizeId(id: string): string {
+  // Strip path separators and traversal sequences; keep only the basename
+  return basename(id).replace(/[^a-zA-Z0-9_-]/g, "_");
 }
 
 function generateCheckpointId(): string {
@@ -89,17 +95,18 @@ export const checkpointTool = tool(
 
         case "rewind": {
           if (!checkpointId) return "Error: checkpointId is required for rewind operation";
-          const checkpointPath = resolve(dir, `${checkpointId}.md`);
+          const safeId = sanitizeId(checkpointId);
+          const checkpointPath = resolve(dir, `${safeId}.md`);
           if (!existsSync(checkpointPath)) {
             const available = existsSync(dir)
               ? readdirSync(dir).filter(f => f.startsWith("cp-")).map(f => f.replace(".md", ""))
               : [];
-            return `Checkpoint "${checkpointId}" not found. Available: ${available.join(", ") || "none"}`;
+            return `Checkpoint "${safeId}" not found. Available: ${available.join(", ") || "none"}`;
           }
 
           const content = readFileSync(checkpointPath, "utf-8");
           return [
-            `⏪ REWINDING TO CHECKPOINT: ${checkpointId}`,
+            `⏪ REWINDING TO CHECKPOINT: ${safeId}`,
             "",
             content,
             "",
@@ -111,11 +118,12 @@ export const checkpointTool = tool(
 
         case "delete": {
           if (!checkpointId) return "Error: checkpointId is required for delete operation";
-          const deletePath = resolve(dir, `${checkpointId}.md`);
+          const safeId = sanitizeId(checkpointId);
+          const deletePath = resolve(dir, `${safeId}.md`);
           if (!existsSync(deletePath)) {
-            return `Checkpoint "${checkpointId}" not found.`;
+            return `Checkpoint "${safeId}" not found.`;
           }
-          const { unlinkSync } = await import("node:fs");
+          unlinkSync(deletePath);
           unlinkSync(deletePath);
           return `Checkpoint "${checkpointId}" deleted.`;
         }

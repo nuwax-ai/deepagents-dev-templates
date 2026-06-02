@@ -21,6 +21,7 @@ import { logger } from "./logger.js";
 import { createStuckLoopMiddleware } from "./middleware/stuck-loop.js";
 import { createPeriodicReminderMiddleware } from "./middleware/periodic-reminder.js";
 import { createCostTrackingMiddleware } from "./middleware/cost-tracking.js";
+import { createHookMiddleware, getHooks } from "../app/hooks/index.js";
 
 // ─── Runtime Context ────────────────────────────────────
 
@@ -403,6 +404,13 @@ export function buildAgentConfigParts(
     middleware.push(createCostTrackingMiddleware({
       warnAtTokens: mwConfig.costTracking.warnAtTokens,
     }));
+  }
+
+  // Hooks middleware — always included when hooks are registered.
+  // Note: hooks registry is module-level (shared across agents in the same process).
+  if (getHooks("pre_tool_use").length > 0 || getHooks("post_tool_use").length > 0 ||
+      getHooks("before_model").length > 0 || getHooks("after_model").length > 0) {
+    middleware.push(createHookMiddleware());
   }
 
   return {

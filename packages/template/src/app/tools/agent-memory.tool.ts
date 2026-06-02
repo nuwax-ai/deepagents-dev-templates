@@ -15,13 +15,25 @@ import { resolve, dirname } from "node:path";
 
 const MEMORY_DIR = ".agent-memory";
 
+/** Escape regex metacharacters in a string for safe use in RegExp */
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function getMemoryPath(agentName: string): string {
   return resolve(process.cwd(), MEMORY_DIR, agentName, "MEMORY.md");
 }
 
+/** Resolve agent name with unique fallback to avoid collisions */
+function resolveAgentName(): string {
+  return process.env.ACP_AGENT_NAME
+    || process.env.ACP_SESSION_ID
+    || `agent-${process.pid}`;
+}
+
 export const agentMemoryTool = tool(
   async ({ operation, key, content }) => {
-    const agentName = process.env.ACP_AGENT_NAME || "default";
+    const agentName = resolveAgentName();
     const memoryPath = getMemoryPath(agentName);
 
     try {
@@ -32,8 +44,8 @@ export const agentMemoryTool = tool(
           }
           const fullContent = readFileSync(memoryPath, "utf-8");
           if (key) {
-            // Extract specific section by key (## heading)
-            const regex = new RegExp(`## ${key}\\n([\\s\\S]*?)(?=\\n## |$)`, "i");
+            const escaped = escapeRegex(key);
+            const regex = new RegExp(`## ${escaped}\\n([\\s\\S]*?)(?=\\n## |$)`, "i");
             const match = fullContent.match(regex);
             return match ? match[1]!.trim() : `Section "${key}" not found in memory.`;
           }
@@ -44,12 +56,12 @@ export const agentMemoryTool = tool(
           if (!content) return "Error: content is required for write operation";
           mkdirSync(dirname(memoryPath), { recursive: true });
           if (key) {
-            // Write/update a specific section
+            const escaped = escapeRegex(key);
             let existing = "";
             if (existsSync(memoryPath)) {
               existing = readFileSync(memoryPath, "utf-8");
             }
-            const regex = new RegExp(`## ${key}\\n[\\s\\S]*?(?=\\n## |$)`, "i");
+            const regex = new RegExp(`## ${escaped}\\n[\\s\\S]*?(?=\\n## |$)`, "i");
             const section = `## ${key}\n${content}\n`;
             if (regex.test(existing)) {
               existing = existing.replace(regex, section);
