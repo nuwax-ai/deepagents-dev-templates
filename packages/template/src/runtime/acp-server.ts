@@ -15,7 +15,6 @@
  */
 
 import { DeepAgentsServer, type DeepAgentConfig } from "deepagents-acp";
-import { FilesystemBackend } from "deepagents";
 import { loadConfig, type ACPSessionConfig } from "./config-loader.js";
 import { logger } from "./logger.js";
 import {
@@ -196,7 +195,8 @@ export function buildACPAgentConfig(
 
     // CreateDeepAgentParams fields (via shared helper)
     ...buildAgentConfigParts(config, sessionConfig, workspaceRoot, runtimeCtx.tools),
-    backend: new FilesystemBackend({ rootDir: workspaceRoot }),
+    // Do NOT set backend here — DeepAgentsServer creates ACPFilesystemBackend
+    // when no backend is provided, enabling IDE integration (unsaved buffer reads).
   };
 
   log.info("Agent config built", {
@@ -220,7 +220,8 @@ export async function buildACPAgentConfigAsync(
     name: config.agent.name,
     description: config.agent.description,
     ...buildAgentConfigParts(config, sessionConfig, workspaceRoot, runtimeCtx.tools),
-    backend: new FilesystemBackend({ rootDir: workspaceRoot }),
+    // Do NOT set backend — DeepAgentsServer creates ACPFilesystemBackend automatically,
+    // which provides IDE integration (unsaved buffer reads via ACP client).
   };
 
   log.info("Agent config built", {

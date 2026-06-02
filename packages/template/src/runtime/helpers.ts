@@ -10,6 +10,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { type CreateDeepAgentParams, type FilesystemPermission } from "deepagents";
 import type { StructuredTool } from "@langchain/core/tools";
+import type { AgentMiddleware } from "langchain";
 import { ChatAnthropic } from "@langchain/anthropic";
 import type { AppConfig, ACPSessionConfig } from "./config-loader.js";
 import { PlatformClient } from "./platform-client.js";
@@ -265,6 +266,7 @@ export function discoverMemoryFiles(workspaceRoot: string): string[] {
   const candidates = [
     "AGENTS.md",
     "CLAUDE.md",
+    ".deepagents/AGENTS.md",  // legacy path (backward compat)
     ".deepagents/agent.md",   // deepagents standard path
   ];
   const found: string[] = [];
@@ -343,8 +345,7 @@ export function buildAgentConfigParts(
   tools: StructuredTool[]
 ) {
   // Build custom middleware array from config
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const middleware: any[] = [];
+  const middleware: AgentMiddleware[] = [];
   const mwConfig = config.middleware;
 
   if (mwConfig.stuckLoopDetection.enabled) {
@@ -371,7 +372,8 @@ export function buildAgentConfigParts(
       : undefined,
     permissions: buildPermissions(config),
     interruptOn: buildInterruptOn(config.permissions.interruptOn),
-    checkpointer: true,  // Enable LangGraph checkpointing for HITL + session persistence
+    checkpointer: true,  // Enables LangGraph checkpointing for HITL + session persistence.
+                          // Note: DeepAgentsServer overrides this with its own MemorySaver in ACP mode.
     middleware,
   };
 }
