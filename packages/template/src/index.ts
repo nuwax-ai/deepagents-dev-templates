@@ -41,7 +41,25 @@ const PROJECT_ROOT = resolve(__dirname, "..");
 // Shell values are almost always stale leftovers from Claude Desktop or other tools.
 // After cleanup, either Zed's env block (if passed) or .env fallback will provide
 // the correct credentials.
-const isAcpMode = process.argv.slice(2).length === 0 || process.argv.slice(2)[0] === "acp";
+// Scan past flags to find the first positional arg (mirrors parseArgs logic).
+const VALUE_FLAGS = new Set(["--config", "--prompt-file", "--system-prompt"]);
+const SIMPLE_FLAGS = new Set(["--debug", "--help", "-h", "--no-acp"]);
+let isAcpMode = true;
+{
+  let i = 2; // skip "node" and script path
+  while (i < process.argv.length) {
+    const a = process.argv[i]!;
+    if (VALUE_FLAGS.has(a)) {
+      i += 2; // skip flag + value
+    } else if (SIMPLE_FLAGS.has(a)) {
+      i++; // skip flag
+    } else {
+      // First positional arg — determine mode
+      isAcpMode = a === "acp" || a === undefined;
+      break;
+    }
+  }
+}
 if (isAcpMode) {
   for (const key of ["ANTHROPIC_BASE_URL", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_MODEL"]) {
     delete process.env[key];

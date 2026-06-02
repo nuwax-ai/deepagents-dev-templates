@@ -1,0 +1,7 @@
+{
+  "name": "@deepagents/dev-agent-config",
+  "version": "0.1.0",
+  "private": true,
+  "description": "开发 Agent 的系统提示词和 Skills 配置 — 用于 nuwax 平台的 Agent 开发助手",
+  "license": "MIT"
+}
