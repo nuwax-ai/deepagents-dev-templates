@@ -23,19 +23,93 @@ import {
   buildAgentConfigParts,
 } from "./helpers.js";
 
+// ─── Session Lifecycle Manager ──────────────────────────
+
+interface SessionInfo {
+  sessionId: string;
+  createdAt: string;
+  lastActivityAt: string;
+  mode: string;
+  messageCount: number;
+}
+
 /**
- * Patch a DeepAgentsServer instance to auto-recover from stale sessions.
- * When Zed sends a prompt/loadSession for a session that no longer exists
- * (e.g. after server restart), automatically create a new session instead
- * of throwing "Session not found".
+ * Session lifecycle manager. Tracks active sessions and provides
+ * close/list operations that deepagents-acp doesn't natively support.
  */
-function patchSessionRecovery(server: DeepAgentsServer): void {
-  const log = logger.child("session-recovery");
+class SessionManager {
+  private sessions = new Map<string, SessionInfo>();
+  private log = logger.child("session-manager");
+
+  track(sessionId: string, mode: string): void {
+    this.sessions.set(sessionId, {
+      sessionId,
+      createdAt: new Date().toISOString(),
+      lastActivityAt: new Date().toISOString(),
+      mode,
+      messageCount: 0,
+    });
+    this.log.debug("Session tracked", { sessionId, mode, total: this.sessions.size });
+  }
+
+  touch(sessionId: string): void {
+    const info = this.sessions.get(sessionId);
+    if (info) {
+      info.lastActivityAt = new Date().toISOString();
+      info.messageCount++;
+    }
+  }
+
+  close(sessionId: string): SessionInfo | undefined {
+    const info = this.sessions.get(sessionId);
+    if (info) {
+      this.sessions.delete(sessionId);
+      this.log.info("Session closed", { sessionId, messages: info.messageCount });
+    }
+    return info;
+  }
+
+  list(): SessionInfo[] {
+    return Array.from(this.sessions.values());
+  }
+
+  has(sessionId: string): boolean {
+    return this.sessions.has(sessionId);
+  }
+
+  get count(): number {
+    return this.sessions.size;
+  }
+}
+
+// ─── Session Recovery + Lifecycle Patch ──────────────────
+
+/**
+ * Patch a DeepAgentsServer instance to:
+ * 1. Auto-recover from stale sessions (Session not found)
+ * 2. Track session lifecycle (new, close, list)
+ * 3. Add closeSession and listSessions methods
+ */
+function patchSessionLifecycle(server: DeepAgentsServer): SessionManager {
+  const log = logger.child("session-lifecycle");
+  const manager = new SessionManager();
   const s = server as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>;
 
-  const origLoadSession = s.handleLoadSession?.bind(server);
-  const origPrompt = s.handlePrompt?.bind(server);
+  // Patch handleNewSession to track new sessions
+  const origNewSession = s.handleNewSession?.bind(server);
+  if (origNewSession) {
+    s.handleNewSession = async (...args: unknown[]) => {
+      const params = args[0] as { mode?: string };
+      const result = await origNewSession(...args) as { sessionId: string } | undefined;
+      if (result?.sessionId) {
+        manager.track(result.sessionId, params?.mode ?? "agent");
+      }
+      return result;
+    };
+  }
 
+  // Patch handleLoadSession for stale session recovery
+  const origLoadSession = s.handleLoadSession?.bind(server);
   if (origLoadSession) {
     s.handleLoadSession = async (...args: unknown[]) => {
       try {
@@ -54,13 +128,17 @@ function patchSessionRecovery(server: DeepAgentsServer): void {
     };
   }
 
+  // Patch handlePrompt for stale session recovery + activity tracking
+  const origPrompt = s.handlePrompt?.bind(server);
   if (origPrompt) {
     s.handlePrompt = async (...args: unknown[]) => {
+      const params = args[0] as { sessionId: string; prompt: unknown[] };
+      manager.touch(params.sessionId);
+
       try {
         return await origPrompt(...args);
       } catch (err) {
         if (err instanceof Error && err.message.includes("Session not found")) {
-          const params = args[0] as { sessionId: string; prompt: unknown[] };
           const conn = args[1];
           const newSession = await s.handleNewSession?.({ mode: "agent" }, conn) as { sessionId: string } | undefined;
           if (newSession) {
@@ -76,7 +154,36 @@ function patchSessionRecovery(server: DeepAgentsServer): void {
     };
   }
 
-  log.info("Session recovery patch applied");
+  // Patch handleCancel for activity tracking
+  const origCancel = s.handleCancel?.bind(server);
+  if (origCancel) {
+    s.handleCancel = async (...args: unknown[]) => {
+      const params = args[0] as { sessionId?: string };
+      if (params?.sessionId) manager.touch(params.sessionId);
+      return origCancel(...args);
+    };
+  }
+
+  // Add closeSession method
+  s.handleCloseSession = async (...args: unknown[]) => {
+    const params = args[0] as { sessionId: string };
+    const info = manager.close(params.sessionId);
+    if (!info) {
+      return { error: `Session not found: ${params.sessionId}` };
+    }
+    return { closed: true, sessionId: params.sessionId, messages: info.messageCount };
+  };
+
+  // Add listSessions method
+  s.handleListSessions = async (..._args: unknown[]) => {
+    return { sessions: manager.list(), total: manager.count };
+  };
+
+  log.info("Session lifecycle patch applied", {
+    features: ["recovery", "tracking", "close", "list"],
+  });
+
+  return manager;
 }
 
 // ─── Types ──────────────────────────────────────────────
@@ -165,7 +272,8 @@ export async function bootstrap(options: ACPServerOptions = {}): Promise<void> {
     tools: agentConfig.tools?.length,
   });
 
-  patchSessionRecovery(server);
+  const _sessionManager = patchSessionLifecycle(server);
+  log.info("Active sessions after startup", { count: _sessionManager.count });
   await server.start();
 }
 
