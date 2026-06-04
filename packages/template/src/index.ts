@@ -37,38 +37,9 @@ import { runOneShot, runPromptFile } from "./cli/one-shot.js";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = resolve(__dirname, "..");
 
-// ACP mode: clean ALL model env vars from the shell environment.
-// Shell values are almost always stale leftovers from Claude Desktop or other tools.
-// After cleanup, either Zed's env block (if passed) or .env fallback will provide
-// the correct credentials.
-// Scan past flags to find the first positional arg (mirrors parseArgs logic).
-const VALUE_FLAGS = new Set(["--config", "--prompt-file", "--system-prompt"]);
-const SIMPLE_FLAGS = new Set(["--debug", "--help", "-h", "--no-acp"]);
-let isAcpMode = true;
-{
-  let i = 2; // skip "node" and script path
-  while (i < process.argv.length) {
-    const a = process.argv[i]!;
-    if (VALUE_FLAGS.has(a)) {
-      i += 2; // skip flag + value
-    } else if (SIMPLE_FLAGS.has(a)) {
-      i++; // skip flag
-    } else {
-      // First positional arg — determine mode
-      isAcpMode = a === "acp" || a === undefined;
-      break;
-    }
-  }
-}
-if (isAcpMode) {
-  for (const key of ["ANTHROPIC_BASE_URL", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_MODEL"]) {
-    delete process.env[key];
-  }
-}
-
-// NOTE: loadDotenv() is called inside main() — only for CLI modes (chat/ask/run/graph).
-// In ACP mode (default), the host (Zed/JetBrains) provides env vars; loading .env
-// would shadow them with stale local values.
+// NOTE: loadDotenv() is called inside main().
+// In ACP mode, keep model env vars supplied by the host (Zed/JetBrains);
+// dotenv is only used as a fallback when the host did not pass credentials.
 
 interface ParsedArgs {
   command: string;

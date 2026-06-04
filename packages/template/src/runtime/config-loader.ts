@@ -145,6 +145,7 @@ const ENV_MAP: Record<string, string> = {
   DEFAULT_MODEL: "model.name",
   ANTHROPIC_MODEL: "model.name",
   ANTHROPIC_BASE_URL: "model.baseUrl",
+  MAX_TOKENS: "model.settings.maxTokens",
   MCP_CONFIG_PATH: "mcp.configPath",
   LOG_LEVEL: "logging.level",
 };
@@ -207,13 +208,24 @@ function loadJsonFile(filePath: string): Record<string, unknown> | null {
   }
 }
 
+/** Numeric env vars that need parsing */
+const NUMERIC_ENV_KEYS = new Set(["MAX_TOKENS"]);
+
 /** Build config overlay from environment variables */
 function loadFromEnv(): Partial<AppConfig> {
   const overlay: Record<string, unknown> = {};
   for (const [envKey, configPath] of Object.entries(ENV_MAP)) {
     const value = process.env[envKey];
     if (value !== undefined && value !== "") {
-      setNestedValue(overlay, configPath, value);
+      // Parse numeric env vars
+      if (NUMERIC_ENV_KEYS.has(envKey)) {
+        const num = Number(value);
+        if (!isNaN(num)) {
+          setNestedValue(overlay, configPath, num);
+        }
+      } else {
+        setNestedValue(overlay, configPath, value);
+      }
     }
   }
   // ACP_DEBUG is a boolean flag that maps to logging.level = "debug"
