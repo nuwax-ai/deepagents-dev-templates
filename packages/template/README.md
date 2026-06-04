@@ -80,6 +80,8 @@ See [docs/template-capabilities.md](./docs/template-capabilities.md) for the def
 
 See [docs/nuwaclaw-engine-integration.md](./docs/nuwaclaw-engine-integration.md) for the engine package, ACP launch, startup config, debug, MCP hydration, and graph contracts expected by nuwaclaw.
 
+See [docs/zed-acp-setup.md](./docs/zed-acp-setup.md) for the Zed `agent_servers` configuration template and authentication notes.
+
 ## Commands
 
 | Command | Description |

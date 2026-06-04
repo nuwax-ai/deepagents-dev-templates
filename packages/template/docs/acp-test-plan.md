@@ -37,13 +37,17 @@ npm run build
       "type": "custom",
       "command": "node",
       "args": [
-        "--import", "tsx",
-        "/Users/apple/workspace/deepagents-dev-templates/packages/template/src/index.ts"
+        "--import",
+        "tsx",
+        "/Users/apple/workspace/deepagents-dev-templates/packages/template/src/index.ts",
+        "--config",
+        "/Users/apple/workspace/deepagents-dev-templates/packages/template/config/app-agent.config.json"
       ],
       "env": {
         "ANTHROPIC_API_KEY": "<你的 API Key>",
         "ANTHROPIC_BASE_URL": "<如有自定义>",
         "ANTHROPIC_MODEL": "<如有自定义>",
+        "MAX_TOKENS": "16384",
         "LOG_LEVEL": "info"
       }
     }
@@ -54,8 +58,10 @@ npm run build
 > **注意**：
 > - Zed **不支持 `cwd` 字段**，工作目录自动设为当前打开的项目根目录。
 > - `args` 中的路径必须使用**绝对路径**，因为 Zed 不保证从哪个目录启动进程。
+> - `--config` 也应使用**绝对路径**，否则在打开 example/workspace 时会回退到默认配置，导致权限模式和模型配置不符合预期。
 > - 如果 `.env` 已配置好凭证且项目根目录就是 `cwd`，`env` 块可省略，ACP Server 会自动加载 `.env` 作为 fallback。
 > - Zed 会把 `env` 中的变量注入到 agent 进程的环境变量中，优先级高于 `.env` 文件。
+> - 使用 `ANTHROPIC_API_KEY` 时，运行时会清理继承来的 `ANTHROPIC_AUTH_TOKEN`，避免 Anthropic-compatible gateway 收到冲突凭证后返回 401。
 
 ### 3. 验证 ACP Server 可独立启动
 

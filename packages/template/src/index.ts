@@ -169,6 +169,13 @@ async function main(): Promise<void> {
     loadDotenv({ path: resolve(PROJECT_ROOT, ".env") });
   }
 
+  // Prefer API-key auth over any inherited Anthropic auth token. Zed passes
+  // ANTHROPIC_API_KEY in settings.json, while shell/launcher environments may
+  // carry a stale ANTHROPIC_AUTH_TOKEN that the SDK would also send.
+  if (process.env.ANTHROPIC_API_KEY) {
+    delete process.env.ANTHROPIC_AUTH_TOKEN;
+  }
+
   if (args.debug) {
     process.env.LOG_LEVEL = "debug";
   }
