@@ -143,8 +143,12 @@ agent-package.json              # Distribution manifest
 - ✅ Package flow (`npm run package`) generates `.tgz` + `agent-package.release.json`
 - ✅ npm/tgz/git distribution surfaces in `agent-package.json`
 - ✅ Runtime verification (`node dist/index.js --help`)
-- ⬜ Full nuwaclaw UI ACP prompt/debug integration test
-- ⬜ Nuwax API production endpoint validation with real platform docs/environment
+- ✅ Compaction middleware (auto-compress context when approaching limit)
+- ✅ Eviction middleware (auto-evict large tool outputs to backend)
+- ✅ ACP integration tests (TC-01~TC-06, TC-12~TC-16) with real LLM
+- ✅ Install script (`scripts/install.sh`) for tgz/npm/git distribution
+- ⬜ Full nuwaclaw UI ACP prompt/debug integration test (blocked: needs nuwaclaw team)
+- ⬜ Nuwax API production endpoint validation (blocked: needs platform credentials)
 
 ## Reference Notes
 
