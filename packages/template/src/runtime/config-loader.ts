@@ -16,7 +16,7 @@ import { logger } from "./logger.js";
 // ─── Config Schema ──────────────────────────────────────
 
 export const ModelConfigSchema = z.object({
-  provider: z.string().default("anthropic"),
+  provider: z.enum(["anthropic", "openai"]).default("anthropic"),
   name: z.string().default("claude-sonnet-4-6"),
   baseUrl: z.string().url().optional(),
   apiKeyEnv: z.string().default("ANTHROPIC_API_KEY"),
@@ -198,6 +198,8 @@ export type AppConfig = z.infer<typeof AppConfigSchema>;
 export type ModelConfig = z.infer<typeof ModelConfigSchema>;
 export type PlatformConfig = z.infer<typeof PlatformConfigSchema>;
 export type PermissionsConfig = z.infer<typeof PermissionsConfigSchema>;
+export type CompactionConfig = z.infer<typeof CompactionConfigSchema>;
+export type EvictionConfig = z.infer<typeof EvictionConfigSchema>;
 
 // ─── Defaults ───────────────────────────────────────────
 
@@ -218,6 +220,9 @@ const ENV_MAP: Record<string, string> = {
   DEFAULT_MODEL: "model.name",
   ANTHROPIC_MODEL: "model.name",
   ANTHROPIC_BASE_URL: "model.baseUrl",
+  OPENAI_MODEL: "model.name",
+  OPENAI_BASE_URL: "model.baseUrl",
+  LLM_PROVIDER: "model.provider",
   MAX_TOKENS: "model.settings.maxTokens",
   MCP_CONFIG_PATH: "mcp.configPath",
   LOG_LEVEL: "logging.level",

@@ -68,7 +68,7 @@ export function createAppAgent(
   const agentConfig = buildAgentConfigParts(config, sessionConfig, workspaceRoot, context.tools, backend);
 
   // 4. Create the deep agent
-  const agent = createDeepAgent({
+  const agent = (createDeepAgent as unknown as (params: unknown) => unknown)({
     ...agentConfig,
     backend,
   });
@@ -102,7 +102,7 @@ export async function createAppAgentAsync(
 
   const backend = new FilesystemBackend({ rootDir: workspaceRoot });
   const agentConfig = buildAgentConfigParts(config, sessionConfig, workspaceRoot, context.tools, backend);
-  const agent = createDeepAgent({
+  const agent = (createDeepAgent as unknown as (params: unknown) => unknown)({
     ...agentConfig,
     backend,
   });

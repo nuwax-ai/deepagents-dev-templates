@@ -26,13 +26,6 @@ export interface EvictionOptions {
   };
 }
 
-interface EvictedRecord {
-  toolCallId: string;
-  filePath: string;
-  originalChars: number;
-  previewChars: number;
-}
-
 /**
  * Check if content should be evicted based on size.
  */

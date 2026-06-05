@@ -108,7 +108,7 @@ export function createCompactionMiddleware(options: CompactionOptions) {
     beforeModel: async (request) => {
       if (!config.enabled) return;
 
-      const messages = request.state?.messages ?? [];
+      const messages = request.messages ?? [];
       if (messages.length === 0) return;
 
       // Count current context tokens

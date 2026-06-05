@@ -509,17 +509,23 @@ export function buildACPAgentConfig(
   // Create runtime context (PlatformClient, MCPManager, VariableManager, tools)
   const runtimeCtx = createRuntimeContext(config, sessionConfig);
 
-  const agentConfig: DeepAgentConfig = {
+  const agentConfigParts = buildAgentConfigParts(config, sessionConfig, workspaceRoot, runtimeCtx.tools);
+
+	  const agentConfig = {
     // ACP-specific fields
     name: config.agent.name,
     description: config.agent.description,
     commands: getAcpSlashCommandSpecs(),
 
     // CreateDeepAgentParams fields (via shared helper)
-    ...buildAgentConfigParts(config, sessionConfig, workspaceRoot, runtimeCtx.tools),
+    ...agentConfigParts,
+    // Disable HITL interruptOn in ACP mode — deepagents-acp does not handle
+    // LangGraph interrupts from humanInTheLoopMiddleware, which causes tool
+    // calls to hang indefinitely. Path-based permissions still work.
+    interruptOn: {},
     // Do NOT set backend here — DeepAgentsServer creates ACPFilesystemBackend
     // when no backend is provided, enabling IDE integration (unsaved buffer reads).
-  };
+	  } as unknown as DeepAgentConfig;
 
   log.info("Agent config built", {
     tools: runtimeCtx.tools.length,
@@ -538,14 +544,14 @@ export async function buildACPAgentConfigAsync(
   const log = logger.child("config-builder");
 
   const runtimeCtx = await createRuntimeContextAsync(config, sessionConfig);
-  const agentConfig: DeepAgentConfig = {
+	  const agentConfig = {
     name: config.agent.name,
     description: config.agent.description,
     commands: getAcpSlashCommandSpecs(),
     ...buildAgentConfigParts(config, sessionConfig, workspaceRoot, runtimeCtx.tools),
     // Do NOT set backend — DeepAgentsServer creates ACPFilesystemBackend automatically,
     // which provides IDE integration (unsaved buffer reads via ACP client).
-  };
+	  } as unknown as DeepAgentConfig;
 
   log.info("Agent config built", {
     tools: runtimeCtx.tools.length,
@@ -568,12 +574,12 @@ export async function buildACPAgentConfigWithMcpAsync(
   const log = logger.child("config-builder");
 
   const runtimeCtx = await createRuntimeContextAsync(config, sessionConfig);
-  const agentConfig: DeepAgentConfig = {
+	  const agentConfig = {
     name: config.agent.name,
     description: config.agent.description,
     commands: getAcpSlashCommandSpecs(),
     ...buildAgentConfigParts(config, sessionConfig, workspaceRoot, runtimeCtx.tools),
-  };
+	  } as unknown as DeepAgentConfig;
 
   log.info("Agent config built", {
     tools: runtimeCtx.tools.length,

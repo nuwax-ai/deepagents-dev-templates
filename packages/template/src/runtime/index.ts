@@ -16,6 +16,7 @@ export {
 } from "./agent-factory.js";
 export {
   loadConfig,
+  resolveConfiguredWorkspaceRoot,
   AppConfigSchema,
   type AppConfig,
   type ModelConfig,
@@ -51,8 +52,11 @@ export {
   resolveSystemPrompt,
   discoverMemoryFiles,
   resolveSkillsPaths,
+  discoverSubAgents,
+  buildAgentConfigParts,
   buildPermissions,
   buildInterruptOn,
+  type DiscoveredSubAgent,
   type RuntimeContext,
 } from "./helpers.js";
 export {

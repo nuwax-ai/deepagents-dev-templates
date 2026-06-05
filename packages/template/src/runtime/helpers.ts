@@ -13,6 +13,7 @@ import { type CreateDeepAgentParams, type FilesystemPermission, type AnyBackendP
 import type { StructuredTool } from "@langchain/core/tools";
 import type { AgentMiddleware } from "langchain";
 import { ChatAnthropic } from "@langchain/anthropic";
+import { ChatOpenAI } from "@langchain/openai";
 import type { AppConfig, ACPSessionConfig } from "./config-loader.js";
 import { PlatformClient } from "./platform-client.js";
 import { MCPManager } from "./mcp-manager.js";
@@ -166,28 +167,50 @@ let cachedModel: { key: string; instance: CreateDeepAgentParams["model"] } | nul
 
 /** Build the model instance/string accepted by deepagents. */
 export function resolveModel(config: AppConfig): CreateDeepAgentParams["model"] {
-  if (config.model.provider !== "anthropic") {
-    return resolveModelString(config);
-  }
-
-  const cacheKey = `${config.model.name}|${config.model.baseUrl ?? ""}|${config.model.settings.temperature}|${config.model.settings.maxTokens ?? ""}`;
+  const cacheKey = `${config.model.provider}:${config.model.name}|${config.model.baseUrl ?? ""}|${config.model.settings.temperature}|${config.model.settings.maxTokens ?? ""}`;
   if (cachedModel && cachedModel.key === cacheKey) {
     return cachedModel.instance;
   }
 
-  const apiKey =
-    process.env[config.model.authTokenEnv] ||
-    process.env[config.model.apiKeyEnv] ||
-    process.env.ANTHROPIC_AUTH_TOKEN ||
-    process.env.ANTHROPIC_API_KEY;
+  // Resolve API key with provider-aware priority
+  let apiKey: string | undefined;
+  if (config.model.provider === "openai") {
+    apiKey =
+      process.env.OPENAI_API_KEY ||
+      process.env[config.model.apiKeyEnv] ||
+      process.env[config.model.authTokenEnv] ||
+      "";
+  } else {
+    apiKey =
+      process.env[config.model.authTokenEnv] ||
+      process.env[config.model.apiKeyEnv] ||
+      process.env.ANTHROPIC_AUTH_TOKEN ||
+      process.env.ANTHROPIC_API_KEY ||
+      "";
+  }
 
-  const instance = new ChatAnthropic({
-    model: config.model.name,
-    apiKey,
-    anthropicApiUrl: config.model.baseUrl,
-    temperature: config.model.settings.temperature,
-    maxTokens: config.model.settings.maxTokens,
-  });
+  let instance: CreateDeepAgentParams["model"];
+
+  if (config.model.provider === "openai") {
+    instance = new ChatOpenAI({
+      model: config.model.name,
+      apiKey,
+      configuration: {
+        baseURL: config.model.baseUrl,
+      },
+      temperature: config.model.settings.temperature,
+      maxTokens: config.model.settings.maxTokens,
+    }) as unknown as CreateDeepAgentParams["model"];
+  } else {
+    instance = new ChatAnthropic({
+      model: config.model.name,
+      apiKey,
+      anthropicApiUrl: config.model.baseUrl,
+      temperature: config.model.settings.temperature,
+      maxTokens: config.model.settings.maxTokens,
+    });
+  }
+
   cachedModel = { key: cacheKey, instance };
   return instance;
 }
@@ -624,7 +647,7 @@ export function buildAgentConfigParts(
   if (config.eviction.enabled && backend) {
     middleware.push(createEvictionMiddleware({
       config: config.eviction,
-      backend,
+      backend: backend as unknown as { write(path: string, content: string): Promise<void> },
     }));
   }
 

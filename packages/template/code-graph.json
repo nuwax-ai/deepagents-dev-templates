@@ -1,0 +1,510 @@
+{
+  "schema": "nuwaclaw.agent-code-graph.v1",
+  "generatedAt": "2026-06-05T08:08:39.571Z",
+  "root": "/Users/apple/workspace/deepagents-dev-templates/packages/template",
+  "nodes": [
+    {
+      "id": "entry:index",
+      "label": "ACP/CLI entrypoint",
+      "kind": "entrypoint",
+      "path": "src/index.ts",
+      "editable": "protected"
+    },
+    {
+      "id": "runtime:acp-server",
+      "label": "ACP server",
+      "kind": "runtime",
+      "path": "src/runtime/acp-server.ts",
+      "editable": "protected"
+    },
+    {
+      "id": "runtime:agent-factory",
+      "label": "Agent factory",
+      "kind": "runtime",
+      "path": "src/runtime/agent-factory.ts",
+      "editable": "protected"
+    },
+    {
+      "id": "runtime:config-loader",
+      "label": "Config loader",
+      "kind": "runtime",
+      "path": "src/runtime/config-loader.ts",
+      "editable": "protected"
+    },
+    {
+      "id": "runtime:helpers",
+      "label": "Runtime helpers",
+      "kind": "runtime",
+      "path": "src/runtime/helpers.ts",
+      "editable": "protected"
+    },
+    {
+      "id": "runtime:platform-client",
+      "label": "Platform client",
+      "kind": "runtime",
+      "path": "src/runtime/platform-client.ts",
+      "editable": "protected"
+    },
+    {
+      "id": "runtime:mcp-manager",
+      "label": "MCP manager",
+      "kind": "runtime",
+      "path": "src/runtime/mcp-manager.ts",
+      "editable": "protected"
+    },
+    {
+      "id": "runtime:variables",
+      "label": "Variable manager",
+      "kind": "runtime",
+      "path": "src/runtime/variable-manager.ts",
+      "editable": "protected"
+    },
+    {
+      "id": "runtime:code-graph",
+      "label": "Code graph generator",
+      "kind": "runtime",
+      "path": "src/runtime/code-graph.ts",
+      "editable": "protected"
+    },
+    {
+      "id": "tool:http-request",
+      "label": "HTTP request tool",
+      "kind": "tool",
+      "path": "src/app/tools/http-request.tool.ts",
+      "editable": "ai-user"
+    },
+    {
+      "id": "tool:json-utils",
+      "label": "JSON utils tool",
+      "kind": "tool",
+      "path": "src/app/tools/json-utils.tool.ts",
+      "editable": "ai-user"
+    },
+    {
+      "id": "tool:platform-api",
+      "label": "Platform API tool",
+      "kind": "tool",
+      "path": "src/app/tools/platform-api.tool.ts",
+      "editable": "ai-user"
+    },
+    {
+      "id": "tool:agent-variable",
+      "label": "Agent variable tool",
+      "kind": "tool",
+      "path": "src/app/tools/agent-variable.tool.ts",
+      "editable": "ai-user"
+    },
+    {
+      "id": "tool:mcp-bridge",
+      "label": "MCP bridge tool",
+      "kind": "tool",
+      "path": "src/app/tools/mcp-bridge.tool.ts",
+      "editable": "ai-user"
+    },
+    {
+      "id": "prompt:developer",
+      "label": "Developer agent system prompt",
+      "kind": "prompt",
+      "path": "prompts/developer-agent.system.md",
+      "editable": "ai-user"
+    },
+    {
+      "id": "prompt:target-base",
+      "label": "Target agent base prompt",
+      "kind": "prompt",
+      "path": "prompts/target-agent.base.md",
+      "editable": "ai-user"
+    },
+    {
+      "id": "config:app",
+      "label": "Application config",
+      "kind": "config",
+      "path": "config/app-agent.config.json",
+      "editable": "user-platform"
+    },
+    {
+      "id": "config:mcp",
+      "label": "Default MCP config",
+      "kind": "config",
+      "path": "config/mcp.default.json",
+      "editable": "user-platform"
+    },
+    {
+      "id": "config:platform",
+      "label": "Platform endpoint config",
+      "kind": "config",
+      "path": "config/platform.json",
+      "editable": "user-platform"
+    },
+    {
+      "id": "manifest:template",
+      "label": "Template manifest",
+      "kind": "distribution",
+      "path": "template.manifest.json",
+      "editable": "ai-user"
+    },
+    {
+      "id": "manifest:package",
+      "label": "Agent package manifest",
+      "kind": "distribution",
+      "path": "agent-package.json",
+      "editable": "ai-user"
+    },
+    {
+      "id": "script:package",
+      "label": "Package script",
+      "kind": "script",
+      "path": "scripts/package.sh",
+      "editable": "ai-user"
+    },
+    {
+      "id": "skill:build-and-compile",
+      "label": "build-and-compile",
+      "kind": "skill",
+      "path": "skills/builtin/build-and-compile/SKILL.md",
+      "editable": "ai-user"
+    },
+    {
+      "id": "skill:code-review",
+      "label": "code-review",
+      "kind": "skill",
+      "path": "skills/builtin/code-review/SKILL.md",
+      "editable": "ai-user"
+    },
+    {
+      "id": "skill:environment-discovery",
+      "label": "environment-discovery",
+      "kind": "skill",
+      "path": "skills/builtin/environment-discovery/SKILL.md",
+      "editable": "ai-user"
+    },
+    {
+      "id": "skill:git-workflow",
+      "label": "git-workflow",
+      "kind": "skill",
+      "path": "skills/builtin/git-workflow/SKILL.md",
+      "editable": "ai-user"
+    },
+    {
+      "id": "skill:refactor",
+      "label": "refactor",
+      "kind": "skill",
+      "path": "skills/builtin/refactor/SKILL.md",
+      "editable": "ai-user"
+    },
+    {
+      "id": "skill:skill-creator",
+      "label": "skill-creator",
+      "kind": "skill",
+      "path": "skills/builtin/skill-creator/SKILL.md",
+      "editable": "ai-user"
+    },
+    {
+      "id": "skill:systematic-debugging",
+      "label": "systematic-debugging",
+      "kind": "skill",
+      "path": "skills/builtin/systematic-debugging/SKILL.md",
+      "editable": "ai-user"
+    },
+    {
+      "id": "skill:test-writer",
+      "label": "test-writer",
+      "kind": "skill",
+      "path": "skills/builtin/test-writer/SKILL.md",
+      "editable": "ai-user"
+    },
+    {
+      "id": "skill:verification-strategy",
+      "label": "verification-strategy",
+      "kind": "skill",
+      "path": "skills/builtin/verification-strategy/SKILL.md",
+      "editable": "ai-user"
+    },
+    {
+      "id": "skill:acp-debugging",
+      "label": "acp-debugging",
+      "kind": "skill",
+      "path": "skills/platform/acp-debugging/SKILL.md",
+      "editable": "ai-user"
+    },
+    {
+      "id": "skill:agent-package-release",
+      "label": "agent-package-release",
+      "kind": "skill",
+      "path": "skills/platform/agent-package-release/SKILL.md",
+      "editable": "ai-user"
+    },
+    {
+      "id": "skill:agent-variable-design",
+      "label": "agent-variable-design",
+      "kind": "skill",
+      "path": "skills/platform/agent-variable-design/SKILL.md",
+      "editable": "ai-user"
+    },
+    {
+      "id": "skill:mcp-integration",
+      "label": "mcp-integration",
+      "kind": "skill",
+      "path": "skills/platform/mcp-integration/SKILL.md",
+      "editable": "ai-user"
+    },
+    {
+      "id": "skill:platform-capability-discovery",
+      "label": "platform-capability-discovery",
+      "kind": "skill",
+      "path": "skills/platform/platform-capability-discovery/SKILL.md",
+      "editable": "ai-user"
+    },
+    {
+      "id": "skill:platform-tool-selection",
+      "label": "platform-tool-selection",
+      "kind": "skill",
+      "path": "skills/platform/platform-tool-selection/SKILL.md",
+      "editable": "ai-user"
+    },
+    {
+      "id": "middleware:compaction",
+      "label": "Compaction",
+      "kind": "middleware",
+      "path": "src/runtime/middleware/compaction.ts",
+      "editable": "protected"
+    },
+    {
+      "id": "middleware:cost-tracking",
+      "label": "Cost Tracking",
+      "kind": "middleware",
+      "path": "src/runtime/middleware/cost-tracking.ts",
+      "editable": "protected"
+    },
+    {
+      "id": "middleware:eviction",
+      "label": "Eviction",
+      "kind": "middleware",
+      "path": "src/runtime/middleware/eviction.ts",
+      "editable": "protected"
+    },
+    {
+      "id": "middleware:fs-path-resolver",
+      "label": "Fs Path Resolver",
+      "kind": "middleware",
+      "path": "src/runtime/middleware/fs-path-resolver.ts",
+      "editable": "protected"
+    },
+    {
+      "id": "middleware:periodic-reminder",
+      "label": "Periodic Reminder",
+      "kind": "middleware",
+      "path": "src/runtime/middleware/periodic-reminder.ts",
+      "editable": "protected"
+    },
+    {
+      "id": "middleware:stuck-loop",
+      "label": "Stuck Loop",
+      "kind": "middleware",
+      "path": "src/runtime/middleware/stuck-loop.ts",
+      "editable": "protected"
+    }
+  ],
+  "edges": [
+    {
+      "from": "entry:index",
+      "to": "runtime:acp-server",
+      "kind": "calls"
+    },
+    {
+      "from": "entry:index",
+      "to": "runtime:agent-factory",
+      "kind": "calls"
+    },
+    {
+      "from": "runtime:acp-server",
+      "to": "runtime:config-loader",
+      "kind": "loads"
+    },
+    {
+      "from": "runtime:acp-server",
+      "to": "runtime:helpers",
+      "kind": "calls"
+    },
+    {
+      "from": "runtime:agent-factory",
+      "to": "runtime:helpers",
+      "kind": "calls"
+    },
+    {
+      "from": "runtime:helpers",
+      "to": "runtime:platform-client",
+      "kind": "configures"
+    },
+    {
+      "from": "runtime:helpers",
+      "to": "runtime:mcp-manager",
+      "kind": "configures"
+    },
+    {
+      "from": "runtime:helpers",
+      "to": "runtime:variables",
+      "kind": "configures"
+    },
+    {
+      "from": "runtime:helpers",
+      "to": "tool:http-request",
+      "kind": "loads"
+    },
+    {
+      "from": "runtime:helpers",
+      "to": "tool:json-utils",
+      "kind": "loads"
+    },
+    {
+      "from": "runtime:helpers",
+      "to": "tool:platform-api",
+      "kind": "loads"
+    },
+    {
+      "from": "runtime:helpers",
+      "to": "tool:agent-variable",
+      "kind": "loads"
+    },
+    {
+      "from": "runtime:helpers",
+      "to": "tool:mcp-bridge",
+      "kind": "loads"
+    },
+    {
+      "from": "runtime:config-loader",
+      "to": "config:app",
+      "kind": "loads"
+    },
+    {
+      "from": "runtime:mcp-manager",
+      "to": "config:mcp",
+      "kind": "loads"
+    },
+    {
+      "from": "runtime:platform-client",
+      "to": "config:platform",
+      "kind": "configures"
+    },
+    {
+      "from": "runtime:helpers",
+      "to": "prompt:developer",
+      "kind": "loads"
+    },
+    {
+      "from": "script:package",
+      "to": "manifest:package",
+      "kind": "packages"
+    },
+    {
+      "from": "script:package",
+      "to": "manifest:template",
+      "kind": "packages"
+    },
+    {
+      "from": "runtime:helpers",
+      "to": "skill:build-and-compile",
+      "kind": "loads"
+    },
+    {
+      "from": "runtime:helpers",
+      "to": "skill:code-review",
+      "kind": "loads"
+    },
+    {
+      "from": "runtime:helpers",
+      "to": "skill:environment-discovery",
+      "kind": "loads"
+    },
+    {
+      "from": "runtime:helpers",
+      "to": "skill:git-workflow",
+      "kind": "loads"
+    },
+    {
+      "from": "runtime:helpers",
+      "to": "skill:refactor",
+      "kind": "loads"
+    },
+    {
+      "from": "runtime:helpers",
+      "to": "skill:skill-creator",
+      "kind": "loads"
+    },
+    {
+      "from": "runtime:helpers",
+      "to": "skill:systematic-debugging",
+      "kind": "loads"
+    },
+    {
+      "from": "runtime:helpers",
+      "to": "skill:test-writer",
+      "kind": "loads"
+    },
+    {
+      "from": "runtime:helpers",
+      "to": "skill:verification-strategy",
+      "kind": "loads"
+    },
+    {
+      "from": "runtime:helpers",
+      "to": "skill:acp-debugging",
+      "kind": "loads"
+    },
+    {
+      "from": "runtime:helpers",
+      "to": "skill:agent-package-release",
+      "kind": "loads"
+    },
+    {
+      "from": "runtime:helpers",
+      "to": "skill:agent-variable-design",
+      "kind": "loads"
+    },
+    {
+      "from": "runtime:helpers",
+      "to": "skill:mcp-integration",
+      "kind": "loads"
+    },
+    {
+      "from": "runtime:helpers",
+      "to": "skill:platform-capability-discovery",
+      "kind": "loads"
+    },
+    {
+      "from": "runtime:helpers",
+      "to": "skill:platform-tool-selection",
+      "kind": "loads"
+    },
+    {
+      "from": "runtime:helpers",
+      "to": "middleware:compaction",
+      "kind": "loads"
+    },
+    {
+      "from": "runtime:helpers",
+      "to": "middleware:cost-tracking",
+      "kind": "loads"
+    },
+    {
+      "from": "runtime:helpers",
+      "to": "middleware:eviction",
+      "kind": "loads"
+    },
+    {
+      "from": "runtime:helpers",
+      "to": "middleware:fs-path-resolver",
+      "kind": "loads"
+    },
+    {
+      "from": "runtime:helpers",
+      "to": "middleware:periodic-reminder",
+      "kind": "loads"
+    },
+    {
+      "from": "runtime:helpers",
+      "to": "middleware:stuck-loop",
+      "kind": "loads"
+    }
+  ]
+}

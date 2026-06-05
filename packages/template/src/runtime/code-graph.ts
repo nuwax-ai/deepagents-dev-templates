@@ -5,6 +5,7 @@ export type CodeGraphNodeKind =
   | "entrypoint"
   | "runtime"
   | "tool"
+  | "middleware"
   | "skill"
   | "subagent"
   | "prompt"
@@ -47,6 +48,28 @@ function addIfExists(
   if (existsSync(resolve(root, node.path))) {
     nodes.push({ ...node, path: rel(root, node.path) });
   }
+}
+
+function listMiddlewareNodes(root: string): CodeGraphNode[] {
+  const dir = resolve(root, "src/runtime/middleware");
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir)
+    .filter((name) => name.endsWith(".ts"))
+    .map((name) => {
+      // humanize: "fs-path-resolver.ts" → "Fs path resolver"
+      const label = name
+        .replace(/\.ts$/, "")
+        .split("-")
+        .map((seg) => seg.charAt(0).toUpperCase() + seg.slice(1))
+        .join(" ");
+      return {
+        id: `middleware:${name.replace(/\.ts$/, "")}`,
+        label,
+        kind: "middleware" as const,
+        path: rel(root, `src/runtime/middleware/${name}`),
+        editable: "protected" as const,
+      };
+    });
 }
 
 function listSkillNodes(root: string): CodeGraphNode[] {
@@ -206,6 +229,7 @@ export function generateCodeGraph(root = process.cwd()): CodeGraph {
 
   nodes.push(...listSkillNodes(root));
   nodes.push(...listSubAgentNodes(root));
+  nodes.push(...listMiddlewareNodes(root));
 
   const skillEdges = nodes
     .filter((node) => node.kind === "skill")
@@ -217,6 +241,14 @@ export function generateCodeGraph(root = process.cwd()): CodeGraph {
 
   const subagentEdges = nodes
     .filter((node) => node.kind === "subagent")
+    .map((node) => ({
+      from: "runtime:helpers",
+      to: node.id,
+      kind: "loads" as const,
+    }));
+
+  const middlewareEdges = nodes
+    .filter((node) => node.kind === "middleware")
     .map((node) => ({
       from: "runtime:helpers",
       to: node.id,
@@ -245,6 +277,7 @@ export function generateCodeGraph(root = process.cwd()): CodeGraph {
     { from: "script:package", to: "manifest:template", kind: "packages" },
     ...skillEdges,
     ...subagentEdges,
+    ...middlewareEdges,
   ];
 
   return {

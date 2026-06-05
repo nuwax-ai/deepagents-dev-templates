@@ -29,17 +29,52 @@ export function createFsPathResolver(workspaceRoot: string) {
         for (const key of PATH_KEYS) {
           const val = args[key];
           if (typeof val === "string" && val.startsWith("/")) {
-            // Only resolve if it's NOT already under workspace root
-            // (i.e., it's a workspace-relative path like "/test.txt", not "/Users/.../test.txt")
-            if (!val.startsWith(normalizedRoot) && val !== workspaceRoot) {
-              args[key] = resolve(workspaceRoot, val.slice(1));
+            // Skip if already under workspace root
+            if (val.startsWith(normalizedRoot) || val === workspaceRoot) {
+              continue;
             }
+            // Skip absolute system paths (e.g. /Users/..., /home/..., /tmp/...)
+            // These are already absolute and should not be resolved relative to workspace
+            const isSystemAbsolutePath =
+              val.startsWith("/Users/") ||
+              val.startsWith("/home/") ||
+              val.startsWith("/tmp/") ||
+              val.startsWith("/var/") ||
+              val.startsWith("/opt/") ||
+              val.startsWith("/usr/") ||
+              val.startsWith("/etc/") ||
+              val.startsWith("/bin/") ||
+              val.startsWith("/sbin/") ||
+              val.startsWith("/lib/") ||
+              val.startsWith("/System/") ||
+              val.startsWith("/Volumes/") ||
+              val.startsWith("/private/") ||
+              val.startsWith("/dev/") ||
+              val.startsWith("/proc/") ||
+              val.startsWith("/run/") ||
+              val.startsWith("/boot/") ||
+              val.startsWith("/mnt/") ||
+              val.startsWith("/media/") ||
+              val.startsWith("/srv/") ||
+              val.startsWith("/sys/") ||
+              val.startsWith("/snap/") ||
+              val.startsWith("/cygdrive/") ||
+              val.startsWith("/c/") ||
+              val.startsWith("/d/") ||
+              val.startsWith("/nix/") ||
+              val.startsWith("/net/");
+            if (isSystemAbsolutePath) {
+              continue;
+            }
+            // Resolve workspace-relative path (e.g. "/test.txt" → "<workspace>/test.txt")
+            args[key] = resolve(workspaceRoot, val.slice(1));
           }
         }
         request.toolCall.args = args;
       }
 
-      return handler(request);
+      const result = await handler(request);
+      return result;
     },
   });
 }

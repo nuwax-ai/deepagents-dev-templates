@@ -1,0 +1,264 @@
+:root {
+  color-scheme: dark;
+  --bg: #11130f;
+  --panel: #1a1d18;
+  --panel-2: #20251e;
+  --line: #3c4338;
+  --text: #f1f0e7;
+  --muted: #aeb5a6;
+  --blue: #6fb7d6;
+  --green: #8dbb62;
+  --orange: #d99b52;
+  --red: #d66f5f;
+  --violet: #b49ad8;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+}
+
+button {
+  font: inherit;
+}
+
+.shell,
+.fallback-shell {
+  min-height: 100vh;
+  padding: 18px;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 16px 0 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: 28px;
+  letter-spacing: 0;
+}
+
+.topbar p {
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.status-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(120px, 1fr));
+  gap: 8px;
+  min-width: min(720px, 60vw);
+}
+
+.badge {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+.badge span {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.badge strong {
+  display: block;
+  margin-top: 3px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 14px;
+  padding-top: 14px;
+}
+
+.main-pane,
+.detail {
+  min-height: calc(100vh - 116px);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  padding: 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.tabs button,
+.resources button {
+  color: var(--text);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.tabs button {
+  padding: 8px 12px;
+  text-transform: capitalize;
+}
+
+.tabs button.active {
+  background: var(--panel-2);
+  border-color: var(--line);
+}
+
+.graph-canvas {
+  height: calc(100vh - 170px);
+}
+
+.react-flow__node {
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: #242920;
+  color: var(--text);
+}
+
+.node-tool {
+  border-color: var(--green);
+}
+
+.node-agent {
+  border-color: var(--blue);
+}
+
+.node-boundary {
+  border-color: var(--orange);
+}
+
+.empty-state,
+.json-view,
+.detail {
+  padding: 16px;
+}
+
+.empty-state p {
+  color: var(--muted);
+  margin: 8px 0 18px;
+}
+
+.empty-state dl {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.empty-state dt,
+.empty-state dd {
+  margin: 0;
+  padding: 8px;
+  background: var(--panel-2);
+}
+
+.pipeline {
+  list-style: none;
+  margin: 0;
+  padding: 10px;
+}
+
+.pipeline li {
+  display: grid;
+  grid-template-columns: 44px 180px minmax(0, 1fr) 90px;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  margin-bottom: 6px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.pipeline li.disabled {
+  opacity: 0.56;
+}
+
+.step,
+.pipeline em,
+.resources span {
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+}
+
+.resources {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+  padding: 10px;
+}
+
+.resources button {
+  min-height: 72px;
+  padding: 10px;
+  text-align: left;
+  background: var(--panel-2);
+  border-color: var(--line);
+}
+
+.resources strong {
+  display: block;
+  margin-top: 6px;
+  overflow-wrap: anywhere;
+}
+
+pre {
+  white-space: pre-wrap;
+  overflow: auto;
+  color: var(--text);
+}
+
+.detail {
+  position: sticky;
+  top: 14px;
+}
+
+.detail h2 {
+  margin-bottom: 12px;
+}
+
+.detail p {
+  color: var(--muted);
+}
+
+@media (max-width: 900px) {
+  .topbar,
+  .workspace {
+    grid-template-columns: 1fr;
+    display: grid;
+  }
+
+  .status-grid {
+    min-width: 0;
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .detail {
+    position: static;
+    min-height: 260px;
+  }
+}
