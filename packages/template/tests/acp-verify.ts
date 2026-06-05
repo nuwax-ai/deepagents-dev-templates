@@ -287,6 +287,102 @@ async function run() {
     record("第二次: 无权限弹窗（缓存生效）", secondPerms === 0, `got ${secondPerms} permission requests`);
     record("第二次: 文件创建（自动批准）", secondExists, `file exists: ${secondExists}`);
 
+    // ─── TC-06: 文件编辑工具 ───
+    console.log("\n── TC-06: 文件编辑工具 ──");
+    const editTestPath = resolve(TEMPLATE_DIR, "acp-edit-test.txt");
+    writeFileSync(editTestPath, "original content\nline 2\nline 3", "utf-8");
+    console.log(`  ${INFO} 发送: "把 acp-edit-test.txt 的第一行改为 edited content"`);
+    client.updates = [];
+    client.permissions = [];
+    client.autoApprove = true;
+    await connection.prompt({
+      sessionId: session.sessionId,
+      prompt: [{ type: "text", text: '把 acp-edit-test.txt 的第一行改为 "edited content"。直接调用工具，不要问问题。' }],
+    });
+
+    const editedContent = existsSync(editTestPath) ? readFileSync(editTestPath, "utf-8") : "";
+    const editSuccess = editedContent.includes("edited content");
+    record("编辑成功", editSuccess, `content: "${editedContent.slice(0, 100)}"`);
+    if (existsSync(editTestPath)) unlinkSync(editTestPath);
+
+    // ─── TC-12: 多轮对话上下文保持 ───
+    console.log("\n── TC-12: 多轮对话上下文保持 ──");
+    console.log(`  ${INFO} 第一轮: "我叫小明"`);
+    client.updates = [];
+    await connection.prompt({
+      sessionId: session.sessionId,
+      prompt: [{ type: "text", text: "记住我叫小明" }],
+    });
+
+    console.log(`  ${INFO} 第二轮: "我刚才说我叫什么？"`);
+    client.updates = [];
+    await connection.prompt({
+      sessionId: session.sessionId,
+      prompt: [{ type: "text", text: "我刚才说我叫什么？只回答名字。" }],
+    });
+
+    const contextResponse = client.updates
+      .filter((u: any) => u.update.sessionUpdate === "agent_message_chunk")
+      .map((u: any) => u.update.content?.text ?? "")
+      .join("");
+    record("上下文保持", contextResponse.toLowerCase().includes("小明"), `response: "${contextResponse.slice(0, 100)}"`);
+
+    // ─── TC-13: 会话取消 ───
+    console.log("\n── TC-13: 会话取消 ──");
+    console.log(`  ${INFO} 发送复杂任务然后取消`);
+    client.updates = [];
+    // 发起一个可能需要多步的任务
+    const cancelPromise = connection.prompt({
+      sessionId: session.sessionId,
+      prompt: [{ type: "text", text: "列出当前目录下所有文件，逐个分析它们的内容" }],
+    });
+
+    // 短暂等待后取消
+    await new Promise((r) => setTimeout(r, 500));
+    try {
+      await connection.cancel({ sessionId: session.sessionId });
+      record("取消请求成功", true, "cancel sent");
+    } catch {
+      record("取消请求成功", false, "cancel failed");
+    }
+    try {
+      await cancelPromise;
+    } catch {
+      // cancel 可能导致 prompt 失败，这是预期的
+    }
+
+    // ─── TC-14: Stale Session 恢复 ───
+    console.log("\n── TC-14: Stale Session 恢复 ──");
+    console.log(`  ${INFO} 使用旧 session ID 发送消息`);
+    const oldSessionId = session.sessionId;
+    // 模拟 stale session：直接用这个 ID 在新连接上发送
+    // 实际上当前连接仍然有效，这里测试的是服务端是否能处理
+    client.updates = [];
+    await connection.prompt({
+      sessionId: oldSessionId,
+      prompt: [{ type: "text", text: "hello" }],
+    });
+    const staleResponse = client.updates.some(
+      (u: any) => u.update.sessionUpdate === "agent_message_chunk"
+    );
+    record("Stale session 响应", staleResponse, `got response: ${staleResponse}`);
+
+    // ─── TC-16: 被保护路径拒绝写入 ───
+    console.log("\n── TC-16: 被保护路径拒绝写入 ──");
+    console.log(`  ${INFO} 发送: "修改 src/runtime/acp-server.ts 的第一行为注释"`);
+    client.updates = [];
+    client.permissions = [];
+    client.autoApprove = true; // 即使批准，权限系统也应拒绝
+    const originalFirstLine = readFileSync(resolve(TEMPLATE_DIR, "src/runtime/acp-server.ts"), "utf-8").split("\n")[0];
+    await connection.prompt({
+      sessionId: session.sessionId,
+      prompt: [{ type: "text", text: "修改 src/runtime/acp-server.ts 的第一行为 // TEST COMMENT。直接调用工具，不要问问题。" }],
+    });
+
+    const afterFirstLine = readFileSync(resolve(TEMPLATE_DIR, "src/runtime/acp-server.ts"), "utf-8").split("\n")[0];
+    const protectedNotModified = afterFirstLine === originalFirstLine;
+    record("保护路径未被修改", protectedNotModified, `first line: "${afterFirstLine}"`);
+
   } catch (err) {
     console.error(`\n${FAIL} Fatal error:`, err);
   } finally {
