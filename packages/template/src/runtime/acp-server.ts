@@ -27,6 +27,7 @@ import {
 } from "./helpers.js";
 import {
   executeSlashCommand,
+  getAcpAvailableCommandSpecs,
   getAcpSlashCommandSpecs,
   type SlashToolInfo,
 } from "./slash-commands.js";
@@ -60,15 +61,26 @@ interface AcpPromptParams {
 interface AcpConnection {
   sessionUpdate(params: {
     sessionId: string;
-    update: {
+    update: AcpSessionUpdate;
+  }): Promise<void>;
+}
+
+type AcpSessionUpdate =
+  | {
       sessionUpdate: "agent_message_chunk";
       content: {
         type: "text";
         text: string;
       };
+    }
+  | {
+      sessionUpdate: "available_commands_update";
+      availableCommands: Array<{
+        name: string;
+        description: string;
+        input?: { hint: string };
+      }>;
     };
-  }): Promise<void>;
-}
 
 interface AcpSessionState {
   id: string;
@@ -193,6 +205,7 @@ function patchSessionLifecycle(
         mode?: string;
         mcpServers?: unknown;
       };
+      const conn = args[1] as AcpConnection | undefined;
       const result = await origNewSession(...args) as { sessionId: string } | undefined;
       if (result?.sessionId) {
         manager.track(result.sessionId, params?.mode ?? "agent");
@@ -205,6 +218,7 @@ function patchSessionLifecycle(
           sessionMcpServers.set(result.sessionId, params.mcpServers);
           forwardAcpMcpServers(params.mcpServers, mcpManager);
         }
+        sendAcpAvailableCommandsAfterSessionReady(result.sessionId, conn, log);
       }
       return result;
     };
@@ -389,6 +403,31 @@ async function sendAcpText(
       },
     },
   });
+}
+
+function sendAcpAvailableCommandsAfterSessionReady(
+  sessionId: string,
+  conn: AcpConnection | undefined,
+  log: ReturnType<typeof logger.child>
+): void {
+  if (!conn) {
+    return;
+  }
+
+  setTimeout(() => {
+    conn.sessionUpdate({
+      sessionId,
+      update: {
+        sessionUpdate: "available_commands_update",
+        availableCommands: getAcpAvailableCommandSpecs(),
+      },
+    }).catch((err) => {
+      log.warn("Failed to send delayed available_commands_update", {
+        sessionId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    });
+  }, 50);
 }
 
 // ─── Types ──────────────────────────────────────────────
