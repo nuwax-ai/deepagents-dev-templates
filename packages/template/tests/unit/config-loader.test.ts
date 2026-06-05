@@ -24,6 +24,9 @@ describe("config-loader", () => {
     delete process.env.PLATFORM_AGENT_ID;
     delete process.env.PLATFORM_SPACE_ID;
     delete process.env.MCP_CONFIG_PATH;
+    delete process.env.DEEPAGENTS_CONFIG_PATH;
+    delete process.env.APP_AGENT_CONFIG_PATH;
+    delete process.env.DEEPAGENTS_BUILTIN_CONFIG;
     delete process.env.LOG_LEVEL;
     delete process.env.ACP_DEBUG;
     delete process.env.DEEPAGENTS_HOME;
@@ -59,6 +62,33 @@ describe("config-loader", () => {
     expect(config.agent.name).toBe("my-agent");
     expect(config.model.provider).toBe("openai");
     expect(config.model.name).toBe("gpt-4o");
+  });
+
+  it("loads the package template config by default, independent of workspace root", async () => {
+    const workspaceRoot = join(tmpDir, "workspace");
+    mkdirSync(join(workspaceRoot, "config"), { recursive: true });
+    writeFileSync(join(workspaceRoot, "config", "app-agent.config.json"), JSON.stringify({
+      agent: { name: "workspace-agent" },
+    }));
+
+    const { loadConfig } = await import("../../src/runtime/config-loader.js");
+    const config = loadConfig({ workspaceRoot });
+
+    expect(config.agent.name).toBe("my-scenario-agent");
+    expect(config.mcp.configPath).toMatch(/packages\/template\/config\/mcp\.default\.json$/);
+  });
+
+  it("allows the main config path to be switched with DEEPAGENTS_CONFIG_PATH", async () => {
+    const configPath = join(tmpDir, "env-app.json");
+    writeFileSync(configPath, JSON.stringify({
+      agent: { name: "env-config-agent" },
+    }));
+    process.env.DEEPAGENTS_CONFIG_PATH = configPath;
+
+    const { loadConfig } = await import("../../src/runtime/config-loader.js");
+    const config = loadConfig();
+
+    expect(config.agent.name).toBe("env-config-agent");
   });
 
   it("env vars override file config", async () => {

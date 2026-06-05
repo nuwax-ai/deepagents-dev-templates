@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { writeFileSync, mkdtempSync, rmSync } from "node:fs";
+import { writeFileSync, mkdtempSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { MCPManager } from "../../src/runtime/mcp-manager.js";
@@ -31,6 +31,24 @@ describe("MCPManager", () => {
     const manager = new MCPManager({ defaultConfigPath: configPath });
     const servers = manager.listServers();
     expect(servers).toContain("context7");
+  });
+
+  it("resolves relative default config paths from an explicit base directory", () => {
+    const configDir = join(tmpDir, "config");
+    const configPath = join(configDir, "mcp.json");
+    mkdirSync(configDir);
+    writeFileSync(configPath, JSON.stringify({
+      servers: {
+        workspace_mcp: { command: "workspace-command" },
+      },
+    }));
+
+    const manager = new MCPManager({
+      defaultConfigPath: "./config/mcp.json",
+      baseDir: tmpDir,
+    });
+
+    expect(manager.getServer("workspace_mcp")?.command).toBe("workspace-command");
   });
 
   it("loads inline default MCP servers", () => {

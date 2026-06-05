@@ -30,11 +30,11 @@ function resolveServerEnv(config: MCPServerConfig): NodeJS.ProcessEnv {
   return env;
 }
 
-async function callStdioMcpTool(
+async function callStdioMcpMethod(
   server: string,
   config: MCPServerConfig,
-  toolName: string,
-  args: Record<string, unknown>
+  method: string,
+  params?: Record<string, unknown>
 ): Promise<unknown> {
   if (!config.command) {
     throw new Error(`MCP server "${server}" is not a stdio server; only command-based MCP servers are supported in this template runtime`);
@@ -120,10 +120,7 @@ async function callStdioMcpTool(
     });
     child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" })}\n`);
 
-    return await send("tools/call", {
-      name: toolName,
-      arguments: args,
-    });
+    return await send(method, params);
   } finally {
     rl.close();
     child.stdin.end();
@@ -134,6 +131,25 @@ async function callStdioMcpTool(
       console.error(stderr.join(""));
     }
   }
+}
+
+async function listStdioMcpTools(
+  server: string,
+  config: MCPServerConfig
+): Promise<unknown> {
+  return await callStdioMcpMethod(server, config, "tools/list", {});
+}
+
+async function callStdioMcpTool(
+  server: string,
+  config: MCPServerConfig,
+  toolName: string,
+  args: Record<string, unknown>
+): Promise<unknown> {
+  return await callStdioMcpMethod(server, config, "tools/call", {
+    name: toolName,
+    arguments: args,
+  });
 }
 
 /**
@@ -152,6 +168,24 @@ export function createMcpBridgeTool(mcpManager: MCPManager) {
               name,
               config: config.servers[name],
             })),
+          });
+        }
+
+        case "list_tools": {
+          if (!server) {
+            return "Error: 'server' is required for list_tools";
+          }
+
+          const serverConfig = mcpManager.getServer(server);
+          if (!serverConfig) {
+            return `Error: MCP server "${server}" not found. Use list_servers to see available servers.`;
+          }
+
+          const result = await listStdioMcpTools(server, serverConfig);
+          return JSON.stringify({
+            status: "ok",
+            server,
+            result,
           });
         }
 
@@ -192,12 +226,21 @@ Platform-configured plugins are exposed as MCP tools.
 IMPORTANT: Before writing custom code for a tool, ALWAYS check if
 a platform plugin already provides the functionality you need.
 
+Workflow:
+1. Use list_servers to see configured MCP servers.
+2. Use list_tools with a server name to discover current tool names and input schemas.
+3. Use call_tool with the exact toolName and args required by that schema.
+
+Context7 currently exposes tools such as "resolve-library-id" and "query-docs";
+do not guess argument names. Discover the schema with list_tools first.
+
 Operations:
 - list_servers: List all configured MCP servers
+- list_tools: List tools and input schemas for one MCP server (params: server)
 - call_tool: Call a specific tool on an MCP server (params: server, toolName, args?)`,
       schema: z.object({
         operation: z
-          .enum(["list_servers", "call_tool"])
+          .enum(["list_servers", "list_tools", "call_tool"])
           .describe("MCP bridge operation"),
         server: z
           .string()

@@ -38,6 +38,7 @@ export class MCPManager {
   private platformConfig: MCPConfig = { servers: {} };
   private sessionConfig: MCPConfig = { servers: {} };
   private mergeStrategy: MergeStrategy;
+  private baseDir: string;
   private mergedConfigCache: MCPConfig | null = null;
 
   constructor(options?: {
@@ -45,8 +46,10 @@ export class MCPManager {
     defaultConfigPath?: string;
     defaultConfigPaths?: string[];
     mergeStrategy?: MergeStrategy;
+    baseDir?: string;
   }) {
     this.mergeStrategy = options?.mergeStrategy ?? "session-wins";
+    this.baseDir = options?.baseDir ?? process.cwd();
     if (options?.defaultConfig) {
       this.defaultConfig = {
         servers: {
@@ -65,7 +68,7 @@ export class MCPManager {
 
   /** Load default MCP config from file */
   private loadDefaultConfig(configPath: string): void {
-    const resolved = resolve(process.cwd(), configPath);
+    const resolved = resolve(this.baseDir, configPath);
     if (!existsSync(resolved)) {
       this.log.warn(`Default MCP config not found: ${resolved}`);
       return;

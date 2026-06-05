@@ -47,9 +47,11 @@ describe("ACP server config", () => {
 
       const agentConfig = buildACPAgentConfig(config, workspaceRoot, sessionConfig);
 
-      expect(agentConfig.systemPrompt).toBe("Prompt supplied by ACP/platform");
+      expect(agentConfig.systemPrompt).toContain("Prompt supplied by ACP/platform");
+      expect(agentConfig.systemPrompt).toContain(`Effective workspace root: ${workspaceRoot}`);
       expect(typeof agentConfig.model).not.toBe("string");
       expect(agentConfig.tools?.map((tool) => tool.name)).toContain("mcp_tool_bridge");
+      expect(agentConfig.tools?.map((tool) => tool.name)).toContain("runtime_info");
     } finally {
       rmSync(workspaceRoot, { recursive: true, force: true });
     }

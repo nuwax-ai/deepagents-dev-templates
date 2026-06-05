@@ -35,5 +35,24 @@ rl.on("line", (line) => {
     return;
   }
 
+  if (message.method === "tools/list") {
+    send(message.id, {
+      tools: [
+        {
+          name: "echo",
+          description: "Echo arguments",
+          inputSchema: {
+            type: "object",
+            properties: {
+              value: { type: "number" },
+            },
+            required: ["value"],
+          },
+        },
+      ],
+    });
+    return;
+  }
+
   send(message.id, {});
 });

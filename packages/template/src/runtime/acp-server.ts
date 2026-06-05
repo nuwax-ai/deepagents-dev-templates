@@ -16,6 +16,7 @@
  */
 
 import { DeepAgentsServer, type DeepAgentConfig } from "deepagents-acp";
+import { randomUUID } from "node:crypto";
 import { loadConfig, resolveConfiguredWorkspaceRoot, type ACPSessionConfig } from "./config-loader.js";
 import { logger } from "./logger.js";
 import type { MCPManager } from "./mcp-manager.js";
@@ -57,6 +58,14 @@ interface AcpPromptParams {
   prompt: AcpPromptBlock[];
 }
 
+interface AcpNewSessionParams {
+  sessionId?: string;
+  mode?: string;
+  cwd?: string;
+  mcpServers?: unknown;
+  configOptions?: { agent?: string } | null;
+}
+
 interface AcpConnection {
   sessionUpdate(params: {
     sessionId: string;
@@ -78,12 +87,18 @@ interface AcpSessionState {
 
 interface DeepAgentsServerInternals {
   handleNewSession?: (...args: unknown[]) => Promise<unknown>;
+  handleLoadSession?: (...args: unknown[]) => Promise<unknown>;
   handlePrompt?: (...args: unknown[]) => Promise<unknown>;
   handleCancel?: (...args: unknown[]) => Promise<unknown>;
+  handleSetSessionMode?: (...args: unknown[]) => Promise<unknown>;
   handleCloseSession?: (...args: unknown[]) => Promise<unknown>;
   handleListSessions?: (...args: unknown[]) => Promise<unknown>;
-  sessions?: Map<string, AcpSessionState>;
+  sessions?: Map<string, AcpSessionState & Record<string, unknown>>;
   agentConfigs?: Map<string, DeepAgentConfig>;
+  agents?: Map<string, unknown>;
+  acpBackends?: Map<string, { setSessionId?: (sessionId: string) => void }>;
+  workspaceRoot?: string;
+  createAgent?: (agentName: string) => void;
 }
 
 /**
@@ -171,12 +186,20 @@ function patchSessionLifecycle(
   server: DeepAgentsServer,
   mcpManager: MCPManager,
   config: ReturnType<typeof loadConfig>,
-  workspaceRoot: string
+  workspaceRoot: string,
+  options: {
+    configPath?: string;
+    sessionConfig?: ACPSessionConfig;
+    useSessionCwd: boolean;
+  }
 ): SessionManager {
   const log = logger.child("session-lifecycle");
   const manager = new SessionManager();
   const s = server as unknown as DeepAgentsServerInternals;
   const mcpForwardingEnabled = isAcpMcpForwardingEnabled();
+  let activeConfig = config;
+  let activeMcpManager = mcpManager;
+  let activeWorkspaceRoot = workspaceRoot;
 
   if (!mcpForwardingEnabled) {
     log.info("ACP MCP forwarding disabled via ACP_MCP_FORWARDING=disabled");
@@ -184,6 +207,85 @@ function patchSessionLifecycle(
 
   // Track last-known mcpServers per session for recovery
   const sessionMcpServers = new Map<string, unknown>();
+  const sessionWorkspaces = new Map<string, { config: ReturnType<typeof loadConfig>; workspaceRoot: string }>();
+
+  const prepareSessionWorkspace = async (params: AcpNewSessionParams): Promise<void> => {
+    if (!options.useSessionCwd || !params.cwd) {
+      return;
+    }
+
+    const requestedConfig = loadConfig({
+      configPath: options.configPath,
+      sessionConfig: { ...options.sessionConfig, cwd: params.cwd },
+      workspaceRoot: params.cwd,
+    });
+    const requestedWorkspaceRoot = resolveConfiguredWorkspaceRoot(requestedConfig, params.cwd);
+    if (requestedWorkspaceRoot === activeWorkspaceRoot) {
+      return;
+    }
+
+    const { agentConfig, mcpManager: sessionMcpManager } = await buildACPAgentConfigWithMcpAsync(
+      requestedConfig,
+      requestedWorkspaceRoot,
+      { ...options.sessionConfig, cwd: requestedWorkspaceRoot }
+    );
+
+    activeConfig = requestedConfig;
+    activeMcpManager = sessionMcpManager;
+    activeWorkspaceRoot = requestedWorkspaceRoot;
+    s.workspaceRoot = requestedWorkspaceRoot;
+    s.agentConfigs?.set(agentConfig.name, agentConfig);
+    s.agents?.delete(agentConfig.name);
+    s.acpBackends?.delete(agentConfig.name);
+
+    log.info("Using ACP session cwd as workspace root", {
+      workspaceRoot: requestedWorkspaceRoot,
+    });
+  };
+
+  const ensureClientSession = (params: AcpNewSessionParams): void => {
+    if (!params.sessionId || s.sessions?.has(params.sessionId)) {
+      return;
+    }
+
+    const agentName =
+      params.configOptions?.agent ??
+      Array.from(s.agentConfigs?.keys() ?? [])[0];
+    if (!agentName || !s.agentConfigs?.has(agentName)) {
+      throw new Error(`Unknown agent: ${agentName ?? "(none)"}`);
+    }
+
+    s.sessions?.set(params.sessionId, {
+      id: params.sessionId,
+      agentName,
+      threadId: randomUUID(),
+      messages: [],
+      createdAt: new Date(),
+      lastActivityAt: new Date(),
+      mode: params.mode ?? "agent",
+    });
+    if (!s.agents?.has(agentName)) {
+      s.createAgent?.(agentName);
+    }
+    s.acpBackends?.get(agentName)?.setSessionId?.(params.sessionId);
+    manager.track(params.sessionId, params.mode ?? "agent");
+    sessionWorkspaces.set(params.sessionId, {
+      config: activeConfig,
+      workspaceRoot: activeWorkspaceRoot,
+    });
+    ensureSessionState(
+      getRuntimeStorage({ workspaceRoot: activeWorkspaceRoot, sessionId: params.sessionId }),
+      { mode: params.mode ?? "agent", agent: activeConfig.agent.name, environment: "acp", recovered: true }
+    );
+    if (mcpForwardingEnabled && params.mcpServers) {
+      sessionMcpServers.set(params.sessionId, params.mcpServers);
+      forwardAcpMcpServers(params.mcpServers, activeMcpManager);
+    }
+    log.info("Recovered missing ACP client session", {
+      sessionId: params.sessionId,
+      workspaceRoot: activeWorkspaceRoot,
+    });
+  };
 
   // Patch handleNewSession to track sessions + forward MCP servers.
   // We do NOT resend available_commands_update after session creation:
@@ -195,24 +297,36 @@ function patchSessionLifecycle(
   const origNewSession = s.handleNewSession?.bind(server);
   if (origNewSession) {
     s.handleNewSession = async (...args: unknown[]) => {
-      const params = args[0] as {
-        mode?: string;
-        mcpServers?: unknown;
-      };
+      const params = args[0] as AcpNewSessionParams;
+      await prepareSessionWorkspace(params);
       const result = await origNewSession(...args) as { sessionId: string } | undefined;
       if (result?.sessionId) {
         manager.track(result.sessionId, params?.mode ?? "agent");
+        sessionWorkspaces.set(result.sessionId, {
+          config: activeConfig,
+          workspaceRoot: activeWorkspaceRoot,
+        });
         ensureSessionState(
-          getRuntimeStorage({ workspaceRoot, sessionId: result.sessionId }),
-          { mode: params?.mode ?? "agent", agent: config.agent.name, environment: "acp" }
+          getRuntimeStorage({ workspaceRoot: activeWorkspaceRoot, sessionId: result.sessionId }),
+          { mode: params?.mode ?? "agent", agent: activeConfig.agent.name, environment: "acp" }
         );
         // @rollback: remove this block when deepagents-acp supports MCP natively
         if (mcpForwardingEnabled && params.mcpServers) {
           sessionMcpServers.set(result.sessionId, params.mcpServers);
-          forwardAcpMcpServers(params.mcpServers, mcpManager);
+          forwardAcpMcpServers(params.mcpServers, activeMcpManager);
         }
       }
       return result;
+    };
+  }
+
+  const origLoadSession = s.handleLoadSession?.bind(server);
+  if (origLoadSession) {
+    s.handleLoadSession = async (...args: unknown[]) => {
+      const params = args[0] as AcpNewSessionParams;
+      await prepareSessionWorkspace(params);
+      ensureClientSession(params);
+      return await origLoadSession(...args);
     };
   }
 
@@ -222,19 +336,24 @@ function patchSessionLifecycle(
     s.handlePrompt = async (...args: unknown[]) => {
       const params = args[0] as AcpPromptParams;
       const conn = args[1] as AcpConnection | undefined;
+      ensureClientSession({ sessionId: params.sessionId });
       const promptText = getAcpPromptText(params.prompt);
-      const storage = getRuntimeStorage({ workspaceRoot, sessionId: params.sessionId });
+      const sessionWorkspace = sessionWorkspaces.get(params.sessionId) ?? {
+        config: activeConfig,
+        workspaceRoot: activeWorkspaceRoot,
+      };
+      const storage = getRuntimeStorage({ workspaceRoot: sessionWorkspace.workspaceRoot, sessionId: params.sessionId });
       if (promptText) {
         appendRuntimeMessage({ role: "user", content: promptText }, storage);
       }
 
-      const slashResult = await withRuntimeStorageContext({ workspaceRoot, sessionId: params.sessionId }, () =>
+      const slashResult = await withRuntimeStorageContext({ workspaceRoot: sessionWorkspace.workspaceRoot, sessionId: params.sessionId }, () =>
         handleAcpSlashCommand({
           server: s,
           params,
           conn,
-          config,
-          workspaceRoot,
+          config: sessionWorkspace.config,
+          workspaceRoot: sessionWorkspace.workspaceRoot,
         })
       );
 
@@ -245,7 +364,7 @@ function patchSessionLifecycle(
 
       try {
         const result = await withRuntimeStorageContext(
-          { workspaceRoot, sessionId: params.sessionId },
+          { workspaceRoot: sessionWorkspace.workspaceRoot, sessionId: params.sessionId },
           () => origPrompt(...args)
         );
         // Only count successful prompts
@@ -257,10 +376,11 @@ function patchSessionLifecycle(
           manager.close(params.sessionId);
           const savedMcp = sessionMcpServers.get(params.sessionId);
           sessionMcpServers.delete(params.sessionId);
+          sessionWorkspaces.delete(params.sessionId);
 
           const conn = args[1];
           const newSession = await s.handleNewSession?.(
-            { mode: "agent", mcpServers: savedMcp },
+            { mode: "agent", mcpServers: savedMcp, cwd: sessionWorkspace.workspaceRoot },
             conn
           ) as { sessionId: string } | undefined;
           if (newSession) {
@@ -290,10 +410,22 @@ function patchSessionLifecycle(
     };
   }
 
+  const origSetSessionMode = s.handleSetSessionMode?.bind(server);
+  if (origSetSessionMode) {
+    s.handleSetSessionMode = async (...args: unknown[]) => {
+      const params = args[0] as AcpNewSessionParams;
+      await prepareSessionWorkspace(params);
+      ensureClientSession(params);
+      return await origSetSessionMode(...args);
+    };
+  }
+
   // Add closeSession method
   s.handleCloseSession = async (...args: unknown[]) => {
     const params = args[0] as { sessionId: string };
     const info = manager.close(params.sessionId);
+    sessionMcpServers.delete(params.sessionId);
+    sessionWorkspaces.delete(params.sessionId);
     if (!info) {
       return { error: `Session not found: ${params.sessionId}` };
     }
@@ -485,7 +617,11 @@ export async function bootstrap(options: ACPServerOptions = {}): Promise<void> {
   });
 
   // Pass mcpManager so ACP session mcpServers can be forwarded
-  const _sessionManager = patchSessionLifecycle(server, mcpManager, config, workspaceRoot);
+  const _sessionManager = patchSessionLifecycle(server, mcpManager, config, workspaceRoot, {
+    configPath: options.configPath,
+    sessionConfig,
+    useSessionCwd: !options.workspaceRoot && !config.workspace.workingDir,
+  });
   log.info("Active sessions after startup", { count: _sessionManager.count });
   await server.start();
 }
@@ -507,7 +643,7 @@ export function buildACPAgentConfig(
   const log = logger.child("config-builder");
 
   // Create runtime context (PlatformClient, MCPManager, VariableManager, tools)
-  const runtimeCtx = createRuntimeContext(config, sessionConfig);
+  const runtimeCtx = createRuntimeContext(config, sessionConfig, workspaceRoot);
 
   const agentConfigParts = buildAgentConfigParts(config, sessionConfig, workspaceRoot, runtimeCtx.tools);
 
@@ -543,7 +679,7 @@ export async function buildACPAgentConfigAsync(
 ): Promise<DeepAgentConfig> {
   const log = logger.child("config-builder");
 
-  const runtimeCtx = await createRuntimeContextAsync(config, sessionConfig);
+  const runtimeCtx = await createRuntimeContextAsync(config, sessionConfig, workspaceRoot);
 	  const agentConfig = {
     name: config.agent.name,
     description: config.agent.description,
@@ -573,7 +709,7 @@ export async function buildACPAgentConfigWithMcpAsync(
 ): Promise<{ agentConfig: DeepAgentConfig; mcpManager: MCPManager }> {
   const log = logger.child("config-builder");
 
-  const runtimeCtx = await createRuntimeContextAsync(config, sessionConfig);
+  const runtimeCtx = await createRuntimeContextAsync(config, sessionConfig, workspaceRoot);
 	  const agentConfig = {
     name: config.agent.name,
     description: config.agent.description,

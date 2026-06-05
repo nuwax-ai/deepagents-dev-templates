@@ -10,8 +10,49 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { logger } from "./logger.js";
+
+const RUNTIME_DIR = dirname(fileURLToPath(import.meta.url));
+const TEMPLATE_PACKAGE_ROOT = resolve(RUNTIME_DIR, "..", "..");
+
+export const BUILTIN_TEMPLATE_CONFIGS = {
+  appAgent: {
+    path: "config/app-agent.config.json",
+    resourceBase: ".",
+  },
+} as const;
+
+export type BuiltinTemplateConfigName = keyof typeof BUILTIN_TEMPLATE_CONFIGS;
+
+export const DEFAULT_BUILTIN_TEMPLATE_CONFIG: BuiltinTemplateConfigName = "appAgent";
+
+function readBuiltinTemplateConfigNameFromEnv(): BuiltinTemplateConfigName | undefined {
+  const name = process.env.DEEPAGENTS_BUILTIN_CONFIG;
+  if (!name) {
+    return undefined;
+  }
+  if (name in BUILTIN_TEMPLATE_CONFIGS) {
+    return name as BuiltinTemplateConfigName;
+  }
+  logger.warn("Unknown DEEPAGENTS_BUILTIN_CONFIG; falling back to default", {
+    requested: name,
+    available: Object.keys(BUILTIN_TEMPLATE_CONFIGS),
+  });
+  return undefined;
+}
+
+function resolveBuiltinTemplateConfig(name: BuiltinTemplateConfigName = DEFAULT_BUILTIN_TEMPLATE_CONFIG): {
+  path: string;
+  resourceBase: string;
+} {
+  const config = BUILTIN_TEMPLATE_CONFIGS[name];
+  return {
+    path: resolve(TEMPLATE_PACKAGE_ROOT, config.path),
+    resourceBase: resolve(TEMPLATE_PACKAGE_ROOT, config.resourceBase),
+  };
+}
 
 // ─── Config Schema ──────────────────────────────────────
 
@@ -318,6 +359,54 @@ function loadJsonFile(filePath: string, baseDir = process.cwd()): Record<string,
   }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function normalizeConfigResourcePaths(config: Record<string, unknown>, baseDir: string): void {
+  const mcp = config.mcp;
+  if (isRecord(mcp)) {
+    if (typeof mcp.configPath === "string") {
+      mcp.configPath = resolveConfigResourcePath(mcp.configPath, baseDir);
+    }
+    if (Array.isArray(mcp.configPaths)) {
+      mcp.configPaths = mcp.configPaths.map((entry: unknown) =>
+        typeof entry === "string" ? resolveConfigResourcePath(entry, baseDir) : entry
+      );
+    }
+  }
+
+  const skills = config.skills;
+  if (isRecord(skills) && Array.isArray(skills.directories)) {
+    skills.directories = skills.directories.map((entry: unknown) =>
+      typeof entry === "string" ? resolveConfigResourcePath(entry, baseDir) : entry
+    );
+  }
+
+  if (Array.isArray(config.agentsDirectories)) {
+    config.agentsDirectories = config.agentsDirectories.map((entry: unknown) =>
+      typeof entry === "string" ? resolveConfigResourcePath(entry, baseDir) : entry
+    );
+  }
+
+  const memory = config.memory;
+  if (isRecord(memory) && typeof memory.dir === "string") {
+    memory.dir = resolveConfigResourcePath(memory.dir, baseDir);
+  }
+
+  const agent = config.agent;
+  if (isRecord(agent) && typeof agent.systemPromptPath === "string") {
+    agent.systemPromptPath = resolveConfigResourcePath(agent.systemPromptPath, baseDir);
+  }
+}
+
+function resolveConfigResourcePath(path: string, baseDir: string): string {
+  if (path.startsWith("~/") || path.startsWith("~/.deepagents/") || isAbsolute(path)) {
+    return path;
+  }
+  return resolve(baseDir, path);
+}
+
 function resolvePath(filePath: string, baseDir = process.cwd()): string {
   if (filePath === "~/.deepagents") {
     return deepAgentsHome();
@@ -498,8 +587,12 @@ export interface ACPSessionConfig {
 // ─── Main Loader ────────────────────────────────────────
 
 export interface LoadConfigOptions {
-  /** Path to config file (default: ./config/app-agent.config.json) */
+  /** Path to config file (default: template package config/app-agent.config.json) */
   configPath?: string;
+  /** Built-in template config preset used when configPath is not provided */
+  builtinConfig?: BuiltinTemplateConfigName;
+  /** Base directory for relative paths inside the template config file */
+  configBaseDir?: string;
   /** Workspace root used for project-level .deepagents config discovery */
   workspaceRoot?: string;
   /** ACP session-level overrides (highest priority) */
@@ -511,7 +604,14 @@ export interface LoadConfigOptions {
  *   defaults < user .deepagents < project .deepagents < template config < env vars < ACP/session meta
  */
 export function loadConfig(options: LoadConfigOptions = {}): AppConfig {
-  const configPath = options.configPath ?? "./config/app-agent.config.json";
+  const builtinConfig = resolveBuiltinTemplateConfig(
+    options.builtinConfig ?? readBuiltinTemplateConfigNameFromEnv()
+  );
+  const envConfigPath =
+    process.env.DEEPAGENTS_CONFIG_PATH ||
+    process.env.APP_AGENT_CONFIG_PATH ||
+    undefined;
+  const configPath = options.configPath ?? envConfigPath ?? builtinConfig.path;
   const userDir = deepAgentsHome();
   const envWorkspaceRoot =
     process.env.DEEPAGENTS_WORKING_DIR ||
@@ -539,6 +639,9 @@ export function loadConfig(options: LoadConfigOptions = {}): AppConfig {
     config,
     options.workspaceRoot ?? options.sessionConfig?.cwd ?? envWorkspaceRoot ?? process.cwd()
   );
+  const resolvedConfigPath = resolvePath(configPath, workspaceRoot);
+  const usingBuiltinConfig = resolvedConfigPath === builtinConfig.path;
+  const configBaseDir = options.configBaseDir ?? (usingBuiltinConfig ? builtinConfig.resourceBase : workspaceRoot);
   const projectDir = resolve(workspaceRoot, ".deepagents");
 
   // Layer 3: Project-level <workspace>/.deepagents config
@@ -554,6 +657,9 @@ export function loadConfig(options: LoadConfigOptions = {}): AppConfig {
   // Layer 4: Existing template config (backward compatible)
   const fileConfig = loadJsonFile(configPath, workspaceRoot);
   if (fileConfig) {
+    if (usingBuiltinConfig || options.configBaseDir) {
+      normalizeConfigResourcePaths(fileConfig, configBaseDir);
+    }
     config = mergeConfigLayer(config, fileConfig as Partial<AppConfig>);
   }
 

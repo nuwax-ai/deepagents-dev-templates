@@ -11,7 +11,7 @@
  */
 
 import { createDeepAgent, FilesystemBackend } from "deepagents";
-import type { AppConfig, ACPSessionConfig } from "./config-loader.js";
+import { resolveConfiguredWorkspaceRoot, type AppConfig, type ACPSessionConfig } from "./config-loader.js";
 import { logger } from "./logger.js";
 import {
   createRuntimeContext,
@@ -46,7 +46,7 @@ export function createAppAgent(
   sessionConfig?: ACPSessionConfig
 ): CreatedAgent {
   const log = logger.child("agent-factory");
-  const workspaceRoot = sessionConfig?.cwd || process.cwd();
+  const workspaceRoot = resolveConfiguredWorkspaceRoot(config, sessionConfig?.cwd || process.cwd());
 
   log.info("Creating deep agent", {
     name: config.agent.name,
@@ -55,7 +55,7 @@ export function createAppAgent(
   });
 
   // 1. Runtime context (PlatformClient, MCPManager, VariableManager, tools)
-  const context = createRuntimeContext(config, sessionConfig);
+  const context = createRuntimeContext(config, sessionConfig, workspaceRoot);
   log.info("Custom tools ready", {
     count: context.tools.length,
     names: context.tools.map((t) => t.name),
@@ -86,7 +86,7 @@ export async function createAppAgentAsync(
   sessionConfig?: ACPSessionConfig
 ): Promise<CreatedAgent> {
   const log = logger.child("agent-factory");
-  const workspaceRoot = sessionConfig?.cwd || process.cwd();
+  const workspaceRoot = resolveConfiguredWorkspaceRoot(config, sessionConfig?.cwd || process.cwd());
 
   log.info("Creating deep agent", {
     name: config.agent.name,
@@ -94,7 +94,7 @@ export async function createAppAgentAsync(
     workspaceRoot,
   });
 
-  const context = await createRuntimeContextAsync(config, sessionConfig);
+  const context = await createRuntimeContextAsync(config, sessionConfig, workspaceRoot);
   log.info("Custom tools ready", {
     count: context.tools.length,
     names: context.tools.map((t) => t.name),

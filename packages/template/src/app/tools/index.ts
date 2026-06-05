@@ -18,6 +18,7 @@ import { checkpointTool } from "./checkpoint.tool.js";
 import { createPlatformApiTool } from "./platform-api.tool.js";
 import { createAgentVariableTool } from "./agent-variable.tool.js";
 import { createMcpBridgeTool } from "./mcp-bridge.tool.js";
+import { createRuntimeInfoTool } from "./runtime-info.tool.js";
 import type { PlatformClient } from "../../runtime/platform-client.js";
 import type { MCPManager } from "../../runtime/mcp-manager.js";
 import type { VariableManager } from "../../runtime/variable-manager.js";
@@ -27,6 +28,7 @@ export interface ToolContext {
   platformClient: PlatformClient | null;
   mcpManager: MCPManager;
   variableManager: VariableManager;
+  workspaceRoot: string;
 }
 
 /**
@@ -42,6 +44,7 @@ export function createTools(ctx: ToolContext): StructuredTool[] {
     agentMemoryTool,
     conversationHistoryTool,
     checkpointTool,
+    createRuntimeInfoTool({ workspaceRoot: ctx.workspaceRoot }),
 
     // Platform-bound tools (created with live context)
     createPlatformApiTool(ctx.platformClient),

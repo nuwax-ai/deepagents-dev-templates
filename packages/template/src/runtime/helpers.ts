@@ -14,7 +14,7 @@ import type { StructuredTool } from "@langchain/core/tools";
 import type { AgentMiddleware } from "langchain";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { ChatOpenAI } from "@langchain/openai";
-import type { AppConfig, ACPSessionConfig } from "./config-loader.js";
+import { resolveConfiguredWorkspaceRoot, type AppConfig, type ACPSessionConfig } from "./config-loader.js";
 import { PlatformClient } from "./platform-client.js";
 import { MCPManager } from "./mcp-manager.js";
 import { VariableManager } from "./variable-manager.js";
@@ -54,9 +54,14 @@ export interface RuntimeContext {
  */
 export function createRuntimeContext(
   config: AppConfig,
-  sessionConfig?: ACPSessionConfig
+  sessionConfig?: ACPSessionConfig,
+  workspaceRoot?: string
 ): RuntimeContext {
   const log = logger.child("runtime-context");
+  const resolvedWorkspaceRoot = resolveConfiguredWorkspaceRoot(
+    config,
+    workspaceRoot ?? sessionConfig?.cwd ?? process.cwd()
+  );
 
   const agentId = config.platform.agentId || sessionConfig?.agentId || "";
   const spaceId = config.platform.spaceId || sessionConfig?.spaceId || "";
@@ -77,13 +82,15 @@ export function createRuntimeContext(
     log.info("Platform credentials not provided — running in local-only mode");
   }
 
+  const defaultMcpDisabled = process.env.DEEPAGENTS_DEFAULT_MCP === "disabled";
   const mcpManager = new MCPManager({
     defaultConfig: {
       servers: config.mcp.servers as Record<string, { command?: string; args?: string[]; url?: string }>,
     },
-    defaultConfigPath: config.mcp.configPath,
-    defaultConfigPaths: config.mcp.configPaths,
+    defaultConfigPath: defaultMcpDisabled ? undefined : config.mcp.configPath,
+    defaultConfigPaths: defaultMcpDisabled ? [] : config.mcp.configPaths,
     mergeStrategy: config.mcp.mergeStrategy,
+    baseDir: resolvedWorkspaceRoot,
   });
 
   // Apply session MCP overrides if present
@@ -103,6 +110,7 @@ export function createRuntimeContext(
     platformClient,
     mcpManager,
     variableManager,
+    workspaceRoot: resolvedWorkspaceRoot,
   };
 
   // Create tools bound to the runtime context
@@ -150,9 +158,10 @@ export async function hydrateRuntimeContext(context: RuntimeContext): Promise<Ru
 
 export async function createRuntimeContextAsync(
   config: AppConfig,
-  sessionConfig?: ACPSessionConfig
+  sessionConfig?: ACPSessionConfig,
+  workspaceRoot?: string
 ): Promise<RuntimeContext> {
-  return await hydrateRuntimeContext(createRuntimeContext(config, sessionConfig));
+  return await hydrateRuntimeContext(createRuntimeContext(config, sessionConfig, workspaceRoot));
 }
 
 // ─── Model ──────────────────────────────────────────────
@@ -324,6 +333,15 @@ export function resolveOutputStyle(styleName: string, workspaceRoot: string): st
 function withOutputStyle(basePrompt: string, config: AppConfig, workspaceRoot: string): string {
   const style = resolveOutputStyle(config.agent.outputStyle, workspaceRoot);
   return style ? `${basePrompt}\n\n${style}` : basePrompt;
+}
+
+function withRuntimeContextPrompt(basePrompt: string, workspaceRoot: string): string {
+  return `${basePrompt}
+
+## Runtime Context
+- Effective workspace root: ${workspaceRoot}
+- If the user asks for the current workspace directory, project root, cwd, runtime directory, or session location, use the \`runtime_info\` tool or answer from this Runtime Context.
+- Do not infer the workspace by listing \`/\`, \`/Users\`, or parent directories.`;
 }
 
 function resolvePromptPath(path: string, workspaceRoot: string): string {
@@ -665,7 +683,10 @@ export function buildAgentConfigParts(
   const mode = config.permissions.mode;
   let interruptOn: Record<string, boolean>;
   let permissions: FilesystemPermission[];
-  let systemPrompt = resolveSystemPrompt(config, sessionConfig, workspaceRoot);
+  let systemPrompt = withRuntimeContextPrompt(
+    resolveSystemPrompt(config, sessionConfig, workspaceRoot),
+    workspaceRoot
+  );
 
   if (mode === "yolo") {
     // No HITL, no path restrictions
