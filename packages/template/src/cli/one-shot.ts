@@ -50,10 +50,11 @@ export async function runOneShot(
   log.info("Creating agent for one-shot prompt");
   // Pass systemPrompt via sessionConfig so createAppAgent routes it
   // to createDeepAgent's systemPrompt field, NOT as a user message.
+  // checkpointer: false — one-shot doesn't provide a thread_id.
   const { agent } = await createAppAgentAsync(config, {
     cwd: workspaceRoot,
     systemPrompt,
-  });
+  }, { checkpointer: false });
 
   try {
     appendRuntimeMessage({ role: "user", content: prompt }, storage);

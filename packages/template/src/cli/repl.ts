@@ -76,10 +76,12 @@ export async function startRepl(options: ReplOptions = {}): Promise<void> {
   log.info("Creating agent for REPL session");
   // Pass systemPrompt via sessionConfig so createAppAgent routes it
   // to createDeepAgent's systemPrompt field, NOT as a user message.
+  // checkpointer: false — the REPL tracks messages itself and doesn't
+  // provide a thread_id, which makes MemorySaver.put throw.
   const { agent, context } = await createAppAgentAsync(config, {
     cwd: workspaceRoot,
     systemPrompt,
-  });
+  }, { checkpointer: false });
 
   // Display available tools
   const toolNames = context.tools.map((t) => t.name);

@@ -14,6 +14,8 @@ import { type CreateDeepAgentParams, type FilesystemPermission, type AnyBackendP
 import type { StructuredTool } from "@langchain/core/tools";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import type { AgentMiddleware } from "langchain";
+import { MemorySaver } from "@langchain/langgraph-checkpoint";
+import type { BaseCheckpointSaver } from "@langchain/langgraph-checkpoint";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { ChatOpenAI } from "@langchain/openai";
 import { resolveConfiguredWorkspaceRoot, type AppConfig, type ACPSessionConfig } from "./config-loader.js";
@@ -722,7 +724,17 @@ export function buildAgentConfigParts(
   sessionConfig: ACPSessionConfig | undefined,
   workspaceRoot: string,
   tools: StructuredTool[],
-  backend?: AnyBackendProtocol
+  backend?: AnyBackendProtocol,
+  /**
+   * Checkpointing strategy. Pass `false` for one-shot / REPL invocations
+   * (no `thread_id` is provided → a checkpointer would throw on
+   * `MemorySaver.put`). Pass `true` or a `BaseCheckpointSaver` instance
+   * for ACP / long-running session flows that need HITL pause/resume.
+   * Defaults to `true` (with a fresh in-memory `MemorySaver`) for
+   * backward compatibility — `DeepAgentsServer` in ACP mode overrides
+   * this with its own checkpointer.
+   */
+  checkpointer: true | false | BaseCheckpointSaver = new MemorySaver()
 ) {
   // Build custom middleware array from config
   const middleware: AgentMiddleware[] = [];
@@ -849,8 +861,11 @@ Before making any changes, you MUST:
     subagents: discoveredSubAgents.length > 0 ? discoveredSubAgents : undefined,
     permissions,
     interruptOn,
-    checkpointer: true,  // Enables LangGraph checkpointing for HITL + session persistence.
-                          // Note: DeepAgentsServer overrides this with its own MemorySaver in ACP mode.
+    // REPL/one-shot pass `false` here. ACP (DeepAgentsServer) passes a
+    // custom checkpointer that supersedes the value returned from
+    // buildAgentConfigParts, so the default `true` keeps the existing
+    // ACP behavior.
+    checkpointer: checkpointer === true ? new MemorySaver() : checkpointer,
     middleware,
   };
 }
