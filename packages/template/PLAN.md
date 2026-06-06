@@ -151,6 +151,16 @@ agent-package.json              # Distribution manifest
 - ⬜ Full nuwaclaw UI ACP prompt/debug integration test (blocked: needs nuwaclaw team)
 - ⬜ Nuwax API production endpoint validation (blocked: needs platform credentials)
 
+## Recent changes (feat/compaction-eviction branch)
+
+- ✅ LLM-based context summarization (was a placeholder): `generateSummary` now invokes the configured chat model with a structured 5-section prompt (Goal / Key Context / Tool Usage / Open Questions / Current State), with a deterministic placeholder fallback when the LLM call fails. New: `resolveSummarizerModel(config)` in `helpers.ts` builds a summarization-tuned chat model (temperature 0, maxTokens 2048) that reuses the agent's provider/credentials/baseURL.
+- ✅ `compaction.summarizerModel` config field (optional). When set, uses that model name (e.g. `claude-haiku-4-5`) for summaries instead of the agent's flagship model. Same provider, same credentials, same baseURL.
+- ✅ Protected paths now actually protected in ACP mode. Two bugs fixed:
+  1. `buildPermissions()` was emitting backend-rooted globs (`/src/runtime/**`) that never matched the OS-absolute `file_path` the tool receives. Now resolves denied entries against `workspaceRoot` and uses `join()` (not `resolve()`) so the trailing `/` is preserved.
+  2. `deepagents-acp`'s `DeepAgentsServer.createAgent()` calls `createDeepAgent({...})` without a `permissions` field, so the deny rules on `agentConfig` are dropped at the bridge. Worked around with a new `createProtectedPathsMiddleware` (`src/runtime/middleware/protected-paths.ts`) that wraps `write_file` / `edit_file` calls and returns a `ToolMessage` with `status: "error"` (not a throw, which deepagents-acp would propagate as a fatal session-prompt error).
+- ✅ OpenAI-compatible provider in `acp-verify.ts`. The integration test was hardcoded to Anthropic even though `.env` configures both. Refactored `startServer()` to honor `LLM_PROVIDER=anthropic|openai` and clear the other provider's env vars. Bumped `@langchain/openai` `^0.5.0` → `^1.3.0` — the old 0.5.x pins `@langchain/core@^0.3.72` which gets deduped to a second copy under `packages/template/node_modules`, breaking `instanceof AIMessage` in langchain's `AgentNode` for OpenAI responses.
+- ✅ Test coverage: 79/79 unit tests, 18/18 ACP integration tests on both Anthropic and OpenAI-compatible providers. New tests: 7 for `generateSummary`, 6 for `buildPermissions`, 8 for `protected-paths`.
+
 ## Reference Notes
 
 See `docs/template-capabilities.md` for:
