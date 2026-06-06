@@ -1,0 +1,25 @@
+{
+  "agent_servers": {
+    "deepagents-template": {
+      "type": "custom",
+      "command": "node",
+      "args": [
+        "--import",
+        "tsx",
+        "${TEMPLATE_ROOT}/src/index.ts",
+        "--config",
+        "${TEMPLATE_ROOT}/config/app-agent.config.json"
+      ],
+      "env": {
+        "LLM_PROVIDER": "openai-compatible",
+        "OPENAI_MODEL": "${OPENAI_MODEL}",
+        "OPENAI_BASE_URL": "${OPENAI_BASE_URL}",
+        "OPENAI_API_KEY": "${SECRET_OPENAI_API_KEY}",
+        "MAX_TOKENS": "${MAX_TOKENS}",
+        "LOG_LEVEL": "${LOG_LEVEL}",
+        "LOG_DIR": "${LOG_DIR}"
+      }
+    }
+  }
+}
+

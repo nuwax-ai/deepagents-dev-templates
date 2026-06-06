@@ -1,0 +1,66 @@
+{
+  "$schema": "https://agent.nuwax.com/schemas/nuwax-agent-capability-sources.v1.json",
+  "schemaVersion": "nuwax.agent.capability-sources.v1",
+  "sources": {
+    "acp-dynamic": {
+      "description": "Workspace-specific values delivered by ACP or the Nuwax configuration panel.",
+      "examples": ["systemPrompt", "mcpServers", "skills", "model"]
+    },
+    "agent-builtin": {
+      "description": "Capabilities shipped inside the template package and available without platform mutation.",
+      "examples": ["runtimeTools", "middleware", "promptFragments", "packagingHooks"]
+    },
+    "env-builtin": {
+      "description": "Environment values provided by the cloud computer, local machine, CI, or installer.",
+      "examples": ["OPENAI_API_KEY", "OPENAI_BASE_URL", "LOG_DIR"]
+    },
+    "package-placeholder": {
+      "description": "Values replaced when building or installing tar/zip/npm artifacts.",
+      "examples": ["INSTALL_ROOT", "AGENT_ID", "PACKAGE_VERSION"]
+    },
+    "future-durable-state": {
+      "description": "Persistent runtime data planned for later iterations.",
+      "examples": ["sessionDb", "memoryStore", "auditLog"]
+    }
+  },
+  "capabilities": {
+    "systemPrompt": {
+      "source": "acp-dynamic",
+      "fallback": "prompts/target-agent.base.md"
+    },
+    "mcpServers": {
+      "source": "acp-dynamic",
+      "fallback": []
+    },
+    "skills": {
+      "source": "acp-dynamic",
+      "fallback": "skills/builtin"
+    },
+    "model": {
+      "source": "acp-dynamic",
+      "fallback": "env-builtin"
+    },
+    "openaiApiKey": {
+      "source": "env-builtin",
+      "secret": true
+    },
+    "builtInTools": {
+      "source": "agent-builtin",
+      "items": [
+        "http_request",
+        "platform_api",
+        "agent_variable",
+        "json_utils",
+        "mcp_tool_bridge"
+      ]
+    },
+    "installRoot": {
+      "source": "package-placeholder"
+    },
+    "durableSessionDb": {
+      "source": "future-durable-state",
+      "status": "planned"
+    }
+  }
+}
+

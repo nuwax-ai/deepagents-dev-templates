@@ -2,6 +2,10 @@
 
 This document defines the V1 contract for installing and launching this template as a nuwaclaw agent engine.
 
+For the planned tar/zip package lifecycle, version/platform JSON, installation,
+upgrade, rollback, and uninstall flow, see
+[Package Install Lifecycle](./package-install-lifecycle.md).
+
 ## Package Contract
 
 The engine package is described by `agent-package.json`.
@@ -136,9 +140,9 @@ Local verification covers:
 - TypeScript compile and typecheck.
 - Unit tests for config, platform client, MCP merge/hydration, tools, variables, and graph generation.
 - ACP stdio smoke test using the official ACP TypeScript SDK for `initialize` and `session/new`.
+- Real Zed ACP launch, session creation, prompt streaming, tool calls, and permissions.
 - `.tgz` packaging with SHA256 release manifest.
 
 Still requires live environment verification:
 
-- Real nuwaclaw UI launch with startup prompt/debug config.
 - Real Nuwax production endpoint validation for component list, prompt save, and debug sessions.

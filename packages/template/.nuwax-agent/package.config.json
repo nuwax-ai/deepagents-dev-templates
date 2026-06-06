@@ -1,0 +1,77 @@
+{
+  "$schema": "https://agent.nuwax.com/schemas/nuwax-agent-package-config.v1.json",
+  "schemaVersion": "nuwax.agent.package-config.v1",
+  "packageId": "deepagents-template",
+  "version": "${PACKAGE_VERSION}",
+  "artifactTypes": ["npm-tgz", "nuwax-tar", "nuwax-zip"],
+  "entrypoints": {
+    "server": "dist/index.js",
+    "cli": "dist/cli/index.js"
+  },
+  "include": [
+    "dist/**",
+    "config/**",
+    "prompts/**",
+    "skills/**",
+    "docs/**",
+    "scripts/**",
+    ".nuwax-agent/**",
+    "agent-package.json",
+    "template.manifest.json",
+    "package.json",
+    "README.md",
+    "PLAN.md"
+  ],
+  "exclude": [
+    "node_modules/**",
+    "logs/**",
+    ".env",
+    "*.local.json",
+    "**/*.tsbuildinfo"
+  ],
+  "excludeSecrets": [
+    ".env",
+    "*.local.json",
+    "logs/**",
+    "**/*secret*",
+    "**/*token*"
+  ],
+  "replaceOnPackage": [
+    "PACKAGE_VERSION"
+  ],
+  "replaceOnInstall": [
+    "INSTALL_ROOT",
+    "WORKSPACE_ROOT",
+    "LOG_DIR",
+    "OPENAI_MODEL",
+    "OPENAI_BASE_URL",
+    "MAX_TOKENS",
+    "LOG_LEVEL",
+    "AGENT_ID",
+    "SPACE_ID"
+  ],
+  "secretPlaceholders": [
+    "SECRET_OPENAI_API_KEY"
+  ],
+  "platformJson": {
+    "outputDirectory": "release",
+    "matrix": [
+      {
+        "os": "darwin",
+        "arch": "arm64"
+      },
+      {
+        "os": "darwin",
+        "arch": "x64"
+      },
+      {
+        "os": "linux",
+        "arch": "x64"
+      },
+      {
+        "os": "linux",
+        "arch": "arm64"
+      }
+    ]
+  }
+}

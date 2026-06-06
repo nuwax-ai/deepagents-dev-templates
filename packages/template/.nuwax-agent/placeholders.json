@@ -1,0 +1,73 @@
+{
+  "$schema": "https://agent.nuwax.com/schemas/nuwax-agent-placeholders.v1.json",
+  "schemaVersion": "nuwax.agent.placeholders.v1",
+  "placeholders": [
+    {
+      "name": "TEMPLATE_ROOT",
+      "description": "Absolute path to the unpacked template source during development.",
+      "requiredAt": "debug"
+    },
+    {
+      "name": "INSTALL_ROOT",
+      "description": "Absolute path to the installed agent package.",
+      "requiredAt": "install"
+    },
+    {
+      "name": "WORKSPACE_ROOT",
+      "description": "Absolute path to the user's active workspace.",
+      "requiredAt": "debug"
+    },
+    {
+      "name": "LOG_DIR",
+      "description": "Directory for runtime logs.",
+      "default": "${INSTALL_ROOT}/logs",
+      "requiredAt": "debug"
+    },
+    {
+      "name": "OPENAI_MODEL",
+      "description": "OpenAI-compatible chat model name.",
+      "default": "gpt-4.1-mini",
+      "requiredAt": "runtime"
+    },
+    {
+      "name": "OPENAI_BASE_URL",
+      "description": "OpenAI-compatible API base URL.",
+      "default": "https://api.openai.com/v1",
+      "requiredAt": "runtime"
+    },
+    {
+      "name": "SECRET_OPENAI_API_KEY",
+      "description": "Secret OpenAI-compatible API key.",
+      "secret": true,
+      "requiredAt": "runtime"
+    },
+    {
+      "name": "MAX_TOKENS",
+      "description": "Maximum model output tokens.",
+      "default": "16384",
+      "requiredAt": "runtime"
+    },
+    {
+      "name": "LOG_LEVEL",
+      "description": "Runtime logging level.",
+      "default": "info",
+      "requiredAt": "runtime"
+    },
+    {
+      "name": "AGENT_ID",
+      "description": "Platform-assigned agent identifier.",
+      "requiredAt": "install"
+    },
+    {
+      "name": "SPACE_ID",
+      "description": "Platform workspace or tenant identifier.",
+      "requiredAt": "install"
+    },
+    {
+      "name": "PACKAGE_VERSION",
+      "description": "Version stamped into generated install metadata.",
+      "requiredAt": "package"
+    }
+  ]
+}
+

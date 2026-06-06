@@ -2,6 +2,10 @@
 
 This template is for a development Agent that helps users and AI Agents build scenario-specific application Agents. The generated application Agent runs through ACP and is packaged for nuwaclaw as an agent engine.
 
+For current completeness status, see [Agent Core Progress](./agent-core-progress.md).
+For user-prompt-driven scenario Agent generation and `.nuwax-agent` configuration boundaries, see [Scenario Agent Template Design](./scenario-agent-template-design.md).
+For concrete prompt-to-Agent examples, see [Scenario Agent Examples](./scenario-agent-examples.md).
+
 ## Runtime Contract
 
 - Framework: DeepAgents JS on LangGraph.
@@ -30,6 +34,7 @@ These tools are built into every generated Agent runtime.
 
 Built-in development skills:
 
+- `agent-requirement-to-spec`
 - `build-and-compile`
 - `code-review`
 - `environment-discovery`
@@ -55,8 +60,9 @@ These capabilities are designed to be delivered by nuwaclaw or the Nuwax platfor
 
 | Capability | Config Surface | Notes |
 |---|---|---|
-| Model selection | `ACP_SESSION_CONFIG_JSON.model`, `ANTHROPIC_MODEL`, `config/app-agent.config.json.model` | Priority is ACP/session > env > config file > defaults. |
-| Anthropic proxy/base URL | `ANTHROPIC_BASE_URL` or `model.baseUrl` | Used by the LangChain `ChatAnthropic` model instance. |
+| Model selection | `ACP_SESSION_CONFIG_JSON.model`, `OPENAI_MODEL`, `ANTHROPIC_MODEL`, `config/app-agent.config.json.model` | Priority is ACP/session > env > config file > defaults. `.nuwax-agent` examples default to OpenAI-compatible config. |
+| OpenAI-compatible proxy/base URL | `OPENAI_BASE_URL` or `model.baseUrl` | Default debug path for cloud computer and Zed-style ACP launch examples. |
+| Anthropic proxy/base URL | `ANTHROPIC_BASE_URL` or `model.baseUrl` | Supported compatibility path when `LLM_PROVIDER=anthropic`. |
 | Auth | `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `OPENAI_API_KEY`, `PLATFORM_API_TOKEN` | `.env` is ignored and not packaged. |
 | Target prompt | `ACP_SESSION_CONFIG_JSON.systemPrompt` | This is the highest-priority prompt source for ACP startup. |
 | Platform identity | `PLATFORM_AGENT_ID`, `PLATFORM_SPACE_ID`, session config | Enables platform-bound tools. |
@@ -66,6 +72,18 @@ These capabilities are designed to be delivered by nuwaclaw or the Nuwax platfor
 | Permissions | `config.permissions` | Protects runtime code while allowing app/prompt/skill/config changes. |
 | Distribution source | `agent-package.json.source`, `alternativeSources` | Supports npm, local/private `.tgz`, and git refs. |
 | Code graph | `node dist/index.js graph` or `npm run graph` | Emits `nuwaclaw.agent-code-graph.v1` for generated-code node relationship UI. |
+
+## Capability Source Layers
+
+The `.nuwax-agent` development configuration separates capability sources:
+
+| Source | Meaning | Examples |
+|---|---|---|
+| `acp-dynamic` | Delivered by configuration panel or ACP startup/session config. | `systemPrompt`, `mcpServers`, skills, model, `agentId`, `spaceId`. |
+| `agent-builtin` | Built into the template package. | App tools, middleware, runtime storage, default skills, code graph. |
+| `env-builtin` | Injected by runtime environment. | `OPENAI_MODEL`, `OPENAI_BASE_URL`, `OPENAI_API_KEY`, `MAX_TOKENS`, `LOG_LEVEL`, `LOG_DIR`. |
+| `package-placeholder` | Replaced by package/install tooling. | `INSTALL_ROOT`, `WORKSPACE_ROOT`, checksum, package version. |
+| `future` | Designed now and implemented later. | ACP auth/logout, durable session DB, sandbox profile, harness lifecycle. |
 
 ## Code Node Relationship Graph
 

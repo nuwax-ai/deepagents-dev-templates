@@ -1,0 +1,85 @@
+{
+  "$schema": "https://agent.nuwax.com/schemas/nuwax-agent-lifecycle.v1.json",
+  "schemaVersion": "nuwax.agent.lifecycle.v1",
+  "packageId": "deepagents-template",
+  "install": {
+    "steps": [
+      {
+        "id": "verify-runtime",
+        "type": "check",
+        "command": "node --version"
+      },
+      {
+        "id": "materialize-placeholders",
+        "type": "replace-placeholders",
+        "config": ".nuwax-agent/placeholders.json"
+      },
+      {
+        "id": "register-agent-server",
+        "type": "write-config",
+        "source": ".nuwax-agent/debug.agent_servers.example.json"
+      },
+      {
+        "id": "create-log-dir",
+        "type": "mkdir",
+        "path": "${LOG_DIR}"
+      }
+    ]
+  },
+  "upgrade": {
+    "strategy": "preserve-user-config",
+    "preserve": [
+      "config/*.local.json",
+      ".env",
+      "logs/**",
+      "skills/platform/**"
+    ],
+    "steps": [
+      {
+        "id": "backup-current",
+        "type": "backup",
+        "path": "${INSTALL_ROOT}"
+      },
+      {
+        "id": "replace-versioned-files",
+        "type": "sync-package-files"
+      },
+      {
+        "id": "migrate-placeholders",
+        "type": "replace-placeholders",
+        "config": ".nuwax-agent/placeholders.json"
+      },
+      {
+        "id": "verify-upgraded-agent",
+        "type": "healthcheck",
+        "command": "node ${INSTALL_ROOT}/dist/cli/index.js --version"
+      }
+    ]
+  },
+  "uninstall": {
+    "strategy": "remove-package-preserve-export",
+    "exportBeforeRemove": [
+      "config/*.local.json",
+      "skills/platform/**",
+      "logs/**"
+    ],
+    "steps": [
+      {
+        "id": "stop-agent-server",
+        "type": "stop-service",
+        "service": "deepagents-template"
+      },
+      {
+        "id": "export-user-data",
+        "type": "archive",
+        "output": "${WORKSPACE_ROOT}/deepagents-template-uninstall-export.zip"
+      },
+      {
+        "id": "remove-package",
+        "type": "remove",
+        "path": "${INSTALL_ROOT}"
+      }
+    ]
+  }
+}
+

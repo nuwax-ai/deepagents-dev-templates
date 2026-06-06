@@ -1,0 +1,80 @@
+{
+  "$schema": "https://agent.nuwax.com/schemas/nuwax-agent-panel-config.v1.json",
+  "schemaVersion": "nuwax.agent.panel-config.v1",
+  "agent": {
+    "id": "${AGENT_ID}",
+    "displayName": "DeepAgents Template",
+    "description": "A configurable DeepAgents-based ACP agent template.",
+    "version": "${PACKAGE_VERSION}"
+  },
+  "model": {
+    "source": "acp-dynamic",
+    "provider": "openai-compatible",
+    "fields": [
+      {
+        "name": "OPENAI_MODEL",
+        "label": "Model",
+        "type": "string",
+        "default": "${OPENAI_MODEL}",
+        "required": true
+      },
+      {
+        "name": "OPENAI_BASE_URL",
+        "label": "Base URL",
+        "type": "url",
+        "default": "${OPENAI_BASE_URL}",
+        "required": true
+      },
+      {
+        "name": "OPENAI_API_KEY",
+        "label": "API Key",
+        "type": "secret",
+        "default": "${SECRET_OPENAI_API_KEY}",
+        "required": true
+      },
+      {
+        "name": "MAX_TOKENS",
+        "label": "Max Tokens",
+        "type": "number",
+        "default": "${MAX_TOKENS}",
+        "required": false
+      }
+    ]
+  },
+  "prompt": {
+    "source": "acp-dynamic",
+    "editable": true,
+    "templatePath": "prompts/target-agent.base.md",
+    "saveOperation": "platform_api.save_prompt"
+  },
+  "mcpServers": {
+    "source": "acp-dynamic",
+    "editable": true,
+    "supportsWorkspaceScopedServers": true
+  },
+  "skills": {
+    "source": "acp-dynamic",
+    "editable": true,
+    "builtinDirectory": "skills/builtin",
+    "platformDirectory": "skills/platform"
+  },
+  "builtinCapabilities": {
+    "source": "agent-builtin",
+    "editable": false,
+    "items": [
+      "filesystem",
+      "shell",
+      "http_request",
+      "json_utils",
+      "agent_variable",
+      "platform_api",
+      "mcp_tool_bridge"
+    ]
+  },
+  "publish": {
+    "source": "package-placeholder",
+    "artifactTypes": ["nuwax-tar", "nuwax-zip", "npm-tgz"],
+    "configPath": ".nuwax-agent/package.config.json"
+  }
+}
+

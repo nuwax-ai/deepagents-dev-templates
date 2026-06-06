@@ -1,58 +1,268 @@
 #!/usr/bin/env bash
-# Package script for distribution
+# Package script for npm tgz plus Nuwax tar/zip artifacts.
 set -euo pipefail
 
-VERSION=${1:-$(node -p "require('./agent-package.json').version")}
-NAME=$(node -p "require('./agent-package.json').name")
-TARBALL="${NAME}-${VERSION}.tgz"
+FORMAT="all"
+OUT_DIR="dist-packages"
+SKIP_TESTS=0
+VERSION=""
+
+usage() {
+  cat <<'EOF'
+Usage: bash scripts/package.sh [options]
+
+Options:
+  --format all|npm-tgz|tgz|tar|zip   Artifact format to build (default: all)
+  --out DIR                          Output directory (default: dist-packages)
+  --version VERSION                  Override package version metadata
+  --skip-tests                       Build without running tests
+  -h, --help                         Show help
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --format)
+      FORMAT="${2:-}"
+      shift 2
+      ;;
+    --out)
+      OUT_DIR="${2:-}"
+      shift 2
+      ;;
+    --version)
+      VERSION="${2:-}"
+      shift 2
+      ;;
+    --skip-tests)
+      SKIP_TESTS=1
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      if [[ -z "$VERSION" && "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+        VERSION="$1"
+        shift
+      else
+        echo "Unknown option: $1" >&2
+        usage >&2
+        exit 1
+      fi
+      ;;
+  esac
+done
+
+case "$FORMAT" in
+  all|npm-tgz|tgz|tar|zip) ;;
+  *)
+    echo "Invalid --format: $FORMAT" >&2
+    exit 1
+    ;;
+esac
+
+PKG_NAME=$(node -p "require('./package.json').name")
+AGENT_NAME=$(node -p "require('./agent-package.json').name")
+VERSION=${VERSION:-$(node -p "require('./package.json').version")}
+AGENT_VERSION=$(node -p "require('./agent-package.json').version")
 NPM_CACHE=${NPM_CONFIG_CACHE:-${TMPDIR:-/tmp}/deepagents-dev-templates-npm-cache}
+OUT_DIR=$(mkdir -p "$OUT_DIR" && cd "$OUT_DIR" && pwd)
+STAGING_DIR=$(mktemp -d "${TMPDIR:-/tmp}/nuwax-agent-package-XXXXXX")
+STAGE_ROOT="$STAGING_DIR/${PKG_NAME}-${VERSION}"
+ARTIFACTS=()
 
-echo "📦 Packaging ${NAME} v${VERSION}..."
+cleanup() {
+  rm -rf "$STAGING_DIR"
+}
+trap cleanup EXIT
 
-# Build first
-bash scripts/build.sh
-
-# Run tests
-echo ""
-echo "🧪 Running tests..."
-npm test
-echo "  ✅ All tests passed"
-
-# Create tarball
-echo ""
-echo "📋 Creating distribution package..."
-npm --cache "$NPM_CACHE" pack --pack-destination .
-ACTUAL_TARBALL=$(ls -t *.tgz 2>/dev/null | head -1)
-
-if [ -z "$ACTUAL_TARBALL" ]; then
-  echo "  ❌ Failed to create tarball"
+if [[ "$VERSION" != "$AGENT_VERSION" ]]; then
+  echo "Version mismatch: package.json=$VERSION agent-package.json=$AGENT_VERSION" >&2
   exit 1
 fi
 
-# Compute checksum
-CHECKSUM=$(shasum -a 256 "$ACTUAL_TARBALL" | cut -d' ' -f1)
-echo "  ✅ Created: $ACTUAL_TARBALL"
-echo "  ✅ SHA256:  $CHECKSUM"
+echo "Packaging ${PKG_NAME} v${VERSION}"
 
-# Write a release manifest next to the tarball. The source manifest remains
-# stable in git; the release manifest carries the tarball checksum.
-node -e "
-  const pkg = require('./agent-package.json');
-  pkg.checksum.value = '$CHECKSUM';
-  pkg.version = '$VERSION';
-  pkg.source = {
-    type: 'tgz',
-    path: './$ACTUAL_TARBALL',
-    version: '$VERSION'
-  };
-  require('fs').writeFileSync('./agent-package.release.json', JSON.stringify(pkg, null, 2) + '\n');
-"
-echo "  ✅ Wrote agent-package.release.json"
+bash scripts/build.sh
+
+if [[ "$SKIP_TESTS" -eq 0 ]]; then
+  echo ""
+  echo "Running tests..."
+  npm test
+else
+  echo "Skipping tests by request."
+fi
 
 echo ""
-echo "✅ Package ready: $ACTUAL_TARBALL"
+echo "Preparing staging directory..."
+mkdir -p "$STAGE_ROOT"
+rsync -a \
+  --exclude ".git/" \
+  --exclude "node_modules/" \
+  --exclude "dist-packages/" \
+  --exclude "logs/" \
+  --exclude ".env" \
+  --exclude ".env.local" \
+  --exclude "*.local.json" \
+  --exclude "*.tsbuildinfo" \
+  ./ "$STAGE_ROOT"/
+
+node - "$STAGE_ROOT" "$VERSION" "$PKG_NAME" "$AGENT_NAME" <<'NODE'
+const fs = require("fs");
+const path = require("path");
+
+const [root, version, packageName, agentName] = process.argv.slice(2);
+const generatedAt = new Date().toISOString();
+
+const versionJson = {
+  schema: "nuwax.agent.version.v1",
+  packageName,
+  agentName,
+  version,
+  generatedAt,
+};
+
+const platformJson = {
+  schema: "nuwax.agent.platform.v1",
+  packageName,
+  agentName,
+  version,
+  entrypoints: {
+    server: "dist/index.js",
+    graph: "dist/index.js graph",
+  },
+  config: {
+    panel: ".nuwax-agent/panel.config.json",
+    lifecycle: ".nuwax-agent/lifecycle.json",
+    placeholders: ".nuwax-agent/placeholders.json",
+    package: ".nuwax-agent/package.config.json",
+  },
+  platforms: [
+    { os: "darwin", arch: "arm64" },
+    { os: "darwin", arch: "x64" },
+    { os: "linux", arch: "x64" },
+    { os: "linux", arch: "arm64" },
+  ],
+};
+
+fs.writeFileSync(path.join(root, ".version.json"), JSON.stringify(versionJson, null, 2) + "\n");
+fs.writeFileSync(path.join(root, ".platform.json"), JSON.stringify(platformJson, null, 2) + "\n");
+NODE
+
+build_npm_tgz() {
+  echo ""
+  echo "Creating npm tgz..."
+  local pack_output
+  pack_output=$(npm --cache "$NPM_CACHE" pack --pack-destination "$OUT_DIR")
+  local tarball
+  tarball=$(basename "$pack_output" | tail -1)
+  if [[ ! -f "$OUT_DIR/$tarball" ]]; then
+    echo "Failed to create npm tgz" >&2
+    exit 1
+  fi
+  ARTIFACTS+=("$OUT_DIR/$tarball")
+  cp "$OUT_DIR/$tarball" "./$tarball"
+  echo "Created $OUT_DIR/$tarball"
+}
+
+build_tar() {
+  echo ""
+  echo "Creating Nuwax tar.gz..."
+  local artifact="$OUT_DIR/${PKG_NAME}-${VERSION}-nuwax.tar.gz"
+  tar -C "$STAGING_DIR" -czf "$artifact" "${PKG_NAME}-${VERSION}"
+  ARTIFACTS+=("$artifact")
+  echo "Created $artifact"
+}
+
+build_zip() {
+  echo ""
+  echo "Creating Nuwax zip..."
+  local artifact="$OUT_DIR/${PKG_NAME}-${VERSION}-nuwax.zip"
+  (cd "$STAGING_DIR" && zip -qr "$artifact" "${PKG_NAME}-${VERSION}")
+  ARTIFACTS+=("$artifact")
+  echo "Created $artifact"
+}
+
+case "$FORMAT" in
+  all)
+    build_npm_tgz
+    build_tar
+    build_zip
+    ;;
+  npm-tgz|tgz)
+    build_npm_tgz
+    ;;
+  tar)
+    build_tar
+    ;;
+  zip)
+    build_zip
+    ;;
+esac
+
 echo ""
-echo "Distribution options:"
-echo "  npm:  npm publish $ACTUAL_TARBALL"
-echo "  tgz:  Share $ACTUAL_TARBALL directly"
-echo "  git:  git tag v$VERSION && git push --tags"
+echo "Writing release metadata..."
+
+node - "$OUT_DIR" "$VERSION" "$PKG_NAME" "$AGENT_NAME" "${ARTIFACTS[@]}" <<'NODE'
+const fs = require("fs");
+const path = require("path");
+const crypto = require("crypto");
+
+const [outDir, version, packageName, agentName, ...artifacts] = process.argv.slice(2);
+
+function sha256(file) {
+  return crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex");
+}
+
+const artifactRecords = artifacts.map((file) => ({
+  file: path.basename(file),
+  type: file.endsWith(".zip") ? "nuwax-zip" : file.endsWith(".tar.gz") ? "nuwax-tar" : "npm-tgz",
+  sha256: sha256(file),
+}));
+
+const checksums = {
+  schema: "nuwax.agent.package-checksums.v1",
+  packageName,
+  version,
+  artifacts: artifactRecords,
+};
+
+const baseManifest = JSON.parse(fs.readFileSync("agent-package.json", "utf8"));
+const primary = artifactRecords[0];
+const release = {
+  ...baseManifest,
+  version,
+  source: primary
+    ? {
+        type: primary.type,
+        path: `./${primary.file}`,
+        version,
+      }
+    : baseManifest.source,
+  checksum: primary
+    ? {
+        algorithm: "sha256",
+        value: primary.sha256,
+      }
+    : baseManifest.checksum,
+  artifacts: artifactRecords,
+  platform: {
+    schema: "nuwax.agent.platform.v1",
+    path: ".platform.json",
+  },
+};
+
+fs.writeFileSync(path.join(outDir, "package-checksums.json"), JSON.stringify(checksums, null, 2) + "\n");
+fs.writeFileSync(path.join(outDir, "agent-package.release.json"), JSON.stringify(release, null, 2) + "\n");
+fs.writeFileSync("agent-package.release.json", JSON.stringify(release, null, 2) + "\n");
+NODE
+
+echo "Wrote $OUT_DIR/agent-package.release.json"
+echo "Wrote $OUT_DIR/package-checksums.json"
+echo ""
+echo "Package artifacts:"
+for artifact in "${ARTIFACTS[@]}"; do
+  shasum -a 256 "$artifact"
+done

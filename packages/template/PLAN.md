@@ -107,11 +107,17 @@ src/
 
 prompts/                        # Prompt templates
 skills/
-├── builtin/                    # 9 development skills (SKILL.md)
+├── builtin/                    # 10 development skills (SKILL.md)
 └── platform/                   # 6 platform skills (SKILL.md)
+.nuwax-agent/                   # Panel/debug/package/lifecycle config defaults
 config/                         # JSON configs
 tests/                          # vitest tests
 scripts/                        # build/package/dev scripts
+├── package.sh                  # npm tgz + Nuwax tar/zip + release metadata
+├── install.sh                  # local dev install + artifact install
+├── upgrade.sh                  # artifact upgrade + rollback
+├── uninstall.sh                # uninstall + optional user-data export
+└── validate-package.sh         # archive/checksum validation
 template.manifest.json          # Zone declarations
 agent-package.json              # Distribution manifest
 ```
@@ -125,11 +131,18 @@ agent-package.json              # Distribution manifest
 - 构建验收：typecheck, lint, build, package
 - 后续集成测试：nuwaclaw client 真实 ACP session → prompt → platform debug session
 
+## Roadmap Documents
+
+- [Agent core progress](docs/agent-core-progress.md) 是当前 agent core 完整度与优先级看板，按 `Supported` / `Planned` / `Blocked` / `Deferred` 追踪。
+- [Scenario agent template design](docs/scenario-agent-template-design.md) 记录“用户提示词 -> Agent Spec -> 能力编排 -> 实现 -> 验证”的模板设计，以及 `.nuwax-agent` 配置边界。
+- [Scenario agent examples](docs/scenario-agent-examples.md) 提供客服、销售、数据分析、文档问答、代码维护、运维自动化等用户提示词到 Agent Spec 的示例。
+- [Package install lifecycle](docs/package-install-lifecycle.md) 记录 npm `.tgz`、Nuwax `.tar.gz`、Nuwax `.zip`、version/platform JSON、安装、升级、回滚、卸载生命周期。
+
 ## Current Status
 - ✅ Project scaffolding
 - ✅ Runtime layer (acp-server, agent-factory, config-loader, platform-client, mcp-manager, variable-manager, logger)
 - ✅ Custom tools (5 tools via tool())
-- ✅ Skills (15 SKILL.md files)
+- ✅ Skills (16 SKILL.md files)
 - ✅ Prompts + template.manifest.json + agent-package.json
 - ✅ TypeScript compiles clean (0 errors)
 - ✅ Unit tests (config-loader, mcp-manager, variable-manager, platform-client)
@@ -141,6 +154,8 @@ agent-package.json              # Distribution manifest
 - ✅ ACP stdio smoke tests (initialize + session/new without invoking LLM)
 - ✅ ACP config smoke tests (session prompt/model/MCP startup injection)
 - ✅ Package flow (`npm run package`) generates `.tgz` + `agent-package.release.json`
+- ✅ Nuwax package flow generates `.tar.gz`, `.zip`, `.version.json`, `.platform.json`, release manifest, and checksum manifest
+- ✅ Install / upgrade / rollback / uninstall lifecycle scripts with local artifact smoke validation
 - ✅ npm/tgz/git distribution surfaces in `agent-package.json`
 - ✅ Runtime verification (`node dist/index.js --help`)
 - ✅ Compaction middleware (auto-compress context when approaching limit)
@@ -148,6 +163,9 @@ agent-package.json              # Distribution manifest
 - ✅ ACP integration tests (TC-01~TC-06, TC-12~TC-16) with real LLM
 - ✅ Install script (`scripts/install.sh`) for tgz/npm/git distribution
 - ✅ Inspector package (`packages/inspector/`) — read-only orchestration visualizer with dry-run + full mode
+- ✅ Real Zed ACP launch, session, prompt streaming, tool calls, and permissions
+- ✅ `.nuwax-agent` development config skeleton for panel fields, Zed/cloud debug, capability source layers, package placeholders, package matrix, and lifecycle hooks
+- ✅ Scenario Agent generation assets: Agent Spec example, `agent-requirement-to-spec` builtin skill, richer target prompt template, and scenario examples document
 - ⬜ Full nuwaclaw UI ACP prompt/debug integration test (blocked: needs nuwaclaw team)
 - ⬜ Nuwax API production endpoint validation (blocked: needs platform credentials)
 
@@ -172,3 +190,7 @@ See `docs/template-capabilities.md` for:
 - current `deepagents-acp` startup-level session config boundary
 
 See `docs/nuwaclaw-engine-integration.md` for the nuwaclaw package, ACP launch, startup config, MCP hydration, debug, and graph contracts.
+
+See `docs/package-install-lifecycle.md` for the planned platform install package lifecycle and release manifest expansion.
+
+See `docs/scenario-agent-examples.md` for concrete prompt-to-Agent examples used to optimize the template generation flow.

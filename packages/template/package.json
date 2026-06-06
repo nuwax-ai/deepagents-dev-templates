@@ -37,6 +37,9 @@
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist/",
     "package": "bash scripts/package.sh",
+    "package:all": "bash scripts/package.sh --format all",
+    "package:nuwax": "bash scripts/package.sh --format all",
+    "validate:package": "bash scripts/validate-package.sh",
     "inspect": "npm run inspect -w inspector --"
   },
   "dependencies": {

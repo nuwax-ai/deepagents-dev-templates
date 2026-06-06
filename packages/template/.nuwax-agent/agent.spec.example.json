@@ -1,0 +1,89 @@
+{
+  "$schema": "https://agent.nuwax.com/schemas/nuwax-agent-spec.v1.json",
+  "schemaVersion": "nuwax.agent.spec.v1",
+  "agent": {
+    "name": "Customer Support Triage Agent",
+    "slug": "customer-support-triage",
+    "summary": "Classifies inbound support requests, collects missing facts, and drafts next actions.",
+    "owner": "${SPACE_ID}"
+  },
+  "sourceRequest": {
+    "userPrompt": "做一个客服 Agent，能看工单、判断优先级、追问缺失信息，并给出回复草稿。",
+    "clarifyingQuestions": [
+      "工单数据来自哪个 MCP 或 API?",
+      "优先级规则是固定规则还是由业务方维护?",
+      "回复草稿需要中文、英文还是跟随用户语言?"
+    ]
+  },
+  "targetUsers": ["support-operator", "support-lead"],
+  "coreTasks": [
+    "Read ticket context",
+    "Classify urgency and category",
+    "Identify missing information",
+    "Draft customer-facing reply",
+    "Recommend escalation when needed"
+  ],
+  "inputs": [
+    {
+      "name": "ticket",
+      "type": "object",
+      "required": true
+    },
+    {
+      "name": "customerHistory",
+      "type": "object",
+      "required": false
+    }
+  ],
+  "outputs": [
+    {
+      "name": "triage",
+      "type": "structured_summary"
+    },
+    {
+      "name": "replyDraft",
+      "type": "markdown"
+    }
+  ],
+  "capabilityPlan": {
+    "systemPrompt": "acp-dynamic",
+    "ticketMcp": "acp-dynamic",
+    "replyStyleSkill": "acp-dynamic",
+    "priorityRules": "acp-dynamic",
+    "modelConfig": "env-builtin",
+    "httpFallback": "agent-builtin",
+    "installRoot": "package-placeholder"
+  },
+  "variables": [
+    {
+      "name": "SUPPORT_API_TOKEN",
+      "type": "secret",
+      "source": "agent_variable"
+    }
+  ],
+  "skills": [
+    "agent-requirement-to-spec",
+    "code-review",
+    "verification-strategy"
+  ],
+  "promptStructure": [
+    "Identity",
+    "Mission",
+    "Boundaries",
+    "User Intents",
+    "Workflow",
+    "Tool Strategy",
+    "Output Format",
+    "Acceptance Criteria"
+  ],
+  "acceptanceScenarios": [
+    "When a ticket lacks order ID, the agent asks for it before making claims.",
+    "When the issue mentions payment failure, the agent marks priority as high and suggests escalation.",
+    "When no ticket MCP exists, the agent reports the missing capability and does not fabricate data."
+  ],
+  "risksAndBoundaries": [
+    "Do not promise refunds without policy evidence.",
+    "Do not expose internal notes in customer-facing replies."
+  ]
+}
+

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://agent.nuwax.com/schemas/nuwax-agent-cloud-debug-profile.v1.json",
+  "schemaVersion": "nuwax.agent.cloud-debug-profile.v1",
+  "profileId": "cloud-debug",
+  "description": "Cloud-computer debug profile with Zed ACP-compatible launch semantics.",
+  "workspaceRoot": "${WORKSPACE_ROOT}",
+  "agentServerId": "deepagents-template",
+  "command": "node",
+  "args": [
+    "--import",
+    "tsx",
+    "${TEMPLATE_ROOT}/src/index.ts",
+    "--config",
+    "${TEMPLATE_ROOT}/config/app-agent.config.json"
+  ],
+  "env": {
+    "LLM_PROVIDER": "openai-compatible",
+    "OPENAI_MODEL": "${OPENAI_MODEL}",
+    "OPENAI_BASE_URL": "${OPENAI_BASE_URL}",
+    "OPENAI_API_KEY": "${SECRET_OPENAI_API_KEY}",
+    "MAX_TOKENS": "${MAX_TOKENS}",
+    "LOG_LEVEL": "${LOG_LEVEL}",
+    "LOG_DIR": "${LOG_DIR}"
+  },
+  "logs": {
+    "directory": "${LOG_DIR}",
+    "retentionDays": 7
+  }
+}
+

@@ -12,6 +12,13 @@ skills/          — Progressive-loading skills (builtin + platform)
 config/          — Model, MCP, variables, permissions
 ```
 
+## Roadmap Documents
+
+- [Agent core progress](./docs/agent-core-progress.md) tracks supported, planned, blocked, and deferred agent-core capabilities.
+- [Scenario agent template design](./docs/scenario-agent-template-design.md) describes how user prompts become Agent Specs, prompts, tools, skills, variables, and `.nuwax-agent` panel/debug configuration.
+- [Scenario agent examples](./docs/scenario-agent-examples.md) provides concrete user-prompt-to-Agent-Spec examples for support, sales, data, document QA, code maintenance, and operations Agents.
+- [Package install lifecycle](./docs/package-install-lifecycle.md) records the planned npm `.tgz`, Nuwax `.tar.gz`, Nuwax `.zip`, version/platform JSON, install, upgrade, rollback, and uninstall flow.
+
 ## Quick Start
 
 ```bash
@@ -48,7 +55,7 @@ npm test
 
 ### Runtime Configuration
 - ACP/platform startup config can be supplied through `ACP_SESSION_CONFIG_JSON`
-- Real model config supports `ANTHROPIC_MODEL`, `ANTHROPIC_BASE_URL`, `ANTHROPIC_API_KEY`, and `ANTHROPIC_AUTH_TOKEN`
+- Real model config supports OpenAI-compatible (`LLM_PROVIDER=openai`, `OPENAI_MODEL`, `OPENAI_BASE_URL`, `OPENAI_API_KEY`) and Anthropic-compatible (`ANTHROPIC_MODEL`, `ANTHROPIC_BASE_URL`, `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`) settings
 - Platform endpoints are configurable through `config/platform.json`
 - Platform-bound MCP components are hydrated into the MCP manager during ACP/CLI startup when platform credentials are present
 - Default Context7 MCP is configured in `config/mcp.default.json`
@@ -67,12 +74,18 @@ Package the agent for nuwaclaw using `agent-package.json`:
 npm run package
 ```
 
-Supports distribution via npm, .tgz, or Git URL.
+Current distribution supports npm, `.tgz`, Git URL, and local Nuwax `.tar.gz`
+/ `.zip` artifacts with version/platform JSON, checksums, and local
+install/upgrade/rollback/uninstall scripts; see
+[docs/package-install-lifecycle.md](./docs/package-install-lifecycle.md).
 
 Generated release artifacts:
 
-- `deepagents-dev-templates-0.1.0.tgz`
+- `deepagents-dev-templates-<version>.tgz`
+- `dist-packages/deepagents-dev-templates-<version>-nuwax.tar.gz`
+- `dist-packages/deepagents-dev-templates-<version>-nuwax.zip`
 - `agent-package.release.json`
+- `dist-packages/package-checksums.json`
 
 ## Capabilities
 
@@ -81,6 +94,10 @@ See [docs/template-capabilities.md](./docs/template-capabilities.md) for the def
 See [docs/nuwaclaw-engine-integration.md](./docs/nuwaclaw-engine-integration.md) for the engine package, ACP launch, startup config, debug, MCP hydration, and graph contracts expected by nuwaclaw.
 
 See [docs/zed-acp-setup.md](./docs/zed-acp-setup.md) for the Zed `agent_servers` configuration template and authentication notes.
+
+See [docs/scenario-agent-template-design.md](./docs/scenario-agent-template-design.md) for `.nuwax-agent`, OpenAI-compatible debug profiles, capability source layering, and example scenario Agent generation.
+
+See [docs/scenario-agent-examples.md](./docs/scenario-agent-examples.md) for concrete scenario Agent generation examples.
 
 ## Commands
 
