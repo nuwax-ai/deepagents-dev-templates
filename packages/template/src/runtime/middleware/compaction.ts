@@ -14,12 +14,15 @@
  */
 
 import { createMiddleware, countTokensApproximately, HumanMessage } from "langchain";
+import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import type { CompactionConfig } from "../config-loader.js";
 import { logger } from "../logger.js";
 
 export interface CompactionOptions {
   config: CompactionConfig;
-  /** Model name for summary generation (e.g., "claude-sonnet-4-6") */
+  /** LLM used to generate summaries. When omitted, falls back to a deterministic placeholder. */
+  summarizer?: BaseChatModel;
+  /** Model name for log lines when summarizer is omitted. */
   modelName?: string;
 }
 
@@ -68,19 +71,121 @@ export function findCutPoint(
   return 0;
 }
 
+const SUMMARIZATION_PROMPT = `You are summarizing a conversation history that is about to be removed from the context window. The agent will continue working with only your summary plus the most recent messages.
+
+Produce a structured summary in this exact format:
+
+## Goal
+The user's original goal or task.
+
+## Key Context
+- Decisions made
+- Constraints discovered
+- Important findings (file paths, function names, configuration keys, concrete values)
+
+## Tool Usage
+- Tools called and their outcomes
+- Files created or modified (with paths)
+
+## Open Questions / Unresolved
+- Things the user still needs to decide
+- Errors encountered but not yet resolved
+
+## Current State
+- Where the agent left off
+- What the next step should be
+
+Keep the summary under 1500 words. Be specific — include file paths, function names, configuration keys, and concrete values. Do not include pleasantries or filler.`;
+
+/**
+ * Convert an array of message-like objects into plain text for summarization.
+ * Handles BaseMessage instances (from @langchain/core/messages) and plain
+ * {role, content} objects (used in tests and across tool boundaries).
+ */
+function messagesToText(messages: unknown[]): string {
+  const parts: string[] = [];
+  for (const msg of messages) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const m = msg as any;
+    const role = m.role || m.type || "unknown";
+    let content: string;
+    if (typeof m.content === "string") {
+      content = m.content;
+    } else if (Array.isArray(m.content)) {
+      // MessageContent[] — extract text parts, drop image/binary blocks
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      content = m.content
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .map((c: any) => (typeof c === "string" ? c : c?.text ?? ""))
+        .filter(Boolean)
+        .join("\n");
+    } else if (m.content == null) {
+      content = "";
+    } else {
+      content = String(m.content);
+    }
+    const name = m.name ? ` (${m.name})` : "";
+    parts.push(`[${role}${name}]: ${content}`);
+  }
+  return parts.join("\n\n");
+}
+
+function placeholderSummary(messages: unknown[], reason: string): string {
+  return `[Conversation history summarized — ${messages.length} earlier messages compressed. ${reason}]`;
+}
+
 /**
  * Generate a summary of old messages using the LLM.
- * In a real implementation, this would call the LLM.
- * For now, returns a placeholder summary.
+ * When `summarizer` is provided, calls it with a focused summarization prompt.
+ * Falls back to a deterministic placeholder if no summarizer is configured
+ * or if the LLM call fails — this preserves the fail-safe behavior the
+ * middleware had before LLM summarization was wired up.
  */
 export async function generateSummary(
-  _messages: unknown[],
-  _modelName: string
+  messages: unknown[],
+  summarizer?: BaseChatModel,
+  fallbackModelName?: string
 ): Promise<string> {
-  // TODO: Implement LLM-based summarization
-  // This would send the messages to the LLM with a summarization prompt
-  // and return the generated summary.
-  return "[Conversation history summarized - previous context compressed]";
+  if (!summarizer) {
+    logger.debug("Compaction summarizer not configured; using placeholder summary", {
+      messageCount: messages.length,
+      modelName: fallbackModelName,
+    });
+    return placeholderSummary(
+      messages,
+      "Configure a summarizer model (compaction.summarizer) to enable LLM-generated summaries."
+    );
+  }
+
+  const conversationText = messagesToText(messages);
+
+  try {
+    const response = await summarizer.invoke([
+      { role: "system", content: SUMMARIZATION_PROMPT },
+      {
+        role: "user",
+        content: `Summarize the following conversation:\n\n${conversationText}`,
+      },
+    ]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const text = typeof response.content === "string"
+      ? response.content
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      : String((response as any).content ?? "");
+    if (!text.trim()) {
+      throw new Error("Summarizer returned empty content");
+    }
+    return text;
+  } catch (err) {
+    logger.warn("LLM-based summarization failed; using fallback summary", {
+      error: err instanceof Error ? err.message : String(err),
+      messageCount: messages.length,
+    });
+    return placeholderSummary(
+      messages,
+      `Summarizer call failed: ${err instanceof Error ? err.message : String(err)}`
+    );
+  }
 }
 
 /**
@@ -146,10 +251,11 @@ export function createCompactionMiddleware(options: CompactionOptions) {
       const messagesToKeep = messages.slice(cutIndex);
 
       try {
-        // Generate summary (placeholder - would call LLM)
+        // Generate summary via LLM (with placeholder fallback)
         const summary = await generateSummary(
           messagesToCompact,
-          options.modelName ?? "claude-sonnet-4-6"
+          options.summarizer,
+          options.modelName
         );
 
         state.hasCompacted = true;
