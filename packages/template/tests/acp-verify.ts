@@ -105,23 +105,50 @@ class VerifyClient implements Client {
 
 function startServer(): ChildProcessWithoutNullStreams {
   const templateDir = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
-  // Debug: verify env vars before spawning
-  console.log(`  ${INFO} Spawning server with ANTHROPIC_BASE_URL: ${process.env.ANTHROPIC_BASE_URL || "not set"}`);
-  console.log(`  ${INFO} Spawning server with ANTHROPIC_AUTH_TOKEN: ${process.env.ANTHROPIC_AUTH_TOKEN ? "set (" + process.env.ANTHROPIC_AUTH_TOKEN.slice(-4) + ")" : "not set"}`);
+  const provider = (process.env.LLM_PROVIDER || "anthropic").toLowerCase();
+  if (provider !== "anthropic" && provider !== "openai") {
+    throw new Error(`Unsupported LLM_PROVIDER: ${provider} (expected "anthropic" or "openai")`);
+  }
+
+  // Build provider-specific env. We always clear the OTHER provider's keys so
+  // helper.ts' fallback resolution in resolveModel()/resolveSummarizerModel()
+  // can't accidentally pick up stale credentials.
+  const providerEnv: Record<string, string> = provider === "openai"
+    ? {
+        OPENAI_API_KEY: process.env.OPENAI_API_KEY || "",
+        OPENAI_BASE_URL: process.env.OPENAI_BASE_URL || "",
+        OPENAI_MODEL: process.env.OPENAI_MODEL || "",
+        ANTHROPIC_API_KEY: "",
+        ANTHROPIC_AUTH_TOKEN: "",
+        ANTHROPIC_BASE_URL: "",
+        ANTHROPIC_MODEL: "",
+      }
+    : {
+        ANTHROPIC_API_KEY: "",
+        ANTHROPIC_AUTH_TOKEN: process.env.ANTHROPIC_AUTH_TOKEN || "",
+        ANTHROPIC_BASE_URL: process.env.ANTHROPIC_BASE_URL || "https://api.deepseek.com/anthropic",
+        ANTHROPIC_MODEL: process.env.ANTHROPIC_MODEL || "deepseek-v4-pro",
+        OPENAI_API_KEY: "",
+        OPENAI_BASE_URL: "",
+        OPENAI_MODEL: "",
+      };
+
+  console.log(`  ${INFO} Provider: ${provider}`);
+  if (provider === "openai") {
+    console.log(`  ${INFO} Spawning server with OPENAI_BASE_URL: ${providerEnv.OPENAI_BASE_URL || "not set"}`);
+    console.log(`  ${INFO} Spawning server with OPENAI_API_KEY: ${providerEnv.OPENAI_API_KEY ? "set (" + providerEnv.OPENAI_API_KEY.slice(-4) + ")" : "not set"}`);
+    console.log(`  ${INFO} Spawning server with OPENAI_MODEL: ${providerEnv.OPENAI_MODEL || "not set"}`);
+  } else {
+    console.log(`  ${INFO} Spawning server with ANTHROPIC_BASE_URL: ${providerEnv.ANTHROPIC_BASE_URL || "not set"}`);
+    console.log(`  ${INFO} Spawning server with ANTHROPIC_AUTH_TOKEN: ${providerEnv.ANTHROPIC_AUTH_TOKEN ? "set (" + providerEnv.ANTHROPIC_AUTH_TOKEN.slice(-4) + ")" : "not set"}`);
+  }
+
   return spawn("node", ["--max-old-space-size=4096", "--import", "tsx", "src/index.ts", "--config", "./config/app-agent.config.json"], {
     cwd: templateDir,
     env: {
       ...process.env,
-      // Support both Anthropic and OpenAI-compatible providers
-      // Clear parent shell env vars that may conflict with .env loaded values
-      ANTHROPIC_API_KEY: "",
-      ANTHROPIC_AUTH_TOKEN: process.env.ANTHROPIC_AUTH_TOKEN || "",
-      ANTHROPIC_BASE_URL: process.env.ANTHROPIC_BASE_URL || "https://api.deepseek.com/anthropic",
-      ANTHROPIC_MODEL: process.env.ANTHROPIC_MODEL || "deepseek-v4-pro",
-      OPENAI_API_KEY: "",
-      OPENAI_BASE_URL: "",
-      OPENAI_MODEL: "",
-      LLM_PROVIDER: process.env.LLM_PROVIDER || "anthropic",
+      ...providerEnv,
+      LLM_PROVIDER: provider,
       LOG_LEVEL: "debug",
       // Override permissions mode for testing HITL
       DEEPAGENTS_PERMISSIONS_MODE: "ask",
