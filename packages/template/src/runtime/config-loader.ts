@@ -167,6 +167,13 @@ export const CompactionConfigSchema = z.object({
   reserveTokens: z.number().min(1000).default(16_384),
   /** Approximate recent context tokens to keep uncompressed. Default: 20000 */
   keepRecentTokens: z.number().min(1000).default(20_000),
+  /**
+   * Model name to use for LLM-based summarization. Same provider / credentials /
+   * baseUrl as the agent's model. Defaults to the agent's model name when unset,
+   * which is fine for small workloads but expensive for long sessions — set
+   * to a cheaper model (e.g. "claude-haiku-4-5" or "gpt-4o-mini") for production.
+   */
+  summarizerModel: z.string().optional(),
 });
 
 export const EvictionConfigSchema = z.object({

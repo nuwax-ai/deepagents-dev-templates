@@ -231,11 +231,16 @@ export function resolveModel(config: AppConfig): CreateDeepAgentParams["model"] 
  * Reuses the same provider/credentials/baseURL as the agent's model, but applies
  * summarization-appropriate settings (temperature 0, bounded maxTokens) so that
  * summaries are deterministic and cheap.
+ *
+ * Model name: defaults to the agent's model name. Override with
+ * `config.compaction.summarizerModel` to use a cheaper model (e.g. Haiku or
+ * gpt-4o-mini) for long sessions.
  */
 let cachedSummarizer: { key: string; instance: BaseChatModel } | null = null;
 
 export function resolveSummarizerModel(config: AppConfig): BaseChatModel {
-  const cacheKey = `${config.model.provider}:${config.model.name}|${config.model.baseUrl ?? ""}`;
+  const modelName = config.compaction.summarizerModel ?? config.model.name;
+  const cacheKey = `${config.model.provider}:${modelName}|${config.model.baseUrl ?? ""}`;
   if (cachedSummarizer && cachedSummarizer.key === cacheKey) {
     return cachedSummarizer.instance;
   }
@@ -260,7 +265,7 @@ export function resolveSummarizerModel(config: AppConfig): BaseChatModel {
   let instance: BaseChatModel;
   if (config.model.provider === "openai") {
     instance = new ChatOpenAI({
-      model: config.model.name,
+      model: modelName,
       apiKey,
       configuration: { baseURL: config.model.baseUrl },
       temperature: 0,    // deterministic summaries
@@ -268,7 +273,7 @@ export function resolveSummarizerModel(config: AppConfig): BaseChatModel {
     }) as unknown as BaseChatModel;
   } else {
     instance = new ChatAnthropic({
-      model: config.model.name,
+      model: modelName,
       apiKey,
       anthropicApiUrl: config.model.baseUrl,
       temperature: 0,
