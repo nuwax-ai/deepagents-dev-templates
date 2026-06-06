@@ -29,6 +29,7 @@ import { createFsPathResolver } from "./middleware/fs-path-resolver.js";
 import { createCompactionMiddleware } from "./middleware/compaction.js";
 import { createEvictionMiddleware } from "./middleware/eviction.js";
 import { createHookMiddleware, getHooks, registerConfiguredHooks } from "../app/hooks/index.js";
+import { createProtectedPathsMiddleware } from "./middleware/protected-paths.js";
 
 // ─── Runtime Context ────────────────────────────────────
 
@@ -588,16 +589,29 @@ export function discoverSubAgents(config: AppConfig, workspaceRoot?: string): Di
 
 /**
  * Build filesystem permissions for deepagents.
- * Protects denied paths from writes while allowing everything else.
- * deepagents expects absolute glob paths starting with `/`.
+ *
+ * Protects denied paths from writes while allowing everything else. The
+ * deepagents `decidePathAccess` rule evaluator uses micromatch globs against
+ * the literal `file_path` string the tool receives — which in our setup is an
+ * OS-absolute path like `/Users/foo/project/src/runtime/x.ts`, not the
+ * backend-rooted path `/src/runtime/x.ts`. So we resolve each denied entry
+ * against the workspace root to produce an absolute glob before adding the
+ * deny rule. Without this resolution, the deny glob never matches the actual
+ * file path the agent passes and the deny is silently ignored.
  */
-export function buildPermissions(config: AppConfig): FilesystemPermission[] {
+export function buildPermissions(config: AppConfig, workspaceRoot?: string): FilesystemPermission[] {
   const permissions: FilesystemPermission[] = [];
 
   for (const denied of config.permissions.deniedPaths) {
-    // Ensure path ends with / before appending ** to avoid matching sibling prefixes
-    const base = denied.endsWith("/") ? denied : `${denied}/`;
-    const globPath = base.startsWith("/") ? `${base}**` : `/${base}**`;
+    // Build the absolute path WITHOUT `resolve` eating the trailing slash.
+    // We need `/abs/dir/**` (not `/abs/dir**`) to avoid matching siblings like
+    // `/abs/dirfoo/x`. So: take the absolute base, ensure it ends in `/`, then
+    // append `**`.
+    const absoluteBase = workspaceRoot && !denied.startsWith("/")
+      ? join(workspaceRoot, denied)        // join preserves the original trailing slash
+      : denied;
+    const withSlash = absoluteBase.endsWith("/") ? absoluteBase : `${absoluteBase}/`;
+    const globPath = withSlash.startsWith("/") ? `${withSlash}**` : `/${withSlash}**`;
     permissions.push({
       operations: ["write"],
       paths: [globPath],
@@ -723,10 +737,28 @@ export function buildAgentConfigParts(
     // No HITL, no path restrictions
     interruptOn = {};
     permissions = [{ operations: ["read", "write"], paths: ["/**"], mode: "allow" as const }];
-  } else if (mode === "plan") {
+  } else {
+    // plan OR ask: protected paths are enforced. deepagents-acp's
+    // DeepAgentsServer drops `permissions` when calling `createDeepAgent`, so
+    // we mirror the deny rules with our own middleware that wraps the tool
+    // call before it reaches the filesystem. Skipped in yolo since there are
+    // no deny rules to enforce there.
+    if (config.permissions.deniedPaths.length > 0) {
+      const deniedGlobs = config.permissions.deniedPaths.map((denied) => {
+        const base = denied.endsWith("/") ? denied : `${denied}/`;
+        const absolute = base.startsWith("/")
+          ? base
+          : join(workspaceRoot, base);            // join preserves trailing `/`
+        return absolute.startsWith("/") ? `${absolute}**` : `/${absolute}**`;
+      });
+      middleware.push(createProtectedPathsMiddleware({ deniedGlobs }));
+    }
+  }
+
+  if (mode === "plan") {
     // HITL on writes + planning preamble
     interruptOn = buildInterruptOn(config.permissions.interruptOn);
-    permissions = buildPermissions(config);
+    permissions = buildPermissions(config, workspaceRoot);
     const planPreamble = `## Planning Mode
 Before making any changes, you MUST:
 1. Present a clear plan of what you intend to do
@@ -738,7 +770,7 @@ Before making any changes, you MUST:
   } else {
     // "ask" — default: HITL on writes
     interruptOn = buildInterruptOn(config.permissions.interruptOn);
-    permissions = buildPermissions(config);
+    permissions = buildPermissions(config, workspaceRoot);
   }
 
   return {
