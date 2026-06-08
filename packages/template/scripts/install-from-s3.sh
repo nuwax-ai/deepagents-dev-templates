@@ -87,10 +87,14 @@ echo "Channel '$CHANNEL' → version $VERSION"
 TMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/nuwax-agent-bootstrap-XXXXXX")
 trap 'rm -rf "$TMP_DIR"' EXIT
 
-echo "Fetching s3-fetch.sh, install.sh and upgrade.sh for version $VERSION ..."
+echo "Fetching scripts and metadata for version $VERSION ..."
 aws s3 cp "s3://$NUWAX_S3_BUCKET/$ENGINE_PREFIX/versions/$VERSION/scripts/s3-fetch.sh" "$TMP_DIR/s3-fetch.sh" "${ENDPOINT_ARGS[@]}"
 aws s3 cp "s3://$NUWAX_S3_BUCKET/$ENGINE_PREFIX/versions/$VERSION/scripts/install.sh"   "$TMP_DIR/install.sh"   "${ENDPOINT_ARGS[@]}"
 aws s3 cp "s3://$NUWAX_S3_BUCKET/$ENGINE_PREFIX/versions/$VERSION/scripts/upgrade.sh"   "$TMP_DIR/upgrade.sh"   "${ENDPOINT_ARGS[@]}"
+# Also fetch agent-package.json and package.json so install.sh can read metadata
+# even when running from a temp directory.
+aws s3 cp "s3://$NUWAX_S3_BUCKET/$ENGINE_PREFIX/versions/$VERSION/manifests/agent-package.json" "$TMP_DIR/agent-package.json" "${ENDPOINT_ARGS[@]}"
+aws s3 cp "s3://$NUWAX_S3_BUCKET/$ENGINE_PREFIX/versions/$VERSION/manifests/package.json"        "$TMP_DIR/package.json"        "${ENDPOINT_ARGS[@]}"
 chmod +x "$TMP_DIR/install.sh" "$TMP_DIR/s3-fetch.sh" "$TMP_DIR/upgrade.sh"
 
 if [[ -d "$INSTALL_ROOT" && -f "$INSTALL_ROOT/dist/index.js" ]]; then
