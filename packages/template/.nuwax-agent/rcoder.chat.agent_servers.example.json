@@ -4,19 +4,12 @@
       "type": "custom",
       "command": "node",
       "args": [
-        "${INSTALL_ROOT}/dist/index.js",
-        "--config",
-        "${INSTALL_ROOT}/config/app-agent.config.json"
+        "${INSTALL_ROOT}/dist/index.js"
       ],
       "env": {
-        "LLM_PROVIDER": "openai",
         "OPENAI_MODEL": "${OPENAI_MODEL}",
         "OPENAI_BASE_URL": "${OPENAI_BASE_URL}",
-        "OPENAI_API_KEY": "${SECRET_OPENAI_API_KEY}",
-        "MAX_TOKENS": "${MAX_TOKENS}",
-        "LOG_LEVEL": "${LOG_LEVEL}",
-        "LOG_DIR": "${LOG_DIR}",
-        "DEEPAGENTS_SANDBOX_PROFILE": "${DEEPAGENTS_SANDBOX_PROFILE}"
+        "OPENAI_API_KEY": "${SECRET_OPENAI_API_KEY}"
       }
     }
   }
