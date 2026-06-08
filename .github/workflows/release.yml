@@ -15,6 +15,9 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/template
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -34,13 +37,11 @@ jobs:
 
       - name: Publish release
         env:
-          # MinIO/S3 connection (all values are GitHub Actions secrets).
           NUWAX_S3_ENDPOINT: ${{ secrets.NUWAX_S3_ENDPOINT }}
           NUWAX_S3_REGION: ${{ secrets.NUWAX_S3_REGION }}
           NUWAX_S3_BUCKET: ${{ secrets.NUWAX_S3_BUCKET }}
           NUWAX_S3_ACCESS_KEY_ID: ${{ secrets.NUWAX_S3_ACCESS_KEY_ID }}
           NUWAX_S3_SECRET_ACCESS_KEY: ${{ secrets.NUWAX_S3_SECRET_ACCESS_KEY }}
-          # publish-s3.sh maps NUWAX_S3_* to AWS_* before calling `aws s3 cp`.
           AWS_ACCESS_KEY_ID: ${{ secrets.NUWAX_S3_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.NUWAX_S3_SECRET_ACCESS_KEY }}
         run: bash scripts/release.sh "${GITHUB_REF_NAME}"
