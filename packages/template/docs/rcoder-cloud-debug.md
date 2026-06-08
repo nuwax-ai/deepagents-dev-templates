@@ -206,7 +206,7 @@ bash scripts/uninstall.sh \
 | 字段 | 默认行为 | 何时需要显式传入 |
 | --- | --- | --- |
 | `--config <path>` | 加载 `<package>/config/app-agent.config.json` | 需要切换到自定义配置文件时 |
-| `LLM_PROVIDER` | `anthropic`（直连 Anthropic 协议） | 端点只支持 OpenAI 协议时设为 `openai` |
+| `LLM_PROVIDER` | 未设置时根据 `OPENAI_*` / `ANTHROPIC_*` 自动推断；配置文件默认 `anthropic` | 两套凭证同时存在、需强制指定协议时显式传入 |
 | `MAX_TOKENS` | `16384` | 需要调整单次输出上限时 |
 | `LOG_LEVEL` | `info` | 需要排障时设为 `debug` |
 | `LOG_DIR` | `<package>/logs` | 需要把日志写到自定义目录时 |
@@ -217,4 +217,4 @@ bash scripts/uninstall.sh \
 - 不要在同一个配置里同时下发 OpenAI 与 Anthropic 的凭证。
 - `OPENAI_API_KEY`（以及 `ANTHROPIC_API_KEY` 等敏感字段）必须放在云端环境变量或密钥占位符中，绝不能写入仓库。
 - 打包后的 rcoder 启动入口使用 `dist/index.js`，不要使用 `tsx src/index.ts`。
-- 如果端点是 OpenAI 协议（不兼容 Anthropic），请在 `env` 里把 `LLM_PROVIDER` 显式设为 `openai`。
+- OpenAI 兼容端点只需注入 `OPENAI_MODEL` / `OPENAI_BASE_URL` / `OPENAI_API_KEY`，无需再设 `LLM_PROVIDER`；仅当同时存在两套凭证且要强制走 Anthropic 协议时才设 `LLM_PROVIDER=anthropic`。

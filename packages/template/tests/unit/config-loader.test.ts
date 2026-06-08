@@ -19,6 +19,10 @@ describe("config-loader", () => {
     delete process.env.ANTHROPIC_MODEL;
     delete process.env.ANTHROPIC_BASE_URL;
     delete process.env.ANTHROPIC_AUTH_TOKEN;
+    delete process.env.OPENAI_API_KEY;
+    delete process.env.OPENAI_MODEL;
+    delete process.env.OPENAI_BASE_URL;
+    delete process.env.LLM_PROVIDER;
     delete process.env.ACP_AGENT_NAME;
     delete process.env.PLATFORM_API_BASE_URL;
     delete process.env.PLATFORM_AGENT_ID;
@@ -113,6 +117,31 @@ describe("config-loader", () => {
     expect(config.model.provider).toBe("anthropic");
     expect(config.model.name).toBe("claude-real-env-model");
     expect(config.model.baseUrl).toBe("https://llm-proxy.example.com");
+  });
+
+  it("infers openai provider from OPENAI_* env when LLM_PROVIDER is unset", async () => {
+    process.env.OPENAI_API_KEY = "sk-test";
+    process.env.OPENAI_BASE_URL = "https://api.example.com/v1";
+    process.env.OPENAI_MODEL = "gpt-4o";
+
+    const { loadConfig } = await import("../../src/runtime/config-loader.js");
+    const config = loadConfig({ configPath: "/nonexistent.json" });
+
+    expect(config.model.provider).toBe("openai");
+    expect(config.model.name).toBe("gpt-4o");
+    expect(config.model.baseUrl).toBe("https://api.example.com/v1");
+    expect(config.model.apiKeyEnv).toBe("OPENAI_API_KEY");
+  });
+
+  it("honors explicit LLM_PROVIDER over OPENAI_* inference", async () => {
+    process.env.LLM_PROVIDER = "anthropic";
+    process.env.OPENAI_API_KEY = "sk-test";
+    process.env.OPENAI_BASE_URL = "https://api.example.com/v1";
+
+    const { loadConfig } = await import("../../src/runtime/config-loader.js");
+    const config = loadConfig({ configPath: "/nonexistent.json" });
+
+    expect(config.model.provider).toBe("anthropic");
   });
 
   it("session config overrides env vars", async () => {

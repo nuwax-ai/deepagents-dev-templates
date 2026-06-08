@@ -614,6 +614,54 @@ function loadFromEnv(): Partial<AppConfig> {
   return overlay as Partial<AppConfig>;
 }
 
+/**
+ * 当未设置 LLM_PROVIDER 时，根据环境变量中的凭证族自动推断 model.provider。
+ *
+ * Zed / rcoder 的 OpenAI 兼容 profile 通常只注入 OPENAI_*，不应再强制要求
+ * LLM_PROVIDER=openai。显式设置 LLM_PROVIDER 时仍以该值为准。
+ */
+function inferModelProviderIfUnset(config: AppConfig): AppConfig {
+  const explicit = process.env.LLM_PROVIDER?.trim().toLowerCase();
+  if (explicit === "openai" || explicit === "anthropic") {
+    return config;
+  }
+
+  const hasOpenAISignals = !!(
+    process.env.OPENAI_API_KEY?.trim() ||
+    process.env.OPENAI_BASE_URL?.trim()
+  );
+  const hasAnthropicSignals = !!(
+    process.env.ANTHROPIC_API_KEY?.trim() ||
+    process.env.ANTHROPIC_AUTH_TOKEN?.trim() ||
+    process.env.ANTHROPIC_BASE_URL?.trim()
+  );
+
+  let provider: AppConfig["model"]["provider"] | null = null;
+
+  if (hasOpenAISignals && !hasAnthropicSignals) {
+    provider = "openai";
+  } else if (hasAnthropicSignals && !hasOpenAISignals) {
+    provider = "anthropic";
+  } else if (hasOpenAISignals && hasAnthropicSignals && process.env.OPENAI_API_KEY?.trim()) {
+    // 两套凭证同时存在且未指定 LLM_PROVIDER：有 OPENAI_API_KEY 时走 OpenAI 兼容路径
+    provider = "openai";
+  }
+
+  if (!provider || provider === config.model.provider) {
+    return config;
+  }
+
+  return {
+    ...config,
+    model: {
+      ...config.model,
+      provider,
+      // OpenAI 路径默认从 OPENAI_API_KEY 取密钥
+      ...(provider === "openai" ? { apiKeyEnv: "OPENAI_API_KEY" } : {}),
+    },
+  };
+}
+
 // ─── ACP Session Config ────────────────────────────────
 
 export interface ACPSessionConfig {
@@ -713,6 +761,7 @@ export function loadConfig(options: LoadConfigOptions = {}): AppConfig {
   // Layer 5: Environment variables
   const envConfig = loadFromEnv();
   config = mergeConfigLayer(config, envConfig);
+  config = inferModelProviderIfUnset(config);
 
   // Layer 6: ACP session overrides (highest priority)
   if (options.sessionConfig) {
