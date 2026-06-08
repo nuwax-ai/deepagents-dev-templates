@@ -20,7 +20,7 @@ what remains blocked by platform or protocol dependencies.
 | DeepAgents template runtime | 85% | Runtime, tools, skills, ACP entry, config, and tests are in place. |
 | Product-grade agent core | 84% | Guarded ACP internals, durable local session load summaries, harness lifecycle snapshots, and local sandbox profiles exist; auth/logout remains planned. |
 | Nuwax/Zed integration | Supported | Real Zed ACP launch, streaming, tool calls, and permissions have been validated. |
-| Distribution lifecycle | Supported locally | npm tgz, Nuwax tar/zip, version/platform JSON, checksums, local install, upgrade, rollback, and uninstall scripts exist; platform production installer validation remains planned. |
+| Distribution lifecycle | Supported locally | npm tgz, Nuwax tar/zip with bundled production `node_modules`, version/platform JSON, checksums, local install, upgrade, rollback, and uninstall scripts exist; platform production installer validation remains planned. |
 
 ## Progress Table
 
@@ -45,11 +45,11 @@ what remains blocked by platform or protocol dependencies.
 | P0 | Tooling + Integration | Built-in custom tools | Supported | `src/app/tools/` and tests | Keep tool descriptions scenario-agent friendly. |
 | P0 | Tooling + Integration | MCP config merge and platform MCP hydration | Supported | `mcp-manager` tests and startup path, `.nuwax-agent/capability-sources.json` | Keep ACP dynamic vs builtin boundaries in sync with panel config. |
 | P1 | Tooling + Integration | Platform API prompt save, component list, debug sessions | Supported locally | Unit tests with mocked platform client | Validate production endpoints with platform credentials. |
-| P1 | Distribution + Observability | npm/tgz and Nuwax tar/zip package flow | Supported | `scripts/package.sh`, `scripts/validate-package.sh`, local package smoke validation | Add platform schema validation when Nuwax schemas are available. |
+| P1 | Distribution + Observability | npm/tgz and Nuwax tar/zip package flow with bundled dependencies | Supported | `scripts/package.sh`, `scripts/validate-package.sh --require-node-modules`, local package smoke validation | Add platform schema validation when Nuwax schemas are available. |
 | P1 | Distribution + Observability | Install, upgrade, rollback, and uninstall scripts | Supported locally | `scripts/install.sh`, `scripts/upgrade.sh`, `scripts/uninstall.sh`, `/tmp` lifecycle smoke validation | Validate with production platform installer. |
 | P1 | Distribution + Observability | Code graph and inspector | Supported | `npm run graph`, inspector package | Include graph entry in platform JSON. |
 | P0 | Scenario Agent Generation | User prompt to Agent Spec workflow | Supported | `skills/builtin/agent-requirement-to-spec/SKILL.md`, `prompts/developer-agent.system.md`, `docs/scenario-agent-examples.md`, `scenario-agent-spec.test.ts` | Add platform-driven generation tests later. |
-| P0 | Scenario Agent Generation | `.nuwax-agent` capability source separation | Supported | `.nuwax-agent/capability-sources.json`, `.nuwax-agent/panel.config.json`, `.nuwax-agent/debug.agent_servers.example.json` | Wire panel schema validation when platform schemas are available. |
+| P0 | Scenario Agent Generation | `.nuwax-agent` capability source separation | Supported | `.nuwax-agent/capability-sources.json`, `.nuwax-agent/panel.config.json`, `.nuwax-agent/debug.agent_servers.example.json`, `.nuwax-agent/rcoder.chat.agent_servers.example.json` | Wire panel schema validation when platform schemas are available. |
 | P0 | Product-Grade Gaps | Reduce private `deepagents-acp` patch risk | Supported locally | `src/runtime/acp-server-internals.ts` centralizes private access with runtime guards and tests | Move to upstream-supported hooks when available. |
 | P1 | Product-Grade Gaps | Durable session load semantics | Supported locally | `loadSessionState`, `/session <id>`, ACP `handleLoadSession` metadata marker | Add platform-backed DB/index if multi-device or remote resume becomes required. |
 | P2 | Product-Grade Gaps | ACP auth/logout capability | Planned | Codex ACP comparison | Add only if target clients require it. |

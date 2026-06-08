@@ -9,7 +9,7 @@
   },
   "model": {
     "source": "acp-dynamic",
-    "provider": "openai-compatible",
+    "provider": "openai",
     "fields": [
       {
         "name": "OPENAI_MODEL",

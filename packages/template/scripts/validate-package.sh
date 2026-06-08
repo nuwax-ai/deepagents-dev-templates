@@ -4,6 +4,7 @@ set -euo pipefail
 
 ARTIFACT=""
 CHECKSUMS=""
+REQUIRE_NODE_MODULES=0
 
 usage() {
   cat <<'EOF'
@@ -11,8 +12,9 @@ Usage: bash scripts/validate-package.sh --artifact PATH [--checksums package-che
 
 Options:
   --artifact PATH      Artifact to validate
-  --checksums PATH     Optional checksum manifest
-  -h, --help           Show help
+  --checksums PATH         Optional checksum manifest
+  --require-node-modules   Require bundled node_modules in the artifact
+  -h, --help               Show help
 EOF
 }
 
@@ -25,6 +27,10 @@ while [[ $# -gt 0 ]]; do
     --checksums)
       CHECKSUMS="${2:-}"
       shift 2
+      ;;
+    --require-node-modules)
+      REQUIRE_NODE_MODULES=1
+      shift
       ;;
     -h|--help)
       usage
@@ -56,6 +62,26 @@ case "$ARTIFACT" in
     ;;
 esac
 
+if [[ "$REQUIRE_NODE_MODULES" -eq 1 ]]; then
+  entries=""
+  case "$ARTIFACT" in
+    *.zip)
+      entries=$(unzip -Z1 "$ARTIFACT")
+      if ! grep -q '/node_modules/deepagents/' <<<"$entries"; then
+        echo "Bundled node_modules missing from artifact: $ARTIFACT" >&2
+        exit 1
+      fi
+      ;;
+    *.tar.gz|*.tgz)
+      entries=$(tar -tzf "$ARTIFACT")
+      if ! grep -q '/node_modules/deepagents/' <<<"$entries"; then
+        echo "Bundled node_modules missing from artifact: $ARTIFACT" >&2
+        exit 1
+      fi
+      ;;
+  esac
+fi
+
 if [[ -n "$CHECKSUMS" ]]; then
   if [[ ! -f "$CHECKSUMS" ]]; then
     echo "Checksum manifest not found: $CHECKSUMS" >&2
@@ -83,4 +109,3 @@ NODE
 fi
 
 echo "Package validation passed: $ARTIFACT"
-

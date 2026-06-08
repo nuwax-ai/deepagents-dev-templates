@@ -95,6 +95,8 @@ See [docs/nuwaclaw-engine-integration.md](./docs/nuwaclaw-engine-integration.md)
 
 See [docs/zed-acp-setup.md](./docs/zed-acp-setup.md) for the Zed `agent_servers` configuration template and authentication notes.
 
+See [docs/rcoder-cloud-debug.md](./docs/rcoder-cloud-debug.md) for packaged rcoder cloud-computer debugging with bundled `node_modules` and chat-delivered ACP config.
+
 See [docs/scenario-agent-template-design.md](./docs/scenario-agent-template-design.md) for `.nuwax-agent`, OpenAI-compatible debug profiles, capability source layering, and example scenario Agent generation.
 
 See [docs/scenario-agent-examples.md](./docs/scenario-agent-examples.md) for concrete scenario Agent generation examples.

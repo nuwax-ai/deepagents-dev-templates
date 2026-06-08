@@ -14,7 +14,7 @@
     "${TEMPLATE_ROOT}/config/app-agent.config.json"
   ],
   "env": {
-    "LLM_PROVIDER": "openai-compatible",
+    "LLM_PROVIDER": "openai",
     "OPENAI_MODEL": "${OPENAI_MODEL}",
     "OPENAI_BASE_URL": "${OPENAI_BASE_URL}",
     "OPENAI_API_KEY": "${SECRET_OPENAI_API_KEY}",
@@ -27,4 +27,3 @@
     "retentionDays": 7
   }
 }
-

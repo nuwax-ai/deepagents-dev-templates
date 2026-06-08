@@ -21,7 +21,7 @@ Production platform installer validation is still planned work.
 
 | Decision | Choice |
 |---|---|
-| Dependency strategy | tar/zip do not include `node_modules`; install runs `npm install --omit=dev`. |
+| Dependency strategy | Nuwax tar/zip bundle production `node_modules`; install skips `npm install` when bundled dependencies exist. |
 | Version source | `package.json.version` and `agent-package.json.version` must match before packaging. |
 | npm artifact | `.tgz` from `npm pack`; kind is `npm-tgz`. |
 | Nuwax tar artifact | `.tar.gz` from a controlled staging directory; kind is `nuwax-tar`. |
@@ -85,6 +85,7 @@ bash scripts/package.sh --format tar
 bash scripts/package.sh --format zip
 bash scripts/package.sh --skip-tests
 bash scripts/package.sh --out dist-packages
+bash scripts/package.sh --format all --no-bundle-node-modules
 ```
 
 ## Packaging Flow
@@ -94,12 +95,13 @@ bash scripts/package.sh --out dist-packages
 3. Run build.
 4. Run tests by default.
 5. Copy runtime files, dist, config, prompts, skills, docs, scripts, manifests, and `.nuwax-agent` defaults to staging.
-6. Run secret scan.
-7. Generate npm `.tgz`.
-8. Generate Nuwax `.tar.gz`.
-9. Generate Nuwax `.zip`.
-10. Compute sha256 and size for every artifact.
-11. Generate `.version.json`, `.platform.json`, `agent-package.release.json`, and `package-checksums.json`.
+6. Install production dependencies into staging `node_modules` for Nuwax tar/zip unless `--no-bundle-node-modules` is used.
+7. Run secret scan.
+8. Generate npm `.tgz`.
+9. Generate Nuwax `.tar.gz`.
+10. Generate Nuwax `.zip`.
+11. Compute sha256 and size for every artifact.
+12. Generate `.version.json`, `.platform.json`, `agent-package.release.json`, and `package-checksums.json`.
 
 ## Version JSON
 
@@ -195,7 +197,7 @@ Install flow:
 2. Extract into version directory.
 3. Run secret scan.
 4. Check Node.js `>=20`.
-5. Run `npm install --omit=dev`.
+5. Use bundled `node_modules` when present; otherwise run `npm install --omit=dev`.
 6. Initialize `${SHARED_DIR}/.nuwax-agent/` from version defaults only if missing.
 7. Render non-secret placeholders: `INSTALL_ROOT`, `WORKSPACE_ROOT`, `LOG_DIR`.
 8. Create `current` symlink; if it fails, write `current.json`.
@@ -331,7 +333,7 @@ npm run build
 npm test
 npm run graph
 bash scripts/package.sh --format all
-bash scripts/validate-package.sh --artifact dist-packages/deepagents-dev-templates-<version>-nuwax.zip
+bash scripts/validate-package.sh --artifact dist-packages/deepagents-dev-templates-<version>-nuwax.zip --require-node-modules
 bash scripts/install.sh --artifact dist-packages/deepagents-dev-templates-<version>-nuwax.zip --install-root /tmp/nuwax-agent-test --force
 bash scripts/upgrade.sh --artifact dist-packages/deepagents-dev-templates-<version>-nuwax.zip --install-root /tmp/nuwax-agent-test
 bash scripts/upgrade.sh --rollback --install-root /tmp/nuwax-agent-test

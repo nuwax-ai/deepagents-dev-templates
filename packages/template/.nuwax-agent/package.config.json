@@ -4,6 +4,7 @@
   "packageId": "deepagents-template",
   "version": "${PACKAGE_VERSION}",
   "artifactTypes": ["npm-tgz", "nuwax-tar", "nuwax-zip"],
+  "dependencyStrategy": "bundle-production-node-modules",
   "entrypoints": {
     "server": "dist/index.js",
     "cli": "dist/cli/index.js"
@@ -20,10 +21,10 @@
     "template.manifest.json",
     "package.json",
     "README.md",
-    "PLAN.md"
+    "PLAN.md",
+    "node_modules/**"
   ],
   "exclude": [
-    "node_modules/**",
     "logs/**",
     ".env",
     "*.local.json",

@@ -130,7 +130,11 @@ artifact_install() {
   cp -R "$root"/. "$INSTALL_ROOT"/
 
   cd "$INSTALL_ROOT"
-  npm install --omit=dev
+  if [[ -d "$INSTALL_ROOT/node_modules" && -d "$INSTALL_ROOT/node_modules/deepagents" ]]; then
+    echo "Using bundled node_modules; skipping npm install."
+  else
+    npm install --omit=dev
+  fi
 
   if [[ ! -f "$INSTALL_ROOT/dist/index.js" ]]; then
     npm run build

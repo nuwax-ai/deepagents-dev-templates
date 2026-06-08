@@ -6,6 +6,7 @@ FORMAT="all"
 OUT_DIR="dist-packages"
 SKIP_TESTS=0
 VERSION=""
+BUNDLE_NODE_MODULES=1
 
 usage() {
   cat <<'EOF'
@@ -16,6 +17,7 @@ Options:
   --out DIR                          Output directory (default: dist-packages)
   --version VERSION                  Override package version metadata
   --skip-tests                       Build without running tests
+  --no-bundle-node-modules           Do not vendor production node_modules into Nuwax tar/zip
   -h, --help                         Show help
 EOF
 }
@@ -36,6 +38,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --skip-tests)
       SKIP_TESTS=1
+      shift
+      ;;
+    --no-bundle-node-modules)
+      BUNDLE_NODE_MODULES=0
       shift
       ;;
     -h|--help)
@@ -122,12 +128,21 @@ find "$STAGE_ROOT" -type f \( \
   -name "agent-package.release.json" \
 \) -delete
 
-node - "$STAGE_ROOT" "$VERSION" "$PKG_NAME" "$AGENT_NAME" <<'NODE'
+if [[ "$BUNDLE_NODE_MODULES" -eq 1 ]]; then
+  echo ""
+  echo "Installing production dependencies into staging node_modules..."
+  (cd "$STAGE_ROOT" && npm --cache "$NPM_CACHE" install --omit=dev)
+else
+  echo "Skipping bundled node_modules by request."
+fi
+
+node - "$STAGE_ROOT" "$VERSION" "$PKG_NAME" "$AGENT_NAME" "$BUNDLE_NODE_MODULES" <<'NODE'
 const fs = require("fs");
 const path = require("path");
 
-const [root, version, packageName, agentName] = process.argv.slice(2);
+const [root, version, packageName, agentName, bundleNodeModules] = process.argv.slice(2);
 const generatedAt = new Date().toISOString();
+const bundlesNodeModules = bundleNodeModules === "1";
 
 const versionJson = {
   schema: "nuwax.agent.version.v1",
@@ -135,6 +150,7 @@ const versionJson = {
   agentName,
   version,
   generatedAt,
+  bundlesNodeModules,
 };
 
 const platformJson = {
@@ -145,6 +161,10 @@ const platformJson = {
   entrypoints: {
     server: "dist/index.js",
     graph: "dist/index.js graph",
+  },
+  dependencies: {
+    nodeModules: bundlesNodeModules ? "bundled" : "install",
+    installCommand: bundlesNodeModules ? null : "npm install --omit=dev",
   },
   config: {
     panel: ".nuwax-agent/panel.config.json",

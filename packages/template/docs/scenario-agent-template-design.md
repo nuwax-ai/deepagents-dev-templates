@@ -62,6 +62,7 @@ and package installation.
   README.md
   panel.config.json
   debug.agent_servers.example.json
+  rcoder.chat.agent_servers.example.json
   cloud-debug.profile.json
   capability-sources.json
   agent.spec.example.json
@@ -77,6 +78,7 @@ and package installation.
 | `README.md` | Explains that this is development configuration, not runtime core logic. |
 | `panel.config.json` | Stores configuration-panel state such as prompt draft, model choice, selected MCP servers, selected skills, and publish state. |
 | `debug.agent_servers.example.json` | Zed-compatible `agent_servers` example using absolute path placeholders. |
+| `rcoder.chat.agent_servers.example.json` | Chat-delivered ACP `agent_servers` example for an installed rcoder cloud-computer package. |
 | `cloud-debug.profile.json` | Cloud computer debug profile with command, args, env placeholders, logs path, and workspace root. |
 | `capability-sources.json` | Declares whether each capability comes from ACP dynamic config, agent builtin, env builtin, package placeholder, or future work. |
 | `sandbox-profiles.json` | Declares local debug and packaged runtime sandbox/environment profiles. |

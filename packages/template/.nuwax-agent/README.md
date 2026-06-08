@@ -23,6 +23,7 @@ No real secrets should be committed here. Use placeholders such as `${SECRET_OPE
 
 - `panel.config.json` describes which configuration fields the platform panel can manage.
 - `debug.agent_servers.example.json` mirrors the Zed ACP `agent_servers` shape for local and cloud debug.
+- `rcoder.chat.agent_servers.example.json` is the chat-delivered ACP config shape for an installed rcoder cloud-computer package.
 - `cloud-debug.profile.json` defines a cloud-computer debug launch profile.
 - `capability-sources.json` maps capabilities to ACP, builtin, env, package, or future sources.
 - `sandbox-profiles.json` declares local debug and packaged runtime sandbox/environment profiles.
