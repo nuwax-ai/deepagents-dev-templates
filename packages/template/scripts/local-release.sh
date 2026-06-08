@@ -208,11 +208,13 @@ fi
 
 # ─── 写入版本号 ───────────────────────────────────────────────
 
-node <<'NODE' "$VERSION" "$TAG" "$PKG_DIR"
+VERSION="$VERSION" TAG="$TAG" PKG_DIR="$PKG_DIR" node <<'NODE'
 const fs = require("fs");
 const path = require("path");
 
-const [version, tag, pkgDir] = process.argv.slice(2);
+const version = process.env.VERSION;
+const tag = process.env.TAG;
+const pkgDir = process.env.PKG_DIR;
 
 function writeJson(rel, mutate) {
   const file = path.join(pkgDir, rel);
