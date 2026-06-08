@@ -43,11 +43,11 @@ packages/template/dist-packages/
 Expected files:
 
 ```text
-deepagents-dev-templates-0.1.1.tgz
-deepagents-dev-templates-0.1.1.tar.gz
-deepagents-dev-templates-0.1.1.zip
-deepagents-dev-templates-0.1.1.version.json
-deepagents-dev-templates-0.1.1.platform.json
+deepagents-dev-templates-<version>.tgz
+deepagents-dev-templates-<version>-nuwax.tar.gz
+deepagents-dev-templates-<version>-nuwax.zip
+deepagents-dev-templates-<version>.version.json
+deepagents-dev-templates-<version>.platform.json
 agent-package.release.json
 package-checksums.json
 ```
@@ -106,7 +106,7 @@ bash scripts/package.sh --out dist-packages
 File:
 
 ```text
-deepagents-dev-templates-0.1.1.version.json
+deepagents-dev-templates-<version>.version.json
 ```
 
 Schema:
@@ -116,13 +116,13 @@ Schema:
   "schema": "nuwax.agent.version.v1",
   "name": "deepagents-dev-templates",
   "agentName": "deepagents-app-agent",
-  "version": "0.1.1",
+  "version": "<version>",
   "engine": "deepagents-app",
   "generatedAt": "2026-06-06T00:00:00.000Z",
   "artifacts": [
-    { "kind": "npm-tgz", "file": "deepagents-dev-templates-0.1.1.tgz", "sha256": "...", "size": 0 },
-    { "kind": "nuwax-tar", "file": "deepagents-dev-templates-0.1.1.tar.gz", "sha256": "...", "size": 0 },
-    { "kind": "nuwax-zip", "file": "deepagents-dev-templates-0.1.1.zip", "sha256": "...", "size": 0 }
+    { "kind": "npm-tgz", "file": "deepagents-dev-templates-<version>.tgz", "sha256": "...", "size": 0 },
+    { "kind": "nuwax-tar", "file": "deepagents-dev-templates-<version>-nuwax.tar.gz", "sha256": "...", "size": 0 },
+    { "kind": "nuwax-zip", "file": "deepagents-dev-templates-<version>-nuwax.zip", "sha256": "...", "size": 0 }
   ],
   "runtime": {
     "node": ">=20.0.0",
@@ -136,7 +136,7 @@ Schema:
 File:
 
 ```text
-deepagents-dev-templates-0.1.1.platform.json
+deepagents-dev-templates-<version>.platform.json
 ```
 
 Schema:
@@ -145,7 +145,7 @@ Schema:
 {
   "schema": "nuwax.agent.platform.v1",
   "engine": "deepagents-app",
-  "version": "0.1.1",
+  "version": "<version>",
   "artifactType": "universal-node",
   "supportedPlatforms": [
     { "os": "darwin", "arch": ["arm64", "x64"] },
@@ -208,8 +208,8 @@ Install state:
 {
   "schema": "nuwax.agent.install-state.v1",
   "name": "deepagents-dev-templates",
-  "currentVersion": "0.1.1",
-  "installedVersions": ["0.1.1"],
+  "currentVersion": "<version>",
+  "installedVersions": ["<version>"],
   "currentPath": "${INSTALL_ROOT}/deepagents-dev-templates/current",
   "sharedPath": "${INSTALL_ROOT}/deepagents-dev-templates/shared",
   "installedAt": "2026-06-06T00:00:00.000Z"
@@ -331,7 +331,9 @@ npm run build
 npm test
 npm run graph
 bash scripts/package.sh --format all
-bash scripts/install.sh --artifact dist-packages/deepagents-dev-templates-0.1.1.zip --install-root /tmp/nuwax-agent-test
+bash scripts/validate-package.sh --artifact dist-packages/deepagents-dev-templates-<version>-nuwax.zip
+bash scripts/install.sh --artifact dist-packages/deepagents-dev-templates-<version>-nuwax.zip --install-root /tmp/nuwax-agent-test --force
+bash scripts/upgrade.sh --artifact dist-packages/deepagents-dev-templates-<version>-nuwax.zip --install-root /tmp/nuwax-agent-test
 bash scripts/upgrade.sh --rollback --install-root /tmp/nuwax-agent-test
 bash scripts/uninstall.sh --install-root /tmp/nuwax-agent-test --keep-data
 ```

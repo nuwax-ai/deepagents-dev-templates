@@ -105,9 +105,22 @@ rsync -a \
   --exclude "logs/" \
   --exclude ".env" \
   --exclude ".env.local" \
+  --exclude ".version.json" \
+  --exclude ".platform.json" \
+  --exclude "agent-package.release.json" \
+  --exclude "*.tgz" \
+  --exclude "*.tar.gz" \
+  --exclude "*.zip" \
   --exclude "*.local.json" \
   --exclude "*.tsbuildinfo" \
   ./ "$STAGE_ROOT"/
+
+find "$STAGE_ROOT" -type f \( \
+  -name "*.tgz" -o \
+  -name "*.tar.gz" -o \
+  -name "*.zip" -o \
+  -name "agent-package.release.json" \
+\) -delete
 
 node - "$STAGE_ROOT" "$VERSION" "$PKG_NAME" "$AGENT_NAME" <<'NODE'
 const fs = require("fs");
@@ -151,9 +164,13 @@ fs.writeFileSync(path.join(root, ".version.json"), JSON.stringify(versionJson, n
 fs.writeFileSync(path.join(root, ".platform.json"), JSON.stringify(platformJson, null, 2) + "\n");
 NODE
 
+cp "$STAGE_ROOT/.version.json" "$OUT_DIR/${PKG_NAME}-${VERSION}.version.json"
+cp "$STAGE_ROOT/.platform.json" "$OUT_DIR/${PKG_NAME}-${VERSION}.platform.json"
+
 build_npm_tgz() {
   echo ""
   echo "Creating npm tgz..."
+  rm -f "$OUT_DIR/${PKG_NAME}-${VERSION}.tgz"
   local pack_output
   pack_output=$(npm --cache "$NPM_CACHE" pack --pack-destination "$OUT_DIR")
   local tarball
@@ -171,6 +188,7 @@ build_tar() {
   echo ""
   echo "Creating Nuwax tar.gz..."
   local artifact="$OUT_DIR/${PKG_NAME}-${VERSION}-nuwax.tar.gz"
+  rm -f "$artifact"
   tar -C "$STAGING_DIR" -czf "$artifact" "${PKG_NAME}-${VERSION}"
   ARTIFACTS+=("$artifact")
   echo "Created $artifact"
@@ -180,6 +198,7 @@ build_zip() {
   echo ""
   echo "Creating Nuwax zip..."
   local artifact="$OUT_DIR/${PKG_NAME}-${VERSION}-nuwax.zip"
+  rm -f "$artifact"
   (cd "$STAGING_DIR" && zip -qr "$artifact" "${PKG_NAME}-${VERSION}")
   ARTIFACTS+=("$artifact")
   echo "Created $artifact"
