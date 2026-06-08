@@ -6,8 +6,8 @@
 
   "source": {
     "type": "s3",
-    "endpoint": "https://s3.nuwax.com",
-    "bucket": "nuwax-agent-registry",
+    "endpoint": "https://s3.nuwax.com:9443",
+    "bucket": "nuwax-packages",
     "region": "us-east-1",
     "prefix": "agent-engines/deepagents-app/versions/0.2.1",
     "version": "0.2.1",
