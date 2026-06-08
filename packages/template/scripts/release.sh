@@ -76,9 +76,38 @@ VERSION="${TAG#v}"
 PKG_VERSION=$(node -p "require('./package.json').version")
 AGENT_VERSION=$(node -p "require('./agent-package.json').version")
 if [[ "$VERSION" != "$PKG_VERSION" || "$VERSION" != "$AGENT_VERSION" ]]; then
-  echo "Version mismatch: tag=$VERSION package.json=$PKG_VERSION agent-package.json=$AGENT_VERSION" >&2
-  echo "Bump both to $VERSION before tagging." >&2
-  exit 1
+  echo "Version mismatch (tag=$VERSION package.json=$PKG_VERSION agent-package.json=$AGENT_VERSION) — auto-syncing..." >&2
+  VERSION="$VERSION" TAG="$TAG" PKG_DIR="$(pwd)" node <<'NODE'
+  const fs = require("fs");
+  const path = require("path");
+  const version = process.env.VERSION;
+  const tag = process.env.TAG;
+  const pkgDir = process.env.PKG_DIR;
+  function writeJson(rel, mutate) {
+    const file = path.join(pkgDir, rel);
+    const data = JSON.parse(fs.readFileSync(file, "utf8"));
+    mutate(data);
+    fs.writeFileSync(file, JSON.stringify(data, null, 2) + "\n");
+  }
+  writeJson("package.json", (j) => { j.version = version; });
+  writeJson("config/app-agent.config.json", (j) => {
+    if (j.agent) j.agent.version = version;
+  });
+  writeJson("agent-package.json", (j) => {
+    j.version = version;
+    if (j.source) {
+      j.source.version = version;
+      if (typeof j.source.prefix === "string")
+        j.source.prefix = j.source.prefix.replace(/\/versions\/[^/]+$/, `/versions/${version}`);
+    }
+    for (const alt of j.alternativeSources || []) {
+      if ("version" in alt) alt.version = version;
+      if (typeof alt.path === "string")
+        alt.path = alt.path.replace(/deepagents-dev-templates-[^.]+\.tgz$/, `deepagents-dev-templates-${version}.tgz`);
+      if (typeof alt.ref === "string" && alt.ref.startsWith("v")) alt.ref = tag;
+    }
+  });
+NODE
 fi
 
 # 2. Channel auto-detected by the same rule as publish-s3.sh.

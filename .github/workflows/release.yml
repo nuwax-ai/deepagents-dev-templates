@@ -10,7 +10,7 @@ on:
       - 'v*.*.*'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   release:
@@ -20,6 +20,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          # Use the default branch so we can push version-bump commits back.
+          ref: main
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -40,6 +42,54 @@ jobs:
 
       - name: Install node deps
         run: npm ci
+
+      - name: Sync version files to tag
+        working-directory: packages/template
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          if [[ "$VERSION" == "$PKG_VERSION" ]]; then
+            echo "Versions already in sync: $VERSION"
+            exit 0
+          fi
+          echo "Auto-syncing version files: $PKG_VERSION → $VERSION"
+          VERSION="$VERSION" TAG="$TAG" PKG_DIR="$(pwd)" node <<'NODE'
+          const fs = require("fs");
+          const path = require("path");
+          const version = process.env.VERSION;
+          const tag = process.env.TAG;
+          const pkgDir = process.env.PKG_DIR;
+          function writeJson(rel, mutate) {
+            const file = path.join(pkgDir, rel);
+            const data = JSON.parse(fs.readFileSync(file, "utf8"));
+            mutate(data);
+            fs.writeFileSync(file, JSON.stringify(data, null, 2) + "\n");
+          }
+          writeJson("package.json", (j) => { j.version = version; });
+          writeJson("config/app-agent.config.json", (j) => {
+            if (j.agent) j.agent.version = version;
+          });
+          writeJson("agent-package.json", (j) => {
+            j.version = version;
+            if (j.source) {
+              j.source.version = version;
+              if (typeof j.source.prefix === "string")
+                j.source.prefix = j.source.prefix.replace(/\/versions\/[^/]+$/, `/versions/${version}`);
+            }
+            for (const alt of j.alternativeSources || []) {
+              if ("version" in alt) alt.version = version;
+              if (typeof alt.path === "string")
+                alt.path = alt.path.replace(/deepagents-dev-templates-[^.]+\.tgz$/, `deepagents-dev-templates-${version}.tgz`);
+              if (typeof alt.ref === "string" && alt.ref.startsWith("v")) alt.ref = tag;
+            }
+          });
+          NODE
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add package.json agent-package.json config/app-agent.config.json
+          git commit -m "chore(release): sync version to ${VERSION} [skip ci]"
+          git push origin HEAD:main
 
       - name: Publish release
         env:
