@@ -67,6 +67,16 @@ s3_engine_id() {
   printf '%s' "${NUWAX_S3_ENGINE_ID:-deepagents-app}"
 }
 
+# Download a single S3 object to a local file.
+# Uses s3api get-object instead of s3 cp to avoid automatic CRC32 checksum
+# validation that AWS CLI v2 performs against MinIO response headers, which
+# can differ from the actual object content due to a MinIO multipart issue.
+# $1 = bucket, $2 = key, $3 = dest path
+_s3_download() {
+  local bucket="$1" key="$2" dest="$3"
+  aws s3api get-object --bucket "$bucket" --key "$key" $(s3_endpoint_args) "$dest" >/dev/null
+}
+
 # Resolve a channel pointer to a version string. Echoes "<version>".
 # Refuses to echo anything on error and exits non-zero.
 s3_resolve_version() {
@@ -101,8 +111,8 @@ s3_fetch_checksums() {
   bucket=$(s3_bucket)
   prefix=$(s3_prefix)
   mkdir -p "$dest_dir"
-  aws s3 cp "s3://${bucket}/${prefix}/versions/${version}/metadata/package-checksums.json" \
-    "$dest_dir/package-checksums.json" $(s3_endpoint_args) --no-checksum-validation >/dev/null
+  _s3_download "$bucket" "${prefix}/versions/${version}/metadata/package-checksums.json" \
+    "$dest_dir/package-checksums.json"
   printf '%s/package-checksums.json' "$dest_dir"
 }
 
@@ -166,7 +176,7 @@ s3_fetch_artifact_at_version() {
   local dest="$dest_dir/$file"
 
   echo "→ fetching s3://${bucket}/${prefix}/versions/${version}/artifacts/${file}"
-  aws s3 cp "s3://${bucket}/${prefix}/versions/${version}/artifacts/${file}" "$dest" $(s3_endpoint_args) --no-checksum-validation
+  _s3_download "$bucket" "${prefix}/versions/${version}/artifacts/${file}" "$dest"
 
   local checksums
   checksums=$(s3_fetch_checksums "$version" "$dest_dir") || return 1
@@ -185,7 +195,7 @@ s3_fetch_script() {
   bucket=$(s3_bucket)
   prefix=$(s3_prefix)
   mkdir -p "$(dirname "$dest")"
-  aws s3 cp "s3://${bucket}/${prefix}/versions/${version}/scripts/${name}" "$dest" $(s3_endpoint_args) --no-checksum-validation
+  _s3_download "$bucket" "${prefix}/versions/${version}/scripts/${name}" "$dest"
   chmod +x "$dest" 2>/dev/null || true
   printf '%s' "$dest"
 }
