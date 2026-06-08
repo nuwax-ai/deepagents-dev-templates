@@ -73,10 +73,13 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-require_cmd aws
 require_cmd jq
 require_cmd git
 require_cmd node
+# aws is only required for actual uploads; skip in dry-run.
+if [[ "$DRY_RUN" -eq 0 ]]; then
+  require_cmd aws
+fi
 
 # CI runs publish-s3.sh from GitHub Actions where secrets are already in
 # process.env. We do NOT load .env here; credentials must come from the
