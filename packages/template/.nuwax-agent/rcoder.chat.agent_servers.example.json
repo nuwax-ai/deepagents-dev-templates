@@ -4,7 +4,7 @@
       "type": "custom",
       "command": "node",
       "args": [
-        "${INSTALL_ROOT}/dist/index.js"
+        "${INSTALL_ROOT}/dist/bundle.mjs"
       ],
       "env": {
         "OPENAI_MODEL": "${OPENAI_MODEL}",
