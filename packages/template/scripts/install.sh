@@ -103,11 +103,11 @@ if [[ "$NO_VERIFY_SSL" -eq 1 ]]; then
   export NUWAX_S3_NO_VERIFY_SSL=1
 fi
 
-NAME=$(node -p "require('$AGENT_PKG').name")
-VERSION=$(node -p "require('$AGENT_PKG').version")
-
 local_install() {
-  echo "Installing ${NAME} v${VERSION} in development checkout..."
+  local name version
+  name=$(node -p "require('$AGENT_PKG').name")
+  version=$(node -p "require('$AGENT_PKG').version")
+  echo "Installing ${name} v${version} in development checkout..."
   cd "$PKG_DIR"
   npm install --production
 
