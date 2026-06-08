@@ -62,11 +62,12 @@ if [[ "$NO_VERIFY_SSL" -eq 1 ]]; then
   export NUWAX_S3_NO_VERIFY_SSL=1
 fi
 
-: "${NUWAX_S3_ENDPOINT:?NUWAX_S3_ENDPOINT is required}"
-: "${NUWAX_S3_BUCKET:?NUWAX_S3_BUCKET is required}"
+# Defaults for the public nuwax packages bucket.
+: "${NUWAX_S3_ENDPOINT:=https://s3.nuwax.com:9443}"
+: "${NUWAX_S3_BUCKET:=nuwax-packages}"
 
 ENGINE_PREFIX="agent-engines/deepagents-app"
-ENDPOINT_ARGS=(--endpoint-url "$NUWAX_S3_ENDPOINT")
+ENDPOINT_ARGS=(--endpoint-url "$NUWAX_S3_ENDPOINT" --no-sign-request)
 if [[ -n "${NUWAX_S3_REGION:-}" ]]; then
   ENDPOINT_ARGS+=(--region "$NUWAX_S3_REGION")
 fi

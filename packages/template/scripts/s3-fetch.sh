@@ -47,6 +47,10 @@ s3_endpoint_args() {
   endpoint=${NUWAX_S3_ENDPOINT:-$(node -p "require('$S3_FETCH_DIST_CONFIG').endpoint.url")}
   region=${NUWAX_S3_REGION:-$(node -p "require('$S3_FETCH_DIST_CONFIG').endpoint.region")}
   printf -- '--endpoint-url %s --region %s' "$endpoint" "$region"
+  # No-sign-request for public buckets; skip if credentials are set for faster rate limits.
+  if [[ -z "${NUWAX_S3_ACCESS_KEY_ID:-}" && -z "${AWS_ACCESS_KEY_ID:-}" ]]; then
+    printf -- ' --no-sign-request'
+  fi
   if [[ "${NUWAX_S3_NO_VERIFY_SSL:-0}" == "1" ]]; then
     printf -- ' --no-verify-ssl'
   fi
