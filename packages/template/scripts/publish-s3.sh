@@ -208,6 +208,7 @@ SCRIPT_FILES=(
 )
 MANIFEST_FILES=(
   "agent-package.json"
+  "package.json"
   "template.manifest.json"
 )
 
