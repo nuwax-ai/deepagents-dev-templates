@@ -63,6 +63,17 @@
   "engines": {
     "node": ">=20.0.0"
   },
+  "files": [
+    "dist",
+    "config",
+    "prompts",
+    "skills",
+    "docs",
+    "scripts",
+    ".nuwax-agent",
+    "agent-package.json",
+    "template.manifest.json"
+  ],
   "keywords": [
     "deepagents",
     "acp",

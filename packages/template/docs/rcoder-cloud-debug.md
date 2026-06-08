@@ -36,6 +36,91 @@ bash scripts/install.sh \
 Using bundled node_modules; skipping npm install.
 ```
 
+## 升级
+
+`scripts/upgrade.sh` 会在保留用户数据的前提下，把当前安装原地替换为新版本制品；如果升级过程中出问题，可以再跑一次 `--rollback` 回到上一个版本。
+
+```bash
+bash scripts/upgrade.sh \
+  --artifact dist-packages/deepagents-dev-templates-<new-version>-nuwax.zip \
+  --install-root /opt/nuwax/deepagents-template
+```
+
+升级时默认会保留以下内容（写入新版本安装目录）：
+
+- `config/*.local.json`（本地配置覆盖）
+- `.env`（API key 等环境变量）
+- `logs/**`（历史日志）
+- `skills/platform/**`（用户自加的平台技能）
+
+升级器会把当前安装备份到 `$(dirname "$INSTALL_ROOT")/.nuwax-agent-backups/$NAME-YYYYMMDDHHMMSS`，并把"上一个目录"改名保留：
+
+```text
+/opt/nuwax/deepagents-template.previous-YYYYMMDDHHMMSS
+/opt/nuwax/.nuwax-agent-backups/deepagents-template-YYYYMMDDHHMMSS
+```
+
+同时在新的安装目录里写入 `.nuwax-agent/upgrade-state.json`，记录备份路径，便于回滚。
+
+### 回滚
+
+如果升级后发现 agent 起不来，可以一次性回滚到刚被替换的版本：
+
+```bash
+bash scripts/upgrade.sh \
+  --rollback \
+  --install-root /opt/nuwax/deepagents-template
+```
+
+回滚逻辑：
+
+- 把当前（坏掉的）目录改名为 `INSTALL_ROOT.failed-YYYYMMDDHHMMSS`，方便事后排查。
+- 用 `upgrade-state.json` 里的 `backupPath` 把上一次成功的安装拷回 `INSTALL_ROOT`。
+- 不需要再传 `--artifact`。
+
+### 升级注意
+
+- 升级器以"复制-再切目录"方式替换，整个过程不是原子提交。回滚只能在**上一次成功升级的产物**之间切换，多次连续升级后只能回到最近一次。
+- 如果新版本修改了 `config/app-agent.config.json` 的字段，`.local.json` 里同名字段会按用户覆盖处理；不冲突的字段会原样保留。
+- `skills/builtin/` 是模板自带技能，每次升级都会被新版本覆盖。`skills/platform/` 是用户扩展，升级不会动。
+
+## 卸载
+
+`scripts/uninstall.sh` 默认直接删除安装目录。如果想把"用户数据"（`.env`、本地配置、日志、平台技能）留一份再删除，可以加 `--export` 或 `--keep-data`。
+
+```bash
+# 直接删除
+bash scripts/uninstall.sh \
+  --install-root /opt/nuwax/deepagents-template
+
+# 删除前先打一个 tar.gz 包，默认路径：
+#   /opt/nuwax/deepagents-template-uninstall-export-YYYYMMDDHHMMSS.tar.gz
+bash scripts/uninstall.sh \
+  --install-root /opt/nuwax/deepagents-template \
+  --keep-data
+
+# 指定导出包路径
+bash scripts/uninstall.sh \
+  --install-root /opt/nuwax/deepagents-template \
+  --export /opt/nuwax/backup/deepagents-template-snapshot.tar.gz
+```
+
+导出包里包含：
+
+- `.env`
+- `logs/**`
+- `skills/platform/**`
+- `.nuwax-agent/**`（含 `install-state.json` / `upgrade-state.json`）
+- `config/*.local.json`
+
+模板自带的 `config/app-agent.config.json`、`dist/`、`node_modules/` 等不会进入导出包——这些下次安装时随制品一起恢复。
+
+### 卸载注意
+
+- 脚本不会调用 `systemctl` / `launchd` 之类的服务管理器；如果 rcoder 是用平台 daemon 拉起的，需要先在平台侧停止 `deepagents-template` 服务。
+- `--keep-data` 和 `--export` 等价：传 `--export` 时自动按"导出再删除"流程处理；不传则只删目录、不打包。
+- 卸载前如果还想升级，先用 `upgrade.sh --rollback` 回滚到上一版本，再决定是继续升级还是卸载；卸载后无法再用回滚。
+
 ## 聊天侧 ACP 配置
 
 聊天端需要下发一个等价于 Zed ACP 格式的 `agent_servers` 配置。安装后使用绝对路径，OpenAI 兼容的模型相关设置保留为默认。

@@ -106,19 +106,37 @@ echo "Preparing staging directory..."
 mkdir -p "$STAGE_ROOT"
 rsync -a \
   --exclude ".git/" \
+  --exclude ".github/" \
+  --exclude ".idea/" \
+  --exclude ".vscode/" \
+  --exclude ".DS_Store" \
   --exclude "node_modules/" \
   --exclude "dist-packages/" \
   --exclude "logs/" \
+  --exclude "coverage/" \
+  --exclude "src/" \
+  --exclude "tests/" \
   --exclude ".env" \
   --exclude ".env.local" \
+  --exclude ".env.example" \
+  --exclude ".gitignore" \
   --exclude ".version.json" \
   --exclude ".platform.json" \
   --exclude "agent-package.release.json" \
+  --exclude "package-lock.json" \
+  --exclude "code-graph.json" \
+  --exclude "tsconfig.json" \
+  --exclude "tsconfig.*.json" \
+  --exclude "vitest.config.*" \
+  --exclude "CLAUDE.md" \
+  --exclude "QUICKSTART.md" \
   --exclude "*.tgz" \
   --exclude "*.tar.gz" \
   --exclude "*.zip" \
+  --exclude "*.log" \
   --exclude "*.local.json" \
   --exclude "*.tsbuildinfo" \
+  --exclude "*.tmp" \
   ./ "$STAGE_ROOT"/
 
 find "$STAGE_ROOT" -type f \( \
@@ -131,7 +149,7 @@ find "$STAGE_ROOT" -type f \( \
 if [[ "$BUNDLE_NODE_MODULES" -eq 1 ]]; then
   echo ""
   echo "Installing production dependencies into staging node_modules..."
-  (cd "$STAGE_ROOT" && npm --cache "$NPM_CACHE" install --omit=dev)
+  (cd "$STAGE_ROOT" && npm --cache "$NPM_CACHE" install --omit=dev --no-package-lock)
 else
   echo "Skipping bundled node_modules by request."
 fi
