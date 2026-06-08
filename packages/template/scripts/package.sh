@@ -136,6 +136,7 @@ rsync -a \
   --exclude "*.log" \
   --exclude "*.local.json" \
   --exclude "*.tsbuildinfo" \
+  --exclude "*.map" \
   --exclude "*.tmp" \
   ./ "$STAGE_ROOT"/
 

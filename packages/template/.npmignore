@@ -1,0 +1,16 @@
+src/
+tests/
+*.map
+*.tsbuildinfo
+*.local.json
+.env
+.env.local
+.env.example
+.gitignore
+code-graph.json
+tsconfig.json
+tsconfig.*.json
+vitest.config.*
+CLAUDE.md
+QUICKSTART.md
+package-lock.json
