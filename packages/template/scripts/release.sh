@@ -22,6 +22,7 @@ TAG="${1:-}"
 ALLOW_DIRTY=0
 SKIP_PACKAGE=0
 SKIP_PUBLISH=0
+SKIP_TESTS=1
 DRY_RUN=0
 
 usage() {
@@ -33,6 +34,8 @@ Options:
   --allow-dirty        Proceed even if the working tree has uncommitted changes
   --skip-package       Do not run scripts/package.sh (assume artifacts exist)
   --skip-publish       Do not run scripts/publish-s3.sh (only rebuild locally)
+  --skip-tests         Skip vitest during package.sh (default)
+  --no-skip-tests      Run vitest during package.sh
   --dry-run            Forward --dry-run to package.sh and publish-s3.sh
   -h, --help           Show help
 
@@ -53,6 +56,8 @@ while [[ $# -gt 0 ]]; do
     --allow-dirty) ALLOW_DIRTY=1; shift ;;
     --skip-package) SKIP_PACKAGE=1; shift ;;
     --skip-publish) SKIP_PUBLISH=1; shift ;;
+    --skip-tests) SKIP_TESTS=1; shift ;;
+    --no-skip-tests) SKIP_TESTS=0; shift ;;
     --dry-run) DRY_RUN=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown option: $1" >&2; usage >&2; exit 1 ;;
@@ -98,7 +103,7 @@ if [[ "$SKIP_PACKAGE" -eq 0 ]]; then
   echo
   echo "▶ package.sh"
   PKG_ARGS=(--format all)
-  if [[ "$DRY_RUN" -eq 1 ]]; then
+  if [[ "$SKIP_TESTS" -eq 1 || "$DRY_RUN" -eq 1 ]]; then
     PKG_ARGS+=(--skip-tests)
   fi
   bash scripts/package.sh "${PKG_ARGS[@]}"
