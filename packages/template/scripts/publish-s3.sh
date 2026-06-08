@@ -145,8 +145,9 @@ ARTIFACT_DIR=$(node -e "process.stdout.write(require('$DIST_CONFIG').artifacts.d
 METADATA_DIR=$(node -e "process.stdout.write(require('$DIST_CONFIG').metadata.directory.replace('{version}',process.argv[1]))" "$VERSION")
 SCRIPTS_DIR=$(node -e "process.stdout.write(require('$DIST_CONFIG').scripts.directory.replace('{version}',process.argv[1]))" "$VERSION")
 MANIFESTS_DIR=$(node -e "process.stdout.write(require('$DIST_CONFIG').manifests.directory.replace('{version}',process.argv[1]))" "$VERSION")
-LATEST_KEY="$PREFIX/$(node -p "require('$DIST_CONFIG').pointers.latest")"
-CHANNEL_KEY="$PREFIX/channels/$CHANNEL.json"
+# Pointer keys are relative to PREFIX (S3_BASE already includes PREFIX).
+LATEST_KEY="$(node -p "require('$DIST_CONFIG').pointers.latest")"
+CHANNEL_KEY="channels/$CHANNEL.json"
 VERSION_JSON_REL=$(node -e "const c=require('$DIST_CONFIG');process.stdout.write(c.consume.versionEndpointTemplate.replace('{version}',process.argv[1]).replace(c.prefix+'/',''))" "$VERSION")
 
 # Validate that the required local artifacts exist.
@@ -379,7 +380,7 @@ fi
 echo
 echo "Publish complete: $ENGINE_ID $VERSION on $CHANNEL"
 echo "Discovery endpoints:"
-echo "  latest:        $ENDPOINT/$BUCKET/$LATEST_KEY"
-echo "  $CHANNEL:      $ENDPOINT/$BUCKET/$CHANNEL_KEY"
+echo "  latest:        $ENDPOINT/$BUCKET/$PREFIX/$LATEST_KEY"
+echo "  $CHANNEL:      $ENDPOINT/$BUCKET/$PREFIX/$CHANNEL_KEY"
 echo "  version:       $ENDPOINT/$BUCKET/$PREFIX/$VERSION_JSON_REL"
 echo "  bootstrap:     $ENDPOINT/$BUCKET/$BOOTSTRAP_KEY"
