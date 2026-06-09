@@ -28,6 +28,7 @@
     "ask": "tsx src/index.ts ask",
     "run": "tsx src/index.ts run",
     "graph": "node dist/index.js graph",
+    "bundle": "bash scripts/bundle.sh",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:unit": "vitest run tests/unit",
@@ -55,6 +56,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "esbuild": "^0.25.0",
     "eslint": "^9.0.0",
     "tsx": "^4.19.0",
     "typescript": "^5.5.0",

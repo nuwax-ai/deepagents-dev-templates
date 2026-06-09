@@ -4,10 +4,10 @@
   "packageId": "deepagents-template",
   "version": "${PACKAGE_VERSION}",
   "artifactTypes": ["npm-tgz", "nuwax-tar", "nuwax-zip"],
-  "dependencyStrategy": "bundle-production-node-modules",
+  "dependencyStrategy": "esbuild-bundle",
   "entrypoints": {
-    "server": "dist/index.js",
-    "cli": "dist/cli/index.js"
+    "server": "dist/bundle.mjs",
+    "cli": "dist/bundle.mjs"
   },
   "include": [
     "dist/**",
@@ -21,8 +21,7 @@
     "template.manifest.json",
     "package.json",
     "README.md",
-    "PLAN.md",
-    "node_modules/**"
+    "PLAN.md"
   ],
   "exclude": [
     "logs/**",

@@ -4,7 +4,7 @@
 This is a template project for building AI Agents using deepagents (JS/TS) that integrate with nuwaclaw via ACP protocol.
 
 ## Architecture Rules
-- `src/runtime/` is PROTECTED — do not modify unless explicitly asked
+- `src/runtime/` (engine) and `src/surfaces/` (ACP/CLI entry) are PROTECTED — do not modify unless explicitly asked
 - `src/app/` is the business logic zone — AI and user can freely modify
 - Prompts for the target agent come ONLY from ACP — never hardcode them
 - When the AI needs a tool, ALWAYS check platform plugins first (MCP), then built-in tools, then write custom code as last resort

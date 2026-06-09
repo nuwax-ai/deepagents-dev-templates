@@ -1,3 +1,22 @@
+/**
+ * deepagents-acp Private-Internals Adapter
+ *
+ * `deepagents-acp`'s `DeepAgentsServer` does not (yet) expose stable lifecycle
+ * hooks, so the ACP surface reaches into private members (`agentConfigs`,
+ * `sessions`, `agents`, `acpBackends`, `handle*`). This module is the SINGLE
+ * place that access is allowed — every reach-through in `surfaces/acp/server.ts`
+ * goes through `getDeepAgentsServerInternals()` / `bindInternalHandler()`, which
+ * fail fast with a clear error if upstream renames or removes a member.
+ *
+ * There is a SECOND, related workaround living in
+ * `runtime/middleware/protected-paths.ts`: `DeepAgentsServer.createAgent()` calls
+ * `createDeepAgent({...})` without our `permissions` field, dropping deny rules
+ * at the bridge — so write protection is enforced by a middleware that wraps
+ * `write_file` / `edit_file` instead of relying on the `permissions` array.
+ *
+ * When upstream ships stable hooks, retire both workarounds together.
+ */
+
 import type { DeepAgentConfig } from "deepagents-acp";
 
 export interface AcpSessionState {

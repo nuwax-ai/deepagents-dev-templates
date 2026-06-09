@@ -33,6 +33,10 @@ describe("agent package manifests", () => {
       command: "node dist/index.js graph",
     });
     expect(manifest.env.optional).toContain("ACP_SESSION_CONFIG_JSON");
+    expect(manifest.env.optional).toContain("OPENAI_MODEL");
+    expect(manifest.env.optional).toContain("OPENAI_BASE_URL");
+    expect(manifest.env.optional).toContain("LOG_LEVEL");
+    expect(manifest.env.optional).toContain("LOG_DIR");
     expect(manifest.env.optional).toContain("PLATFORM_AGENT_ID");
     expect(manifest.env.optional).toContain("PLATFORM_SPACE_ID");
     expect(manifest.env.oneOfRequired).toContainEqual(["ANTHROPIC_API_KEY"]);

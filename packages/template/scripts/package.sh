@@ -17,7 +17,7 @@ Options:
   --out DIR                          Output directory (default: dist-packages)
   --version VERSION                  Override package version metadata
   --skip-tests                       Build without running tests
-  --no-bundle-node-modules           Do not vendor production node_modules into Nuwax tar/zip
+  --no-bundle-node-modules           Use legacy vendored node_modules instead of the esbuild bundle
   -h, --help                         Show help
 EOF
 }
@@ -149,10 +149,17 @@ find "$STAGE_ROOT" -type f \( \
 
 if [[ "$BUNDLE_NODE_MODULES" -eq 1 ]]; then
   echo ""
-  echo "Installing production dependencies into staging node_modules..."
-  (cd "$STAGE_ROOT" && npm --cache "$NPM_CACHE" install --omit=dev --no-package-lock)
+  echo "Bundling runnable agent into staging dist/bundle.mjs (esbuild)..."
+  # The deployable artifact ships a single self-contained bundle instead of the
+  # full production node_modules tree. Drop the tsc dist/ that rsync copied and
+  # replace it with just the esbuild bundle. The bundle is built from the real
+  # package src/ (cwd), written into the staging dir.
+  rm -rf "$STAGE_ROOT/dist"
+  ENTRY="src/index.ts" bash scripts/bundle.sh "$STAGE_ROOT/dist/bundle.mjs"
 else
-  echo "Skipping bundled node_modules by request."
+  echo ""
+  echo "Vendoring production node_modules (legacy --no-bundle-node-modules)..."
+  (cd "$STAGE_ROOT" && npm --cache "$NPM_CACHE" install --omit=dev --no-package-lock)
 fi
 
 node - "$STAGE_ROOT" "$VERSION" "$PKG_NAME" "$AGENT_NAME" "$BUNDLE_NODE_MODULES" <<'NODE'
@@ -161,7 +168,9 @@ const path = require("path");
 
 const [root, version, packageName, agentName, bundleNodeModules] = process.argv.slice(2);
 const generatedAt = new Date().toISOString();
-const bundlesNodeModules = bundleNodeModules === "1";
+// "1" → esbuild single-file bundle (default); "0" → legacy vendored node_modules.
+const esbuildBundle = bundleNodeModules === "1";
+const bundleStrategy = esbuildBundle ? "esbuild-bundle" : "vendored-node-modules";
 
 const versionJson = {
   schema: "nuwax.agent.version.v1",
@@ -169,7 +178,7 @@ const versionJson = {
   agentName,
   version,
   generatedAt,
-  bundlesNodeModules,
+  bundleStrategy,
 };
 
 const platformJson = {
@@ -178,12 +187,13 @@ const platformJson = {
   agentName,
   version,
   entrypoints: {
-    server: "dist/index.js",
-    graph: "dist/index.js graph",
+    server: esbuildBundle ? "dist/bundle.mjs" : "dist/index.js",
+    graph: esbuildBundle ? "dist/bundle.mjs graph" : "dist/index.js graph",
   },
   dependencies: {
-    nodeModules: bundlesNodeModules ? "bundled" : "install",
-    installCommand: bundlesNodeModules ? null : "npm install --omit=dev",
+    strategy: bundleStrategy,
+    nodeModules: esbuildBundle ? "none" : "bundled",
+    installCommand: esbuildBundle ? null : "npm install --omit=dev",
   },
   config: {
     panel: ".nuwax-agent/panel.config.json",
