@@ -9,7 +9,7 @@
 #   - Uploads artifacts, metadata, scripts, and manifests under
 #       engines/<engineId>/versions/<version>/
 #   - Rewrites the matching channels/<channel>.json pointer and latest.json.
-#   - Overwrites agent-engines/deepagents-app/install-from-s3.sh so the
+#   - Overwrites agent-engines/deepagents-app-ts/install-from-s3.sh so the
 #     bootstrap URL always points to the current stable install script.
 #
 # Environment overrides:
@@ -356,8 +356,8 @@ if [[ "$SKIP_POINTERS" -eq 0 ]]; then
 process.stdout.write(JSON.stringify({
   schema: "nuwax.agent.channel.v1",
   channel: process.env.CHANNEL,
-  engineId: "deepagents-app",
-  packageName: "deepagents-app",
+  engineId: "deepagents-app-ts",
+  packageName: "deepagents-app-ts",
   version: process.env.VERSION,
   gitSha: process.env.GITSHA,
   releasedAt: process.env.DATE,
@@ -382,8 +382,8 @@ NODE
 process.stdout.write(JSON.stringify({
   schema: "nuwax.agent.latest.v1",
   channel: process.env.CHANNEL,
-  engineId: "deepagents-app",
-  packageName: "deepagents-app",
+  engineId: "deepagents-app-ts",
+  packageName: "deepagents-app-ts",
   version: process.env.VERSION,
   gitSha: process.env.GITSHA,
   releasedAt: process.env.DATE,

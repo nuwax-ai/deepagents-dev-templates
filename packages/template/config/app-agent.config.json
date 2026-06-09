@@ -1,7 +1,7 @@
 {
   "$schema": "./config-schema.json",
   "agent": {
-    "name": "deepagents-app",
+    "name": "deepagents-app-ts",
     "description": "AI agent for [specific scenario]",
     "version": "0.4.0",
     "outputStyle": "concise"

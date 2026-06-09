@@ -18,7 +18,7 @@ Required fields:
 
 | Field | Purpose |
 |---|---|
-| `engine` | Stable engine id. Current value: `deepagents-app`. |
+| `engine` | Stable engine id. Current value: `deepagents-app-ts`. |
 | `source` | Default install source. V1 supports npm. |
 | `alternativeSources` | Private/offline install options. V1 supports `.tgz` and git refs. |
 | `bin.start` | ACP stdio entrypoint. Current value: `dist/index.js`. |

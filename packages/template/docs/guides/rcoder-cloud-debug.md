@@ -32,7 +32,7 @@ export NUWAX_S3_BUCKET=nuwax-packages
 export NUWAX_S3_ACCESS_KEY_ID=...            # 来自 nuwax 平台 / .env
 export NUWAX_S3_SECRET_ACCESS_KEY=...
 
-bash <(curl -fsSL $NUWAX_S3_ENDPOINT/$NUWAX_S3_BUCKET/agent-engines/deepagents-app/install-from-s3.sh) \
+bash <(curl -fsSL $NUWAX_S3_ENDPOINT/$NUWAX_S3_BUCKET/agent-engines/deepagents-app-ts-ts/install-from-s3.sh) \
   --channel stable \
   --install-root /opt/nuwax/deepagents-template
 ```
@@ -66,7 +66,7 @@ bash scripts/install.sh \
   --force
 ```
 
-`install.sh` 自动 source `s3-fetch.sh` + 加载 `.env`（如存在），从 `agent-engines/deepagents-app/channels/stable.json` 解析当前 version，下载 `nuwax-zip` 并校验 sha256，再走原生安装流程。
+`install.sh` 自动 source `s3-fetch.sh` + 加载 `.env`（如存在），从 `agent-engines/deepagents-app-ts-ts/channels/stable.json` 解析当前 version，下载 `nuwax-zip` 并校验 sha256，再走原生安装流程。
 
 凭证注入（与"从 S3 一键安装"相同）：`NUWAX_S3_*` 这 4 个 env 变量。
 

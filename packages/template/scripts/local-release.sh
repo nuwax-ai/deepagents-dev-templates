@@ -2,10 +2,10 @@
 # 本地一键发布：改版本号 → commit → tag → 打包 → 推 S3（stable / beta）
 #
 # S3 目录约定（见 .nuwax-agent/distribution.json）：
-#   agent-engines/deepagents-app/versions/<version>/...
-#   agent-engines/deepagents-app/channels/stable.json   ← 仅 stable 发布时更新
-#   agent-engines/deepagents-app/channels/beta.json     ← 仅 beta 发布时更新
-#   agent-engines/deepagents-app/latest.json            ← 仅 stable 发布时更新
+#   agent-engines/deepagents-app-ts/versions/<version>/...
+#   agent-engines/deepagents-app-ts/channels/stable.json   ← 仅 stable 发布时更新
+#   agent-engines/deepagents-app-ts/channels/beta.json     ← 仅 beta 发布时更新
+#   agent-engines/deepagents-app-ts/latest.json            ← 仅 stable 发布时更新
 #
 # Channel 与版本号：
 #   stable  版本形如 0.2.2        tag: v0.2.2
@@ -182,7 +182,7 @@ echo "Local release plan"
 echo "  channel:  $CHANNEL"
 echo "  version:  $VERSION"
 echo "  tag:      $TAG"
-echo "  s3 path:  agent-engines/deepagents-app/versions/$VERSION/"
+echo "  s3 path:  agent-engines/deepagents-app-ts/versions/$VERSION/"
 echo "  pointer:  channels/${CHANNEL}.json"
 if [[ "$CHANNEL" == "stable" ]]; then
   echo "  also:     latest.json"

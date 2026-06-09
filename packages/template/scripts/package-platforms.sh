@@ -62,7 +62,7 @@ usage() {
 Usage: bash scripts/package-platforms.sh [agentName] [version] [outDir] [options]
 
 Positional (all optional; sensible defaults):
-  agentName   default: agent-package.json .name   (e.g. deepagents-app)
+  agentName   default: agent-package.json .name   (e.g. deepagents-app-ts)
   version     default: package.json .version       (e.g. 0.2.10)
   outDir      default: dist-packages
 

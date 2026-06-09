@@ -18,7 +18,7 @@ describe("agent package manifests", () => {
       metadata: { framework: string; nodeVersion: string };
     }>("agent-package.json");
 
-    expect(manifest.engine).toBe("deepagents-app");
+    expect(manifest.engine).toBe("deepagents-app-ts");
     expect(manifest.source).toMatchObject({
       type: "s3",
       bucket: "nuwax-packages",

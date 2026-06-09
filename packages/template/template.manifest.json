@@ -1,6 +1,6 @@
 {
   "templateVersion": "1.0.0",
-  "engine": "deepagents-app",
+  "engine": "deepagents-app-ts",
   "framework": "deepagents-js",
   "description": "DeepAgents ACP Application Agent Template — development environment for building scenario-specific AI agents integrated with nuwaclaw",
 

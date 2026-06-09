@@ -10,10 +10,10 @@
     "signatureVersion": "v4"
   },
   "bucket": "nuwax-packages",
-  "engineId": "deepagents-app",
+  "engineId": "deepagents-app-ts",
   "packageName": "deepagents-dev-templates",
-  "agentName": "deepagents-app-agent",
-  "prefix": "agent-engines/deepagents-app",
+  "agentName": "deepagents-app-ts-agent",
+  "prefix": "agent-engines/deepagents-app-ts",
   "versioning": {
     "versionSource": ["package.json", "agent-package.json"],
     "versionRegex": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-[0-9A-Za-z.-]+)?(?:-[0-9A-Za-z.-]+)?$",
@@ -98,19 +98,19 @@
     ]
   },
   "consume": {
-    "discoveryEndpoint": "agent-engines/deepagents-app/latest.json",
+    "discoveryEndpoint": "agent-engines/deepagents-app-ts/latest.json",
     "channelEndpoints": {
-      "stable": "agent-engines/deepagents-app/channels/stable.json",
-      "beta": "agent-engines/deepagents-app/channels/beta.json"
+      "stable": "agent-engines/deepagents-app-ts/channels/stable.json",
+      "beta": "agent-engines/deepagents-app-ts/channels/beta.json"
     },
-    "versionEndpointTemplate": "agent-engines/deepagents-app/versions/{version}/metadata/.version.json",
-    "artifactBaseTemplate": "agent-engines/deepagents-app/versions/{version}/artifacts/",
-    "scriptBaseTemplate": "agent-engines/deepagents-app/versions/{version}/scripts/",
-    "manifestBaseTemplate": "agent-engines/deepagents-app/versions/{version}/manifests/"
+    "versionEndpointTemplate": "agent-engines/deepagents-app-ts/versions/{version}/metadata/.version.json",
+    "artifactBaseTemplate": "agent-engines/deepagents-app-ts/versions/{version}/artifacts/",
+    "scriptBaseTemplate": "agent-engines/deepagents-app-ts/versions/{version}/scripts/",
+    "manifestBaseTemplate": "agent-engines/deepagents-app-ts/versions/{version}/manifests/"
   },
   "installer": {
-    "bootstrapKey": "agent-engines/deepagents-app/install-from-s3.sh",
-    "bootstrapUrlTemplate": "${NUWAX_S3_ENDPOINT}/${NUWAX_S3_BUCKET}/agent-engines/deepagents-app/install-from-s3.sh",
+    "bootstrapKey": "agent-engines/deepagents-app-ts/install-from-s3.sh",
+    "bootstrapUrlTemplate": "${NUWAX_S3_ENDPOINT}/${NUWAX_S3_BUCKET}/agent-engines/deepagents-app-ts/install-from-s3.sh",
     "resolveChannelTemplate": "${PREFIX}/channels/{channel}.json",
     "checksumTemplate": "${PREFIX}/versions/{version}/metadata/package-checksums.json",
     "artifactTemplate": "${PREFIX}/versions/{version}/artifacts/deepagents-dev-templates-{version}-{kind}",

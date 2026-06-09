@@ -78,7 +78,7 @@ describe("config-loader", () => {
     const { loadConfig } = await import("../../../src/runtime/config/config-loader.js");
     const config = loadConfig({ workspaceRoot });
 
-    expect(config.agent.name).toBe("my-scenario-agent");
+    expect(config.agent.name).toBe("deepagents-app-ts");
     expect(config.mcp.configPath).toMatch(/packages\/template\/config\/mcp\.default\.json$/);
   });
 

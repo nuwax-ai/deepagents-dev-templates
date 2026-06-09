@@ -88,7 +88,7 @@ describe("ACP stdio server", () => {
         },
       });
 
-      expect(init.agentInfo?.name).toBe("my-scenario-agent");
+      expect(init.agentInfo?.name).toBe("deepagents-app-ts");
       expect(init.agentCapabilities.loadSession).toBe(true);
       expect(init.agentCapabilities.sessionCapabilities?.commands).toBe(true);
 
@@ -129,7 +129,7 @@ describe("ACP stdio server", () => {
         )
         .join("");
       expect(responseText).toContain("当前配置");
-      expect(responseText).toContain("my-scenario-agent");
+      expect(responseText).toContain("deepagents-app-ts");
     } catch (err) {
       throw new Error(`${err instanceof Error ? err.message : String(err)}\nACP stderr:\n${stderr}`);
     } finally {

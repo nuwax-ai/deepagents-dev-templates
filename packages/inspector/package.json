@@ -15,7 +15,7 @@
     "test": "INSPECTOR_TEMPLATE_SOURCE=1 vitest run"
   },
   "dependencies": {
-    "deepagents-app": "file:../template"
+    "deepagents-app-ts": "file:../template"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

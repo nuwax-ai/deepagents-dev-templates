@@ -18,7 +18,7 @@
 ```text
 s3://nuwax-packages/
 └── agent-engines/
-    └── deepagents-app/                                  # engineId 维度
+    └── deepagents-app-ts/                                  # engineId 维度
         ├── latest.json                                  # 当前稳定版指针
         ├── channels/
         │   ├── stable.json                              # → { version: "0.2.1", ... }
@@ -62,31 +62,31 @@ s3://nuwax-packages/
                         └── distribution.json              # 描述这次发布的 manifest 自身
 ```
 
-`agent-engines/deepagents-app/latest.json` 与 `channels/stable.json` 都指向稳定版；只有 `channels/beta.json` 指向预发布版。`latest.json` 只在 `channel=stable` 发布时更新。
+`agent-engines/deepagents-app-ts-ts/latest.json` 与 `channels/stable.json` 都指向稳定版；只有 `channels/beta.json` 指向预发布版。`latest.json` 只在 `channel=stable` 发布时更新。
 
 ## 指针（pointer）文件
 
 ```json
-// agent-engines/deepagents-app/channels/stable.json
+// agent-engines/deepagents-app-ts-ts/channels/stable.json
 {
   "schema": "nuwax.agent.channel.v1",
   "channel": "stable",
-  "engineId": "deepagents-app",
+  "engineId": "deepagents-app-ts",
   "packageName": "deepagents-dev-templates",
   "version": "0.2.1",
   "gitSha": "196ff52...",
   "releasedAt": "2026-06-08T07:00:00Z",
-  "artifactBase": "agent-engines/deepagents-app/versions/0.2.1/artifacts/",
-  "versionJsonPath": "agent-engines/deepagents-app/versions/0.2.1/metadata/.version.json"
+  "artifactBase": "agent-engines/deepagents-app-ts-ts/versions/0.2.1/artifacts/",
+  "versionJsonPath": "agent-engines/deepagents-app-ts-ts/versions/0.2.1/metadata/.version.json"
 }
 ```
 
 nuwaclaw 拉取的典型流程：
 
-1. 拉 `agent-engines/deepagents-app/latest.json`，得 `version="0.2.1"`。
-2. 拉 `agent-engines/deepagents-app/versions/0.2.1/metadata/.version.json`，校验 sha256 与 `package-checksums.json` 一致。
-3. 下载 `agent-engines/deepagents-app/versions/0.2.1/artifacts/deepagents-dev-templates-0.2.1-nuwax.zip`。
-4. 从 `agent-engines/deepagents-app/versions/0.2.1/scripts/install.sh` 拉安装脚本（保证跟制品是同一版本），然后 `bash install.sh --artifact ...`。
+1. 拉 `agent-engines/deepagents-app-ts-ts/latest.json`，得 `version="0.2.1"`。
+2. 拉 `agent-engines/deepagents-app-ts-ts/versions/0.2.1/metadata/.version.json`，校验 sha256 与 `package-checksums.json` 一致。
+3. 下载 `agent-engines/deepagents-app-ts-ts/versions/0.2.1/artifacts/deepagents-dev-templates-0.2.1-nuwax.zip`。
+4. 从 `agent-engines/deepagents-app-ts-ts/versions/0.2.1/scripts/install.sh` 拉安装脚本（保证跟制品是同一版本），然后 `bash install.sh --artifact ...`。
 
 ## tag → channel 规则
 
@@ -231,7 +231,7 @@ export NUWAX_S3_BUCKET=nuwax-packages
 export NUWAX_S3_ACCESS_KEY_ID=...            # 来自 nuwax 平台 / .env
 export NUWAX_S3_SECRET_ACCESS_KEY=...
 
-bash <(curl -fsSL $NUWAX_S3_ENDPOINT/$NUWAX_S3_BUCKET/agent-engines/deepagents-app/install-from-s3.sh) \
+bash <(curl -fsSL $NUWAX_S3_ENDPOINT/$NUWAX_S3_BUCKET/agent-engines/deepagents-app-ts-ts/install-from-s3.sh) \
   --channel stable \
   --install-root /opt/nuwax/deepagents-template
 ```
@@ -326,21 +326,21 @@ env:
 
 ## nuwaclaw 拉取端约定
 
-nuwaclaw 端读 `agent-engines/deepagents-app/channels/stable.json` 拿到当前稳定版，然后走 `agent-engines/deepagents-app/versions/<version>/scripts/install.sh` 启动本地安装。`latest.json` 作为兜底指针，nuwaclaw 启动时如果 channels 文件暂时不可达就回退到 `latest.json`。
+nuwaclaw 端读 `agent-engines/deepagents-app-ts-ts/channels/stable.json` 拿到当前稳定版，然后走 `agent-engines/deepagents-app-ts-ts/versions/<version>/scripts/install.sh` 启动本地安装。`latest.json` 作为兜底指针，nuwaclaw 启动时如果 channels 文件暂时不可达就回退到 `latest.json`。
 
 文件 / 目录布局由 `.nuwax-agent/distribution.json` 的 `consume` 段描述：
 
 ```json
 "consume": {
-  "discoveryEndpoint": "agent-engines/deepagents-app/latest.json",
+  "discoveryEndpoint": "agent-engines/deepagents-app-ts-ts/latest.json",
   "channelEndpoints": {
-    "stable": "agent-engines/deepagents-app/channels/stable.json",
-    "beta":   "agent-engines/deepagents-app/channels/beta.json"
+    "stable": "agent-engines/deepagents-app-ts-ts/channels/stable.json",
+    "beta":   "agent-engines/deepagents-app-ts-ts/channels/beta.json"
   },
-  "versionEndpointTemplate": "agent-engines/deepagents-app/versions/{version}/metadata/.version.json",
-  "artifactBaseTemplate":   "agent-engines/deepagents-app/versions/{version}/artifacts/",
-  "scriptBaseTemplate":      "agent-engines/deepagents-app/versions/{version}/scripts/",
-  "manifestBaseTemplate":    "agent-engines/deepagents-app/versions/{version}/manifests/"
+  "versionEndpointTemplate": "agent-engines/deepagents-app-ts-ts/versions/{version}/metadata/.version.json",
+  "artifactBaseTemplate":   "agent-engines/deepagents-app-ts-ts/versions/{version}/artifacts/",
+  "scriptBaseTemplate":      "agent-engines/deepagents-app-ts-ts/versions/{version}/scripts/",
+  "manifestBaseTemplate":    "agent-engines/deepagents-app-ts-ts/versions/{version}/manifests/"
 }
 ```
 
@@ -358,7 +358,7 @@ bash scripts/validate-package.sh \
   --require-node-modules
 
 # 2) 远端：拉 S3 上的 checksums，对比本地 sha256
-aws s3 cp s3://nuwax-packages/agent-engines/deepagents-app/versions/<version>/metadata/package-checksums.json /tmp/
+aws s3 cp s3://nuwax-packages/agent-engines/deepagents-app-ts-ts/versions/<version>/metadata/package-checksums.json /tmp/
 diff <(jq -S '.artifacts' dist-packages/package-checksums.json) \
      <(jq -S '.artifacts' /tmp/package-checksums.json)
 ```

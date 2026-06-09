@@ -2,7 +2,7 @@
 # Bootstrap a fresh cloud computer into an installed agent.
 #
 # Pulled by the cloud computer with a one-liner:
-#   bash <(curl -fsSL $NUWAX_S3_ENDPOINT/$NUWAX_S3_BUCKET/agent-engines/deepagents-app/install-from-s3.sh) \
+#   bash <(curl -fsSL $NUWAX_S3_ENDPOINT/$NUWAX_S3_BUCKET/agent-engines/deepagents-app-ts/install-from-s3.sh) \
 #     --channel stable \
 #     --install-root /opt/nuwax/deepagents-template
 #
@@ -65,12 +65,12 @@ fi
 # Defaults for the public nuwax packages bucket.
 : "${NUWAX_S3_ENDPOINT:=https://s3.nuwax.com:9443}"
 : "${NUWAX_S3_BUCKET:=nuwax-packages}"
-: "${NUWAX_S3_PREFIX:=agent-engines/deepagents-app}"
-: "${NUWAX_S3_ENGINE_ID:=deepagents-app}"
+: "${NUWAX_S3_PREFIX:=agent-engines/deepagents-app-ts}"
+: "${NUWAX_S3_ENGINE_ID:=deepagents-app-ts}"
 : "${NUWAX_S3_REGION:=us-east-1}"
 export NUWAX_S3_ENDPOINT NUWAX_S3_BUCKET NUWAX_S3_PREFIX NUWAX_S3_ENGINE_ID NUWAX_S3_REGION
 
-ENGINE_PREFIX="agent-engines/deepagents-app"
+ENGINE_PREFIX="agent-engines/deepagents-app-ts"
 ENDPOINT_ARGS=(--endpoint-url "$NUWAX_S3_ENDPOINT" --no-sign-request)
 if [[ -n "${NUWAX_S3_REGION:-}" ]]; then
   ENDPOINT_ARGS+=(--region "$NUWAX_S3_REGION")

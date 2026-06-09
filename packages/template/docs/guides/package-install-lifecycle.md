@@ -118,9 +118,9 @@ Schema:
 {
   "schema": "nuwax.agent.version.v1",
   "name": "deepagents-dev-templates",
-  "agentName": "deepagents-app",
+  "agentName": "deepagents-app-ts",
   "version": "<version>",
-  "engine": "deepagents-app",
+  "engine": "deepagents-app-ts",
   "generatedAt": "2026-06-06T00:00:00.000Z",
   "artifacts": [
     { "kind": "npm-tgz", "file": "deepagents-dev-templates-<version>.tgz", "sha256": "...", "size": 0 },
@@ -147,7 +147,7 @@ Schema:
 ```json
 {
   "schema": "nuwax.agent.platform.v1",
-  "engine": "deepagents-app",
+  "engine": "deepagents-app-ts",
   "version": "<version>",
   "artifactType": "universal-node",
   "supportedPlatforms": [
@@ -239,14 +239,14 @@ bash scripts/install.sh \
 S3 模式：
 
 - 自动 source `scripts/s3-fetch.sh`，加载 `.env`（如存在）。
-- 拉 `agent-engines/deepagents-app/channels/<channel>.json` 拿 version。
+- 拉 `agent-engines/deepagents-app-ts-ts/channels/<channel>.json` 拿 version。
 - 拉 `versions/<v>/artifacts/deepagents-dev-templates-<v>-nuwax.zip`，校验 sha256 后走本地安装流程。
 - 与 `--artifact <本地>` 互斥。
 
 **云端电脑一行起跑**（不走 git clone）：
 
 ```bash
-bash <(curl -fsSL https://s3.nuwax.com:9443/nuwax-packages/agent-engines/deepagents-app/install-from-s3.sh) \
+bash <(curl -fsSL https://s3.nuwax.com:9443/nuwax-packages/agent-engines/deepagents-app-ts-ts/install-from-s3.sh) \
   --channel stable \
   --install-root /opt/nuwax/deepagents-template
 ```

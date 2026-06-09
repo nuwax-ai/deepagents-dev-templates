@@ -18,7 +18,7 @@ When packaging the agent for distribution to nuwaclaw, generating the distributi
   "name": "my-scenario-agent",
   "version": "1.0.0",
   "description": "AI agent for [specific scenario]",
-  "engine": "deepagents-app",
+  "engine": "deepagents-app-ts",
   "source": {
     "type": "npm",
     "package": "@scope/my-scenario-agent",
@@ -89,7 +89,7 @@ npm install git+https://github.com/org/my-scenario-agent.git#v1.0.0
 ```
 
 ### Step 5: Verify nuwaclaw Integration
-- Confirm nuwaclaw can discover the `deepagents-app` engine
+- Confirm nuwaclaw can discover the `deepagents-app-ts` engine
 - Verify the ACP server starts from the installed package
 - Test a basic prompt through nuwaclaw
 

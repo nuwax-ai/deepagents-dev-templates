@@ -61,7 +61,7 @@ s3_bucket() {
 
 # Central name: all other names derive from this single fallback.
 # Override via NUWAX_S3_ENGINE_ID; scripts that run locally read agent-package.json instead.
-_S3_ENGINE_ID="${NUWAX_S3_ENGINE_ID:-deepagents-app}"
+_S3_ENGINE_ID="${NUWAX_S3_ENGINE_ID:-deepagents-app-ts}"
 
 s3_prefix() {
   printf '%s' "${NUWAX_S3_PREFIX:-agent-engines/${_S3_ENGINE_ID}}"

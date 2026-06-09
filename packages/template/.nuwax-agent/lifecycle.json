@@ -135,19 +135,19 @@
         "type": "s3-sync",
         "endpoint": "${NUWAX_S3_ENDPOINT}",
         "bucket": "${NUWAX_S3_BUCKET}",
-        "destination": "engines/deepagents-app/versions/${VERSION}/"
+        "destination": "engines/deepagents-app-ts/versions/${VERSION}/"
       },
       {
         "id": "update-channel-pointer",
         "type": "s3-put",
-        "key": "engines/deepagents-app/channels/${CHANNEL}.json",
+        "key": "engines/deepagents-app-ts/channels/${CHANNEL}.json",
         "cacheControl": "public, max-age=60, must-revalidate"
       },
       {
         "id": "update-latest-pointer",
         "type": "s3-put-conditional",
         "condition": "channel == 'stable'",
-        "key": "engines/deepagents-app/latest.json",
+        "key": "engines/deepagents-app-ts/latest.json",
         "cacheControl": "public, max-age=60, must-revalidate"
       }
     ]
