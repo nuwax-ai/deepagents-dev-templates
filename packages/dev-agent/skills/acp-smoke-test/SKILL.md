@@ -1,5 +1,5 @@
 ---
-name: env-check
+name: acp-smoke-test
 description: "开发阶段用 rcoder-cli 在本地启动 ACP Agent 并发送消息，快速验证改动是否可运行"
 tags: [rcoder, acp, env, dev, smoke-test]
 version: "1.0.0"
