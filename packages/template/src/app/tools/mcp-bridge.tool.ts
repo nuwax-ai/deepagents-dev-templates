@@ -123,7 +123,7 @@ async function callStdioMcpMethod(
       protocolVersion: "2024-11-05",
       capabilities: {},
       clientInfo: {
-        name: "deepagents-dev-templates",
+        name: "deepagents-app",
         version: "0.1.0",
       },
     });

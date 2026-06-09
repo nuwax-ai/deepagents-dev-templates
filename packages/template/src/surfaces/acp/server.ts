@@ -123,7 +123,7 @@ export async function bootstrap(options: ACPServerOptions = {}): Promise<void> {
   // serverVersion: prefer the config's agent.version (so consumers can
   // pin a release tag), but fall back to this package's version when
   // the config leaves it unset. This keeps the version Zed displays
-  // in sync with `npm view deepagents-dev-templates version`.
+  // in sync with `npm view deepagents-app version`.
   const pkgVersion = readPackageVersionSafe();
   const server = new DeepAgentsServer({
     agents: agentConfig,

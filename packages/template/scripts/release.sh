@@ -103,7 +103,7 @@ if [[ "$VERSION" != "$PKG_VERSION" || "$VERSION" != "$AGENT_VERSION" ]]; then
     for (const alt of j.alternativeSources || []) {
       if ("version" in alt) alt.version = version;
       if (typeof alt.path === "string")
-        alt.path = alt.path.replace(/deepagents-dev-templates-[^.]+\.tgz$/, `deepagents-dev-templates-${version}.tgz`);
+        alt.path = alt.path.replace(/deepagents-app-[^.]+\.tgz$/, `deepagents-app-${version}.tgz`);
       if (typeof alt.ref === "string" && alt.ref.startsWith("v")) alt.ref = tag;
     }
   });

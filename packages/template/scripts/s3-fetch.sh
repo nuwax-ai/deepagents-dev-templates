@@ -75,7 +75,7 @@ s3_agent_name() {
 
 # The npm package name used for npm-tgz artifacts.
 s3_pkg_name() {
-  printf '%s' "${NUWAX_S3_PKG_NAME:-deepagents-dev-templates}"
+  printf '%s' "${NUWAX_S3_PKG_NAME:-deepagents-app}"
 }
 
 # Download a public S3 object to a local file.
