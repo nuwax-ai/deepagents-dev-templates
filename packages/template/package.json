@@ -1,6 +1,6 @@
 {
   "name": "deepagents-app",
-  "version": "0.3.9",
+  "version": "0.4.0",
   "description": "DeepAgents application agent framework — run AI agents in the terminal (REPL/one-shot) or as an ACP server for nuwaclaw/Zed. Built on deepagents + LangGraph.",
   "type": "module",
   "main": "dist/index.js",
