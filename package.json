@@ -1,5 +1,5 @@
 {
-  "name": "deepagents-dev-templates-workspace",
+  "name": "deepagents-app-workspace",
   "version": "0.2.10",
   "private": true,
   "workspaces": [
