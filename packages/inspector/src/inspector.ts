@@ -3,7 +3,10 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { introspectRuntimeGraph } from "./graph-introspect.js";
 import { loadTemplateRuntime, type ACPSessionConfig, type AppConfig, type RuntimeContext } from "./template-runtime.js";
-import type { AgentOrchestrationSpec, GraphSpec, InspectMode } from "./types.js";
+import type { AgentOrchestrationSpec, EditableSpec, GraphSpec, InspectMode } from "./types.js";
+import { EDITABLE_CONFIG_FIELDS } from "./editing/editable-model.js";
+import { readConfigSource } from "./editing/config-source.js";
+import { computeProvenance } from "./editing/provenance.js";
 import {
   projectMemory,
   projectMeta,
@@ -59,6 +62,7 @@ export async function inspectAgent(options: InspectAgentOptions = {}): Promise<A
 
   return assembleSpec({
     config,
+    configPath: options.configPath ?? "config/app-agent.config.json",
     context,
     graph,
     mode,
@@ -92,6 +96,7 @@ export function defaultStaticDir(): string {
 
 interface AssembleSpecInput {
   config: AppConfig;
+  configPath: string;
   context: RuntimeContext;
   graph: GraphSpec | null;
   mode: InspectMode;
@@ -128,6 +133,29 @@ function assembleSpec(input: AssembleSpecInput): AgentOrchestrationSpec {
     permissions: projectPermissions(projectionInput),
     graph: input.graph,
     warnings: input.warnings,
+    editable: projectEditable(input.workspaceRoot, input.configPath, input.config),
+  };
+}
+
+function projectEditable(workspaceRoot: string, configPath: string, merged: AppConfig): EditableSpec {
+  const source = readConfigSource(workspaceRoot, configPath);
+  const provenance = computeProvenance(
+    source.raw,
+    merged as unknown as Record<string, unknown>,
+    EDITABLE_CONFIG_FIELDS
+  );
+  const byPath = new Map(provenance.map((p) => [p.configPath, p]));
+  return {
+    configPath,
+    fields: EDITABLE_CONFIG_FIELDS.map((field) => {
+      const p = byPath.get(field.configPath)!;
+      return {
+        ...field,
+        sourceValue: p.sourceValue,
+        effectiveValue: p.effectiveValue,
+        overridden: p.overridden,
+      };
+    }),
   };
 }
 

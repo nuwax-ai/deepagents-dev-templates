@@ -16,6 +16,7 @@ export interface AgentOrchestrationSpec {
   permissions: PermissionsSpec;
   graph: GraphSpec | null;
   warnings: string[];
+  editable: EditableSpec | null;
 }
 
 export interface AgentMeta {
@@ -99,6 +100,25 @@ export interface PermissionsSpec {
     paths: string[];
     mode: "allow" | "deny";
   }>;
+}
+
+export interface EditableFieldSpec {
+  id: string;
+  section: string;
+  configPath: string;
+  type: "enum" | "number" | "string" | "boolean" | "string[]";
+  label: string;
+  enumValues?: string[];
+  min?: number;
+  max?: number;
+  sourceValue: unknown;
+  effectiveValue: unknown;
+  overridden: boolean;
+}
+
+export interface EditableSpec {
+  configPath: string;
+  fields: EditableFieldSpec[];
 }
 
 export interface GraphSpec {
