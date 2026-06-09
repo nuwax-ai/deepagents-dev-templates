@@ -3,7 +3,14 @@ name: CI
 on:
   push:
     branches: [main]
+    paths:
+      - "packages/template/**"
+      - "packages/inspector/**"
+      - "package-lock.json"
   pull_request:
+    paths:
+      - "packages/template/**"
+      - "packages/inspector/**"
 
 permissions:
   contents: read
