@@ -36,6 +36,7 @@
       "npm run lint",
       "npm run test",
       "npm run test:acp-smoke",
+      "npm run test:bundle-smoke",
       "npm run graph"
     ],
     "description": "All acceptance commands must pass before the agent is considered ready for distribution."

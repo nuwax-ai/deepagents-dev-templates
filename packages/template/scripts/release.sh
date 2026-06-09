@@ -136,6 +136,13 @@ if [[ "$SKIP_PACKAGE" -eq 0 ]]; then
     PKG_ARGS+=(--skip-tests)
   fi
   bash scripts/package.sh "${PKG_ARGS[@]}"
+
+  echo
+  echo "▶ package-platforms.sh"
+  # Per-platform archives ({agentName}-{os}-{arch}-{version}.{ext}) + platforms.json
+  # for nuwax-file-server. --verbose so progress shows up in CI logs.
+  AGENT_NAME=$(node -p "require('./agent-package.json').name")
+  bash scripts/package-platforms.sh "$AGENT_NAME" "$VERSION" dist-packages --verbose
 else
   echo "▶ package.sh (skipped)"
 fi

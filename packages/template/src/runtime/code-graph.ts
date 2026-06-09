@@ -73,14 +73,48 @@ function listMiddlewareNodes(root: string): CodeGraphNode[] {
     });
 }
 
+/**
+ * Best-effort read of the app config JSON. Returns {} on any failure — config
+ * problems must never break graph generation (the `graph` subcommand can run
+ * when config is absent or mid-edit).
+ */
+function readAppConfig(root: string): Record<string, unknown> {
+  try {
+    const configPath = resolve(root, "config/app-agent.config.json");
+    if (existsSync(configPath)) {
+      return JSON.parse(readFileSync(configPath, "utf-8")) as Record<string, unknown>;
+    }
+  } catch {
+    // non-fatal
+  }
+  return {};
+}
+
+/**
+ * Skill scan roots, read from config `skills.directories` so the graph stays in
+ * sync with what the agent actually loads. Falls back to the built-in layout
+ * when config is missing or empty.
+ */
+function readSkillDirectories(root: string): string[] {
+  const fallback = ["skills/builtin", "skills/platform"];
+  const skills = readAppConfig(root).skills as Record<string, unknown> | undefined;
+  if (skills && Array.isArray(skills.directories) && skills.directories.length > 0) {
+    return skills.directories as string[];
+  }
+  return fallback;
+}
+
 function listSkillNodes(root: string): CodeGraphNode[] {
   const nodes: CodeGraphNode[] = [];
-  for (const base of ["skills/builtin", "skills/platform"]) {
+  const seen = new Set<string>();
+  for (const base of readSkillDirectories(root)) {
     const baseAbs = resolve(root, base);
     if (!existsSync(baseAbs)) continue;
     for (const name of readdirSync(baseAbs)) {
-      const skillPath = `${base}/${name}/SKILL.md`;
-      if (!existsSync(resolve(root, skillPath))) continue;
+      const skillPath = resolve(baseAbs, name, "SKILL.md");
+      if (!existsSync(skillPath)) continue;
+      if (seen.has(name)) continue; // a skill name wins from the first dir it appears in
+      seen.add(name);
       nodes.push({
         id: `skill:${name}`,
         label: name,
@@ -100,19 +134,11 @@ function listSkillNodes(root: string): CodeGraphNode[] {
 function listSubAgentNodes(root: string): CodeGraphNode[] {
   const nodes: CodeGraphNode[] = [];
 
-  // Read agentsDirectories from config
-  let agentsDirectories: string[] = [];
-  try {
-    const configPath = resolve(root, "config/app-agent.config.json");
-    if (existsSync(configPath)) {
-      const config = JSON.parse(readFileSync(configPath, "utf-8")) as Record<string, unknown>;
-      if (Array.isArray(config.agentsDirectories)) {
-        agentsDirectories = config.agentsDirectories as string[];
-      }
-    }
-  } catch {
-    // Config parse failure is non-fatal for code graph
-  }
+  // Read agentsDirectories from the same app config the runtime uses.
+  const config = readAppConfig(root);
+  const agentsDirectories = Array.isArray(config.agentsDirectories)
+    ? (config.agentsDirectories as string[])
+    : [];
 
   for (const agentsDir of agentsDirectories) {
     const normalized = agentsDir.startsWith("./") || agentsDir.startsWith("/") ? agentsDir : `./${agentsDir}`;

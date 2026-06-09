@@ -114,6 +114,7 @@ export async function startRepl(options: ReplOptions = {}): Promise<void> {
 
   rl.prompt();
 
+  // eslint-disable-next-line @typescript-eslint/no-misused-promises -- fire-and-forget readline handler; the agent call below has its own try/catch
   rl.on("line", async (line) => {
     const input = line.trim();
 

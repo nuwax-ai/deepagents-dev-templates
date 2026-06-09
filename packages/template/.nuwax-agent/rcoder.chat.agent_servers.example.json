@@ -4,7 +4,9 @@
       "type": "custom",
       "command": "node",
       "args": [
-        "${INSTALL_ROOT}/dist/bundle.mjs"
+        "${INSTALL_ROOT}/dist/bundle.mjs",
+        "--config",
+        "${INSTALL_ROOT}/config/app-agent.config.json"
       ],
       "env": {
         "OPENAI_MODEL": "${OPENAI_MODEL}",

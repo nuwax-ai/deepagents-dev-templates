@@ -31,7 +31,6 @@ const TEMPLATE_DIR = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
 // Load .env explicitly to get the correct API endpoint (override shell env)
 loadDotenv({ path: resolve(TEMPLATE_DIR, ".env"), override: true });
 
-let sessionId: string | undefined;
 const testResults: { name: string; pass: boolean; detail: string }[] = [];
 
 class VerifyClient implements Client {
@@ -207,7 +206,6 @@ async function run() {
       mcpServers: [],
     });
 
-    sessionId = session.sessionId;
     record("sessionId format", /^sess_/.test(session.sessionId), `got "${session.sessionId}"`);
     record("default mode", session.modes?.currentModeId === "agent", `got "${session.modes?.currentModeId}"`);
 
@@ -243,9 +241,6 @@ async function run() {
       prompt: [{ type: "text", text: "读取 package.json 并告诉我 name 字段的值，只输出值" }],
     });
 
-    const readUpdates = client.updates.filter(
-      (u: any) => u.update.sessionUpdate === "tool_call"
-    );
     const allText = client.updates
       .filter((u: any) => u.update.sessionUpdate === "agent_message_chunk")
       .map((u: any) => u.update.content?.text ?? "")

@@ -16,6 +16,9 @@ import { loadConfig, resolveConfiguredWorkspaceRoot, type ACPSessionConfig } fro
 import { logger } from "@runtime/logger.js";
 import { buildACPAgentConfigWithMcpAsync, loadSessionConfigFromEnv } from "./config-builder.js";
 import { patchSessionLifecycle } from "./session-lifecycle.js";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 export {
   buildACPAgentConfig,
@@ -36,9 +39,7 @@ function readPackageVersionSafe(): string | undefined {
   if (cachedPackageVersion !== undefined) return cachedPackageVersion;
   try {
     // Resolve relative to this file so the lookup works regardless of cwd.
-    const { readFileSync } = require("node:fs") as typeof import("node:fs");
-    const { dirname, join } = require("node:path") as typeof import("node:path");
-    const pkgPath = join(dirname(new URL(import.meta.url).pathname), "..", "..", "..", "package.json");
+    const pkgPath = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "package.json");
     const parsed = JSON.parse(readFileSync(pkgPath, "utf-8")) as { version?: string };
     cachedPackageVersion = typeof parsed?.version === "string" ? parsed.version : undefined;
   } catch {
