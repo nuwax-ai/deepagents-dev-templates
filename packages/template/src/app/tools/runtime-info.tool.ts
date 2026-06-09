@@ -8,8 +8,8 @@
 
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import { getRuntimeStorage } from "../../runtime/runtime-storage.js";
-import { readHarnessLifecycle } from "../../runtime/harness-lifecycle.js";
+import { getRuntimeStorage } from "@runtime/storage/runtime-storage.js";
+import { readHarnessLifecycle } from "@runtime/storage/harness-lifecycle.js";
 
 export interface RuntimeInfoToolOptions {
   workspaceRoot: string;

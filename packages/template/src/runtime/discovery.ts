@@ -11,7 +11,7 @@ import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { resolve, join } from "node:path";
 import { parse as parseYaml } from "yaml";
-import { type AppConfig } from "./config-loader.js";
+import { type AppConfig } from "./config/config-loader.js";
 import { logger } from "./logger.js";
 
 // ─── Memory Files ───────────────────────────────────────

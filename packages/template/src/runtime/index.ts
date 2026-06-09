@@ -16,7 +16,7 @@ export {
   type PlatformConfig,
   type PermissionsConfig,
   type ACPSessionConfig,
-} from "./config-loader.js";
+} from "./config/config-loader.js";
 export {
   PlatformClient,
   type PlatformClientOptions,
@@ -24,18 +24,18 @@ export {
   type AgentVariable,
   type ComponentBinding,
   type DebugSession,
-} from "./platform-client.js";
+} from "./platform/platform-client.js";
 export {
   MCPManager,
   type MCPServerConfig,
   type MCPConfig,
   type MergeStrategy,
-} from "./mcp-manager.js";
+} from "./platform/mcp-manager.js";
 export {
   VariableManager,
   type VariableDefinition,
   type VariableStore,
-} from "./variable-manager.js";
+} from "./platform/variable-manager.js";
 export {
   createRuntimeContext,
   createRuntimeContextAsync,

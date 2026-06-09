@@ -7,7 +7,7 @@
 
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import type { VariableManager } from "../../runtime/variable-manager.js";
+import type { VariableManager } from "@runtime/platform/variable-manager.js";
 
 /**
  * Create the agent_variable tool bound to a specific VariableManager instance.

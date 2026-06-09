@@ -14,16 +14,16 @@
  */
 
 import { type DeepAgentConfig } from "deepagents-acp";
-import { type AppConfig, type ACPSessionConfig } from "../../runtime/config-loader.js";
-import { logger } from "../../runtime/logger.js";
-import type { MCPManager } from "../../runtime/mcp-manager.js";
+import { type AppConfig, type ACPSessionConfig } from "@runtime/config/config-loader.js";
+import { logger } from "@runtime/logger.js";
+import type { MCPManager } from "@runtime/platform/mcp-manager.js";
 import {
   createRuntimeContext,
   createRuntimeContextAsync,
   buildAgentConfigParts,
   type RuntimeContext,
-} from "../../runtime/helpers.js";
-import { getAcpSlashCommandSpecs } from "../../runtime/slash-commands.js";
+} from "@runtime/helpers.js";
+import { getAcpSlashCommandSpecs } from "@runtime/slash-commands.js";
 
 // loadConfig() returns AppConfig; alias kept for readable builder signatures.
 type LoadedConfig = AppConfig;

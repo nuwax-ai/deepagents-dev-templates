@@ -7,10 +7,10 @@
  * patch.
  */
 
-import { type AppConfig } from "../../runtime/config-loader.js";
-import { type DeepAgentsServerInternals } from "../../runtime/acp-server-internals.js";
-import { executeSlashCommand, type SlashToolInfo } from "../../runtime/slash-commands.js";
-import { appendRuntimeMessage, getRuntimeStorage } from "../../runtime/runtime-storage.js";
+import { type AppConfig } from "@runtime/config/config-loader.js";
+import { type DeepAgentsServerInternals } from "@runtime/acp-server-internals.js";
+import { executeSlashCommand, type SlashToolInfo } from "@runtime/slash-commands.js";
+import { appendRuntimeMessage, getRuntimeStorage } from "@runtime/storage/runtime-storage.js";
 
 export interface AcpPromptBlock {
   type?: string;

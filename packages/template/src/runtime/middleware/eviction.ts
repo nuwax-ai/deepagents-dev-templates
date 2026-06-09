@@ -15,7 +15,7 @@
  */
 
 import { createMiddleware, ToolMessage } from "langchain";
-import type { EvictionConfig } from "../config-loader.js";
+import type { EvictionConfig } from "../config/config-loader.js";
 import { logger } from "../logger.js";
 
 export interface EvictionOptions {

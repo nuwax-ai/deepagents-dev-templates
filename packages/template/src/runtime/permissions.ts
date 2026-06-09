@@ -9,7 +9,7 @@
 
 import { join } from "node:path";
 import { type FilesystemPermission } from "deepagents";
-import { type AppConfig } from "./config-loader.js";
+import { type AppConfig } from "./config/config-loader.js";
 
 export interface SandboxPolicy {
   profile: "custom" | "workspace-write" | "read-only" | "open";

@@ -6,7 +6,7 @@
  * lifecycle patching that drives it lives in `session-lifecycle.ts`.
  */
 
-import { logger } from "../../runtime/logger.js";
+import { logger } from "@runtime/logger.js";
 
 export interface SessionInfo {
   sessionId: string;

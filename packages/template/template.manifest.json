@@ -67,8 +67,8 @@
     "src/app/tools/index.ts",
     "config/app-agent.config.json",
     "config/platform.json",
-    "docs/template-capabilities.md",
-    "docs/nuwaclaw-engine-integration.md",
+    "docs/architecture/template-capabilities.md",
+    "docs/architecture/nuwaclaw-engine-integration.md",
     "agent-package.json",
     "package.json"
   ],

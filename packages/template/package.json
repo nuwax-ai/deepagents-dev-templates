@@ -20,8 +20,8 @@
     "deepagents-app": "dist/index.js"
   },
   "scripts": {
-    "build": "tsc",
-    "dev": "tsx src/index.ts",
+    "build": "tsc && tsc-alias",
+    "dev": "tsx --tsconfig tsconfig.json src/index.ts",
     "start": "node dist/index.js",
     "start:acp": "tsx src/index.ts",
     "chat": "tsx src/index.ts chat",
@@ -58,6 +58,7 @@
     "@types/node": "^22.0.0",
     "esbuild": "^0.25.0",
     "eslint": "^9.0.0",
+    "tsc-alias": "^1.8.17",
     "tsx": "^4.19.0",
     "typescript": "^5.5.0",
     "vitest": "^2.0.0"

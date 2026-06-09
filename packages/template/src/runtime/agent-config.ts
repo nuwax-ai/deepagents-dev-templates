@@ -12,7 +12,7 @@ import type { StructuredTool } from "@langchain/core/tools";
 import type { AgentMiddleware } from "langchain";
 import { MemorySaver } from "@langchain/langgraph-checkpoint";
 import type { BaseCheckpointSaver } from "@langchain/langgraph-checkpoint";
-import { type AppConfig, type ACPSessionConfig } from "./config-loader.js";
+import { type AppConfig, type ACPSessionConfig } from "./config/config-loader.js";
 import { createStuckLoopMiddleware } from "./middleware/stuck-loop.js";
 import { createPeriodicReminderMiddleware } from "./middleware/periodic-reminder.js";
 import { createCostTrackingMiddleware } from "./middleware/cost-tracking.js";

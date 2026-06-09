@@ -12,8 +12,8 @@
  */
 
 import { DeepAgentsServer } from "deepagents-acp";
-import { loadConfig, resolveConfiguredWorkspaceRoot, type ACPSessionConfig } from "../../runtime/config-loader.js";
-import { logger } from "../../runtime/logger.js";
+import { loadConfig, resolveConfiguredWorkspaceRoot, type ACPSessionConfig } from "@runtime/config/config-loader.js";
+import { logger } from "@runtime/logger.js";
 import { buildACPAgentConfigWithMcpAsync, loadSessionConfigFromEnv } from "./config-builder.js";
 import { patchSessionLifecycle } from "./session-lifecycle.js";
 

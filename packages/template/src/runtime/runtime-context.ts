@@ -8,10 +8,10 @@
  */
 
 import type { StructuredTool } from "@langchain/core/tools";
-import { resolveConfiguredWorkspaceRoot, type AppConfig, type ACPSessionConfig } from "./config-loader.js";
-import { PlatformClient } from "./platform-client.js";
-import { MCPManager } from "./mcp-manager.js";
-import { VariableManager } from "./variable-manager.js";
+import { resolveConfiguredWorkspaceRoot, type AppConfig, type ACPSessionConfig } from "./config/config-loader.js";
+import { PlatformClient } from "./platform/platform-client.js";
+import { MCPManager } from "./platform/mcp-manager.js";
+import { VariableManager } from "./platform/variable-manager.js";
 import { createTools, type ToolContext } from "../app/tools/index.js";
 import { logger } from "./logger.js";
 

@@ -19,9 +19,9 @@ import { createPlatformApiTool } from "./platform-api.tool.js";
 import { createAgentVariableTool } from "./agent-variable.tool.js";
 import { createMcpBridgeTool } from "./mcp-bridge.tool.js";
 import { createRuntimeInfoTool } from "./runtime-info.tool.js";
-import type { PlatformClient } from "../../runtime/platform-client.js";
-import type { MCPManager } from "../../runtime/mcp-manager.js";
-import type { VariableManager } from "../../runtime/variable-manager.js";
+import type { PlatformClient } from "@runtime/platform/platform-client.js";
+import type { MCPManager } from "@runtime/platform/mcp-manager.js";
+import type { VariableManager } from "@runtime/platform/variable-manager.js";
 
 export interface ToolContext {
   /** PlatformClient when platform credentials are configured, null in local-only mode */

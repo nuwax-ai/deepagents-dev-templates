@@ -10,7 +10,7 @@ import { type CreateDeepAgentParams } from "deepagents";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { ChatOpenAI } from "@langchain/openai";
-import { type AppConfig } from "./config-loader.js";
+import { type AppConfig } from "./config/config-loader.js";
 
 /** Build the model string deepagents expects: "provider:model-name" */
 export function resolveModelString(config: AppConfig): string {

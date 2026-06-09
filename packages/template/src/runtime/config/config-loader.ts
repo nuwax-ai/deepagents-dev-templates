@@ -30,7 +30,7 @@ export * from "./config-schema.js";
 export { deepMerge } from "./deep-merge.js";
 
 const RUNTIME_DIR = dirname(fileURLToPath(import.meta.url));
-const TEMPLATE_PACKAGE_ROOT = resolve(RUNTIME_DIR, "..", "..");
+const TEMPLATE_PACKAGE_ROOT = resolve(RUNTIME_DIR, "..", "..", "..");
 
 function readBuiltinTemplateConfigNameFromEnv(): BuiltinTemplateConfigName | undefined {
   const name = process.env.DEEPAGENTS_BUILTIN_CONFIG;

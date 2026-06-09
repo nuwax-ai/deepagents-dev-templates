@@ -174,12 +174,12 @@ export function generateCodeGraph(root = process.cwd()): CodeGraph {
   for (const [id, label, path] of [
     ["runtime:acp-server", "ACP server", "src/surfaces/acp/server.ts"],
     ["runtime:agent-factory", "Agent factory", "src/runtime/agent-factory.ts"],
-    ["runtime:config-loader", "Config loader", "src/runtime/config-loader.ts"],
+    ["runtime:config-loader", "Config loader", "src/runtime/config/config-loader.ts"],
     ["runtime:helpers", "Runtime helpers", "src/runtime/helpers.ts"],
-    ["runtime:platform-client", "Platform client", "src/runtime/platform-client.ts"],
-    ["runtime:mcp-manager", "MCP manager", "src/runtime/mcp-manager.ts"],
-    ["runtime:variables", "Variable manager", "src/runtime/variable-manager.ts"],
-    ["runtime:harness-lifecycle", "Harness lifecycle", "src/runtime/harness-lifecycle.ts"],
+    ["runtime:platform-client", "Platform client", "src/runtime/platform/platform-client.ts"],
+    ["runtime:mcp-manager", "MCP manager", "src/runtime/platform/mcp-manager.ts"],
+    ["runtime:variables", "Variable manager", "src/runtime/platform/variable-manager.ts"],
+    ["runtime:harness-lifecycle", "Harness lifecycle", "src/runtime/storage/harness-lifecycle.ts"],
     ["runtime:code-graph", "Code graph generator", "src/runtime/code-graph.ts"],
   ] as const) {
     addIfExists(nodes, root, {

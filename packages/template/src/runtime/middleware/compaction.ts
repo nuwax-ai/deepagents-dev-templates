@@ -15,7 +15,7 @@
 
 import { createMiddleware, countTokensApproximately, HumanMessage } from "langchain";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
-import type { CompactionConfig } from "../config-loader.js";
+import type { CompactionConfig } from "../config/config-loader.js";
 import { logger } from "../logger.js";
 
 export interface CompactionOptions {

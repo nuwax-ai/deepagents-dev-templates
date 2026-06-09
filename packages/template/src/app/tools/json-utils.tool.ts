@@ -7,7 +7,7 @@
 
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import { deepMerge } from "../../runtime/config-loader.js";
+import { deepMerge } from "@runtime/config/config-loader.js";
 
 export const jsonUtilsTool = tool(
   async ({ operation, input, path, second }) => {

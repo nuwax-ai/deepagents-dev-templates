@@ -11,7 +11,7 @@
 
 import { describe, it, expect } from "vitest";
 import { buildPermissions, buildAgentConfigParts, resolveSandboxPolicy } from "../../src/runtime/helpers.js";
-import type { AppConfig } from "../../src/runtime/config-loader.js";
+import type { AppConfig } from "../../src/runtime/config/config-loader.js";
 
 function makeConfig(deniedPaths: string[], sandbox?: Partial<AppConfig["sandbox"]>): AppConfig {
   return {

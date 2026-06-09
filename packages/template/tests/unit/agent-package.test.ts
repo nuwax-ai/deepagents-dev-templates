@@ -71,7 +71,7 @@ describe("agent package manifests", () => {
       "deepagents-builtin",
       "write-code",
     ]);
-    expect(template.requiredFiles).toContain("docs/nuwaclaw-engine-integration.md");
+    expect(template.requiredFiles).toContain("docs/architecture/nuwaclaw-engine-integration.md");
     expect(template.distribution.supportedSources).toEqual(["npm", "tgz", "git"]);
     expect(template.distribution.entryPoint).toBe("dist/index.js");
   });

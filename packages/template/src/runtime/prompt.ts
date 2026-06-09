@@ -9,7 +9,7 @@
 
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { type AppConfig, type ACPSessionConfig } from "./config-loader.js";
+import { type AppConfig, type ACPSessionConfig } from "./config/config-loader.js";
 
 /**
  * Resolve system prompt with priority chain:

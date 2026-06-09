@@ -7,17 +7,17 @@
 
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { createAppAgentAsync } from "../../runtime/agent-factory.js";
-import { loadConfig, resolveConfiguredWorkspaceRoot } from "../../runtime/config-loader.js";
-import { resolveCliSystemPrompt } from "../../runtime/helpers.js";
-import { logger } from "../../runtime/logger.js";
+import { createAppAgentAsync } from "@runtime/agent-factory.js";
+import { loadConfig, resolveConfiguredWorkspaceRoot } from "@runtime/config/config-loader.js";
+import { resolveCliSystemPrompt } from "@runtime/helpers.js";
+import { logger } from "@runtime/logger.js";
 import {
   appendRuntimeMessage,
   createSessionId,
   ensureSessionState,
   getRuntimeStorage,
   withRuntimeStorageContext,
-} from "../../runtime/runtime-storage.js";
+} from "@runtime/storage/runtime-storage.js";
 
 const log = logger.child("one-shot");
 
@@ -90,43 +90,4 @@ export async function runPromptFile(
 
 // ─── Helpers ───────────────────────────────────────────
 
-function extractContent(response: unknown): string {
-  if (!response) return "(no response)";
-  if (typeof response === "string") return response;
-
-  if (Array.isArray(response)) {
-    return response
-      .map((m) => extractContent(m))
-      .filter(Boolean)
-      .join("\n");
-  }
-
-  const r = response as { messages?: unknown[]; content?: unknown; text?: unknown };
-  if (Array.isArray(r.messages)) {
-    return r.messages
-      .map((m) => extractContent(m))
-      .filter(Boolean)
-      .join("\n");
-  }
-
-  if (typeof r.content === "string") return r.content;
-  if (typeof r.text === "string") return r.text;
-
-  if (Array.isArray(r.content)) {
-    return r.content
-      .map((b) => {
-        if (typeof b === "string") return b;
-        const block = b as { type?: string; text?: string };
-        if (block.type === "text" && typeof block.text === "string") return block.text;
-        return "";
-      })
-      .filter(Boolean)
-      .join("\n");
-  }
-
-  try {
-    return JSON.stringify(response, null, 2);
-  } catch {
-    return String(response);
-  }
-}
+import { extractContent } from "./extract-content.js";
