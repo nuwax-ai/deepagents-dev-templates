@@ -14,8 +14,8 @@ import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { getRuntimeStorage, listSessions } from "@runtime/storage/runtime-storage.js";
-import { truncate } from "@runtime/utils/string.js";
+import { getRuntimeStorage, listSessions } from "../../runtime/storage/runtime-storage.js";
+import { truncate } from "../../runtime/utils/string.js";
 
 const HISTORY_DIR = "conversation_history";
 

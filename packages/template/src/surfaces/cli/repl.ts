@@ -17,18 +17,18 @@
 import * as readline from "node:readline";
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { createAppAgentAsync } from "@runtime/agent-factory.js";
-import { loadConfig, resolveConfiguredWorkspaceRoot } from "@runtime/config/config-loader.js";
-import { resolveCliSystemPrompt } from "@runtime/helpers.js";
-import { logger } from "@runtime/logger.js";
-import { executeSlashCommand } from "@runtime/slash-commands.js";
+import { createAppAgentAsync } from "../../runtime/agent-factory.js";
+import { loadConfig, resolveConfiguredWorkspaceRoot } from "../../runtime/config/config-loader.js";
+import { resolveCliSystemPrompt } from "../../runtime/helpers.js";
+import { logger } from "../../runtime/logger.js";
+import { executeSlashCommand } from "../../runtime/slash-commands.js";
 import {
   appendRuntimeMessage,
   createSessionId,
   ensureSessionState,
   getRuntimeStorage,
   withRuntimeStorageContext,
-} from "@runtime/storage/runtime-storage.js";
+} from "../../runtime/storage/runtime-storage.js";
 
 const log = logger.child("repl");
 

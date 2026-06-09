@@ -18,12 +18,7 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noImplicitReturns": true,
-    "noFallthroughCasesInSwitch": true,
-    "paths": {
-      "@runtime/*": ["./src/runtime/*"],
-      "@app/*": ["./src/app/*"]
-    },
-    "baseUrl": "."
+    "noFallthroughCasesInSwitch": true
   },
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist", "tests"]
