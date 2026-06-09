@@ -15,6 +15,7 @@ import { z } from "zod";
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { getRuntimeStorage, listSessions } from "@runtime/storage/runtime-storage.js";
+import { truncate } from "@runtime/utils/string.js";
 
 const HISTORY_DIR = "conversation_history";
 
@@ -135,7 +136,7 @@ export const conversationHistoryTool = tool(
         case "read": {
           const sessionContent = readSessionMessages(storage.messagesPath);
           if (sessionContent) {
-            return truncate(sessionContent);
+            return truncate(sessionContent, 10000);
           }
           if (!existsSync(historyDir)) {
             return "No conversation history directory found.";
@@ -147,7 +148,7 @@ export const conversationHistoryTool = tool(
           // Read the most recent file
           const latestFile = allFiles[allFiles.length - 1]!;
           const content = readFileSync(resolve(historyDir, latestFile), "utf-8");
-          return truncate(content);
+          return truncate(content, 10000);
         }
 
         default:
@@ -179,11 +180,4 @@ function readSessionMessages(messagesPath: string): string | null {
   }
   const content = readFileSync(messagesPath, "utf-8").trim();
   return content ? content : null;
-}
-
-function truncate(content: string): string {
-  if (content.length > 10000) {
-    return content.slice(0, 10000) + "\n\n... [truncated, total length: " + content.length + " chars]";
-  }
-  return content;
 }

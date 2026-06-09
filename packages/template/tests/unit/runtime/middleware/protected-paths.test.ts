@@ -194,4 +194,70 @@ describe("createProtectedPathsMiddleware", () => {
     );
     expect(handler).toHaveBeenCalledTimes(1);
   });
+
+  // ─── src/surfaces/ protection ─────────────────────────
+
+  it("denies write_file to src/surfaces/ when surfaces are in deniedGlobs", async () => {
+    const mw = createProtectedPathsMiddleware({
+      deniedGlobs: [`${workspaceAbs}/src/runtime/**`, `${workspaceAbs}/src/surfaces/**`],
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fn = (mw as any).wrapToolCall as (
+      req: FakeRequest,
+      handler: (req: FakeRequest) => unknown
+    ) => Promise<unknown>;
+    const handler = vi.fn();
+    const result = await fn(
+      makeRequest("write_file", { file_path: `${workspaceAbs}/src/surfaces/acp/server.ts`, content: "x" }),
+      handler
+    );
+    expect(handler).not.toHaveBeenCalled();
+    const msg = asToolMessage(result);
+    expect(msg).not.toBeNull();
+    expect(msg!.status).toBe("error");
+    expect(msg!.content).toContain(`${workspaceAbs}/src/surfaces/acp/server.ts`);
+  });
+
+  it("denies edit_file to src/surfaces/cli/ when surfaces are in deniedGlobs", async () => {
+    const mw = createProtectedPathsMiddleware({
+      deniedGlobs: [`${workspaceAbs}/src/runtime/**`, `${workspaceAbs}/src/surfaces/**`],
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fn = (mw as any).wrapToolCall as (
+      req: FakeRequest,
+      handler: (req: FakeRequest) => unknown
+    ) => Promise<unknown>;
+    const handler = vi.fn();
+    const result = await fn(
+      makeRequest("edit_file", {
+        file_path: `${workspaceAbs}/src/surfaces/cli/repl.ts`,
+        old_string: "a",
+        new_string: "b",
+      }),
+      handler
+    );
+    expect(handler).not.toHaveBeenCalled();
+    const msg = asToolMessage(result);
+    expect(msg).not.toBeNull();
+    expect(msg!.status).toBe("error");
+    expect(msg!.name).toBe("edit_file");
+  });
+
+  it("allows write_file to src/app/ even when surfaces are protected", async () => {
+    const mw = createProtectedPathsMiddleware({
+      deniedGlobs: [`${workspaceAbs}/src/runtime/**`, `${workspaceAbs}/src/surfaces/**`],
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fn = (mw as any).wrapToolCall as (
+      req: FakeRequest,
+      handler: (req: FakeRequest) => unknown
+    ) => Promise<unknown>;
+    const handler = vi.fn().mockReturnValue("WROTE");
+    const result = await fn(
+      makeRequest("write_file", { file_path: `${workspaceAbs}/src/app/tools/my-tool.ts`, content: "x" }),
+      handler
+    );
+    expect(result).toBe("WROTE");
+    expect(handler).toHaveBeenCalledTimes(1);
+  });
 });

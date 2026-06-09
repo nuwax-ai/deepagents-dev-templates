@@ -15,11 +15,11 @@ import {
 } from "../storage/runtime-storage.js";
 import { approvalsPath, listApprovals } from "../storage/approvals.js";
 import { ACP_BUILTIN_COMMANDS } from "./types.js";
-import type { SlashCommandContext, SlashEnvironment, SlashToolInfo } from "./types.js";
-import { COMMANDS } from "./definitions.js";
+import type { SlashCommandContext, SlashCommandDefinition, SlashEnvironment, SlashToolInfo } from "./types.js";
+import { truncate } from "../utils/string.js";
 
-export function renderHelp(environment: SlashEnvironment): string {
-  const commands = COMMANDS
+export function renderHelp(environment: SlashEnvironment, commands: SlashCommandDefinition[]): string {
+  const filtered = commands
     .filter((command) => command.environments.includes(environment))
     .map((command) => {
       const aliases = command.aliases?.map((alias) => `/${alias}`).join(", ");
@@ -29,14 +29,14 @@ export function renderHelp(environment: SlashEnvironment): string {
     });
 
   if (environment === "acp") {
-    commands.push(
+    filtered.push(
       ...ACP_BUILTIN_COMMANDS.map((command) =>
         `  /${command.name} - ${command.description}`
       )
     );
   }
 
-  return ["可用命令:", ...commands].join("\n");
+  return ["可用命令:", ...filtered].join("\n");
 }
 
 export function renderTools(tools: SlashToolInfo[]): string {
@@ -199,11 +199,4 @@ export function renderApprovals(ctx: SlashCommandContext): string {
       `  ${approval.decision} ${approval.toolName} path=${approval.pathPattern ?? "*"} command=${approval.commandHash ? approval.commandHash.slice(0, 12) : "-"} updated=${approval.updatedAt}`
     ),
   ].join("\n");
-}
-
-function truncate(content: string, maxLength: number): string {
-  if (content.length <= maxLength) {
-    return content;
-  }
-  return `${content.slice(0, maxLength)}\n\n... [truncated, total length: ${content.length} chars]`;
 }

@@ -9,12 +9,6 @@ import { migrateLegacyState } from "../storage/runtime-storage.js";
 import { renderHelp, renderTools, renderConfig, renderStatus, renderSessions, renderSession, renderPlan, renderHistory, renderMemory, renderCheckpoints, renderApprovals } from "./rendering.js";
 import type { SlashCommandDefinition } from "./types.js";
 
-// NOTE: This file has a bidirectional value import with rendering.ts
-// (we import render* functions; rendering.ts imports COMMANDS). This is safe
-// because COMMANDS is a synchronous top-level const and render functions are
-// only called inside deferred execute callbacks, never at module init time.
-// Do NOT add top-level calls that read COMMANDS from rendering.ts.
-
 export const COMMANDS: SlashCommandDefinition[] = [
   {
     name: "help",
@@ -23,7 +17,7 @@ export const COMMANDS: SlashCommandDefinition[] = [
     environments: ["cli", "acp"],
     execute: (ctx) => ({
       kind: "handled",
-      text: renderHelp(ctx.environment),
+      text: renderHelp(ctx.environment, COMMANDS),
     }),
   },
   {
@@ -141,17 +135,18 @@ export const COMMANDS: SlashCommandDefinition[] = [
     description: "切换 deepagents 权限 mode (yolo|plan|ask)，仅影响新 session",
     environments: ["cli", "acp"],
     inputHint: "<yolo|plan|ask>",
-    execute: (_ctx, parsed) => {
+    execute: (ctx, parsed) => {
       const arg = parsed.arg.trim().toLowerCase();
       const valid = ["yolo", "plan", "ask"];
       if (!arg) {
         const current = process.env.DEEPAGENTS_PERMISSIONS_MODE || "(unset → uses config default)";
+        const configDefault = ctx.config.permissions?.mode ?? "(见 app-agent.config.json)";
         return {
           kind: "handled",
           text: [
             "Deepagents 权限 mode:",
             `  当前 env:  ${current}`,
-            `  config 默认: ${arg || "(见 app-agent.config.json)"}`,
+            `  config 默认: ${configDefault}`,
             "",
             "用法: /permissions yolo|plan|ask",
             "说明: 改 env 变量只对新建的 session 生效 — 当前 session 的 mode 在 agent 启动时已 baked-in。",

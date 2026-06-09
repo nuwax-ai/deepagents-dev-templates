@@ -29,7 +29,7 @@ export function executeSlashCommand(
     }
     return {
       kind: "handled",
-      text: `Unknown command: /${parsed.name}\n\n${renderHelp(ctx.environment)}`,
+      text: `Unknown command: /${parsed.name}\n\n${renderHelp(ctx.environment, COMMANDS)}`,
     };
   }
 

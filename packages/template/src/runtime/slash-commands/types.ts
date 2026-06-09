@@ -27,6 +27,9 @@ export interface SlashCommandConfig {
   skills: {
     directories: string[];
   };
+  permissions?: {
+    mode?: string;
+  };
 }
 
 export interface SlashCommandContext {
