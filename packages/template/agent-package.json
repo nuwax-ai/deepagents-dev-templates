@@ -1,6 +1,6 @@
 {
   "name": "deepagents-app-agent",
-  "version": "0.2.10",
+  "version": "0.3.0",
   "description": "AI application agent built with DeepAgents + ACP",
   "engine": "deepagents-app",
   "source": {
@@ -8,8 +8,8 @@
     "endpoint": "https://s3.nuwax.com:9443",
     "bucket": "nuwax-packages",
     "region": "us-east-1",
-    "prefix": "agent-engines/deepagents-app/versions/0.2.10",
-    "version": "0.2.10",
+    "prefix": "agent-engines/deepagents-app/versions/0.3.0",
+    "version": "0.3.0",
     "forcePathStyle": true
   },
   "alternativeSources": [
@@ -17,17 +17,17 @@
       "type": "npm",
       "package": "deepagents-dev-templates",
       "registry": "https://registry.npmjs.org",
-      "version": "0.2.10"
+      "version": "0.3.0"
     },
     {
       "type": "tgz",
       "path": "./deepagents-dev-templates-0.2.9.tgz",
-      "version": "0.2.10"
+      "version": "0.3.0"
     },
     {
       "type": "git",
       "url": "https://github.com/nuwax-ai/deepagents-dev-templates.git",
-      "ref": "v0.2.10"
+      "ref": "v0.3.0"
     },
     {
       "type": "s3-channel",

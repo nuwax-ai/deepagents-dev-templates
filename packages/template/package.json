@@ -1,6 +1,6 @@
 {
   "name": "deepagents-dev-templates",
-  "version": "0.2.10",
+  "version": "0.3.0",
   "description": "DeepAgents application agent framework — run AI agents in the terminal (REPL/one-shot) or as an ACP server for nuwaclaw/Zed. Built on deepagents + LangGraph.",
   "type": "module",
   "main": "dist/index.js",

@@ -3,7 +3,7 @@
   "agent": {
     "name": "my-scenario-agent",
     "description": "AI agent for [specific scenario]",
-    "version": "0.2.10",
+    "version": "0.3.0",
     "outputStyle": "concise"
   },
   "model": {
