@@ -213,8 +213,8 @@ fs.writeFileSync(path.join(root, ".version.json"), JSON.stringify(versionJson, n
 fs.writeFileSync(path.join(root, ".platform.json"), JSON.stringify(platformJson, null, 2) + "\n");
 NODE
 
-cp "$STAGE_ROOT/.version.json" "$OUT_DIR/${PKG_NAME}-${VERSION}.version.json"
-cp "$STAGE_ROOT/.platform.json" "$OUT_DIR/${PKG_NAME}-${VERSION}.platform.json"
+cp "$STAGE_ROOT/.version.json" "$OUT_DIR/${AGENT_NAME}-${VERSION}.version.json"
+cp "$STAGE_ROOT/.platform.json" "$OUT_DIR/${AGENT_NAME}-${VERSION}.platform.json"
 
 build_npm_tgz() {
   echo ""
@@ -236,7 +236,7 @@ build_npm_tgz() {
 build_tar() {
   echo ""
   echo "Creating Nuwax tar.gz..."
-  local artifact="$OUT_DIR/${PKG_NAME}-${VERSION}-nuwax.tar.gz"
+  local artifact="$OUT_DIR/${AGENT_NAME}-${VERSION}-nuwax.tar.gz"
   rm -f "$artifact"
   tar -C "$STAGING_DIR" -czf "$artifact" "${PKG_NAME}-${VERSION}"
   ARTIFACTS+=("$artifact")
@@ -246,7 +246,7 @@ build_tar() {
 build_zip() {
   echo ""
   echo "Creating Nuwax zip..."
-  local artifact="$OUT_DIR/${PKG_NAME}-${VERSION}-nuwax.zip"
+  local artifact="$OUT_DIR/${AGENT_NAME}-${VERSION}-nuwax.zip"
   rm -f "$artifact"
   (cd "$STAGING_DIR" && zip -qr "$artifact" "${PKG_NAME}-${VERSION}")
   ARTIFACTS+=("$artifact")

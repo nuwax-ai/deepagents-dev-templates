@@ -67,6 +67,17 @@ s3_engine_id() {
   printf '%s' "${NUWAX_S3_ENGINE_ID:-deepagents-app}"
 }
 
+# The agent name used for nuwax artifacts (zip/tar).
+# Falls back to engine id when not set explicitly.
+s3_agent_name() {
+  printf '%s' "${NUWAX_S3_AGENT_NAME:-deepagents-app}"
+}
+
+# The npm package name used for npm-tgz artifacts.
+s3_pkg_name() {
+  printf '%s' "${NUWAX_S3_PKG_NAME:-deepagents-dev-templates}"
+}
+
 # Download a public S3 object to a local file.
 # Always uses --no-sign-request (artifacts/scripts/checksums are public reads).
 # Uses `aws s3 cp` instead of `s3api get-object` for better MinIO compatibility
@@ -170,7 +181,7 @@ s3_fetch_artifact_at_version() {
   bucket=$(s3_bucket)
   prefix=$(s3_prefix)
 
-  local suffix
+  local suffix basename
   case "$kind" in
     nuwax-zip) suffix="nuwax.zip" ;;
     nuwax-tar) suffix="nuwax.tar.gz" ;;
@@ -178,7 +189,11 @@ s3_fetch_artifact_at_version() {
     *) echo "Unknown artifact kind: $kind" >&2; return 1 ;;
   esac
 
-  local file="deepagents-dev-templates-${version}-${suffix}"
+  case "$kind" in
+    npm-tgz) basename="$(s3_pkg_name)" ;;
+    *)       basename="$(s3_agent_name)" ;;
+  esac
+  local file="${basename}-${version}-${suffix}"
   mkdir -p "$dest_dir"
   local dest="$dest_dir/$file"
 

@@ -157,13 +157,12 @@ CHANNEL_KEY="channels/$CHANNEL.json"
 VERSION_JSON_REL=$(node -e "const c=require('$DIST_CONFIG');process.stdout.write(c.consume.versionEndpointTemplate.replace('{version}',process.argv[1]).replace(c.prefix+'/',''))" "$VERSION")
 
 # Validate that the required local artifacts exist.
-[[ -f "$OUT_DIR/$(basename "$PKG_JSON" | sed 's/.json$//')-$VERSION.tgz" || -f "$OUT_DIR/deepagents-dev-templates-$VERSION.tgz" ]] || true
 for required in \
-  "$OUT_DIR/deepagents-dev-templates-$VERSION.tgz" \
-  "$OUT_DIR/deepagents-dev-templates-$VERSION-nuwax.tar.gz" \
-  "$OUT_DIR/deepagents-dev-templates-$VERSION-nuwax.zip" \
-  "$OUT_DIR/deepagents-dev-templates-$VERSION.version.json" \
-  "$OUT_DIR/deepagents-dev-templates-$VERSION.platform.json" \
+  "$OUT_DIR/${PKG_NAME}-$VERSION.tgz" \
+  "$OUT_DIR/${AGENT_NAME}-$VERSION-nuwax.tar.gz" \
+  "$OUT_DIR/${AGENT_NAME}-$VERSION-nuwax.zip" \
+  "$OUT_DIR/${AGENT_NAME}-$VERSION.version.json" \
+  "$OUT_DIR/${AGENT_NAME}-$VERSION.platform.json" \
   "$OUT_DIR/package-checksums.json" \
   "$OUT_DIR/agent-package.release.json"; do
   if [[ ! -f "$required" ]]; then
@@ -173,7 +172,7 @@ for required in \
   fi
 done
 
-VERSION_JSON_BODY=$(cat "$OUT_DIR/deepagents-dev-templates-$VERSION.version.json")
+VERSION_JSON_BODY=$(cat "$OUT_DIR/${AGENT_NAME}-$VERSION.version.json")
 RELEASE_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 GIT_SHA=$(git rev-parse "${TAG:-HEAD}" 2>/dev/null || git rev-parse HEAD)
 
@@ -186,13 +185,13 @@ echo
 
 # ─── Build the S3 source list ──────────────────────────────
 ARTIFACT_FILES=(
-  "deepagents-dev-templates-$VERSION.tgz"
-  "deepagents-dev-templates-$VERSION-nuwax.tar.gz"
-  "deepagents-dev-templates-$VERSION-nuwax.zip"
+  "${PKG_NAME}-$VERSION.tgz"
+  "${AGENT_NAME}-$VERSION-nuwax.tar.gz"
+  "${AGENT_NAME}-$VERSION-nuwax.zip"
 )
 METADATA_FILES=(
-  "deepagents-dev-templates-$VERSION.version.json"
-  "deepagents-dev-templates-$VERSION.platform.json"
+  "${AGENT_NAME}-$VERSION.version.json"
+  "${AGENT_NAME}-$VERSION.platform.json"
   "package-checksums.json"
   "agent-package.release.json"
 )
