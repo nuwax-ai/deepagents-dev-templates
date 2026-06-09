@@ -1,11 +1,12 @@
 /**
- * ACP Session Lifecycle
+ * ACP Session Lifecycle Patch
  *
  * Patches a `DeepAgentsServer` instance to add capabilities deepagents-acp does
- * not provide natively: session tracking (new/close/list), ACP session
- * mcpServers forwarding, durable session state, harness-turn lifecycle, stale
- * session recovery, and slash-command handling. All reach-through to the
- * server's private internals goes through `acp-server-internals.ts`.
+ * not provide natively: session tracking (new/close/list via SessionManager),
+ * ACP session mcpServers forwarding, durable session state, harness-turn
+ * lifecycle, stale session recovery, and slash-command interception. All
+ * reach-through to the server's private internals goes through
+ * `acp-server-internals.ts`.
  */
 
 import { DeepAgentsServer } from "deepagents-acp";
@@ -17,7 +18,6 @@ import { forwardAcpMcpServers } from "../../runtime/mcp-acp-adapter.js";
 import {
   bindInternalHandler,
   getDeepAgentsServerInternals,
-  type DeepAgentsServerInternals,
 } from "../../runtime/acp-server-internals.js";
 import {
   beginHarnessTurn,
@@ -25,10 +25,6 @@ import {
   failHarnessTurn,
   readHarnessLifecycle,
 } from "../../runtime/harness-lifecycle.js";
-import {
-  executeSlashCommand,
-  type SlashToolInfo,
-} from "../../runtime/slash-commands.js";
 import {
   appendRuntimeMessage,
   closeSessionState,
@@ -39,26 +35,13 @@ import {
   withRuntimeStorageContext,
 } from "../../runtime/runtime-storage.js";
 import { buildACPAgentConfigWithMcpAsync } from "./config-builder.js";
-
-// ─── Session Lifecycle Manager ──────────────────────────
-
-interface SessionInfo {
-  sessionId: string;
-  createdAt: string;
-  lastActivityAt: string;
-  mode: string;
-  messageCount: number;
-}
-
-interface AcpPromptBlock {
-  type?: string;
-  text?: string;
-}
-
-interface AcpPromptParams {
-  sessionId: string;
-  prompt: AcpPromptBlock[];
-}
+import { SessionManager } from "./session-manager.js";
+import {
+  handleAcpSlashCommand,
+  getAcpPromptText,
+  type AcpPromptParams,
+  type AcpConnection,
+} from "./slash-command-handler.js";
 
 interface AcpNewSessionParams {
   sessionId?: string;
@@ -66,68 +49,6 @@ interface AcpNewSessionParams {
   cwd?: string;
   mcpServers?: unknown;
   configOptions?: { agent?: string } | null;
-}
-
-interface AcpConnection {
-  sessionUpdate(params: {
-    sessionId: string;
-    update: {
-      sessionUpdate: "agent_message_chunk";
-      content: {
-        type: "text";
-        text: string;
-      };
-    };
-  }): Promise<void>;
-}
-
-/**
- * Session lifecycle manager. Tracks active sessions and provides
- * close/list operations that deepagents-acp doesn't natively support.
- */
-export class SessionManager {
-  private sessions = new Map<string, SessionInfo>();
-  private log = logger.child("session-manager");
-
-  track(sessionId: string, mode: string): void {
-    this.sessions.set(sessionId, {
-      sessionId,
-      createdAt: new Date().toISOString(),
-      lastActivityAt: new Date().toISOString(),
-      mode,
-      messageCount: 0,
-    });
-    this.log.debug("Session tracked", { sessionId, mode, total: this.sessions.size });
-  }
-
-  touch(sessionId: string): void {
-    const info = this.sessions.get(sessionId);
-    if (info) {
-      info.lastActivityAt = new Date().toISOString();
-      info.messageCount++;
-    }
-  }
-
-  close(sessionId: string): SessionInfo | undefined {
-    const info = this.sessions.get(sessionId);
-    if (info) {
-      this.sessions.delete(sessionId);
-      this.log.info("Session closed", { sessionId, messages: info.messageCount });
-    }
-    return info;
-  }
-
-  list(): SessionInfo[] {
-    return Array.from(this.sessions.values());
-  }
-
-  has(sessionId: string): boolean {
-    return this.sessions.has(sessionId);
-  }
-
-  get count(): number {
-    return this.sessions.size;
-  }
 }
 
 // ─── ACP MCP Forwarding Toggle ──────────────────────────
@@ -490,89 +411,4 @@ export function patchSessionLifecycle(
   });
 
   return manager;
-}
-
-async function handleAcpSlashCommand(options: {
-  server: DeepAgentsServerInternals;
-  params: AcpPromptParams;
-  conn?: AcpConnection;
-  config: ReturnType<typeof loadConfig>;
-  workspaceRoot: string;
-}): Promise<{ stopReason: "end_turn" } | null> {
-  const text = getAcpPromptText(options.params.prompt);
-  if (!text?.startsWith("/")) {
-    return null;
-  }
-
-  const session = options.server.sessions.get(options.params.sessionId);
-  const agentConfig = session
-    ? options.server.agentConfigs.get(session.agentName)
-    : undefined;
-
-  const result = executeSlashCommand(text, {
-    environment: "acp",
-    tools: toSlashToolInfo(agentConfig?.tools),
-    config: options.config,
-    workspaceRoot: options.workspaceRoot,
-    mode: session?.mode,
-    sessionId: session?.id,
-  });
-
-  if (!result) {
-    return null;
-  }
-
-  if (result.text && options.conn) {
-    await sendAcpText(options.params.sessionId, options.conn, result.text);
-    appendRuntimeMessage(
-      { role: "assistant", content: result.text },
-      getRuntimeStorage({ workspaceRoot: options.workspaceRoot, sessionId: options.params.sessionId })
-    );
-  }
-
-  return { stopReason: "end_turn" };
-}
-
-function getAcpPromptText(prompt: AcpPromptBlock[]): string | null {
-  const block = prompt.find((candidate) => candidate.type === "text" && candidate.text);
-  return block?.text?.trim() ?? null;
-}
-
-function toSlashToolInfo(tools: unknown): SlashToolInfo[] {
-  if (!Array.isArray(tools)) {
-    return [];
-  }
-
-  const result: SlashToolInfo[] = [];
-  for (const tool of tools) {
-    const candidate = tool as { name?: unknown; description?: unknown };
-    if (typeof candidate.name !== "string") {
-      continue;
-    }
-
-    const info: SlashToolInfo = { name: candidate.name };
-    if (typeof candidate.description === "string") {
-      info.description = candidate.description;
-    }
-    result.push(info);
-  }
-
-  return result;
-}
-
-async function sendAcpText(
-  sessionId: string,
-  conn: AcpConnection,
-  text: string
-): Promise<void> {
-  await conn.sessionUpdate({
-    sessionId,
-    update: {
-      sessionUpdate: "agent_message_chunk",
-      content: {
-        type: "text",
-        text,
-      },
-    },
-  });
 }
