@@ -1,0 +1,26 @@
+{
+  "schema": "nuwaclaw.template-manifest.v1",
+  "name": "deepagents-dev-templates-python",
+  "version": "0.2.10",
+  "framework": "pydantic-ai",
+  "pythonVersion": ">=3.11",
+  "zones": {
+    "protected": {
+      "paths": ["src/deepagents_template/runtime/", "src/deepagents_template/surfaces/"]
+    },
+    "ai-editable": {
+      "paths": ["src/deepagents_template/app/", "prompts/", "skills/"]
+    },
+    "user-platform": {
+      "paths": ["config/", "agents/", ".deepagents/"]
+    }
+  },
+  "acceptance": {
+    "commands": [
+      "uv run pytest",
+      "uv run ruff check .",
+      "uv run pyright",
+      "uv build"
+    ]
+  }
+}
