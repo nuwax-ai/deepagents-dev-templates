@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AppConfig",
+  "type": "object",
+  "properties": {
+    "agent": { "type": "object" },
+    "model": { "type": "object" },
+    "permissions": { "type": "object" },
+    "skills": { "type": "object" },
+    "compaction": { "type": "object" },
+    "eviction": { "type": "object" }
+  }
+}

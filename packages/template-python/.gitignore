@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+dist-packages/
+build/
+.venv/
+*.egg
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# DeepAgents
+.agent-sessions/
+.agent-memory/
+.evicted/
+.nuwax-agent/
+
+# Environment
+.env
+.env.local
+
+# Coverage
+htmlcov/
+.coverage
+coverage/

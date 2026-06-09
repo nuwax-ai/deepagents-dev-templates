@@ -1,0 +1,33 @@
+{
+  "agent": {
+    "name": "deepagents-template",
+    "description": "DeepAgents Python application agent",
+    "outputStyle": "concise"
+  },
+  "model": {
+    "provider": "anthropic",
+    "name": "claude-sonnet-4-6"
+  },
+  "permissions": {
+    "mode": "ask",
+    "interruptOn": ["write", "edit", "execute"],
+    "allowedPaths": ["src/app/", "prompts/", "skills/", "config/"],
+    "deniedPaths": ["src/runtime/", "src/surfaces/"]
+  },
+  "skills": {
+    "directories": ["skills/builtin", "skills/platform"]
+  },
+  "agentsDirectories": [".agents"],
+  "compaction": {
+    "enabled": true,
+    "triggerThreshold": 0.75,
+    "contextWindow": 200000,
+    "keepRecentTokens": 40000
+  },
+  "eviction": {
+    "enabled": true,
+    "tokenLimit": 8000,
+    "headLines": 50,
+    "tailLines": 20
+  }
+}
