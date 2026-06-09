@@ -102,12 +102,16 @@ export interface PermissionsSpec {
   }>;
 }
 
+export type WidgetType = "dropdown" | "number" | "text" | "switch" | "taglist" | "textarea";
+
 export interface EditableFieldSpec {
   id: string;
   section: string;
   configPath: string;
   type: "enum" | "number" | "string" | "boolean" | "string[]";
+  widget: WidgetType;
   label: string;
+  hint?: string;
   enumValues?: string[];
   min?: number;
   max?: number;
@@ -117,7 +121,8 @@ export interface EditableFieldSpec {
 }
 
 export interface EditableSpec {
-  configPath: string;
+  configFile: string;
+  configBaseHash: string;
   fields: EditableFieldSpec[];
 }
 

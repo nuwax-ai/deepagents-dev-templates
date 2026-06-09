@@ -146,7 +146,8 @@ function projectEditable(workspaceRoot: string, configPath: string, merged: AppC
   );
   const byPath = new Map(provenance.map((p) => [p.configPath, p]));
   return {
-    configPath,
+    configFile: configPath,
+    configBaseHash: source.hash,
     fields: EDITABLE_CONFIG_FIELDS.map((field) => {
       const p = byPath.get(field.configPath)!;
       return {

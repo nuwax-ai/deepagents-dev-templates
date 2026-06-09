@@ -1,6 +1,6 @@
 # DeepAgents Inspector
 
-Read-only orchestration inspector for DeepAgents template workspaces.
+Read + write orchestration inspector for DeepAgents template workspaces.
 
 ## What is this?
 
@@ -11,7 +11,11 @@ The inspector reads a DeepAgents template app and produces an `AgentOrchestratio
 - See the real LangGraph node/edge topology (`--full` mode)
 - Share an agent's structure as a single JSON file or Mermaid diagram
 
-Phase 1 is **read-only** — no configuration is modified.
+Phase 1 is **read-only** for the dry-run inspection path. The browser UI now also
+ships an **editing** panel that writes back to the same `app-agent.config.json`
+and text files (system prompt, `SKILL.md`, `AGENT.md`). See
+[`docs/editing.md`](./docs/editing.md) for the supported field list, the
+`/api/preview` / `/api/apply` / `/api/text` endpoints, and the protection model.
 
 ## Usage
 

@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import type { TemplateRuntime } from "../template-runtime.js";
+import type { AppConfig, TemplateRuntime } from "../template-runtime.js";
 import {
   patchConfigSource,
   readConfigSource,
@@ -20,6 +20,13 @@ export interface TextEdit {
 
 export interface EditPayload {
   config: Record<string, unknown>;
+  /**
+   * Optional baseline hash of the on-disk config. If provided and the disk
+   * hash has changed since the spec was sent to the client, applyEdits
+   * returns 409 to prevent clobbering concurrent edits. If omitted, no
+   * check is performed (legacy clients).
+   */
+  configBaseHash?: string;
   text: TextEdit[];
 }
 
@@ -46,9 +53,9 @@ function buildConfigDiff(
   return { path: configPath, kind: "config", before, after };
 }
 
-function buildTextDiffs(workspaceRoot: string, edits: TextEdit[]): FileDiff[] {
+function buildTextDiffs(workspaceRoot: string, config: AppConfig, edits: TextEdit[]): FileDiff[] {
   return edits.map((edit) => {
-    assertEditablePath(workspaceRoot, edit.path);
+    assertEditablePath(workspaceRoot, config, edit.path);
     const abs = resolve(workspaceRoot, edit.path);
     const before = existsSync(abs) ? readFileSync(abs, "utf-8") : "";
     return { path: edit.path, kind: "text" as const, before, after: edit.content };
@@ -59,6 +66,7 @@ export function previewEdits(
   runtime: TemplateRuntime,
   workspaceRoot: string,
   configPath: string,
+  config: AppConfig,
   payload: EditPayload
 ): PreviewResult {
   const files: FileDiff[] = [];
@@ -66,7 +74,7 @@ export function previewEdits(
   if (configDiff) {
     files.push(configDiff);
   }
-  files.push(...buildTextDiffs(workspaceRoot, payload.text));
+  files.push(...buildTextDiffs(workspaceRoot, config, payload.text));
 
   const source = readConfigSource(workspaceRoot, configPath);
   const validation = validateConfig(runtime, patchConfigSource(source.raw, payload.config));
@@ -77,6 +85,7 @@ export function applyEdits(
   runtime: TemplateRuntime,
   workspaceRoot: string,
   configPath: string,
+  config: AppConfig,
   payload: EditPayload
 ): ApplyResult {
   // Gate 1: config validation
@@ -87,13 +96,29 @@ export function applyEdits(
     return { ok: false, errors: validation.errors };
   }
 
-  // Gate 2: protected-zone guard
+  // Gate 2: optimistic concurrency for the config file (optional, opt-in via baseHash)
+  if (payload.configBaseHash !== undefined) {
+    const current = readConfigSource(workspaceRoot, configPath);
+    if (current.hash !== payload.configBaseHash) {
+      return {
+        ok: false,
+        errors: [
+          {
+            path: configPath,
+            message: "Config file changed on disk; reload before applying.",
+          },
+        ],
+      };
+    }
+  }
+
+  // Gate 3: protected-zone guard (denylist from merged config)
   try {
     if (Object.keys(payload.config).length > 0) {
-      assertEditablePath(workspaceRoot, configPath);
+      assertEditablePath(workspaceRoot, config, configPath);
     }
     for (const edit of payload.text) {
-      assertEditablePath(workspaceRoot, edit.path);
+      assertEditablePath(workspaceRoot, config, edit.path);
     }
   } catch (error) {
     return {
@@ -102,26 +127,28 @@ export function applyEdits(
     };
   }
 
-  // Gate 3: optimistic concurrency for text files
+  // Gate 4: optimistic concurrency for text files
   for (const edit of payload.text) {
     const abs = resolve(workspaceRoot, edit.path);
     const current = existsSync(abs) ? readFileSync(abs, "utf-8") : "";
     if (hashContent(current) !== edit.baseHash) {
       return {
         ok: false,
-        errors: [{ path: edit.path, message: "File changed on disk; reload before applying." }],
+        errors: [
+          { path: edit.path, message: "File changed on disk; reload before applying." },
+        ],
       };
     }
   }
 
-  // Gate 4: atomic writes
+  // Gate 5: atomic writes
   const written: string[] = [];
   if (Object.keys(payload.config).length > 0) {
-    writeTextFileAtomic(workspaceRoot, configPath, serializeConfigSource(patched));
+    writeTextFileAtomic(workspaceRoot, config, configPath, serializeConfigSource(patched));
     written.push(configPath);
   }
   for (const edit of payload.text) {
-    writeTextFileAtomic(workspaceRoot, edit.path, edit.content);
+    writeTextFileAtomic(workspaceRoot, config, edit.path, edit.content);
     written.push(edit.path);
   }
   return { ok: true, written };
