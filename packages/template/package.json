@@ -51,6 +51,7 @@
     "package:nuwax": "bash scripts/package.sh --format all",
     "package:platforms": "bash scripts/package-platforms.sh",
     "validate:package": "bash scripts/validate-package.sh",
+    "smoke:acp": "npx rcoder-cli chat -c 'node dist/bundle.mjs' -w . -p 'hello' --timeout 30 --mode yolo -q",
     "inspect": "npm run inspect -w inspector --"
   },
   "dependencies": {
