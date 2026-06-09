@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { loadConfig } from "../../src/runtime/config-loader.js";
-import { buildACPAgentConfig, loadSessionConfigFromEnv } from "../../src/runtime/acp-server.js";
+import { buildACPAgentConfig, loadSessionConfigFromEnv } from "../../src/surfaces/acp/server.js";
 import { createRuntimeContextAsync, discoverMemoryFiles, resolveSkillsPaths, resolveSystemPrompt } from "../../src/runtime/helpers.js";
 
 function jsonResponse(body: unknown): Response {

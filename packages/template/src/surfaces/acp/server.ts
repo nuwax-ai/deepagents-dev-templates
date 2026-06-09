@@ -17,31 +17,31 @@
 
 import { DeepAgentsServer, type DeepAgentConfig } from "deepagents-acp";
 import { randomUUID } from "node:crypto";
-import { loadConfig, resolveConfiguredWorkspaceRoot, type ACPSessionConfig } from "./config-loader.js";
-import { logger } from "./logger.js";
-import type { MCPManager } from "./mcp-manager.js";
-import { forwardAcpMcpServers } from "./mcp-acp-adapter.js";
+import { loadConfig, resolveConfiguredWorkspaceRoot, type ACPSessionConfig } from "../../runtime/config-loader.js";
+import { logger } from "../../runtime/logger.js";
+import type { MCPManager } from "../../runtime/mcp-manager.js";
+import { forwardAcpMcpServers } from "../../runtime/mcp-acp-adapter.js";
 import {
   bindInternalHandler,
   getDeepAgentsServerInternals,
   type DeepAgentsServerInternals,
-} from "./acp-server-internals.js";
+} from "../../runtime/acp-server-internals.js";
 import {
   beginHarnessTurn,
   completeHarnessTurn,
   failHarnessTurn,
   readHarnessLifecycle,
-} from "./harness-lifecycle.js";
+} from "../../runtime/harness-lifecycle.js";
 import {
   createRuntimeContext,
   createRuntimeContextAsync,
   buildAgentConfigParts,
-} from "./helpers.js";
+} from "../../runtime/helpers.js";
 import {
   executeSlashCommand,
   getAcpSlashCommandSpecs,
   type SlashToolInfo,
-} from "./slash-commands.js";
+} from "../../runtime/slash-commands.js";
 import {
   appendRuntimeMessage,
   closeSessionState,
@@ -50,7 +50,7 @@ import {
   loadSessionState,
   listSessions,
   withRuntimeStorageContext,
-} from "./runtime-storage.js";
+} from "../../runtime/runtime-storage.js";
 
 // ─── Session Lifecycle Manager ──────────────────────────
 

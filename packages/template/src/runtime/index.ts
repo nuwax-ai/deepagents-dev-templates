@@ -3,13 +3,6 @@
  */
 
 export {
-  bootstrap,
-  buildACPAgentConfig,
-  buildACPAgentConfigAsync,
-  loadSessionConfigFromEnv,
-  type ACPServerOptions,
-} from "./acp-server.js";
-export {
   createAppAgent,
   createAppAgentAsync,
   type CreatedAgent,

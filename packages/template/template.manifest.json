@@ -7,9 +7,10 @@
   "zones": {
     "protected": {
       "paths": [
-        "src/runtime/"
+        "src/runtime/",
+        "src/surfaces/"
       ],
-      "description": "Infrastructure code — ACP server, platform client, config loader. Do not modify unless explicitly instructed.",
+      "description": "Infrastructure code — runtime engine (platform client, config loader, MCP) and runnable surfaces (ACP server, CLI entry). Do not modify unless explicitly instructed.",
       "enforcement": "permission-gate"
     },
     "ai-editable": {

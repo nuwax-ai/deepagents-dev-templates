@@ -7,17 +7,17 @@
 
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { createAppAgentAsync } from "../runtime/agent-factory.js";
-import { loadConfig, resolveConfiguredWorkspaceRoot } from "../runtime/config-loader.js";
-import { resolveCliSystemPrompt } from "../runtime/helpers.js";
-import { logger } from "../runtime/logger.js";
+import { createAppAgentAsync } from "../../runtime/agent-factory.js";
+import { loadConfig, resolveConfiguredWorkspaceRoot } from "../../runtime/config-loader.js";
+import { resolveCliSystemPrompt } from "../../runtime/helpers.js";
+import { logger } from "../../runtime/logger.js";
 import {
   appendRuntimeMessage,
   createSessionId,
   ensureSessionState,
   getRuntimeStorage,
   withRuntimeStorageContext,
-} from "../runtime/runtime-storage.js";
+} from "../../runtime/runtime-storage.js";
 
 const log = logger.child("one-shot");
 

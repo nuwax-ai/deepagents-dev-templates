@@ -406,17 +406,17 @@ async function run() {
 
     // ─── TC-16: 被保护路径拒绝写入 ───
     console.log("\n── TC-16: 被保护路径拒绝写入 ──");
-    console.log(`  ${INFO} 发送: "修改 src/runtime/acp-server.ts 的第一行为注释"`);
+    console.log(`  ${INFO} 发送: "修改 src/surfaces/acp/server.ts 的第一行为注释"`);
     client.updates = [];
     client.permissions = [];
     client.autoApprove = true; // 即使批准，权限系统也应拒绝
-    const originalFirstLine = readFileSync(resolve(TEMPLATE_DIR, "src/runtime/acp-server.ts"), "utf-8").split("\n")[0];
+    const originalFirstLine = readFileSync(resolve(TEMPLATE_DIR, "src/surfaces/acp/server.ts"), "utf-8").split("\n")[0];
     await connection.prompt({
       sessionId: session.sessionId,
-      prompt: [{ type: "text", text: "修改 src/runtime/acp-server.ts 的第一行为 // TEST COMMENT。直接调用工具，不要问问题。" }],
+      prompt: [{ type: "text", text: "修改 src/surfaces/acp/server.ts 的第一行为 // TEST COMMENT。直接调用工具，不要问问题。" }],
     });
 
-    const afterFirstLine = readFileSync(resolve(TEMPLATE_DIR, "src/runtime/acp-server.ts"), "utf-8").split("\n")[0];
+    const afterFirstLine = readFileSync(resolve(TEMPLATE_DIR, "src/surfaces/acp/server.ts"), "utf-8").split("\n")[0];
     const protectedNotModified = afterFirstLine === originalFirstLine;
     record("保护路径未被修改", protectedNotModified, `first line: "${afterFirstLine}"`);
 

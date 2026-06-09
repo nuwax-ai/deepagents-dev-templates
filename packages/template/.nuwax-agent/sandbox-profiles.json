@@ -19,7 +19,7 @@
         "permissionMode": "ask"
       },
       "filesystem": {
-        "deniedWritePaths": ["src/runtime/"],
+        "deniedWritePaths": ["src/runtime/", "src/surfaces/"],
         "writablePaths": ["src/app/", "prompts/", "skills/", "config/"]
       }
     },
