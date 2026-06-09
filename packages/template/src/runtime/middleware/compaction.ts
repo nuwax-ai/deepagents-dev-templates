@@ -15,7 +15,7 @@
 
 import { createMiddleware, countTokensApproximately, HumanMessage } from "langchain";
 import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
-import type { CompactionConfig } from "../config-loader.js";
+import type { CompactionConfig } from "../config/config-loader.js";
 import { logger } from "../logger.js";
 
 export interface CompactionOptions {
@@ -113,7 +113,6 @@ function messagesToText(messages: unknown[]): string {
       content = m.content;
     } else if (Array.isArray(m.content)) {
       // MessageContent[] — extract text parts, drop image/binary blocks
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       content = m.content
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .map((c: any) => (typeof c === "string" ? c : c?.text ?? ""))
@@ -167,7 +166,6 @@ export async function generateSummary(
         content: `Summarize the following conversation:\n\n${conversationText}`,
       },
     ]);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const text = typeof response.content === "string"
       ? response.content
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

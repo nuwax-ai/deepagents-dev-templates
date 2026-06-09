@@ -4,13 +4,25 @@
 
 ## Architecture
 
+Three layers, visible in the directory tree:
+
 ```
-src/runtime/     — Protected infrastructure (ACP server, platform client, config)
-src/app/         — Business logic (tools, subagents, hooks) — AI & user editable
-prompts/         — System prompt templates
-skills/          — Progressive-loading skills (builtin + platform)
-config/          — Model, MCP, variables, permissions
+src/
+  runtime/     — Engine (PROTECTED): config loader, model, MCP, middleware, storage
+  surfaces/    — Runnable entries (PROTECTED): acp/ (ACP server), cli/ (REPL, one-shot)
+  app/         — Business logic (AI & user editable): tools, subagents, hooks
+  index.ts     — Thin dispatcher: default→ACP, chat/ask/run→CLI, graph
+
+prompts/       — System prompt templates (editable)
+skills/        — Progressive-loading skills: builtin + platform (editable)
+config/        — Model, MCP, variables, permissions (user/platform editable)
+.nuwax-agent/  — Platform panel / debug / package config
+scripts/       — Build, esbuild bundle, package, install/upgrade/release tooling
 ```
+
+- **Engine + surfaces** (`src/runtime/`, `src/surfaces/`) are protected infrastructure.
+- **App + assets** (`src/app/`, `prompts/`, `skills/`, `config/`) are the editable agent.
+- **Tooling** (`scripts/`, `docs/`, `.nuwax-agent/`) builds and distributes the package.
 
 ## Roadmap Documents
 
@@ -62,7 +74,7 @@ npm test
 - Generated code node relationships are available through `npm run graph`
 
 ### Editable Zones
-- **Protected** (`src/runtime/`): Infrastructure code — do not modify
+- **Protected** (`src/runtime/` engine, `src/surfaces/` ACP/CLI entry): Infrastructure — do not modify
 - **AI-editable** (`src/app/`, `prompts/`, `skills/`): AI and user can modify
 - **User-editable** (`config/`): User and platform configure
 
@@ -78,6 +90,11 @@ Current distribution supports npm, `.tgz`, Git URL, and local Nuwax `.tar.gz`
 / `.zip` artifacts with version/platform JSON, checksums, and local
 install/upgrade/rollback/uninstall scripts; see
 [docs/package-install-lifecycle.md](./docs/package-install-lifecycle.md).
+
+The Nuwax `.tar.gz` / `.zip` artifacts ship a **self-contained esbuild bundle**
+(`dist/bundle.mjs`, `npm run bundle`) instead of a vendored `node_modules` tree —
+install requires no `npm install` step. The npm package keeps its compiled
+`dist/` output for `exports['./runtime']` and the inspector.
 
 Generated release artifacts:
 
@@ -97,7 +114,7 @@ See [docs/nuwaclaw-engine-integration.md](./docs/nuwaclaw-engine-integration.md)
 
 See [docs/zed-acp-setup.md](./docs/zed-acp-setup.md) for the Zed `agent_servers` configuration template and authentication notes.
 
-See [docs/rcoder-cloud-debug.md](./docs/rcoder-cloud-debug.md) for packaged rcoder cloud-computer debugging with bundled `node_modules` and chat-delivered ACP config.
+See [docs/rcoder-cloud-debug.md](./docs/rcoder-cloud-debug.md) for packaged rcoder cloud-computer debugging with the self-contained esbuild bundle and chat-delivered ACP config.
 
 See [docs/scenario-agent-template-design.md](./docs/scenario-agent-template-design.md) for `.nuwax-agent`, OpenAI-compatible debug profiles, capability source layering, and example scenario Agent generation.
 
@@ -108,7 +125,8 @@ See [docs/scenario-agent-examples.md](./docs/scenario-agent-examples.md) for con
 | Command | Description |
 |---------|-------------|
 | `npm run dev` | Start in development mode |
-| `npm run build` | Compile TypeScript |
+| `npm run build` | Compile TypeScript to `dist/` |
+| `npm run bundle` | Bundle into a self-contained `dist/bundle.mjs` (esbuild) |
 | `npm start` | Start ACP server (production) |
 | `npm test` | Run all tests |
 | `npm run test:unit` | Run unit tests only |

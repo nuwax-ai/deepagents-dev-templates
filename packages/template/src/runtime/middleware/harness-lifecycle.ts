@@ -6,7 +6,7 @@ import {
   completeHarnessTurn,
   failHarnessTurn,
   recordHarnessModelCall,
-} from "../harness-lifecycle.js";
+} from "../storage/harness-lifecycle.js";
 import { logger } from "../logger.js";
 
 /**

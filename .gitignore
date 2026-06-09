@@ -36,3 +36,6 @@ logs/
 examples/
 .agent-checkpoints/
 .agent-memory/
+
+# superpowers brainstorm mockups
+.superpowers/

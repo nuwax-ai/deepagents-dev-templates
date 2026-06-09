@@ -12,7 +12,7 @@
 
 import { createDeepAgent, FilesystemBackend } from "deepagents";
 import type { BaseCheckpointSaver } from "@langchain/langgraph-checkpoint";
-import { resolveConfiguredWorkspaceRoot, type AppConfig, type ACPSessionConfig } from "./config-loader.js";
+import { resolveConfiguredWorkspaceRoot, type AppConfig, type ACPSessionConfig } from "./config/config-loader.js";
 import { logger } from "./logger.js";
 import {
   createRuntimeContext,

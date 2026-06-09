@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  static:
+    name: typecheck · lint · build · graph
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck -w packages/template
+      - run: npm run lint -w packages/template
+      - run: npm run build -w packages/template
+      - run: npm run graph -w packages/template
+
+  test:
+    name: test · ${{ matrix.os }} · node ${{ matrix.node }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        node: [20, 22]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      # Unit + ACP smoke + integration. All run without LLM credentials:
+      # acp-smoke uses a dummy key and exercises /config (no model call).
+      - run: npm test -w packages/template
+      # Builds the esbuild bundle, then boots dist/bundle.mjs over stdio —
+      # cross-platform so a missing createRequire shim or unbundled CJS dep
+      # surfaces here, not post-install on a client.
+      - run: npm run test:bundle-smoke -w packages/template

@@ -1,8 +1,10 @@
 name: release
 
 # Triggers on a push of any v*.*.* tag (stable or pre-release).
-# Runs scripts/release.sh which packages the agent and publishes
-# to the MinIO/S3 bucket declared in .nuwax-agent/distribution.json.
+# Runs scripts/release.sh which packages the agent (npm tgz, legacy
+# *-nuwax.{tar.gz,zip}, AND per-platform {agentName}-{os}-{arch}-{version}.{tar.gz,zip}
+# + platforms.json) and publishes to the MinIO/S3 bucket declared in
+# .nuwax-agent/distribution.json.
 
 on:
   push:
@@ -31,7 +33,8 @@ jobs:
       - name: Install system deps
         run: |
           sudo apt-get update -qq || true
-          sudo apt-get install -y -qq jq curl 2>&1 || true
+          # zip: required to build the windows-x86_64 per-platform archive.
+          sudo apt-get install -y -qq jq curl zip 2>&1 || true
 
       - name: Install AWS CLI
         run: |

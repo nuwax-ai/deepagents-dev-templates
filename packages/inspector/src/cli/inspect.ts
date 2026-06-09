@@ -4,6 +4,7 @@ import { spawn } from "node:child_process";
 import { inspectAgent, writeOrchestrationSpec } from "../inspector.js";
 import { defaultStaticDir } from "../inspector.js";
 import { startInspectServer } from "../server.js";
+import { loadTemplateRuntime } from "../template-runtime.js";
 
 interface CliOptions {
   configPath?: string;
@@ -57,10 +58,16 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
     return;
   }
 
+  const runtime = await loadTemplateRuntime();
   const server = await startInspectServer({
     spec,
     port: options.port,
     staticDir: defaultStaticDir(),
+    editing: {
+      runtime,
+      workspaceRoot: options.workspaceRoot ?? process.cwd(),
+      configPath: options.configPath ?? "config/app-agent.config.json",
+    },
   });
   console.log(`DeepAgents inspector running at ${server.url}`);
   if (options.open) {

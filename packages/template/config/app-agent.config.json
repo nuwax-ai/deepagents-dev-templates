@@ -37,7 +37,8 @@
       "config/"
     ],
     "deniedPaths": [
-      "src/runtime/"
+      "src/runtime/",
+      "src/surfaces/"
     ]
   },
   "skills": {

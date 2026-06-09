@@ -1,0 +1,585 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://deepagents.dev/schemas/app-agent.config.v1.json",
+  "title": "App Agent Config",
+  "description": "Schema for config/app-agent.config.json. Defaults are applied at runtime by the zod loader, not enforced by this schema.",
+  "type": "object",
+  "properties": {
+    "agent": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "outputStyle": {
+          "type": "string"
+        },
+        "systemPrompt": {
+          "type": "string"
+        },
+        "systemPromptPath": {
+          "type": "string"
+        },
+        "includeWorkspaceInstructions": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "model": {
+      "type": "object",
+      "properties": {
+        "provider": {
+          "type": "string",
+          "enum": [
+            "anthropic",
+            "openai"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "baseUrl": {
+          "type": "string",
+          "format": "uri"
+        },
+        "apiKeyEnv": {
+          "type": "string"
+        },
+        "authTokenEnv": {
+          "type": "string"
+        },
+        "settings": {
+          "type": "object",
+          "properties": {
+            "temperature": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "maxTokens": {
+              "type": "number"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "mcp": {
+      "type": "object",
+      "properties": {
+        "configPath": {
+          "type": "string"
+        },
+        "configPaths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "servers": {
+          "type": "object",
+          "additionalProperties": {}
+        },
+        "mergeStrategy": {
+          "type": "string",
+          "enum": [
+            "session-wins",
+            "platform-wins",
+            "defaults-wins"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "platform": {
+      "type": "object",
+      "properties": {
+        "apiBaseUrl": {
+          "type": "string",
+          "format": "uri"
+        },
+        "agentId": {
+          "type": "string"
+        },
+        "spaceId": {
+          "type": "string"
+        },
+        "endpoints": {
+          "type": "object",
+          "properties": {
+            "savePrompt": {
+              "type": "object",
+              "properties": {
+                "method": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            "queryPlugins": {
+              "type": "object",
+              "properties": {
+                "method": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            "bindComponent": {
+              "type": "object",
+              "properties": {
+                "method": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            "listComponents": {
+              "type": "object",
+              "properties": {
+                "method": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            "createVariable": {
+              "type": "object",
+              "properties": {
+                "method": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            "updateVariable": {
+              "type": "object",
+              "properties": {
+                "method": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            "listVariables": {
+              "type": "object",
+              "properties": {
+                "method": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            "executePlugin": {
+              "type": "object",
+              "properties": {
+                "method": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            "executeWorkflow": {
+              "type": "object",
+              "properties": {
+                "method": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            "createDebugSession": {
+              "type": "object",
+              "properties": {
+                "method": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            "getDebugSession": {
+              "type": "object",
+              "properties": {
+                "method": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "permissions": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "yolo",
+            "ask",
+            "plan"
+          ]
+        },
+        "interruptOn": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "allowedPaths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "deniedPaths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "sandbox": {
+      "type": "object",
+      "properties": {
+        "profile": {
+          "type": "string",
+          "enum": [
+            "custom",
+            "workspace-write",
+            "read-only",
+            "open"
+          ]
+        },
+        "writablePaths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "deniedWritePaths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "environment": {
+          "type": "object",
+          "properties": {
+            "allowedEnv": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "secretEnv": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "skills": {
+      "type": "object",
+      "properties": {
+        "directories": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "progressiveLoading": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "agentsDirectories": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "memory": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "dir": {
+          "type": "string"
+        },
+        "addCacheControl": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "hooks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "event": {
+            "type": "string",
+            "enum": [
+              "pre_tool_use",
+              "post_tool_use",
+              "post_tool_use_failure",
+              "before_model_request",
+              "after_model_request",
+              "before_run",
+              "after_run"
+            ]
+          },
+          "matcher": {
+            "type": "string"
+          },
+          "command": {
+            "type": "string"
+          },
+          "timeoutMs": {
+            "type": "number",
+            "minimum": 1
+          },
+          "priority": {
+            "type": "number"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "user",
+              "project"
+            ]
+          }
+        },
+        "required": [
+          "event",
+          "command"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "plugins": {
+      "type": "object",
+      "properties": {
+        "directories": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "enabled": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "disabled": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "workspace": {
+      "type": "object",
+      "properties": {
+        "workingDir": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "logging": {
+      "type": "object",
+      "properties": {
+        "level": {
+          "type": "string",
+          "enum": [
+            "debug",
+            "info",
+            "warn",
+            "error"
+          ]
+        },
+        "structured": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "compaction": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "contextWindow": {
+          "type": "number",
+          "minimum": 1000
+        },
+        "triggerThreshold": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 0.95
+        },
+        "reserveTokens": {
+          "type": "number",
+          "minimum": 1000
+        },
+        "keepRecentTokens": {
+          "type": "number",
+          "minimum": 1000
+        },
+        "summarizerModel": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "eviction": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "tokenLimit": {
+          "type": "number",
+          "minimum": 1000
+        },
+        "charPerToken": {
+          "type": "number",
+          "minimum": 1
+        },
+        "headLines": {
+          "type": "number",
+          "minimum": 1
+        },
+        "tailLines": {
+          "type": "number",
+          "minimum": 1
+        },
+        "evictionPath": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "middleware": {
+      "type": "object",
+      "properties": {
+        "stuckLoopDetection": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "threshold": {
+              "type": "number",
+              "minimum": 2,
+              "maximum": 10
+            },
+            "mode": {
+              "type": "string",
+              "enum": [
+                "warn",
+                "error"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        "periodicReminder": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "firstAt": {
+              "type": "number",
+              "minimum": 1
+            },
+            "every": {
+              "type": "number",
+              "minimum": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "costTracking": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "warnAtTokens": {
+              "type": "number",
+              "minimum": 1000
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "$schema": {
+      "type": "string",
+      "description": "Path or URL to this JSON Schema. Editor metadata only; ignored by the runtime loader."
+    }
+  },
+  "additionalProperties": false
+}

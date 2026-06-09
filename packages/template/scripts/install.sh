@@ -191,14 +191,20 @@ do_install_from_artifact() {
   cp -R "$root"/. "$install_root"/
 
   cd "$install_root"
-  if [[ -d "$install_root/node_modules" && -d "$install_root/node_modules/deepagents" ]]; then
-    echo "Using bundled node_modules; skipping npm install."
+  if [[ -f "$install_root/dist/bundle.mjs" ]]; then
+    # Self-contained esbuild bundle: all production deps are inlined, so there
+    # is no node_modules to install and nothing to compile.
+    echo "Self-contained esbuild bundle detected; skipping npm install and build."
   else
-    npm install --omit=dev
-  fi
+    if [[ -d "$install_root/node_modules" && -d "$install_root/node_modules/deepagents" ]]; then
+      echo "Using bundled node_modules; skipping npm install."
+    else
+      npm install --omit=dev
+    fi
 
-  if [[ ! -f "$install_root/dist/index.js" ]]; then
-    npm run build
+    if [[ ! -f "$install_root/dist/index.js" ]]; then
+      npm run build
+    fi
   fi
 
   mkdir -p "$install_root/logs" "$install_root/.nuwax-agent"
@@ -224,7 +230,11 @@ fs.writeFileSync(path.join(installRoot, ".nuwax-agent", "install-state.json"), J
 NODE
 
   echo "Installation complete: $install_root"
-  echo "Run: node $install_root/dist/index.js"
+  if [[ -f "$install_root/dist/bundle.mjs" ]]; then
+    echo "Run: node $install_root/dist/bundle.mjs"
+  else
+    echo "Run: node $install_root/dist/index.js"
+  fi
 }
 
 bucket_install() {

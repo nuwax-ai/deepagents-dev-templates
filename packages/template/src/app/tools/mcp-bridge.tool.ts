@@ -9,7 +9,7 @@ import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import type { MCPManager, MCPServerConfig } from "../../runtime/mcp-manager.js";
+import type { MCPManager, MCPServerConfig } from "@runtime/platform/mcp-manager.js";
 
 interface JsonRpcResponse {
   id?: number;

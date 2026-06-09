@@ -9,7 +9,7 @@
  */
 
 import { createMiddleware, countTokensApproximately } from "langchain";
-import { logger } from "../../runtime/logger.js";
+import { logger } from "../logger.js";
 
 export interface CostTrackingOptions {
   /** Warn when cumulative tokens exceed this threshold. Default: 100000 */

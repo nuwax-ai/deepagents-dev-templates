@@ -12,7 +12,7 @@ import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { dirname } from "node:path";
-import { memoryPath, readableMemoryPath } from "../../runtime/runtime-storage.js";
+import { memoryPath, readableMemoryPath } from "@runtime/storage/runtime-storage.js";
 
 /** Escape regex metacharacters in a string for safe use in RegExp */
 function escapeRegex(s: string): string {

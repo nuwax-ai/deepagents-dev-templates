@@ -7,7 +7,7 @@
 
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import type { PlatformClient } from "../../runtime/platform-client.js";
+import type { PlatformClient } from "@runtime/platform/platform-client.js";
 
 /**
  * Create the platform_api tool bound to a specific PlatformClient instance.

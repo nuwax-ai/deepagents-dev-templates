@@ -91,6 +91,17 @@ export interface DiscoveredSubAgent {
 }
 
 export interface TemplateRuntime {
+  /**
+   * Template's exported Zod schema for the app config. Used by the editing
+   * engine to validate patched source config before writing. The template
+   * `./runtime` barrel re-exports it (config/config-schema.ts).
+   */
+  AppConfigSchema: {
+    parse(data: unknown): AppConfig;
+    safeParse(data: unknown):
+      | { success: true; data: AppConfig }
+      | { success: false; error: { issues: Array<{ path: (string | number)[]; message: string }> } };
+  };
   loadConfig(options?: {
     configPath?: string;
     workspaceRoot?: string;

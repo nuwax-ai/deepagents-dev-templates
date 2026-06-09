@@ -14,7 +14,7 @@
 
 import { createMiddleware, ToolMessage } from "langchain";
 import { spawn } from "node:child_process";
-import { logger } from "../../runtime/logger.js";
+import { logger } from "@runtime/logger.js";
 
 // ─── Types ──────────────────────────────────────────────
 

@@ -36,7 +36,13 @@
     "patterns": [
       "deepagents-dev-templates-{version}-nuwax.zip",
       "deepagents-dev-templates-{version}-nuwax.tar.gz",
-      "deepagents-dev-templates-{version}.tgz"
+      "deepagents-dev-templates-{version}.tgz",
+      "{agentName}-linux-x86_64-{version}.tar.gz",
+      "{agentName}-linux-arm64-{version}.tar.gz",
+      "{agentName}-darwin-arm64-{version}.tar.gz",
+      "{agentName}-darwin-x86_64-{version}.tar.gz",
+      "{agentName}-windows-x86_64-{version}.zip",
+      "{agentName}-{version}.platforms.json"
     ]
   },
   "metadata": {

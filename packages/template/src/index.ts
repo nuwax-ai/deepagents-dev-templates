@@ -30,10 +30,9 @@
 import { config as loadDotenv } from "dotenv";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { bootstrap } from "./runtime/index.js";
 import { generateCodeGraph, writeCodeGraph } from "./runtime/code-graph.js";
-import { startRepl } from "./cli/repl.js";
-import { runOneShot, runPromptFile } from "./cli/one-shot.js";
+import { bootstrap } from "./surfaces/acp/index.js";
+import { startRepl, runOneShot, runPromptFile } from "./surfaces/cli/index.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = resolve(__dirname, "..");
@@ -242,4 +241,4 @@ async function main(): Promise<void> {
   }
 }
 
-main();
+void main();

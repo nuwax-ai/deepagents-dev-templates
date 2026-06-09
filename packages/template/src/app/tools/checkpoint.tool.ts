@@ -16,7 +16,7 @@ import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { readdirSync, readFileSync, writeFileSync, mkdirSync, existsSync, unlinkSync } from "node:fs";
 import { resolve, basename } from "node:path";
-import { ensureSessionState, getRuntimeStorage, legacyCheckpointsDir } from "../../runtime/runtime-storage.js";
+import { ensureSessionState, getRuntimeStorage, legacyCheckpointsDir } from "@runtime/storage/runtime-storage.js";
 
 /** Sanitize checkpoint ID to prevent path traversal */
 function sanitizeId(id: string): string {

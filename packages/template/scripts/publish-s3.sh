@@ -113,6 +113,7 @@ fi
 
 PKG_VERSION=$(node -p "require('$PKG_JSON').version")
 AGENT_VERSION=$(node -p "require('$AGENT_PKG_JSON').version")
+AGENT_NAME=$(node -p "require('$AGENT_PKG_JSON').name")
 if [[ "$VERSION" != "$PKG_VERSION" || "$VERSION" != "$AGENT_VERSION" ]]; then
   echo "Version mismatch: --version=$VERSION package.json=$PKG_VERSION agent-package.json=$AGENT_VERSION" >&2
   echo "Bump them to the same value or pass --version explicitly." >&2
@@ -239,6 +240,43 @@ for f in "${ARTIFACT_FILES[@]}"; do
     --cache-control "public, max-age=31536000, immutable" \
     --content-type "application/octet-stream" >/dev/null
 done
+
+# ─── Upload per-platform archives + platforms.json (nuwax-file-server) ───
+# {agentName}-{os}-{arch}-{version}.{ext} plus the install-from-url platforms
+# map. These are additive to the legacy *-nuwax.* artifacts above.
+echo "→ artifacts/ (per-platform)"
+PLATFORMS_JSON="$OUT_DIR/${AGENT_NAME}-${VERSION}.platforms.json"
+ARTIFACT_PUBLIC_BASE="$ENDPOINT/$BUCKET/$PREFIX/$ARTIFACT_DIR"
+if [[ -f "$PLATFORMS_JSON" ]]; then
+  # Backfill PlatformEntry.url with the public S3 URL before upload so the
+  # file-server can POST it straight to /agent-mgmt/agents/install-from-url.
+  PUBLIC_BASE="$ARTIFACT_PUBLIC_BASE" node -e '
+    const fs = require("fs");
+    const file = process.argv[1];
+    const base = process.env.PUBLIC_BASE.replace(/\/+$/, "");
+    const doc = JSON.parse(fs.readFileSync(file, "utf8"));
+    for (const k of Object.keys(doc.platforms || {})) {
+      doc.platforms[k].url = `${base}/${doc.platforms[k].file}`;
+    }
+    fs.writeFileSync(file, JSON.stringify(doc, null, 2) + "\n");
+  ' "$PLATFORMS_JSON"
+fi
+shopt -s nullglob
+for f in "$OUT_DIR/${AGENT_NAME}-"*"-${VERSION}".tar.gz "$OUT_DIR/${AGENT_NAME}-"*"-${VERSION}".zip; do
+  base=$(basename "$f")
+  echo "  put $base"
+  run_aws s3 cp "$f" "$S3_BASE/$ARTIFACT_DIR/$base" "${AWS_S3_COMMON_ARGS[@]}" \
+    --cache-control "public, max-age=31536000, immutable" \
+    --content-type "application/octet-stream" >/dev/null
+done
+shopt -u nullglob
+if [[ -f "$PLATFORMS_JSON" ]]; then
+  echo "  put $(basename "$PLATFORMS_JSON")"
+  run_aws s3 cp "$PLATFORMS_JSON" "$S3_BASE/$ARTIFACT_DIR/$(basename "$PLATFORMS_JSON")" \
+    "${AWS_S3_COMMON_ARGS[@]}" \
+    --cache-control "public, max-age=60, must-revalidate" \
+    --content-type "application/json" >/dev/null
+fi
 
 # ─── Upload metadata ───────────────────────────────────────
 echo "→ metadata/"
