@@ -265,7 +265,9 @@ bucket_install() {
 
   # Copy the downloaded artifact out of tmp_dir BEFORE do_install_from_artifact
   # overwrites the trap with its own INSTALL_TMP cleanup.
-  local artifact_copy="$tmp_dir/.deepagents-artifact"
+  # Preserve extension so extract_artifact can detect the type.
+  local ext="${artifact##*.}"
+  local artifact_copy="$tmp_dir/.deepagents-artifact.${ext}"
   cp "$artifact" "$artifact_copy"
 
   do_install_from_artifact "$artifact_copy" "$INSTALL_ROOT"
