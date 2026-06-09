@@ -114,6 +114,7 @@ fi
 PKG_VERSION=$(node -p "require('$PKG_JSON').version")
 AGENT_VERSION=$(node -p "require('$AGENT_PKG_JSON').version")
 AGENT_NAME=$(node -p "require('$AGENT_PKG_JSON').name")
+PKG_NAME=$(node -p "require('$PKG_JSON').name")
 if [[ "$VERSION" != "$PKG_VERSION" || "$VERSION" != "$AGENT_VERSION" ]]; then
   echo "Version mismatch: --version=$VERSION package.json=$PKG_VERSION agent-package.json=$AGENT_VERSION" >&2
   echo "Bump them to the same value or pass --version explicitly." >&2
