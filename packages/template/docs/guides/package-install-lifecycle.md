@@ -118,7 +118,7 @@ Schema:
 {
   "schema": "nuwax.agent.version.v1",
   "name": "deepagents-dev-templates",
-  "agentName": "deepagents-app-agent",
+  "agentName": "deepagents-app",
   "version": "<version>",
   "engine": "deepagents-app",
   "generatedAt": "2026-06-06T00:00:00.000Z",

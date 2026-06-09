@@ -1,5 +1,5 @@
 {
-  "name": "deepagents-app-agent",
+  "name": "deepagents-app",
   "version": "0.3.3",
   "description": "AI application agent built with DeepAgents + ACP",
   "engine": "deepagents-app",
