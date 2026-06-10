@@ -2,7 +2,7 @@
 name: deepagents-acp-py
 description: "Python 模板 ACP 协议集成参考：stdio server、会话配置、平台身份、调试方法"
 tags: [acp, pydantic-ai, session, platform, protocol, python]
-version: "1.0.0"
+version: "1.1.0"
 ---
 
 # ACP 协议集成参考（Python 模板）
@@ -29,6 +29,22 @@ from deepagents_app_py.surfaces.acp.server import bootstrap
 ```
 
 **重要**：`surfaces/acp/` 在保护区，开发者不需要修改。
+
+### 与 TS 模板的差异
+
+| | TS 模板 | Python 模板 |
+|---|---------|------------|
+| **ACP 库** | `deepagents-acp`（npm） | `agent-client-protocol`（PyPI，可选依赖） |
+| **底层 SDK** | `@agentclientprotocol/sdk ^0.18.0` | 无（手写 stdio JSON-line 循环） |
+| **协议实现** | SDK 提供完整 ACP 协议支持 | **裸实现**：手动读 stdin、写 stdout |
+| **成熟度** | 完整 ACP handshake / notification / tool call | 基础 request-response，尚未接入 SDK |
+
+**当前状态**：`agent-client-protocol>=0.8.0` 已声明在 `pyproject.toml` 的 `[acp]` optional dependency 中，但 `src/` 中 **没有 import 过**。ACP server 是自己手写的简化版 stdio 循环，未使用 SDK 提供的协议解析能力。
+
+**影响**：
+- 基本 ACP 功能（启动、接收消息、返回响应）可用
+- 高级 ACP 特性（notification、tool call streaming、capability negotiation）可能不完整
+- 后续计划接入 `agent-client-protocol` SDK 以对齐 TS 模板的完整 ACP 支持
 
 ---
 
