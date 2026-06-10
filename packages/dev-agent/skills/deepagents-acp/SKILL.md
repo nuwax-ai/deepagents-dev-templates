@@ -211,7 +211,3 @@ src/surfaces/acp/
 - ✅ 用 `pnpm run smoke:acp` 快速验证改动不破坏 ACP 协议
 - ✅ 提示词修改 → 立即 `save_prompt` → 验证效果
 - ✅ 生产密钥通过 `agent_variable` 管理，不放在 `.env`
-
----
-
-> **TODO (Python)**：本文档为 TypeScript 模板专用。Python 模板使用 `pydantic-ai` + `agent-client-protocol`，ACP server 入口在 `src/deepagents_app_py/surfaces/`，运行命令为 `uv run deepagents-app-py`。需补充 Python 版 ACP 配置参考。

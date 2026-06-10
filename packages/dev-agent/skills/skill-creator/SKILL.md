@@ -1,8 +1,8 @@
 ---
 name: skill-creator
-description: "创建新技能 SKILL.md：YAML frontmatter 格式、目录约定、渐进加载"
+description: "创建新技能 SKILL.md：YAML frontmatter 格式、目录约定、渐进加载（TS / Python 通用）"
 tags: [skills, markdown, meta, creation]
-version: "1.0.0"
+version: "2.0.0"
 ---
 
 # 技能创建器
@@ -48,11 +48,16 @@ version: "1.0.0"
 3. ...
 
 ## 示例
+
+TypeScript 模板：
 ```typescript
-// 具体代码示例
+// TypeScript 代码示例
 ```
 
-<!-- TODO (Python): 补充 Python 代码示例块 `python` -->
+Python 模板：
+```python
+# Python 代码示例
+```
 
 ## 常见问题
 | 问题 | 原因 | 解决 |
@@ -85,15 +90,54 @@ version: "1.0.0"
 2. 需要时才加载完整 SKILL.md 内容
 3. **description 必须足够清晰**，让 Agent 知道何时需要加载
 
+---
+
+## 代码示例（双模板）
+
+如果一个技能涉及代码，应同时提供 TS 和 Python 示例：
+
+**TypeScript 模板示例**：
+```typescript
+import { tool } from "@langchain/core/tools";
+import { z } from "zod";
+
+export const myTool = tool(
+  async ({ param }) => `Result: ${param}`,
+  {
+    name: "my_tool",
+    description: "工具描述",
+    schema: z.object({
+      param: z.string().describe("参数说明"),
+    }),
+  }
+);
+```
+
+**Python 模板示例**：
+```python
+from typing import Any
+
+def create_my_tool() -> dict[str, Any]:
+    return {
+        "name": "my_tool",
+        "description": "工具描述",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "param": {"type": "string", "description": "参数说明"},
+            },
+            "required": ["param"],
+        },
+    }
+```
+
 ## Anti-patterns
 - ❌ description 写得太模糊，Agent 不知道何时加载
 - ❌ 步骤太抽象，没有具体命令或代码
 - ❌ 超过 500 行（应该拆分为多个技能）
 - ❌ 没有 Anti-patterns 部分
+- ❌ 只提供一种语言的代码示例
 - ✅ description 用"当...时使用"的句式
 - ✅ 每个步骤都有具体操作
-- ✅ 包含代码示例和故障排除
-
----
-
-> **TODO (Python)**：本技能的目录约定、YAML frontmatter 规范和渐进加载机制在 TS/Python 模板中一致。示例代码块需同时提供 `typescript` 和 `python` 版本。
+- ✅ 包含 TS + Python 双模板代码示例
+- ✅ 包含故障排除

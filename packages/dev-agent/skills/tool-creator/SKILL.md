@@ -134,7 +134,3 @@ export function createTools(ctx: ToolContext): StructuredTool[] {
 - ✅ 先查平台，确认无方案再写
 - ✅ 用 agent_variable 管理密钥
 - ✅ 参考 _example.tool.ts 的结构
-
----
-
-> **TODO (Python)**：本文档为 TypeScript 模板专用。Python 模板工具使用 `@tool` 装饰器 + pydantic schema，文件路径 `src/deepagents_app_py/app/tools/{name}_tool.py`，注册在 `tools/__init__.py`。验证命令为 `uv run ruff check .` + `uv run pyright`。需补充 Python 版工具创建流程。

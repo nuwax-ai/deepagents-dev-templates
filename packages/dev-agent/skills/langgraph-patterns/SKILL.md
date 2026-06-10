@@ -203,7 +203,3 @@ for await (const chunk of app.streamEvents(input, { version: "v2" })) {
 - ✅ 利用 `MessagesAnnotation` 作为对话状态的标准起点
 - ✅ 条件边函数保持纯函数（只读状态，只返回节点名）
 - ✅ 每个节点只负责一件事
-
----
-
-> **TODO (Python)**：本文档为 TypeScript 模板专用。Python 模板使用 `pydantic-ai` 的 Agent / RunContext 模式，而非 LangGraph StateGraph。如需图编排，Python 版使用 `langgraph`（非 `@langchain/langgraph`）。需补充 Python 版图模式参考。

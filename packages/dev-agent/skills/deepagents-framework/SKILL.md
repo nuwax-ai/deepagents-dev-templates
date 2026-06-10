@@ -195,7 +195,3 @@ pnpm run test:acp-smoke  # ACP 协议兼容性检查（不调用 LLM）
 - ✅ 新工具放在 `src/app/tools/`，注册到 `createTools()`
 - ✅ 用 `ToolContext` 工厂函数访问运行时资源
 - ✅ 编译和 graph 命令通过后再报告完成
-
----
-
-> **TODO (Python)**：本文档为 TypeScript 模板专用。Python 模板使用 `pydantic-ai` 而非 LangGraph，工具注册方式为 `@tool` 装饰器 + pydantic schema，包管理器为 `uv`。需补充 `pydantic-deepagents` 框架 API 参考。

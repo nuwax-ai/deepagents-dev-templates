@@ -69,6 +69,3 @@ pnpm dlx rcoder-cli tui -c "node dist/bundle.mjs" -w .
 pnpm dlx rcoder-cli chat -c "node dist/bundle.mjs" -w . -p "hello" -vv
 ```
 
----
-
-> **TODO (Python)**：本文档为 TypeScript 模板专用。Python 模板使用 `uv run deepagents-app-py` 作为 agent 入口，ACP smoke test 命令需调整为 `pnpm dlx rcoder-cli chat -c "uv run deepagents-app-py" -w .`。需补充 Python 版冒烟测试流程。

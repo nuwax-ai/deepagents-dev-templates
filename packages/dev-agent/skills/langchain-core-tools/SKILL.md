@@ -229,7 +229,3 @@ platform_api(operation: "query_plugins", params: { query: "weather api" })
 - ✅ API key 通过 `process.env.AGENT_VAR_XXX` 读取（由平台注入）
 - ✅ 工具返回描述性错误字符串而不是抛出异常
 - ✅ 写完工具后运行 `pnpm run build` 验证编译
-
----
-
-> **TODO (Python)**：本文档为 TypeScript 模板专用。Python 模板使用 `pydantic-ai` 的 `@tool` 装饰器和 pydantic schema，文件命名 `{name}_tool.py`，验证命令为 `uv run ruff check .` + `uv run pyright`。需补充 Python 版工具开发参考。

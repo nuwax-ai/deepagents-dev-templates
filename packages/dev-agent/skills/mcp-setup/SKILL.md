@@ -1,8 +1,8 @@
 ---
 name: mcp-setup
-description: "配置 MCP 服务器、平台组件绑定、合并策略管理"
+description: "配置 MCP 服务器、平台组件绑定、合并策略管理（TS / Python 通用）"
 tags: [mcp, configuration, platform, integration]
-version: "1.0.0"
+version: "2.0.0"
 ---
 
 # MCP 集成配置
@@ -10,29 +10,34 @@ version: "1.0.0"
 ## When to Use
 需要添加 MCP 服务器、绑定平台组件、或调试 MCP 连接问题时使用。
 
-## MCP 配置文件
+---
+
+## 通用概念
+
+### MCP 配置文件
 默认配置：`config/mcp.default.json`
 
 ```json
 {
   "servers": {
     "context7": {
-      "command": "pnpm",
-      "args": ["dlx", "@upstash/context7-mcp"],
+      "command": "<runner>",
+      "args": ["<mcp-package>"],
       "description": "查询最新框架/API 文档"
     }
   }
 }
 ```
 
-## 添加新 MCP 服务器
+### 添加新 MCP 服务器
 
-### Stdio 类型（本地进程）
+#### Stdio 类型（本地进程）
+
 ```json
 {
   "my-server": {
-    "command": "pnpm",
-    "args": ["dlx", "@my-org/mcp-server"],
+    "command": "<runner>",
+    "args": ["<mcp-package>"],
     "env": {
       "API_KEY": "${AGENT_VAR_MY_API_KEY}"
     },
@@ -41,7 +46,8 @@ version: "1.0.0"
 }
 ```
 
-### HTTP 类型（远程服务）
+#### HTTP 类型（远程服务）
+
 ```json
 {
   "remote-server": {
@@ -55,7 +61,7 @@ version: "1.0.0"
 }
 ```
 
-## 合并策略（session-wins）
+### 合并策略
 MCP 配置按以下优先级合并（后者覆盖前者）：
 1. `config/mcp.default.json` — 基础配置
 2. 平台 MCP — 通过 `PlatformClient.listMcpServers()` 获取
@@ -70,25 +76,49 @@ MCP 配置按以下优先级合并（后者覆盖前者）：
 }
 ```
 
-## 平台组件绑定
-通过 `platform_api` 绑定平台提供的组件：
-```json
-platform_api(operation: "bind_component", params: {
-  "componentId": "<组件ID>",
-  "config": { ... }
-})
-```
+| 策略 | 行为 |
+|------|------|
+| `session-wins` | ACP session 的 mcpServers 覆盖默认和平台配置 |
+| `platform-wins` | 平台绑定的 MCP 服务器覆盖 session 配置 |
+| `defaults-wins` | config/mcp.default.json 优先，session 不可覆盖 |
 
-组件类型：
-- 知识库（knowledge base）
-- 表单构建器（form builder）
-- 工作流触发器（workflow trigger）
-
-## 环境变量插值
+### 环境变量插值
 MCP 配置中支持 `${AGENT_VAR_XXX}` 占位符：
 - 运行时自动替换为 agent variable 的值
 - 用于 API key、token 等敏感配置
 - 变量不存在时工具调用会报错
+
+---
+
+## TypeScript 模板
+
+Stdio MCP 服务器使用 `pnpm dlx` 运行：
+
+```json
+{
+  "context7": {
+    "command": "pnpm",
+    "args": ["dlx", "@upstash/context7-mcp"],
+    "description": "查询最新框架/API 文档"
+  }
+}
+```
+
+## Python 模板
+
+Stdio MCP 服务器使用 `uvx` 运行：
+
+```json
+{
+  "context7": {
+    "command": "uvx",
+    "args": ["context7-mcp"],
+    "description": "查询最新框架/API 文档"
+  }
+}
+```
+
+---
 
 ## 调试 MCP 问题
 1. 检查服务器列表：`mcp_tool_bridge(operation: "list_servers")`
@@ -111,7 +141,3 @@ MCP 配置中支持 `${AGENT_VAR_XXX}` 占位符：
 - ✅ 使用 agent_variable 管理敏感配置
 - ✅ 测试每个 MCP 服务器的连接
 - ✅ 记录 MCP 配置变更原因
-
----
-
-> **TODO (Python)**：Python 项目 MCP stdio 服务器推荐使用 `uvx` 替代 `pnpm dlx`，如 `"command": "uvx", "args": ["mcp-server-xxx"]`。其余 MCP JSON 配置结构、合并策略、变量插值逻辑在 Python 模板中一致。
