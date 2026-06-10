@@ -1,1 +1,1 @@
-"""ACP Session Lifecycle — patches session tracking onto the ACP server."""
+"""ACP Session Lifecycle — now handled by deepagents-acp-py SessionManager."""

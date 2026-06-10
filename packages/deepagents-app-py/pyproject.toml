@@ -34,7 +34,9 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
+    "deepagents-acp-py",
     "pydantic>=2.7",
+    "pydantic-settings>=2.3",
     "pydantic-settings>=2.3",
     "pydantic-ai>=1.97.0",
     "pydantic-ai-slim[anthropic,openai,web-fetch]>=1.97.0",
@@ -81,6 +83,9 @@ deepagents-app-py = "deepagents_app_py.main:main"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.uv.sources]
+deepagents-acp-py = { path = "../deepagents-acp-py", editable = true }
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/deepagents_app_py"]

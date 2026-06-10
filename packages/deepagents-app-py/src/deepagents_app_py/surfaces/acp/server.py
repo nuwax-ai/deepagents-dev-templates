@@ -1,12 +1,12 @@
 """ACP server — bootstraps ACP server over stdio transport.
 
-Port of the TS ``surfaces/acp/server.ts``.
+Uses ``deepagents-acp-py`` to provide a full ACP protocol implementation,
+replacing the previous hand-rolled stdio stub.
 """
 
 from __future__ import annotations
 
 import os
-import sys
 
 from deepagents_app_py.runtime.logger import logger
 
@@ -23,54 +23,57 @@ def bootstrap(
     log.info(
         "Starting ACP server",
         extra={
-            "acp": acp, "debug": debug, "configPath": config_path, "workspaceRoot": workspace_root
+            "acp": acp,
+            "debug": debug,
+            "configPath": config_path,
+            "workspaceRoot": workspace_root,
         },
     )
 
     from deepagents_app_py.runtime.config.config_loader import loadConfig
-    from deepagents_app_py.runtime.config.config_schema import ACPSessionConfig
-    from deepagents_app_py.surfaces.acp.config_builder import buildACPAgentConfig
+    from deepagents_app_py.runtime.acp_server_internals import read_package_version
 
+    # Load config
     config = loadConfig({
         "configPath": config_path,
         "workspaceRoot": workspace_root or os.getcwd(),
     })
 
-    session_config_raw = os.environ.get("ACP_SESSION_CONFIG_JSON")
-    session_config: ACPSessionConfig | None = None
-    if session_config_raw:
-        import json
-        try:
-            data = json.loads(session_config_raw)
-            session_config = ACPSessionConfig(**data)
-        except Exception as exc:
-            log.warning("Failed to parse ACP_SESSION_CONFIG_JSON", extra={"error": str(exc)})
+    # Build agent factory — creates a pydantic-ai Agent per session
+    def build_agent(ctx):  # type: ignore[no-untyped-def]
+        from deepagents_app_py.surfaces.acp.config_builder import buildACPAgent
+        return buildACPAgent(config, ctx.cwd)
 
-    agent_config = buildACPAgentConfig(config, workspace_root or os.getcwd(), session_config)
+    # Build model list from config
+    models = []
+    provider = config.model.provider or "anthropic"
+    model_name = config.model.name or "claude-sonnet-4-6"
+    models.append({
+        "value": f"{provider}:{model_name}",
+        "name": model_name,
+    })
+
+    # Create and run the ACP server
+    from deepagents_acp_py import DeepAgentsServer, run_agent
+
+    pkg_version = read_package_version() or "0.0.0"
+
+    server = DeepAgentsServer(
+        agent=build_agent,
+        name=config.agent.name or "deepagents-app-py",
+        version=pkg_version,
+        models=models,
+        workspace_root=workspace_root or os.getcwd(),
+        debug=debug,
+    )
+
     log.info(
-        "Agent config built",
+        "ACP server configured",
         extra={
-            "name": agent_config.get("name", "unknown"),
-            "tools": len(agent_config.get("tools", [])),
+            "name": config.agent.name,
+            "model": model_name,
+            "version": pkg_version,
         },
     )
 
-    # Bootstrap ACP server via stdio
-    from deepagents_app_py.runtime.acp_server_internals import detect_session_id
-    session_id = detect_session_id(config)
-    log.info("ACP server ready", extra={"sessionId": session_id, "transport": "stdio"})
-
-    # In ACP mode, the host (Zed/nuwaclaw) talks to us over stdio.
-    # Read lines, process, write responses.
-    try:
-        for line in sys.stdin:
-            if not line.strip():
-                continue
-            log.debug("ACP request", extra={"line": line.strip()[:200]})
-            response = '{"type":"response","status":"ok"}'
-            sys.stdout.write(response + "\n")
-            sys.stdout.flush()
-    except (BrokenPipeError, EOFError):
-        log.info("ACP server stdin closed")
-    except KeyboardInterrupt:
-        log.info("ACP server interrupted")
+    run_agent(server, debug=debug)
