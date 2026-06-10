@@ -98,7 +98,6 @@ class DeepAgentsServer(ACPAgent):
 
         # Session management
         self._session_mgr = SessionManager()
-        self._cancelled = False
 
         # Slash commands
         self._slash_cmds = SlashCommandRegistry()
@@ -255,6 +254,7 @@ class DeepAgentsServer(ACPAgent):
         ctx = self._session_mgr.get(session_id)
         if ctx is not None:
             ctx.model = model_id
+            ctx.invalidate_agent()
             ctx.touch()
         return None
 
@@ -270,6 +270,7 @@ class DeepAgentsServer(ACPAgent):
             ctx = self._session_mgr.get(session_id)
             if ctx is not None:
                 ctx.model = value
+                ctx.invalidate_agent()
                 ctx.touch()
         return SetSessionConfigOptionResponse(
             configOptions=self._build_config_options(session_id),
@@ -287,9 +288,11 @@ class DeepAgentsServer(ACPAgent):
         return None
 
     async def cancel(self, session_id: str, **kwargs: Any) -> None:
-        """Cancel current operation."""
-        self._cancelled = True
-        self._session_mgr.touch(session_id)
+        """Cancel current operation for a specific session."""
+        ctx = self._session_mgr.get(session_id)
+        if ctx is not None:
+            ctx.cancelled = True
+            ctx.touch()
         logger.info("Session %s cancelled", session_id)
 
     async def prompt(  # noqa: C901
@@ -300,7 +303,6 @@ class DeepAgentsServer(ACPAgent):
         **kwargs: Any,
     ) -> PromptResponse:
         """Handle a user prompt — run the agent and stream results."""
-        self._cancelled = False
         session_id = session_id or "default"
 
         # Extract text from prompt blocks
@@ -313,6 +315,9 @@ class DeepAgentsServer(ACPAgent):
             # Auto-create session for stale recovery
             ctx = SessionContext(session_id=session_id)
             self._session_mgr.track(ctx)
+
+        # Reset per-session cancel flag at the start of each turn
+        ctx.cancelled = False
 
         ctx.message_count += 1
         ctx.touch()
@@ -363,14 +368,24 @@ class DeepAgentsServer(ACPAgent):
     # ── Agent Management ─────────────────────────────────────────────
 
     def _get_or_create_agent(self, ctx: SessionContext) -> Any:
-        """Get the static agent or create one via factory."""
+        """Get the static agent or use a cached factory result for the session.
+
+        For factory agents, the agent is cached on the SessionContext and only
+        rebuilt when the session's model changes (see
+        ``SessionContext.invalidate_agent``). This avoids re-running the
+        factory on every prompt turn.
+        """
         if self._static_agent is not None:
             return self._static_agent
 
-        if callable(self._agent_factory):
-            return self._agent_factory(ctx)
+        if ctx.cached_agent is not None and ctx.cached_agent_model == ctx.model:
+            return ctx.cached_agent
 
-        return self._agent_factory
+        agent = self._agent_factory(ctx) if callable(self._agent_factory) else self._agent_factory
+
+        ctx.cached_agent = agent
+        ctx.cached_agent_model = ctx.model
+        return agent
 
     # ── Streaming ────────────────────────────────────────────────────
 
@@ -393,13 +408,15 @@ class DeepAgentsServer(ACPAgent):
 
         active_tool_calls: set[str] = set()
         history = ctx.history
+        run_result: Any = None
 
         async with agent.iter(
             user_text,
             message_history=history if history else None,
         ) as run:
+            run_result = run
             async for node in run:
-                if self._cancelled:
+                if ctx.cancelled:
                     break
 
                 if isinstance(node, ModelRequestNode):
@@ -407,7 +424,7 @@ class DeepAgentsServer(ACPAgent):
                         final_result_found = False
 
                         async for event in request_stream:
-                            if self._cancelled:
+                            if ctx.cancelled:
                                 break
 
                             # Capture tool calls
@@ -441,7 +458,7 @@ class DeepAgentsServer(ACPAgent):
                         if final_result_found:
                             prev_len = 0
                             async for cumulative_text in request_stream.stream_text():
-                                if self._cancelled:
+                                if ctx.cancelled:
                                     break
                                 delta = cumulative_text[prev_len:]
                                 if delta:
@@ -451,7 +468,7 @@ class DeepAgentsServer(ACPAgent):
                 elif isinstance(node, CallToolsNode):
                     async with node.stream(run.ctx) as tool_stream:
                         async for event in tool_stream:
-                            if self._cancelled:
+                            if ctx.cancelled:
                                 break
                             ename = type(event).__name__
                             if ename == "FunctionToolResultEvent":
@@ -464,9 +481,14 @@ class DeepAgentsServer(ACPAgent):
                                     if content_str else None,
                                 ))
 
-        # Save history for next turn
-        if hasattr(run, "result") and hasattr(run.result, "all_messages"):
-            ctx.history = list(run.result.all_messages())
+        # Save history for next turn (capture before async-with exits)
+        if run_result is not None and hasattr(run_result, "result"):
+            result = run_result.result
+            if result is not None and hasattr(result, "all_messages"):
+                try:
+                    ctx.history = list(result.all_messages())
+                except Exception:
+                    logger.debug("Could not capture history for next turn")
 
     # ── Helpers ──────────────────────────────────────────────────────
 

@@ -24,10 +24,19 @@ class SessionContext:
     message_count: int = 0
     history: list[Any] = field(default_factory=list)
     extra: dict[str, Any] = field(default_factory=dict)
+    # Per-session state — independent across concurrent sessions
+    cancelled: bool = False
+    cached_agent: Any | None = None
+    cached_agent_model: str | None = None
 
     def touch(self) -> None:
         """Update last activity timestamp."""
         self.last_activity_at = datetime.now(timezone.utc)
+
+    def invalidate_agent(self) -> None:
+        """Drop the cached agent (call when session state changes)."""
+        self.cached_agent = None
+        self.cached_agent_model = None
 
 
 class SessionManager:

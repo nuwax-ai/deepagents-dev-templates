@@ -6,6 +6,7 @@ etc.) that are intercepted before reaching the agent.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Callable, Coroutine
 from dataclasses import dataclass
@@ -86,9 +87,14 @@ class SlashCommandRegistry:
         return list(self._commands.values())
 
     def list_specs(self) -> list[dict[str, str]]:
-        """Return command specs for ACP ``available_commands_update``."""
+        """Return command specs for ACP ``available_commands_update``.
+
+        ACP ``AvailableCommand.name`` expects a bare command name (no leading
+        ``/``) — the leading slash is part of the user's input syntax, not the
+        command identifier.
+        """
         return [
-            {"name": f"/{cmd.name}", "description": cmd.description}
+            {"name": cmd.name, "description": cmd.description}
             for cmd in sorted(self._commands.values(), key=lambda c: c.name)
         ]
 
@@ -103,6 +109,8 @@ class SlashCommandRegistry:
         """Route a slash command to its handler.
 
         Returns the response text, or None if the text is not a slash command.
+        Supports both async and sync handlers — sync handlers are called
+        directly, async handlers are awaited.
         """
         if not text.startswith("/"):
             return None
@@ -112,4 +120,7 @@ class SlashCommandRegistry:
         if cmd is None:
             return f"Unknown command: /{cmd_name}. Type /help for available commands."
 
-        return await cmd.handler(text, ctx)
+        result = cmd.handler(text, ctx)
+        if asyncio.iscoroutine(result):
+            return await result
+        return result

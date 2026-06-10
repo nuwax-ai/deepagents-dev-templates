@@ -39,10 +39,15 @@ def bootstrap(
         "workspaceRoot": workspace_root or os.getcwd(),
     })
 
+    # Parse ACP_SESSION_CONFIG_JSON (highest-priority session override).
+    session_config = _load_session_config_from_env()
+    if session_config:
+        log.info("Loaded ACP session config from environment")
+
     # Build agent factory — creates a pydantic-ai Agent per session
     def build_agent(ctx):  # type: ignore[no-untyped-def]
         from deepagents_app_py.surfaces.acp.config_builder import buildACPAgent
-        return buildACPAgent(config, ctx.cwd)
+        return buildACPAgent(config, ctx.cwd, session_config=session_config)
 
     # Build model list from config
     models = []
@@ -77,3 +82,17 @@ def bootstrap(
     )
 
     run_agent(server, debug=debug)
+
+
+def _load_session_config_from_env() -> dict | None:
+    """Parse ``ACP_SESSION_CONFIG_JSON`` env var (mirrors the TS helper)."""
+    import json
+
+    raw = os.environ.get("ACP_SESSION_CONFIG_JSON")
+    if not raw:
+        return None
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        logger.warning("Failed to parse ACP_SESSION_CONFIG_JSON")
+        return None

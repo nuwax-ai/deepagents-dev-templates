@@ -62,6 +62,10 @@ class TestCustomCommands:
     def test_list_specs(self, registry: SlashCommandRegistry) -> None:
         specs = registry.list_specs()
         names = [s["name"] for s in specs]
-        assert "/help" in names
-        assert "/clear" in names
-        assert "/status" in names
+        # ACP AvailableCommand.name uses bare names (no leading slash)
+        assert "help" in names
+        assert "clear" in names
+        assert "status" in names
+        # Make sure no spec has a leading slash
+        for spec in specs:
+            assert not spec["name"].startswith("/")

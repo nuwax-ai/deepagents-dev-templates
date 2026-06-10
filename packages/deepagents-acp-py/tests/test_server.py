@@ -129,10 +129,23 @@ class TestModelSwitching:
 
 
 class TestCancel:
-    async def test_cancel_sets_flag(self, server: DeepAgentsServer) -> None:
+    async def test_cancel_sets_per_session_flag(self, server: DeepAgentsServer) -> None:
         resp = await server.new_session(cwd="/tmp")
         await server.cancel(session_id=resp.sessionId)
-        assert server._cancelled is True
+        ctx = server._session_mgr.get(resp.sessionId)
+        assert ctx is not None
+        assert ctx.cancelled is True
+
+    async def test_cancel_does_not_affect_other_sessions(self, server: DeepAgentsServer) -> None:
+        resp_a = await server.new_session(cwd="/tmp/a")
+        resp_b = await server.new_session(cwd="/tmp/b")
+        await server.cancel(session_id=resp_a.sessionId)
+        ctx_a = server._session_mgr.get(resp_a.sessionId)
+        ctx_b = server._session_mgr.get(resp_b.sessionId)
+        assert ctx_a is not None
+        assert ctx_b is not None
+        assert ctx_a.cancelled is True
+        assert ctx_b.cancelled is False
 
 
 class TestFactoryPattern:
@@ -149,6 +162,43 @@ class TestFactoryPattern:
         ctx = srv._session_mgr.get(resp.sessionId)
         srv._get_or_create_agent(ctx)
         assert resp.sessionId in call_log
+
+    async def test_factory_cached_across_prompts(self) -> None:
+        call_count = 0
+
+        def build_agent(ctx):
+            nonlocal call_count
+            call_count += 1
+            return MagicMock()
+
+        srv = DeepAgentsServer(agent=build_agent)
+        resp = await srv.new_session(cwd="/tmp")
+        ctx = srv._session_mgr.get(resp.sessionId)
+        a1 = srv._get_or_create_agent(ctx)
+        a2 = srv._get_or_create_agent(ctx)
+        a3 = srv._get_or_create_agent(ctx)
+        # Factory called once and result cached on the session
+        assert call_count == 1
+        assert a1 is a2 is a3
+
+    async def test_factory_rebuilt_on_model_change(self) -> None:
+        call_count = 0
+
+        def build_agent(ctx):
+            nonlocal call_count
+            call_count += 1
+            return MagicMock()
+
+        srv = DeepAgentsServer(agent=build_agent)
+        resp = await srv.new_session(cwd="/tmp")
+        ctx = srv._session_mgr.get(resp.sessionId)
+        srv._get_or_create_agent(ctx)
+        assert call_count == 1
+
+        # Simulate model switch — should invalidate cache
+        await srv.set_session_model(model_id="new-model", session_id=resp.sessionId)
+        srv._get_or_create_agent(ctx)
+        assert call_count == 2
 
     async def test_static_agent_reused(self, mock_agent: MagicMock) -> None:
         srv = DeepAgentsServer(agent=mock_agent)
