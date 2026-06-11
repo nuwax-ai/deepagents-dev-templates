@@ -18,7 +18,12 @@
 
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import type { ActionScheduler, ScheduledAction, ToolExecutor } from "../../runtime/scheduler/action-scheduler.js";
+import {
+  MAX_DELAY_SECONDS,
+  type ActionScheduler,
+  type ScheduledAction,
+  type ToolExecutor,
+} from "../../runtime/scheduler/action-scheduler.js";
 import { ensureSessionState, getRuntimeStorage } from "../../runtime/storage/runtime-storage.js";
 
 export interface ScheduleActionToolOptions {
@@ -34,7 +39,6 @@ export function createScheduleActionTool(options: ScheduleActionToolOptions) {
   return tool(
     async ({ operation, action, delaySeconds, toolName, toolArgs, actionId }) => {
       const storage = getRuntimeStorage();
-      ensureSessionState(storage);
       const scheduler = options.getScheduler(storage.scheduledActionsPath, options.executor);
 
       switch (operation) {
@@ -42,6 +46,9 @@ export function createScheduleActionTool(options: ScheduleActionToolOptions) {
           if (!action) return "Error: `action` (description) is required for schedule";
           if (!toolName) return "Error: `toolName` is required for schedule";
           if (!delaySeconds || delaySeconds < 1) return "Error: `delaySeconds` must be >= 1";
+          if (delaySeconds > MAX_DELAY_SECONDS) {
+            return `Error: \`delaySeconds\` must be <= ${MAX_DELAY_SECONDS}`;
+          }
 
           // Validate tool name is known
           if (!options.knownTools.has(toolName)) {
@@ -49,12 +56,22 @@ export function createScheduleActionTool(options: ScheduleActionToolOptions) {
             return `Error: Unknown tool "${toolName}". Available tools: ${known}`;
           }
 
+          // Only materialize the session dir when we're actually about to write
+          // a new action. Running ensureSessionState for list/cancel would create
+          // a phantom active session (metadata.json, empty messages.jsonl, etc.)
+          // and pollute session enumeration.
+          ensureSessionState(storage);
+
           try {
             const result = scheduler.schedule({
               action,
               toolName,
               toolArgs: toolArgs ?? {},
               delaySeconds,
+              // Capture the live session so the background timer re-enters it
+              // when it fires (ActionScheduler wraps the executor in this ctx).
+              workspaceRoot: storage.workspaceRoot,
+              sessionId: storage.sessionId,
             });
             return `Scheduled: [${result.id}] "${action}" → ${toolName} in ${delaySeconds}s (fires at ${result.fireAt})`;
           } catch (err) {
@@ -108,6 +125,7 @@ Operations:
 
 const STATUS_ICON: Record<ScheduledAction["status"], string> = {
   pending: "⏳",
+  running: "⏺",
   fired: "✅",
   cancelled: "❌",
   failed: "⚠️",

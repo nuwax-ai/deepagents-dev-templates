@@ -18,6 +18,7 @@ import {
   getRuntimeStorage,
   withRuntimeStorageContext,
 } from "../../runtime/storage/runtime-storage.js";
+import { destroyRuntimeContext } from "../../runtime/runtime-context.js";
 
 const log = logger.child("one-shot");
 
@@ -51,7 +52,7 @@ export async function runOneShot(
   // Pass systemPrompt via sessionConfig so createAppAgent routes it
   // to createDeepAgent's systemPrompt field, NOT as a user message.
   // checkpointer: false — one-shot doesn't provide a thread_id.
-  const { agent } = await createAppAgentAsync(config, {
+  const { agent, context } = await createAppAgentAsync(config, {
     cwd: workspaceRoot,
     systemPrompt,
   }, { checkpointer: false });
@@ -68,8 +69,10 @@ export async function runOneShot(
     console.log(content);
   } catch (err) {
     console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
+    destroyRuntimeContext(context);
     process.exit(1);
   }
+  destroyRuntimeContext(context);
 }
 
 /**

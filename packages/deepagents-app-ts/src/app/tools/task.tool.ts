@@ -42,7 +42,7 @@ export function createTaskTool(config: AppConfig, workspaceRoot: string) {
 
       // 2. Spin up a minimal agent (LLM-only, no tools) for isolation.
       //    checkpointer=false avoids MemorySaver.put errors when no thread_id is provided.
-      const agentInstance = (createDeepAgent as unknown as (params: unknown) => unknown)({
+      const agent = createDeepAgent({
         model: resolveModel(config),
         systemPrompt:
           systemPrompt ??
@@ -53,34 +53,9 @@ export function createTaskTool(config: AppConfig, workspaceRoot: string) {
 
       // 3. Invoke and extract response text
       try {
-        const result = await (agentInstance as { invoke: (i: unknown) => Promise<unknown> }).invoke(
-          { messages: [{ role: "human", content: prompt }] }
-        );
-        const messages: unknown[] = (result as { messages?: unknown[] })?.messages ?? [];
-        const lastAi = [...messages]
-          .reverse()
-          .find(
-            (m) =>
-              (m as { type?: string }).type === "ai" ||
-              (m as { _getType?: () => string })._getType?.() === "ai"
-          ) as { content?: unknown } | undefined;
-
-        const content = lastAi?.content;
-        if (typeof content === "string") {
-          return content.trim() || "[Subagent returned empty response]";
-        }
-        if (Array.isArray(content)) {
-          return (
-            (content as unknown[])
-              .map((c) =>
-                typeof c === "string" ? c : (c as { text?: string })?.text ?? ""
-              )
-              .filter(Boolean)
-              .join("\n")
-              .trim() || "[Subagent returned empty response]"
-          );
-        }
-        return "[Subagent returned no text response]";
+        const result = await agent.invoke({ messages: [{ role: "user", content: prompt }] });
+        const text = extractLastAiText(result);
+        return text ?? "[Subagent returned no text response]";
       } catch (err) {
         log.error("Subagent execution failed", {
           error: err instanceof Error ? err.message : String(err),
@@ -118,4 +93,53 @@ Examples:
       }),
     }
   );
+}
+
+// ─── Helpers ──────────────────────────────────────────────
+
+/**
+ * Extract the text of the last AI message from a deepagents invoke result.
+ * Returns the trimmed text, or null if no text content was produced.
+ *
+ * deepagents returns `{ messages: BaseMessage[] }`; an AI message's `content`
+ * is either a string or an array of content blocks (text/image/tool_use/...).
+ * We pick text blocks explicitly so a trailing tool_use block can't mask the
+ * answer, and we look at the LAST ai message so tool-call turns are skipped.
+ */
+function extractLastAiText(response: unknown): string | null {
+  const messages = (response as { messages?: unknown[] })?.messages;
+  if (!Array.isArray(messages)) return null;
+
+  for (const m of [...messages].reverse()) {
+    if (!isAiMessage(m)) continue;
+    const content = (m as { content?: unknown }).content;
+    const text = contentToText(content);
+    if (text) return text;
+  }
+  return null;
+}
+
+function isAiMessage(m: unknown): boolean {
+  if (typeof m !== "object" || m === null) return false;
+  const msg = m as { type?: string; _getType?: () => string };
+  return msg.type === "ai" || msg._getType?.() === "ai";
+}
+
+function contentToText(content: unknown): string | null {
+  if (typeof content === "string") {
+    return content.trim() || null;
+  }
+  if (Array.isArray(content)) {
+    const text = content
+      .map((block) => {
+        if (typeof block === "string") return block;
+        const b = block as { type?: string; text?: string };
+        return b.type === "text" && typeof b.text === "string" ? b.text : "";
+      })
+      .filter(Boolean)
+      .join("\n")
+      .trim();
+    return text || null;
+  }
+  return null;
 }

@@ -6,7 +6,12 @@
  * so they survive across agent turns.
  *
  * When a timer fires, the scheduler invokes the injected `ToolExecutor`
- * callback which dispatches to the appropriate tool (builtin or MCP).
+ * callback which dispatches to the appropriate tool (builtin or MCP). The
+ * call is made inside the originating session's `withRuntimeStorageContext`
+ * so builtin tools that read `getRuntimeStorage()` (checkpoint,
+ * conversation_history, runtime_info, agent_memory) resolve the SAME session
+ * the action was scheduled under — background timers otherwise run outside
+ * the request's AsyncLocalStorage scope and would land in the default session.
  *
  * Inspired by the scheduling gap found across codex / nuwaxcode / pi-mono —
  * none of them provide this capability. This is a first-party implementation
@@ -14,8 +19,11 @@
  */
 
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { dirname } from "node:path";
 import { logger } from "../logger.js";
+import { truncate } from "../utils/string.js";
+import { withRuntimeStorageContext } from "../storage/runtime-storage.js";
 
 // ─── Types ──────────────────────────────────────────────
 
@@ -29,17 +37,36 @@ export interface ScheduledAction {
   toolArgs: Record<string, unknown>;
   /** Delay in seconds */
   delaySeconds: number;
-  /** ISO timestamp when the action was created */
-  createdAt: string;
+  /**
+   * Workspace root captured at schedule time. Re-established as the storage
+   * context when the timer fires so the target tool writes to the right place.
+   */
+  workspaceRoot: string;
+  /** Session id captured at schedule time (see workspaceRoot). */
+  sessionId: string;
   /** ISO timestamp when the action should fire */
   fireAt: string;
   /** Current status */
-  status: "pending" | "fired" | "cancelled" | "failed";
+  status: "pending" | "running" | "fired" | "cancelled" | "failed";
   /** Error message if status is "failed" */
   error?: string;
   /** Result from the tool execution if status is "fired" */
   result?: string;
 }
+
+export type ScheduledActionStatus = ScheduledAction["status"];
+
+/**
+ * Maximum allowed delay, in seconds. Single source of truth shared by the
+ * schedule_action tool (for schema-level validation) and the scheduler.
+ */
+export const MAX_DELAY_SECONDS = 3600;
+
+/**
+ * How many terminal (fired/cancelled/failed) actions to keep on disk and in
+ * memory for `list` history. Pending/running actions are always retained.
+ */
+const MAX_TERMINAL_HISTORY = 50;
 
 /**
  * Callback that executes a tool by name with the given arguments.
@@ -55,7 +82,7 @@ export interface ActionSchedulerOptions {
   storagePath: string;
   /** Callback to execute tools when timers fire */
   executor: ToolExecutor;
-  /** Maximum allowed delay in seconds (default: 3600 = 1 hour) */
+  /** Maximum allowed delay in seconds (default: MAX_DELAY_SECONDS) */
   maxDelaySeconds?: number;
 }
 
@@ -65,7 +92,7 @@ export class ActionScheduler {
   private log = logger.child("action-scheduler");
   private timers = new Map<string, NodeJS.Timeout>();
   private actions = new Map<string, ScheduledAction>();
-  private storagePath: string;
+  readonly storagePath: string;
   private executor: ToolExecutor;
   private maxDelaySeconds: number;
   private destroyed = false;
@@ -73,7 +100,7 @@ export class ActionScheduler {
   constructor(options: ActionSchedulerOptions) {
     this.storagePath = options.storagePath;
     this.executor = options.executor;
-    this.maxDelaySeconds = options.maxDelaySeconds ?? 3600;
+    this.maxDelaySeconds = options.maxDelaySeconds ?? MAX_DELAY_SECONDS;
 
     // Restore persisted actions from previous runs
     this.restoreFromDisk();
@@ -87,10 +114,13 @@ export class ActionScheduler {
     toolName: string;
     toolArgs: Record<string, unknown>;
     delaySeconds: number;
+    /** Captured from the live storage context; re-entered when the timer fires. */
+    workspaceRoot: string;
+    sessionId: string;
   }): { id: string; fireAt: string } {
     if (this.destroyed) throw new Error("ActionScheduler has been destroyed");
 
-    const { action, toolName, toolArgs, delaySeconds } = params;
+    const { action, toolName, toolArgs, delaySeconds, workspaceRoot, sessionId } = params;
 
     if (delaySeconds < 1) {
       throw new Error("delaySeconds must be at least 1");
@@ -99,7 +129,7 @@ export class ActionScheduler {
       throw new Error(`delaySeconds exceeds maximum of ${this.maxDelaySeconds}`);
     }
 
-    const id = generateActionId();
+    const id = `sa-${randomUUID()}`;
     const now = new Date();
     const fireAt = new Date(now.getTime() + delaySeconds * 1000);
 
@@ -109,7 +139,8 @@ export class ActionScheduler {
       toolName,
       toolArgs,
       delaySeconds,
-      createdAt: now.toISOString(),
+      workspaceRoot,
+      sessionId,
       fireAt: fireAt.toISOString(),
       status: "pending",
     };
@@ -119,7 +150,7 @@ export class ActionScheduler {
 
     // Start the timer
     const timer = setTimeout(() => {
-      this.executeAction(id);
+      void this.executeAction(id);
     }, delaySeconds * 1000);
 
     // Unref so the timer doesn't keep the Node.js process alive
@@ -132,7 +163,8 @@ export class ActionScheduler {
   }
 
   /**
-   * Cancel a scheduled action.
+   * Cancel a scheduled action. Returns false if it has already started running
+   * or has fired/failed (too late to cancel).
    */
   cancel(actionId: string): boolean {
     const action = this.actions.get(actionId);
@@ -156,7 +188,7 @@ export class ActionScheduler {
   /**
    * List all actions (optionally filtered by status).
    */
-  list(status?: ScheduledAction["status"]): ScheduledAction[] {
+  list(status?: ScheduledActionStatus): ScheduledAction[] {
     const all = Array.from(this.actions.values());
     if (status) {
       return all.filter(a => a.status === status);
@@ -165,7 +197,7 @@ export class ActionScheduler {
   }
 
   /**
-   * Clean up all timers. Call on process exit or session close.
+   * Clean up all timers. Call on session close via destroyRuntimeContext().
    */
   destroy(): void {
     this.destroyed = true;
@@ -186,9 +218,23 @@ export class ActionScheduler {
 
     this.timers.delete(id);
 
+    // Flip to "running" BEFORE awaiting the executor. Without this, a cancel()
+    // issued during the executor's await still sees status "pending", reports
+    // success, and then this method overwrites it with "fired" — the action
+    // runs despite a successful cancel. Once "running", cancel() correctly
+    // returns false (too late).
+    action.status = "running";
+    this.persist();
+
     try {
       this.log.info("Executing scheduled action", { id, toolName: action.toolName });
-      const result = await this.executor(action.toolName, action.toolArgs);
+      // Re-enter the originating session's storage context. Background timers
+      // fire outside any request's AsyncLocalStorage; without this, builtin
+      // tools that call getRuntimeStorage() resolve the wrong (default) session.
+      const result = await withRuntimeStorageContext(
+        { workspaceRoot: action.workspaceRoot, sessionId: action.sessionId },
+        () => this.executor(action.toolName, action.toolArgs),
+      );
       action.status = "fired";
       action.result = truncate(result, 500);
       this.log.info("Scheduled action completed", { id, toolName: action.toolName });
@@ -203,9 +249,18 @@ export class ActionScheduler {
 
   private persist(): void {
     try {
-      const data = Array.from(this.actions.values());
+      const data = this.collectForPersistence();
       mkdirSync(dirname(this.storagePath), { recursive: true });
       writeFileSync(this.storagePath, JSON.stringify(data, null, 2) + "\n", "utf-8");
+
+      // Drop pruned terminal actions from memory so the map (and list()) stays
+      // bounded — without this, fired/cancelled/failed actions accumulate forever.
+      const keepIds = new Set(data.map(a => a.id));
+      for (const id of Array.from(this.actions.keys())) {
+        if (!keepIds.has(id)) {
+          this.actions.delete(id);
+        }
+      }
     } catch (err) {
       this.log.warn("Failed to persist scheduled actions", {
         error: err instanceof Error ? err.message : String(err),
@@ -213,25 +268,48 @@ export class ActionScheduler {
     }
   }
 
+  /**
+   * All pending/running actions plus the most-recent terminal actions (bounded).
+   */
+  private collectForPersistence(): ScheduledAction[] {
+    const all = Array.from(this.actions.values());
+    const active = all.filter(a => a.status === "pending" || a.status === "running");
+    const terminal = all.filter(
+      a => a.status === "fired" || a.status === "cancelled" || a.status === "failed",
+    );
+    return [...active, ...terminal.slice(-MAX_TERMINAL_HISTORY)];
+  }
+
   private restoreFromDisk(): void {
     if (!existsSync(this.storagePath)) return;
     try {
-      const data = JSON.parse(readFileSync(this.storagePath, "utf-8")) as ScheduledAction[];
+      const raw = JSON.parse(readFileSync(this.storagePath, "utf-8"));
+      // Guard against a corrupt/hand-edited file: a non-array payload would
+      // throw inside the for..of and silently abandon every pending action.
+      if (!Array.isArray(raw)) {
+        this.log.warn("Scheduled-actions file is not an array; skipping restore", {
+          path: this.storagePath,
+        });
+        return;
+      }
+      const data = raw as ScheduledAction[];
       for (const action of data) {
         // Only restore pending actions; fired/cancelled/failed are historical
         if (action.status === "pending") {
           const remainingMs = new Date(action.fireAt).getTime() - Date.now();
           if (remainingMs > 0) {
             this.actions.set(action.id, action);
-            const timer = setTimeout(() => this.executeAction(action.id), remainingMs);
+            const timer = setTimeout(() => {
+              void this.executeAction(action.id);
+            }, remainingMs);
             timer.unref();
             this.timers.set(action.id, timer);
             this.log.info("Restored pending action", { id: action.id, toolName: action.toolName });
           } else {
-            // Already past fire time — execute immediately
-            action.status = "pending"; // ensure status is set for executeAction
+            // Already past fire time — execute immediately. The session context
+            // is restored from the action's stored fields inside executeAction.
             this.actions.set(action.id, action);
-            this.executeAction(action.id);
+            void this.executeAction(action.id);
           }
         } else {
           this.actions.set(action.id, action);
@@ -243,15 +321,4 @@ export class ActionScheduler {
       });
     }
   }
-}
-
-// ─── Helpers ──────────────────────────────────────────────
-
-function generateActionId(): string {
-  return `sa-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`;
-}
-
-function truncate(str: string, maxLen: number): string {
-  if (str.length <= maxLen) return str;
-  return str.slice(0, maxLen) + "... [truncated]";
 }

@@ -179,3 +179,13 @@ export async function createRuntimeContextAsync(
 ): Promise<RuntimeContext> {
   return await hydrateRuntimeContext(createRuntimeContext(config, sessionConfig, workspaceRoot));
 }
+
+/**
+ * Tear down runtime resources held by a context. Currently clears the
+ * per-session ActionScheduler's timers so they don't outlive the session.
+ * Call when a session ends (CLI exit, one-shot completion). Safe to call
+ * multiple times — destroy() is idempotent.
+ */
+export function destroyRuntimeContext(context: RuntimeContext): void {
+  context.toolContext.scheduler?.destroy();
+}
