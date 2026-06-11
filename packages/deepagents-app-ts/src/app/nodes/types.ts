@@ -20,7 +20,7 @@ export interface RAGState {
 
   // Rewrite 输出
   rewritten_query?: string;
-  intent?: RAGIntent;
+  intent?: string;  // RAGIntent 类型在 Annotation 中用 string
   keywords?: string[];
   mcp_hint?: string;
 

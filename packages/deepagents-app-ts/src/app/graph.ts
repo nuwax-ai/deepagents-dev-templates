@@ -7,13 +7,16 @@
 import { StateGraph, END, START } from "@langchain/langgraph";
 import { Annotation } from "@langchain/langgraph";
 import { BaseMessage } from "@langchain/core/messages";
-import {
-  rewriteNode,
-  retrieveNode,
-  prepareNode,
-  agentNode,
-} from "./nodes/index.js";
-import type { RAGConfig, RAGResponse, RetrievalResult, Source } from "./nodes/types.js";
+import { rewriteNode } from "./nodes/rewrite.js";
+import { retrieveNode, type RetrieveNodeConfig } from "./nodes/retrieve.js";
+import { prepareNode } from "./nodes/prepare.js";
+import { agentNode } from "./nodes/agent.js";
+import type {
+  RAGConfig,
+  RAGResponse,
+  RetrievalResult,
+  Source,
+} from "./nodes/types.js";
 import { DEFAULT_RAG_CONFIG } from "./nodes/types.js";
 
 /** RAG State 定义 */
@@ -45,27 +48,44 @@ const RAGStateAnnotation = Annotation.Root({
 
 type RAGStateType = typeof RAGStateAnnotation.State;
 
+/** MCP 服务器配置 */
+interface MCPServerConfig {
+  command?: string;
+  args?: string[];
+  env?: Record<string, string>;
+  url?: string;
+  enabled?: boolean;
+}
+
+/** 创建 RAG Graph 的配置 */
+export interface CreateRAGGraphConfig extends RAGConfig {
+  mcpServers: Record<string, MCPServerConfig>;
+}
+
 /**
  * 创建 RAG Graph
  */
-export function createRAGGraph(config: RAGConfig = DEFAULT_RAG_CONFIG) {
+export function createRAGGraph(config: CreateRAGGraphConfig) {
+  // 构建 Retrieve 节点配置
+  const retrieveConfig: RetrieveNodeConfig = {
+    mcpServers: config.mcpServers,
+    retrievalTools: config.retrievalTools,
+    retrieve: config.retrieve,
+  };
+
   const graph = new StateGraph(RAGStateAnnotation)
     // 添加节点
     .addNode("rewrite", async (state: RAGStateType) => {
-      const result = await rewriteNode(state, config);
-      return result;
+      return await rewriteNode(state);
     })
     .addNode("retrieve", async (state: RAGStateType) => {
-      const result = await retrieveNode(state, config);
-      return result;
+      return await retrieveNode(state, retrieveConfig);
     })
     .addNode("prepare", async (state: RAGStateType) => {
-      const result = await prepareNode(state, config);
-      return result;
+      return await prepareNode(state, config);
     })
     .addNode("agent", async (state: RAGStateType) => {
-      const result = await agentNode(state, config);
-      return result;
+      return await agentNode(state, config);
     })
 
     // 定义边
@@ -83,15 +103,15 @@ export function createRAGGraph(config: RAGConfig = DEFAULT_RAG_CONFIG) {
  */
 export async function executeRAG(
   query: string,
-  options?: {
-    config?: RAGConfig;
+  options: {
+    config: CreateRAGGraphConfig;
     history?: BaseMessage[];
     callbacks?: {
       onToken?: (token: string) => void;
     };
   }
 ): Promise<RAGResponse> {
-  const config = options?.config || DEFAULT_RAG_CONFIG;
+  const { config } = options;
   const graph = createRAGGraph(config);
 
   const startTime = Date.now();
