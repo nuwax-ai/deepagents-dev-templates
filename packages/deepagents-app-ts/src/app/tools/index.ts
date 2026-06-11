@@ -28,7 +28,7 @@ import type { PlatformClient } from "../../runtime/platform/platform-client.js";
 import type { MCPManager } from "../../runtime/platform/mcp-manager.js";
 import type { VariableManager } from "../../runtime/platform/variable-manager.js";
 import type { AppConfig } from "../../runtime/config/config-loader.js";
-import type { ToolExecutor } from "../../runtime/scheduler/action-scheduler.js";
+import { ActionScheduler, type ToolExecutor } from "../../runtime/scheduler/action-scheduler.js";
 
 export interface ToolContext {
   /** PlatformClient when platform credentials are configured, null in local-only mode */
@@ -51,6 +51,12 @@ export interface ToolContext {
    * by hydrateRuntimeContext after MCP tools load.
    */
   schedulableTools?: Set<string>;
+  /**
+   * Per-session ActionScheduler, lazily created on the first schedule_action
+   * call. Owned by the context (not a module singleton) so it is reclaimed when
+   * the context is dropped, and torn down by destroyRuntimeContext().
+   */
+  scheduler?: ActionScheduler;
 }
 
 /**
@@ -99,31 +105,26 @@ export function createTools(ctx: ToolContext): StructuredTool[] {
   const scheduleActionTool = createScheduleActionTool({
     knownTools,
     executor: lazyExecutor,
-    getScheduler: getOrCreateScheduler,
+    // One scheduler per ToolContext (per session): lazily created on first use
+    // and cached on ctx so timers survive across tool invocations. Because it
+    // lives on ctx (not a module-level Map), it is GC'd when the context is
+    // dropped and never cross-wires with a different session sharing the same
+    // storage path. The executor is fixed at lazyExecutor (which reads
+    // ctx.toolExecutor at fire time), so the caller's executor arg is ignored.
+    getScheduler: (storagePath: string): ActionScheduler => {
+      if (!ctx.scheduler) {
+        ctx.scheduler = new ActionScheduler({ storagePath, executor: lazyExecutor });
+      }
+      return ctx.scheduler;
+    },
   });
 
-  // Add schedule_action's own name to the known set
-  knownTools.add(scheduleActionTool.name);
+  // NOTE: schedule_action's own name is intentionally NOT added to knownTools.
+  // Allowing the agent to schedule schedule_action itself would create an
+  // unbounded self-perpetuating timer chain (each fire schedules another),
+  // with no recursion-depth guard and no way for the agent to cancel the
+  // generated ids. It is not a meaningful "delayed" action anyway.
 
   return [...builtinTools, scheduleActionTool];
-}
-
-// ── Scheduler Cache ───────────────────────────────────────
-
-import { ActionScheduler } from "../../runtime/scheduler/action-scheduler.js";
-
-/**
- * Cache of ActionScheduler instances keyed by storage path.
- * Ensures one scheduler per session — timers survive across tool invocations.
- */
-const schedulerCache = new Map<string, ActionScheduler>();
-
-function getOrCreateScheduler(storagePath: string, executor: ToolExecutor): ActionScheduler {
-  let scheduler = schedulerCache.get(storagePath);
-  if (!scheduler) {
-    scheduler = new ActionScheduler({ storagePath, executor });
-    schedulerCache.set(storagePath, scheduler);
-  }
-  return scheduler;
 }
 

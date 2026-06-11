@@ -29,6 +29,7 @@ import {
   getRuntimeStorage,
   withRuntimeStorageContext,
 } from "../../runtime/storage/runtime-storage.js";
+import { destroyRuntimeContext } from "../../runtime/runtime-context.js";
 
 const log = logger.child("repl");
 
@@ -98,12 +99,14 @@ export async function startRepl(options: ReplOptions = {}): Promise<void> {
   });
 
   const cleanup = () => {
+    destroyRuntimeContext(context);
     rl.close();
     console.log("\n\x1b[2m再见!\x1b[0m");
     process.exit(0);
   };
 
   rl.on("close", () => {
+    destroyRuntimeContext(context);
     console.log("\n\x1b[2m再见!\x1b[0m");
     process.exit(0);
   });
