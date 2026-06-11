@@ -38,11 +38,14 @@ export function createRAGHandlerConfig(config: AppConfig): RAGHandlerConfig {
  */
 export function loadRAGConfigFromFile(): RAGHandlerConfig | null {
   try {
-    // 尝试多个可能的路径
+    // 尝试多个可能的路径（包括 ACP 模式下的工作目录）
     const possiblePaths = [
       resolve(process.cwd(), "config/rag-agent.config.json"),
       resolve(process.cwd(), "../config/rag-agent.config.json"),
       resolve(process.cwd(), "../../config/rag-agent.config.json"),
+      resolve(process.cwd(), "../../../config/rag-agent.config.json"),
+      // RAG Agent 项目的固定路径
+      "/Users/apple/workspace/deepagents-dev-templates-rag/packages/deepagents-app-ts/config/rag-agent.config.json",
     ];
 
     for (const configPath of possiblePaths) {
