@@ -33,6 +33,7 @@ import { dirname, resolve } from "node:path";
 import { generateCodeGraph, writeCodeGraph } from "./runtime/code-graph.js";
 import { bootstrap } from "./surfaces/acp/index.js";
 import { startRepl, runOneShot, runPromptFile } from "./surfaces/cli/index.js";
+import { runRAGCLI } from "./surfaces/cli/rag.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = resolve(__dirname, "..");
@@ -51,6 +52,7 @@ interface ParsedArgs {
   systemPrompt?: string;
   workspaceRoot?: string;
   showHelp: boolean;
+  interactive?: boolean;
 }
 
 function parseArgs(argv: string[]): ParsedArgs {
@@ -87,6 +89,9 @@ function parseArgs(argv: string[]): ParsedArgs {
     } else if ((a === "--cwd" || a === "--working-dir") && i + 1 < argv.length) {
       args.workspaceRoot = resolve(process.cwd(), argv[i + 1]);
       i += 2;
+    } else if (a === "--interactive" || a === "-i") {
+      args.interactive = true;
+      i++;
     } else if (a.startsWith("--")) {
       console.error(`Unknown flag: ${a}`);
       process.exit(1);
@@ -116,6 +121,10 @@ function parseArgs(argv: string[]): ParsedArgs {
     args.command = "graph";
     args.acp = false;
     args.commandArg = positional[1];
+  } else if (first === "rag") {
+    args.command = "rag";
+    args.acp = false;
+    args.commandArg = positional[1];
   } else if (first === undefined) {
     // No command → default ACP
   } else {
@@ -141,6 +150,8 @@ DeepAgents Dev Templates — Multi-mode Entry Point
   ask "<prompt>"         单次提问并打印回答
   run <file>             从文件读取 prompt 并执行
   graph [output.json]    生成代码节点关系图 JSON
+  rag "<query>"          RAG 查询（单次）
+  rag --interactive      RAG 交互模式
 
 标志:
   --debug                启用 debug 级别日志
@@ -149,6 +160,7 @@ DeepAgents Dev Templates — Multi-mode Entry Point
   --system-prompt <s>    直接指定系统提示词
   --cwd <path>           指定项目工作目录
   --no-acp               禁用 ACP 模式
+  --interactive, -i      交互模式（用于 rag 命令）
   --help, -h             显示此帮助
 
 示例:
@@ -157,6 +169,8 @@ DeepAgents Dev Templates — Multi-mode Entry Point
   npx tsx src/index.ts ask "hello world"      # 单次问答
   npx tsx src/index.ts run prompt.md          # 从文件运行
   npx tsx src/index.ts graph                  # 输出节点关系图 JSON
+  npx tsx src/index.ts rag "什么是 LangGraph？"  # RAG 查询
+  npx tsx src/index.ts rag --interactive      # RAG 交互模式
 `;
 
 async function main(): Promise<void> {
@@ -233,6 +247,14 @@ async function main(): Promise<void> {
         } else {
           console.log(JSON.stringify(generateCodeGraph(), null, 2));
         }
+        break;
+
+      case "rag":
+        await runRAGCLI(args.commandArg, {
+          configPath: args.configPath,
+          workspaceRoot: args.workspaceRoot,
+          interactive: args.interactive,
+        });
         break;
     }
   } catch (error) {

@@ -1,0 +1,129 @@
+/**
+ * RAG ACP Handler
+ *
+ * 拦截用户输入，通过 RAG Graph 流程处理
+ * 流程：Query → Rewrite → Retrieve → Prepare → Agent → Response
+ */
+
+import { executeRAG, type CreateRAGGraphConfig } from "./graph.js";
+import { DEFAULT_RAG_CONFIG } from "./nodes/types.js";
+import type { AppConfig } from "../runtime/config/config-loader.js";
+import { logger } from "../runtime/logger.js";
+
+/** RAG 处理器配置 */
+export interface RAGHandlerConfig {
+  enabled: boolean;
+  mcpServers: Record<string, any>;
+  retrievalTools: string[];
+}
+
+/**
+ * 从 AppConfig 创建 RAG 配置
+ */
+export function createRAGHandlerConfig(config: AppConfig): RAGHandlerConfig {
+  const mcpServers = config?.mcp?.servers || {};
+  const ragConfig = (config as any)?.rag || {};
+
+  return {
+    enabled: ragConfig.enabled ?? false,
+    mcpServers,
+    retrievalTools: ragConfig.retrievalTools || Object.keys(mcpServers),
+  };
+}
+
+/**
+ * RAG 处理器
+ *
+ * 在 ACP 层拦截用户消息，走 RAG 流程
+ */
+export class RAGHandler {
+  private config: CreateRAGGraphConfig;
+  private log = logger.child("rag-handler");
+
+  constructor(handlerConfig: RAGHandlerConfig) {
+    this.config = {
+      ...DEFAULT_RAG_CONFIG,
+      mcpServers: handlerConfig.mcpServers,
+      retrievalTools: handlerConfig.retrievalTools,
+    };
+    this.log.info("RAG Handler initialized", {
+      enabled: handlerConfig.enabled,
+      tools: handlerConfig.retrievalTools,
+    });
+  }
+
+  /**
+   * 处理用户查询
+   * 返回 null 表示不处理（降级到普通 Agent）
+   */
+  async handle(
+    query: string,
+    options?: {
+      onToken?: (token: string) => void;
+    }
+  ): Promise<string | null> {
+    if (!this.config.retrievalTools || this.config.retrievalTools.length === 0) {
+      this.log.debug("No retrieval tools configured, skipping RAG");
+      return null;
+    }
+
+    this.log.info("Processing RAG query", { query: query.substring(0, 100) });
+
+    try {
+      const response = await executeRAG(query, {
+        config: this.config,
+        callbacks: options?.onToken
+          ? { onToken: options.onToken }
+          : undefined,
+      });
+
+      // 格式化输出
+      let output = response.answer;
+
+      if (response.sources && response.sources.length > 0) {
+        output += "\n\n---\n**来源:**\n";
+        response.sources.forEach((s, i) => {
+          output += `${i + 1}. ${s.title}${s.url ? ` (${s.url})` : ""}\n`;
+        });
+      }
+
+      this.log.info("RAG completed", {
+        intent: response.metadata.intent,
+        toolsUsed: response.metadata.tools_used,
+        duration: response.metadata.duration_ms,
+      });
+
+      return output;
+    } catch (error) {
+      this.log.error("RAG processing failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null; // 降级到普通 Agent
+    }
+  }
+}
+
+/**
+ * 创建 RAG 处理器实例
+ */
+export function createRAGHandler(config: AppConfig, ragHandlerConfig?: RAGHandlerConfig): RAGHandler | null {
+  const handlerConfig = ragHandlerConfig || createRAGHandlerConfig(config);
+
+  logger.info("Creating RAG Handler", {
+    enabled: handlerConfig.enabled,
+    mcpServerCount: Object.keys(handlerConfig.mcpServers).length,
+    retrievalTools: handlerConfig.retrievalTools,
+  });
+
+  if (!handlerConfig.enabled) {
+    logger.debug("RAG disabled in config");
+    return null;
+  }
+
+  if (Object.keys(handlerConfig.mcpServers).length === 0) {
+    logger.warn("No MCP servers configured for RAG");
+    return null;
+  }
+
+  return new RAGHandler(handlerConfig);
+}
