@@ -2,15 +2,21 @@
 
 from __future__ import annotations
 
-from typing import Any
+import os
+import platform
+import sys
+
+from langchain_core.tools import tool
 
 
-def create_runtime_info_tool() -> dict[str, Any]:
-    return {
-        "name": "runtime_info",
-        "description": "Get runtime configuration and environment information",
-        "parameters": {
-            "type": "object",
-            "properties": {},
-        },
+@tool
+def runtime_info() -> str:
+    """Return runtime configuration and environment information (cwd, Python, platform, provider)."""
+    info = {
+        "cwd": os.getcwd(),
+        "working_dir": os.environ.get("DEEPAGENTS_WORKING_DIR", os.getcwd()),
+        "python": sys.version.split()[0],
+        "platform": platform.platform(),
+        "provider": os.environ.get("LLM_PROVIDER", "(unset)"),
     }
+    return "\n".join(f"{k}: {v}" for k, v in info.items())
