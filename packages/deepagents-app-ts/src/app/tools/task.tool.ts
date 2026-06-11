@@ -89,7 +89,7 @@ export function createTaskTool(config: AppConfig, workspaceRoot: string) {
       }
     },
     {
-      name: "task",
+      name: "deepagents_task",
       description: `Delegate a task to a specialized subagent and return the result.
 
 Use this to break complex work into focused subtasks:
