@@ -100,6 +100,7 @@ export function createRuntimeContext(
     mcpManager,
     variableManager,
     workspaceRoot: resolvedWorkspaceRoot,
+    config,
   };
 
   // Create tools bound to the runtime context
@@ -149,6 +150,23 @@ export async function hydrateRuntimeContext(context: RuntimeContext): Promise<Ru
     log.warn("Failed to load MCP tools; continuing with builtin tools only", {
       error: err instanceof Error ? err.message : String(err),
     });
+  }
+
+  // Wire MCP-aware executor for schedule_action so scheduled timers can dispatch
+  // MCP tools (e.g. chrome-devtools.close_page) in addition to builtin tools.
+  if (context.mcpTools.length > 0) {
+    const allTools = [...context.tools, ...context.mcpTools];
+
+    context.toolContext.toolExecutor = async (toolName, args) => {
+      const target = allTools.find(t => t.name === toolName);
+      if (target) return String(await target.invoke(args));
+      return `Error: tool "${toolName}" not found for scheduled execution`;
+    };
+
+    // Extend the schedulable-tools set so schedule_action accepts MCP tool names.
+    for (const t of context.mcpTools) {
+      context.toolContext.schedulableTools?.add(t.name);
+    }
   }
 
   return context;

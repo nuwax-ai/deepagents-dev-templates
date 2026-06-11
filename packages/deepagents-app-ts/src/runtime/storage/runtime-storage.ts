@@ -28,6 +28,7 @@ export interface RuntimeStorage {
   messagesPath: string;
   planPath: string;
   todosPath: string;
+  scheduledActionsPath: string;
   checkpointsDir: string;
   artifactsDir: string;
   memoryDir: string;
@@ -115,6 +116,7 @@ export function getRuntimeStorage(options: RuntimeStorageContext = {}): RuntimeS
     messagesPath: join(sessionDir, "messages.jsonl"),
     planPath: join(sessionDir, "plan.md"),
     todosPath: join(sessionDir, "todos.json"),
+    scheduledActionsPath: join(sessionDir, "scheduled-actions.json"),
     checkpointsDir: join(sessionDir, "checkpoints"),
     artifactsDir: join(sessionDir, "artifacts"),
     memoryDir: join(workspaceDir, "memory"),
