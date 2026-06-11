@@ -19,24 +19,23 @@
 | 技能 | 触发场景 | 关键内容 |
 |------|----------|----------|
 | `deepagents-framework` | 使用 deepagents npm 包 API | createDeepAgent、FilesystemBackend、工具注册、AppConfig |
-| `deepagents-framework-py` | 使用 Python 模板（pydantic-ai） | Agent 构建、模型解析、中间件链、依赖生态 |
+| `deepagents-framework-py` | 使用 Python 模板（LangGraph + deepagents） | create_deep_agent、模型解析、AgentMiddleware 链、langchain 工具 |
 | `deepagents-acp` | ACP 协议集成（TS 模板） | DeepAgentsServer、ACPSessionConfig、调试方法 |
-| `deepagents-acp-py` | ACP 协议集成（Python 模板） | stdio server、会话配置、Python ACP 差异 |
+| `deepagents-acp-py` | ACP 协议集成（Python 模板） | 官方 deepagents-acp AgentServerACP、工厂模式、会话配置 |
 
 ### LangChain 生态参考
 | 技能 | 触发场景 | 关键内容 |
 |------|----------|----------|
 | `langgraph-patterns` | 理解/调试图结构执行 | StateGraph、MessagesAnnotation、条件边、checkpointing |
 | `langchain-core-tools` | 创建新工具（TS） | tool() 函数、Zod schema、无状态 vs 平台绑定工具 |
-| `pydantic-ai-patterns` | Python 模板 Agent 模式 | Agent 构建、中间件钩子、子 agent、上下文压缩 |
-| `pydantic-ai-tools` | Python 模板工具开发 | create_xxx_tool()、JSON Schema 参数定义 |
+| `langgraph-patterns` / `langchain-core-tools` | Python 模板同样适用（用 `@tool`） | 图执行、工具创建对 TS/Python 通用 |
 
 ### 开发流程技能
 | 技能 | 触发场景 | 关键内容 |
 |------|----------|----------|
 | `template-init` | 开始任何开发任务前 | 模板检测、目录扫描、区域识别（TS/Python） |
 | `tool-creator` | TS 模板创建新工具 | Zod schema -> tool() -> 注册到 createTools() |
-| `tool-creator-py` | Python 模板创建新工具 | JSON Schema -> create_xxx_tool() -> 注册 |
+| `tool-creator-py` | Python 模板创建新工具 | langchain @tool -> collect_tools() 注册 |
 | `skill-creator` | 创建新技能 SKILL.md | YAML frontmatter、目录约定、渐进加载 |
 | `prompt-designer` | 设计场景提示词 | target-agent.base.md 模板、save_prompt 保存 |
 | `mcp-setup` | 配置 MCP 服务器 | mcp.default.json、平台组件绑定、合并策略 |
@@ -59,13 +58,13 @@
 你已绑定了 Context7 MCP 服务（`resolve-library-id` + `query-docs`），用于查询第三方库的最新文档。
 
 ### 使用流程
-1. **解析库 ID**：当需要查阅某个库（如 langchain、pydantic-ai、zod 等）的文档时：
+1. **解析库 ID**：当需要查阅某个库（如 deepagents、langgraph、langchain、zod 等）的文档时：
    ```
-   resolve-library-id(libraryName: "pydantic-ai", query: "如何创建 Agent")
+   resolve-library-id(libraryName: "deepagents", query: "create_deep_agent 用法")
    ```
 2. **查询文档**：拿到 libraryId 后：
    ```
-   query-docs(libraryId: "/pydantic/pydantic-ai", query: "Agent 构建和工具注册")
+   query-docs(libraryId: "/langchain-ai/deepagents", query: "create_deep_agent 工具和中间件")
    ```
 
 ### 触发场景
@@ -124,7 +123,7 @@
 ### Python 规范
 - **类型注解**：所有函数必须有类型注解
 - **Pydantic 模型**：使用 `_CamelModel` 基类（自动 camelCase ↔ snake_case）
-- **工具定义**：使用 `dict[str, Any]` JSON Schema 格式
+- **工具定义**：使用 langchain `@tool` 装饰器（docstring 即描述，类型注解即 schema）
 - **包管理**：使用 `uv`，不用 pip
 
 ### 命名规范
@@ -137,9 +136,9 @@
 ### 工具开发规范
 新工具必须遵循以下结构：
 1. 使用 `tool()` 函数从 `@langchain/core/tools` 创建（TS）
-2. 使用 `create_xxx_tool()` 返回 JSON Schema dict（Python）
+2. 使用 `@tool` 从 `langchain_core.tools` 创建（Python）
 3. 在 `src/app/tools/index.ts` 的 `createTools()` 中注册（TS）
-4. 在 `agent_config.py` 的工具列表中注册（Python）
+4. 在 `app/tools/__init__.py` 的 `collect_tools()` 中注册（Python）
 5. 参考 `src/app/tools/_example.tool.ts` 的模板
 
 ### 技能开发规范

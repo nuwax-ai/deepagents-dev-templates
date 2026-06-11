@@ -23,7 +23,7 @@ version: "2.0.0"
 
 **TS 模板**：确认 `package.json` 中 `name` 包含 `deepagents`、`dependencies` 包含 `deepagents` 和 `deepagents-acp`、`type` 为 `"module"`。
 
-**Python 模板**：确认 `pyproject.toml` 中 `name` 包含 `deepagents`、`dependencies` 包含 `pydantic-ai`。
+**Python 模板**：确认 `pyproject.toml` 中 `name` 包含 `deepagents`、`dependencies` 包含 `deepagents`、`deepagents-acp`、`langgraph`。
 
 ### Step 2: 读取模板清单
 

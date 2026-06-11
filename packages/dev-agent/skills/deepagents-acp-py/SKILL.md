@@ -1,102 +1,81 @@
 ---
 name: deepagents-acp-py
-description: "Python 模板 ACP 协议集成参考：stdio server、会话配置、平台身份、调试方法"
-tags: [acp, pydantic-ai, session, platform, protocol, python]
-version: "1.1.0"
+description: "Python 模板 ACP 协议集成参考:官方 deepagents-acp AgentServerACP、会话配置、平台身份、调试方法"
+tags: [acp, deepagents, langgraph, session, platform, protocol, python]
+version: "2.0.0"
 ---
 
-# ACP 协议集成参考（Python 模板）
+# ACP 协议集成参考(Python 模板)
 
 ## When to Use
 
-需要理解或配置 Python 模板的 ACP 服务器时使用——包括 `bootstrap()` 启动、`ACPSessionConfig`、平台身份配置、会话优先级链。
+需要理解或配置 Python 模板的 ACP 服务器时使用——包括 `bootstrap()` 启动、官方 `deepagents-acp`、`ACP_SESSION_CONFIG_JSON`、平台身份、会话优先级链。
 
 ---
 
-## 核心：ACP Server
+## 核心:ACP Server(官方 deepagents-acp)
 
-Python 模板的 ACP server 在 `src/deepagents_app_py/surfaces/acp/` 中，通过 **stdio transport** 与宿主进程通信。
+Python 模板的 ACP server 在 `src/deepagents_app_py/surfaces/acp/`,直接使用 **官方 `deepagents-acp`(PyPI)** 的 `AgentServerACP`(与 TS 模板用 `deepagents-acp` npm 包对齐)。**不再有自研的 stdio 循环。**
 
 ```python
 # src/deepagents_app_py/surfaces/acp/server.py
-from deepagents_app_py.surfaces.acp.server import bootstrap
+from acp import run_agent
+from deepagents_app_py.surfaces.acp.session_lifecycle import DeepAgentsAppServer  # AgentServerACP 子类
 
-# ACP 启动流程：
-# 1. loadConfig() — 加载 6 层优先级配置
-# 2. 解析 ACP_SESSION_CONFIG_JSON 环境变量
-# 3. buildACPAgentConfig() — 组装 Agent 配置
-# 4. 进入 stdin JSON-line 循环（读请求 → 写响应）
+# bootstrap() 流程:
+# 1. loadConfig() — 6 层优先级配置
+# 2. load_session_config_from_env() — 解析 ACP_SESSION_CONFIG_JSON
+# 3. build_acp_agent_factory() — 返回工厂 (AgentSessionContext) -> CompiledStateGraph
+# 4. DeepAgentsAppServer(agent=factory, models=...) + await run_agent(server)
 ```
 
-**重要**：`surfaces/acp/` 在保护区，开发者不需要修改。
+**工厂模式**:`build_acp_agent_factory()` 返回的工厂被官方 server 调用,内部 `create_deep_agent(**build_agent_config_parts(...))` 构图;工厂吃 `ctx.model` 实现**模型切换**。
 
-### 与 TS 模板的差异
+**官方 server 已内置**:LangGraph 流式输出、HITL 权限提示(approve/reject/edit)、模型/模式切换、todo/计划更新、多模态输入。
+
+**`DeepAgentsAppServer` 补丁**(`session_lifecycle.py`):补官方 0.0.8 缺的 server name/version(`initialize().agent_info`)。**仍待补**(已在文件中标注 deferred):slash 命令拦截、ACP `mcp_servers` 转发。
+
+**重要**:`surfaces/acp/` 在保护区,开发者不需要修改。
+
+### 与 TS 模板的差异(已基本对齐)
 
 | | TS 模板 | Python 模板 |
 |---|---------|------------|
-| **ACP 库** | `deepagents-acp`（npm） | `agent-client-protocol`（PyPI，可选依赖） |
-| **底层 SDK** | `@agentclientprotocol/sdk ^0.18.0` | 无（手写 stdio JSON-line 循环） |
-| **协议实现** | SDK 提供完整 ACP 协议支持 | **裸实现**：手动读 stdin、写 stdout |
-| **成熟度** | 完整 ACP handshake / notification / tool call | 基础 request-response，尚未接入 SDK |
-
-**当前状态**：`agent-client-protocol>=0.8.0` 已声明在 `pyproject.toml` 的 `[acp]` optional dependency 中，但 `src/` 中 **没有 import 过**。ACP server 是自己手写的简化版 stdio 循环，未使用 SDK 提供的协议解析能力。
-
-**影响**：
-- 基本 ACP 功能（启动、接收消息、返回响应）可用
-- 高级 ACP 特性（notification、tool call streaming、capability negotiation）可能不完整
-- 后续计划接入 `agent-client-protocol` SDK 以对齐 TS 模板的完整 ACP 支持
+| **ACP 库** | `deepagents-acp`(npm) | `deepagents-acp`(PyPI,`AgentServerACP`) |
+| **底层 SDK** | `@agentclientprotocol/sdk` | `agent-client-protocol`(`acp`) |
+| **入口类** | `DeepAgentsServer` | `AgentServerACP` → 子类 `DeepAgentsAppServer` |
+| **Agent** | `createDeepAgent()` 配置 | 工厂返回 `create_deep_agent()` 图 |
+| **流式/HITL** | 库内置 | 库内置(LangGraph `astream`) |
 
 ---
 
-## ACPSessionConfig（最高优先级覆盖）
+## ACPSessionConfig(最高优先级覆盖)
 
-ACP 客户端（如 nuwaclaw/Zed）在建立连接时传入会话级配置：
-
-```python
-# Pydantic 模型
-class ACPSessionConfig(_CamelModel):
-    model: str | None                        # 覆盖 config.model.name
-    system_prompt: str | None                # 覆盖系统提示词
-    cwd: str | None                          # 工作目录
-    agent_id: str | None                     # 平台 Agent ID
-    space_id: str | None                     # 平台 Space ID
-    mcp_servers: dict[str, Any] | None       # 追加/覆盖 MCP 服务器配置
-```
-
-通过环境变量传入：
+ACP 客户端(如 nuwaclaw/Zed)在建立连接时传入会话级配置,通过环境变量传入:
 
 ```bash
-ACP_SESSION_CONFIG_JSON='{"model":"claude-opus-4-8","cwd":"/workspace/my-project"}' \
+ACP_SESSION_CONFIG_JSON='{"model":"anthropic:claude-opus-4-8","cwd":"/workspace/my-project"}' \
   uv run deepagents-app-py
 ```
 
+字段:`model`(`provider:name`)、`system_prompt`、`cwd`、`agent_id`、`space_id`、`mcp_servers`。
+
 ---
 
-## 配置优先级链（6 层，从低到高）
+## 配置优先级链(6 层,从低到高)
 
 ```
 defaults
   < user ~/.deepagents/config.json
   < project .deepagents/config.json
   < config/app-agent.config.json
-  < 环境变量（ANTHROPIC_API_KEY、LLM_PROVIDER 等）
-  < ACP_SESSION_CONFIG_JSON（最高优先级）
+  < 环境变量(ANTHROPIC_API_KEY、LLM_PROVIDER 等)
+  < ACP_SESSION_CONFIG_JSON(最高优先级)
 ```
 
 ---
 
 ## 平台身份配置
-
-```json
-// config/platform.json
-{
-  "platformApiBaseUrl": "https://api.nuwax.ai",
-  "agentId": "2843",
-  "spaceId": "1136"
-}
-```
-
-或通过环境变量：
 
 ```bash
 PLATFORM_AGENT_ID=2843
@@ -108,65 +87,29 @@ PLATFORM_API_TOKEN=your-token-here
 
 ---
 
-## MCP 合并策略
-
-```json
-// config/app-agent.config.json
-{
-  "mcp": {
-    "configPath": "./config/mcp.default.json",
-    "mergeStrategy": "session-wins"
-  }
-}
-```
-
-| 策略 | 行为 |
-|------|------|
-| `session-wins` | ACP session 的 mcpServers 覆盖默认和平台配置 |
-| `platform-wins` | 平台绑定的 MCP 服务器覆盖 session 配置 |
-| `defaults-wins` | config/mcp.default.json 优先，session 不可覆盖 |
-
----
-
 ## ACP 调试
 
-### 快速冒烟测试
-
 ```bash
-# 前提：uv sync --group dev 已执行
-pnpm dlx rcoder-cli chat \
-  -c "uv run deepagents-app-py" \
-  -w . \
-  -p "hello" \
-  --timeout 30 \
-  --mode yolo \
-  -q
+# 前提:uv sync --group dev
+pnpm dlx rcoder-cli chat -c "uv run deepagents-app-py" -w . -p "hello" --timeout 30 --mode yolo -q
+pnpm dlx rcoder-cli tui  -c "uv run deepagents-app-py" -w .          # 交互式
+pnpm dlx rcoder-cli chat -c "uv run deepagents-app-py" -w . -p "hi" -vv   # 详细日志
 ```
 
-### 交互式调试
-
-```bash
-pnpm dlx rcoder-cli tui -c "uv run deepagents-app-py" -w .
-```
-
-### 详细日志
-
-```bash
-pnpm dlx rcoder-cli chat -c "uv run deepagents-app-py" -w . -p "hello" -vv
-```
+直接看启动报错:`uv run deepagents-app-py`(日志走 stderr,stdout 留给 ACP JSON-RPC)。
 
 ---
 
-## ACP 服务器文件结构（仅供参考，禁止修改）
+## ACP 服务器文件结构(仅供参考,禁止修改)
 
 ```
 src/deepagents_app_py/surfaces/acp/
-├── __init__.py                  # 导出 bootstrap()
-├── server.py                    # ACP stdio 服务器入口
-├── config_builder.py            # 构建 Agent 配置
-├── session_manager.py           # 会话追踪
-├── session_lifecycle.py         # 会话状态管理
-└── slash_command_handler.py     # /命令处理
+├── __init__.py
+├── server.py                # bootstrap():build factory → AgentServerACP → run_agent
+├── config_builder.py        # build_acp_agent_factory() + load_session_config_from_env()
+├── session_lifecycle.py     # DeepAgentsAppServer(AgentServerACP):补 name/version
+├── session_manager.py       # 会话追踪(占位)
+└── slash_command_handler.py # /命令处理(占位,deferred)
 ```
 
 ---
@@ -175,19 +118,17 @@ src/deepagents_app_py/surfaces/acp/
 
 | 错误 | 原因 | 解决 |
 |------|------|------|
-| `model_provider is None` | `.env` 缺少 API key | 填写 `ANTHROPIC_API_KEY` 或 `OPENAI_API_KEY` |
+| 模型调用 401/无 key | 缺 API key | 填 `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` |
 | `Failed to start subprocess` | agent 启动崩溃 | `uv run deepagents-app-py` 直接看报错 |
-| `platform_api` 返回 "not configured" | 缺少平台身份 | 设置 `PLATFORM_AGENT_ID` 和 `PLATFORM_SPACE_ID` |
-| MCP server not found | 配置路径错误 | `uvx <mcp-package>` 手动测试 |
-| 提示词不生效 | 未调用 `save_prompt` | 对话中调用 `platform_api(save_prompt)` |
-| ACP timeout | 握手无响应 | 加 `-vv` 查看详细日志 |
+| `Please remove duplicate middleware` | 自加了 deepagents 已内置的中间件(如 Summarization) | 删掉,复用内置 |
+| `platform_api` 返回 "not configured" | 缺平台身份 | 设 `PLATFORM_API_URL` / `PLATFORM_API_TOKEN` |
+| ACP timeout | 握手无响应 | 加 `-vv` 看日志 |
 
 ## Anti-patterns
 
-- ❌ 修改 `src/deepagents_app_py/surfaces/` 或 `src/deepagents_app_py/runtime/`
-- ❌ 在运行时代码中硬编码系统提示词
+- ❌ 修改 `src/deepagents_app_py/surfaces/` 或 `runtime/`
+- ❌ 在运行时代码中硬编码系统提示词(从 ACP 会话/配置获取)
 - ❌ 把 API token 写死在代码里
-- ❌ 修改提示词后不调用 `save_prompt`
-- ✅ 用 `pnpm dlx rcoder-cli chat` 快速验证 ACP 协议
-- ✅ 提示词修改 → 立即 `save_prompt` → 验证效果
+- ❌ 重新手写 ACP stdio 循环(用官方 `deepagents-acp`)
+- ✅ 用 `pnpm dlx rcoder-cli chat` 快速验证
 - ✅ 生产密钥通过 `agent_variable` 管理
