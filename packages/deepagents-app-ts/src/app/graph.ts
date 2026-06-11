@@ -75,19 +75,33 @@ export function createRAGGraph(config: CreateRAGGraphConfig) {
     retrieve: config.retrieve,
   };
 
+  console.log("[RAG Graph] Creating StateGraph with nodes: rewrite, retrieve, prepare, agent");
+
   const graph = new StateGraph(RAGStateAnnotation)
     // 添加节点
     .addNode("rewrite", async (state: RAGStateType) => {
-      return await rewriteNode(state, config.appConfig);
+      console.log("[RAG Graph] Executing node: rewrite");
+      const result = await rewriteNode(state, config.appConfig);
+      console.log("[RAG Graph] Node rewrite completed:", { intent: result.intent });
+      return result;
     })
     .addNode("retrieve", async (state: RAGStateType) => {
-      return await retrieveNode(state, retrieveConfig);
+      console.log("[RAG Graph] Executing node: retrieve");
+      const result = await retrieveNode(state, retrieveConfig);
+      console.log("[RAG Graph] Node retrieve completed:", { resultCount: result.raw_results?.length });
+      return result;
     })
     .addNode("prepare", async (state: RAGStateType) => {
-      return await prepareNode(state, config);
+      console.log("[RAG Graph] Executing node: prepare");
+      const result = await prepareNode(state, config);
+      console.log("[RAG Graph] Node prepare completed:", { tokenCount: result.token_count });
+      return result;
     })
     .addNode("agent", async (state: RAGStateType) => {
-      return await agentNode(state, config, config.appConfig);
+      console.log("[RAG Graph] Executing node: agent");
+      const result = await agentNode(state, config, config.appConfig);
+      console.log("[RAG Graph] Node agent completed:", { answerLength: result.answer?.length });
+      return result;
     })
 
     // 定义边
@@ -96,6 +110,8 @@ export function createRAGGraph(config: CreateRAGGraphConfig) {
     .addEdge("retrieve", "prepare")
     .addEdge("prepare", "agent")
     .addEdge("agent", END);
+
+  console.log("[RAG Graph] Graph compiled: START → rewrite → retrieve → prepare → agent → END");
 
   return graph.compile();
 }
