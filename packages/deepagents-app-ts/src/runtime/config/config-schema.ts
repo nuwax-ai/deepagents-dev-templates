@@ -8,6 +8,7 @@
  */
 
 import { z } from "zod";
+import { getPackageVersion } from "../version.js";
 
 export const BUILTIN_TEMPLATE_CONFIGS = {
   appAgent: {
@@ -191,7 +192,7 @@ export const AppConfigSchema = z.object({
   agent: z.object({
     name: z.string().default("deepagents-app-ts"),
     description: z.string().default("AI application agent"),
-    version: z.string().default("0.1.1"),
+    version: z.string().default(getPackageVersion() ?? "0.0.0"),
     outputStyle: z.string().default("concise"),
     systemPrompt: z.string().optional(),
     systemPromptPath: z.string().default("prompts/developer-agent.system.md"),

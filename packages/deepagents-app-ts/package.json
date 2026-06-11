@@ -30,6 +30,8 @@
     "ask": "tsx src/index.ts ask",
     "run": "tsx src/index.ts run",
     "graph": "node dist/index.js graph",
+    "sync-version": "tsx scripts/sync-version.ts",
+    "sync-version:check": "tsx scripts/sync-version.ts --check",
     "codegen:config-schema": "tsx scripts/codegen-config-schema.ts",
     "new:tool": "tsx scripts/scaffold/tool.ts",
     "new:skill": "tsx scripts/scaffold/skill.ts",

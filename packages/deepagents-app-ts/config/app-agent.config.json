@@ -3,7 +3,7 @@
   "agent": {
     "name": "deepagents-app-ts",
     "description": "AI agent for [specific scenario]",
-    "version": "0.4.1",
+    "version": "0.4.2",
     "outputStyle": "concise"
   },
   "model": {

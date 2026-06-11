@@ -8,6 +8,7 @@
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import { tool } from "@langchain/core/tools";
+import { getPackageVersion } from "../../runtime/version.js";
 import { z } from "zod";
 import type { MCPManager, MCPServerConfig } from "../../runtime/platform/mcp-manager.js";
 
@@ -124,7 +125,7 @@ async function callStdioMcpMethod(
       capabilities: {},
       clientInfo: {
         name: "deepagents-app-ts",
-        version: "0.1.0",
+        version: getPackageVersion() ?? "0.0.0",
       },
     });
     child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" })}\n`, (err) => {

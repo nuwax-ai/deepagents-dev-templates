@@ -14,11 +14,9 @@
 import { DeepAgentsServer } from "deepagents-acp";
 import { loadConfig, resolveConfiguredWorkspaceRoot, type ACPSessionConfig } from "../../runtime/config/config-loader.js";
 import { logger } from "../../runtime/logger.js";
+import { getPackageVersion } from "../../runtime/version.js";
 import { buildACPAgentConfigWithMcpAsync, loadSessionConfigFromEnv } from "./config-builder.js";
 import { patchSessionLifecycle } from "./session-lifecycle.js";
-import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 
 export {
   buildACPAgentConfig,
@@ -26,27 +24,6 @@ export {
   buildACPAgentConfigWithMcpAsync,
   loadSessionConfigFromEnv,
 } from "./config-builder.js";
-
-/**
- * Read this package's version from package.json as a fallback for the
- * `serverVersion` advertised by `DeepAgentsServer`. Cached at module
- * load. Used when `config.agent.version` is left unset in
- * `app-agent.config.json` — the package version is the most common
- * default in templates.
- */
-let cachedPackageVersion: string | undefined;
-function readPackageVersionSafe(): string | undefined {
-  if (cachedPackageVersion !== undefined) return cachedPackageVersion;
-  try {
-    // Resolve relative to this file so the lookup works regardless of cwd.
-    const pkgPath = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "package.json");
-    const parsed = JSON.parse(readFileSync(pkgPath, "utf-8")) as { version?: string };
-    cachedPackageVersion = typeof parsed?.version === "string" ? parsed.version : undefined;
-  } catch {
-    cachedPackageVersion = undefined;
-  }
-  return cachedPackageVersion;
-}
 
 // ─── Types ──────────────────────────────────────────────
 
@@ -124,7 +101,7 @@ export async function bootstrap(options: ACPServerOptions = {}): Promise<void> {
   // pin a release tag), but fall back to this package's version when
   // the config leaves it unset. This keeps the version Zed displays
   // in sync with `npm view deepagents-app-ts version`.
-  const pkgVersion = readPackageVersionSafe();
+  const pkgVersion = getPackageVersion();
   const server = new DeepAgentsServer({
     agents: agentConfig,
     serverName: config.agent.name,

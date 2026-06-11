@@ -61,3 +61,4 @@ export {
   type CodeGraphNodeKind,
 } from "./code-graph.js";
 export { Logger, logger, type LogLevel } from "./logger.js";
+export { getPackageVersion } from "./version.js";
