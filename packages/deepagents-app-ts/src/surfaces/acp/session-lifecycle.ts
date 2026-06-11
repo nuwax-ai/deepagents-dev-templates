@@ -181,6 +181,12 @@ export function createAcpSessionHooks(opts: AcpSessionHooksOptions): {
     },
 
     async onPrompt(ctx) {
+      log.info("onPrompt called", { 
+        sessionId: ctx.sessionId, 
+        promptText: ctx.promptText?.substring(0, 100),
+        hasRagHandler: !!ragHandler 
+      });
+      
       const sc = ctxFor(ctx.sessionId);
       const storage = getRuntimeStorage({
         workspaceRoot: sc.workspaceRoot,
