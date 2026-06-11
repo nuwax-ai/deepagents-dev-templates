@@ -8,6 +8,7 @@ import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { executeRAG, type CreateRAGGraphConfig } from "../graph.js";
 import { DEFAULT_RAG_CONFIG } from "../nodes/types.js";
+import type { AppConfig } from "../../runtime/config/config-loader.js";
 
 /**
  * 创建 RAG 查询工具
