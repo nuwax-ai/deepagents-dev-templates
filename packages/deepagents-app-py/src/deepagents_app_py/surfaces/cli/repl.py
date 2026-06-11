@@ -33,6 +33,21 @@ def start_repl(options: Any = None) -> None:
         workspaceRoot=getattr(options, "workspace_root", "") or "",
     )
 
+    # Build the deepagents graph once; a MemorySaver + fixed thread id keeps
+    # multi-turn history across the REPL session.
+    import os as _os
+
+    from langgraph.checkpoint.memory import MemorySaver
+
+    from deepagents_app_py.app.tools import collect_tools
+    from deepagents_app_py.runtime.agent_config import build_graph
+    from deepagents_app_py.runtime.config.config_loader import loadConfig
+
+    ws = getattr(options, "workspace_root", None) or _os.getcwd()
+    config = loadConfig({"workspaceRoot": ws, "configPath": getattr(options, "config_path", None)})
+    graph = build_graph(config, None, ws, collect_tools(), checkpointer=MemorySaver())
+    thread = {"configurable": {"thread_id": "repl"}}
+
     try:
         while True:
             try:
@@ -54,7 +69,18 @@ def start_repl(options: Any = None) -> None:
                 continue
 
             console.print(f"[green]You:[/green] {text}")
-            console.print("[yellow]Agent:[/yellow] (agent response placeholder)")
+            try:
+                result = graph.invoke(
+                    {"messages": [{"role": "user", "content": text}]}, config=thread
+                )
+                messages = result.get("messages", []) if isinstance(result, dict) else []
+                reply = ""
+                if messages:
+                    content = messages[-1].content
+                    reply = content if isinstance(content, str) else str(content)
+                console.print(f"[yellow]Agent:[/yellow] {reply}")
+            except Exception as exc:  # noqa: BLE001 — keep the REPL alive on errors
+                console.print(f"[red]Error:[/red] {exc}")
             console.print()
     except Exception as exc:
         log.exception("REPL error: %s", exc)

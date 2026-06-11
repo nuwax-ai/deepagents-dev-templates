@@ -1,11 +1,19 @@
-"""ACP server — bootstraps ACP server over stdio transport.
+"""ACP server — bootstraps the official ``deepagents-acp`` server over stdio.
 
-Uses ``deepagents-acp-py`` to provide a full ACP protocol implementation,
-replacing the previous hand-rolled stdio stub.
+Mirrors the TS ``surfaces/acp/server.ts``: load config, build the agent factory
+(``create_deep_agent`` per session), then start ``deepagents_acp``'s
+``AgentServerACP`` over stdin/stdout via ``acp.run_agent``.
+
+The official server already provides LangGraph streaming, HITL/permission
+prompts, model switching, todo/plan updates and multimodal input. Gaps it does
+*not* cover (slash commands, ACP MCP forwarding, configurable server
+name/version, session list/close) are layered on by the ``session_lifecycle`` /
+``slash_command_handler`` patch modules.
 """
 
 from __future__ import annotations
 
+import asyncio
 import os
 
 from deepagents_app_py.runtime.logger import logger
@@ -20,79 +28,55 @@ def bootstrap(
 ) -> None:
     """Bootstrap and start the ACP server over stdin/stdout."""
     log = logger.child("acp-server")
-    log.info(
-        "Starting ACP server",
-        extra={
-            "acp": acp,
-            "debug": debug,
-            "configPath": config_path,
-            "workspaceRoot": workspace_root,
-        },
-    )
+    if debug:
+        os.environ.setdefault("LOG_LEVEL", "debug")
 
     from deepagents_app_py.runtime.config.config_loader import loadConfig
-    from deepagents_app_py.runtime.acp_server_internals import read_package_version
+    from deepagents_app_py.surfaces.acp.config_builder import (
+        build_acp_agent_factory,
+        load_session_config_from_env,
+    )
 
-    # Load config
-    config = loadConfig({
-        "configPath": config_path,
-        "workspaceRoot": workspace_root or os.getcwd(),
-    })
-
-    # Parse ACP_SESSION_CONFIG_JSON (highest-priority session override).
-    session_config = _load_session_config_from_env()
+    ws = workspace_root or os.getcwd()
+    config = loadConfig({"configPath": config_path, "workspaceRoot": ws})
+    session_config = load_session_config_from_env()
     if session_config:
         log.info("Loaded ACP session config from environment")
 
-    # Build agent factory — creates a pydantic-ai Agent per session
-    def build_agent(ctx):  # type: ignore[no-untyped-def]
-        from deepagents_app_py.surfaces.acp.config_builder import buildACPAgent
-        return buildACPAgent(config, ctx.cwd, session_config=session_config)
+    # Agent factory — rebuilds a deepagents graph per session / model switch.
+    factory = build_acp_agent_factory(config, ws, session_config=session_config)
 
-    # Build model list from config
-    models = []
+    # Single-entry model list (the model selector advertised to the ACP client).
     provider = config.model.provider or "anthropic"
     model_name = config.model.name or "claude-sonnet-4-6"
-    models.append({
-        "value": f"{provider}:{model_name}",
-        "name": model_name,
-    })
+    models = [{"value": f"{provider}:{model_name}", "name": model_name}]
 
-    # Create and run the ACP server
-    from deepagents_acp_py import DeepAgentsServer, run_agent
+    if not acp:
+        log.info("ACP mode disabled — skipping server start")
+        return
 
-    pkg_version = read_package_version() or "0.0.0"
+    from acp import run_agent as run_acp_agent
 
-    server = DeepAgentsServer(
-        agent=build_agent,
-        name=config.agent.name or "deepagents-app-py",
-        version=pkg_version,
+    from deepagents_app_py.surfaces.acp.session_lifecycle import DeepAgentsAppServer
+
+    try:
+        from deepagents_app_py.runtime.acp_server_internals import read_package_version
+
+        pkg_version = read_package_version() or "0.0.0"
+    except Exception:  # noqa: BLE001 — version metadata is best-effort
+        pkg_version = "0.0.0"
+
+    server = DeepAgentsAppServer(
+        agent=factory,
         models=models,
-        workspace_root=workspace_root or os.getcwd(),
-        debug=debug,
+        server_name=config.agent.name or "deepagents-app-py",
+        server_version=getattr(config.agent, "version", None) or pkg_version,
     )
 
     log.info(
-        "ACP server configured",
-        extra={
-            "name": config.agent.name,
-            "model": model_name,
-            "version": pkg_version,
-        },
+        "Starting ACP server",
+        name=config.agent.name,
+        model=model_name,
+        workspaceRoot=ws,
     )
-
-    run_agent(server, debug=debug)
-
-
-def _load_session_config_from_env() -> dict | None:
-    """Parse ``ACP_SESSION_CONFIG_JSON`` env var (mirrors the TS helper)."""
-    import json
-
-    raw = os.environ.get("ACP_SESSION_CONFIG_JSON")
-    if not raw:
-        return None
-    try:
-        return json.loads(raw)
-    except json.JSONDecodeError:
-        logger.warning("Failed to parse ACP_SESSION_CONFIG_JSON")
-        return None
+    asyncio.run(run_acp_agent(server))

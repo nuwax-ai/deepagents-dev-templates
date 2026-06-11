@@ -1,67 +1,71 @@
-"""ACP Agent Config Builder — creates a pydantic-ai Agent for the ACP server."""
+"""ACP agent factory — builds a deepagents ``CompiledStateGraph`` per session.
+
+Mirrors the TS ``surfaces/acp/config-builder.ts``. The official
+``deepagents_acp.server.AgentServerACP`` takes either a compiled graph or a
+factory ``(AgentSessionContext) -> CompiledStateGraph``; we return the factory
+so each session (and model switch) rebuilds via ``create_deep_agent`` using the
+shared ``build_agent_config_parts`` assembler.
+"""
 
 from __future__ import annotations
 
-import logging
+import json
+import os
 from typing import Any
 
-logger = logging.getLogger(__name__)
+from deepagents_app_py.runtime.logger import logger
+
+log = logger.child("acp-config")
 
 
-def buildACPAgent(
+def build_acp_agent_factory(
     config: Any,
     workspace_root: str,
     session_config: Any | None = None,
 ) -> Any:
-    """Build a pydantic-ai Agent for use with DeepAgentsServer.
+    """Return a factory ``(AgentSessionContext) -> CompiledStateGraph``.
 
-    Uses the runtime's ``build_agent_config_parts()`` to assemble model,
-    system prompt, tools, middleware, etc. — then constructs an Agent that
-    supports ``.iter()`` for streaming.
-
-    Reads the returned dict with the actual key names produced by
-    ``build_agent_config_parts()``: ``"instructions"`` (not
-    ``"system_prompt"``).
+    The factory honors the per-session model override (``ctx.model`` is a
+    ``"provider:model-name"`` string), so switching models in the ACP client
+    actually rebuilds the agent with the new model.
     """
-    from deepagents_app_py.runtime.helpers import build_agent_config_parts
-    from deepagents_app_py.runtime.model import resolve_model
+    from deepagents import create_deep_agent
 
-    # Assemble all agent config parts
-    parts = build_agent_config_parts(
-        config=config,
-        session_config=session_config,
-        workspace_root=workspace_root,
-        tools=[],
-        backend=None,
-        checkpointer=True,
-    )
+    from deepagents_app_py.runtime.agent_config import build_agent_config_parts
 
-    # Extract model — parts["model"] is a string like "anthropic:claude-sonnet-4-6";
-    # pydantic-ai expects a Model instance.
-    model = resolve_model(config)
+    base_model_str = f"{config.model.provider}:{config.model.name}"
 
-    # Build the pydantic-ai Agent
+    def build_agent(ctx: Any) -> Any:
+        cwd = getattr(ctx, "cwd", None) or workspace_root
+        cfg = config
+
+        # Per-session model override → rebuild config with the selected model.
+        model_override = getattr(ctx, "model", None)
+        if model_override and ":" in model_override and model_override != base_model_str:
+            try:
+                cfg = config.model_copy(deep=True)
+                provider, _, name = model_override.partition(":")
+                cfg.model.provider = provider
+                cfg.model.name = name
+            except Exception:  # noqa: BLE001 — fall back to the configured model
+                log.warn("Could not apply session model override", model=model_override)
+                cfg = config
+
+        from deepagents_app_py.app.tools import collect_tools
+
+        parts = build_agent_config_parts(cfg, session_config, cwd, collect_tools())
+        return create_deep_agent(**parts)
+
+    return build_agent
+
+
+def load_session_config_from_env() -> dict | None:
+    """Parse ``ACP_SESSION_CONFIG_JSON`` (mirrors the TS helper)."""
+    raw = os.environ.get("ACP_SESSION_CONFIG_JSON")
+    if not raw:
+        return None
     try:
-        from pydantic_ai import Agent
-
-        return Agent(
-            model=model,
-            # helpers.py returns key "instructions" — use that, fall back to
-            # "system_prompt" in case a future refactor renames it.
-            instructions=parts.get("instructions", parts.get("system_prompt", "")),
-            deps_type=Any,
-        )
-    except ImportError:
-        # If pydantic-ai not available, return a simple callable
-        logger.warning("pydantic-ai not available, returning simple agent")
-        return _SimpleAgent(parts)
-
-
-class _SimpleAgent:
-    """Fallback agent when pydantic-ai is not installed."""
-
-    def __init__(self, parts: dict[str, Any]) -> None:
-        self.parts = parts
-
-    def __call__(self, prompt: str) -> str:
-        return f"Agent received: {prompt}"
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        log.warn("Failed to parse ACP_SESSION_CONFIG_JSON")
+        return None
