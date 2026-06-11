@@ -8,9 +8,10 @@
  * 4. 推荐 MCP 工具
  */
 
-import { ChatAnthropic } from "@langchain/anthropic";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import type { RAGState, RAGIntent } from "./types.js";
+import type { AppConfig } from "../../runtime/config/config-loader.js";
+import { resolveModel } from "../../runtime/model.js";
 
 const REWRITE_SYSTEM_PROMPT = `你是一个查询分析专家。你的任务是分析用户的问题，并提供结构化的分析结果。
 
@@ -30,13 +31,13 @@ const REWRITE_SYSTEM_PROMPT = `你是一个查询分析专家。你的任务是�
 
 export async function rewriteNode(
   state: RAGState,
-  config?: { modelName?: string }
+  config?: AppConfig
 ): Promise<Partial<RAGState>> {
   const { query, history } = state;
-  const modelName = config?.modelName ?? "claude-sonnet-4-20250514";
 
   try {
-    const model = new ChatAnthropic({ modelName });
+    // 使用配置中的模型
+    const model = resolveModel(config!);
 
     // 构建上下文
     let context = "";
@@ -57,7 +58,7 @@ export async function rewriteNode(
     ]);
 
     // 解析响应
-    const content = response.content as string;
+    const content = typeof response.content === "string" ? response.content : JSON.stringify(response.content);
     const jsonMatch = content.match(/\{[\s\S]*\}/);
 
     if (jsonMatch) {

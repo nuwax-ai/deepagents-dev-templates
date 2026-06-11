@@ -7,9 +7,10 @@
  * 3. 包含来源引用
  */
 
-import { ChatAnthropic } from "@langchain/anthropic";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import type { RAGState, RAGConfig, RAGMetadata } from "./types.js";
+import type { AppConfig } from "../../runtime/config/config-loader.js";
+import { resolveModel } from "../../runtime/model.js";
 
 const AGENT_SYSTEM_PROMPT = `你是一个专业的知识助手。基于提供的上下文信息回答用户的问题。
 
@@ -23,6 +24,7 @@ const AGENT_SYSTEM_PROMPT = `你是一个专业的知识助手。基于提供的
 export async function agentNode(
   state: RAGState,
   config: RAGConfig,
+  appConfig?: AppConfig,
   callbacks?: {
     onToken?: (token: string) => void;
   }
@@ -32,10 +34,8 @@ export async function agentNode(
   const startTime = Date.now();
 
   try {
-    const model = new ChatAnthropic({
-      modelName: "claude-sonnet-4-20250514",
-      streaming: config.agent.streaming,
-    });
+    // 使用配置中的模型
+    const model = resolveModel(appConfig!);
 
     // 构建用户提示
     let userPrompt = "";

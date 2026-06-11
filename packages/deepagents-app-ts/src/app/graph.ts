@@ -18,6 +18,7 @@ import type {
   Source,
 } from "./nodes/types.js";
 import { DEFAULT_RAG_CONFIG } from "./nodes/types.js";
+import type { AppConfig } from "../runtime/config/config-loader.js";
 
 /** RAG State 定义 */
 const RAGStateAnnotation = Annotation.Root({
@@ -60,6 +61,7 @@ interface MCPServerConfig {
 /** 创建 RAG Graph 的配置 */
 export interface CreateRAGGraphConfig extends RAGConfig {
   mcpServers: Record<string, MCPServerConfig>;
+  appConfig?: AppConfig;
 }
 
 /**
@@ -76,7 +78,7 @@ export function createRAGGraph(config: CreateRAGGraphConfig) {
   const graph = new StateGraph(RAGStateAnnotation)
     // 添加节点
     .addNode("rewrite", async (state: RAGStateType) => {
-      return await rewriteNode(state);
+      return await rewriteNode(state, config.appConfig);
     })
     .addNode("retrieve", async (state: RAGStateType) => {
       return await retrieveNode(state, retrieveConfig);
@@ -85,7 +87,7 @@ export function createRAGGraph(config: CreateRAGGraphConfig) {
       return await prepareNode(state, config);
     })
     .addNode("agent", async (state: RAGStateType) => {
-      return await agentNode(state, config);
+      return await agentNode(state, config, config.appConfig);
     })
 
     // 定义边

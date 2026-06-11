@@ -38,13 +38,16 @@ export function createRAGHandlerConfig(config: AppConfig): RAGHandlerConfig {
  */
 export class RAGHandler {
   private config: CreateRAGGraphConfig;
+  private appConfig: AppConfig;
   private log = logger.child("rag-handler");
 
-  constructor(handlerConfig: RAGHandlerConfig) {
+  constructor(handlerConfig: RAGHandlerConfig, appConfig: AppConfig) {
+    this.appConfig = appConfig;
     this.config = {
       ...DEFAULT_RAG_CONFIG,
       mcpServers: handlerConfig.mcpServers,
       retrievalTools: handlerConfig.retrievalTools,
+      appConfig,
     };
     this.log.info("RAG Handler initialized", {
       enabled: handlerConfig.enabled,
@@ -125,5 +128,5 @@ export function createRAGHandler(config: AppConfig, ragHandlerConfig?: RAGHandle
     return null;
   }
 
-  return new RAGHandler(handlerConfig);
+  return new RAGHandler(handlerConfig, config);
 }
