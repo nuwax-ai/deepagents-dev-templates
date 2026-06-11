@@ -17,15 +17,13 @@ import { createStuckLoopMiddleware } from "./middleware/stuck-loop.js";
 import { createPeriodicReminderMiddleware } from "./middleware/periodic-reminder.js";
 import { createCostTrackingMiddleware } from "./middleware/cost-tracking.js";
 import { createFsPathResolver } from "./middleware/fs-path-resolver.js";
-import { createCompactionMiddleware } from "./middleware/compaction.js";
-import { createEvictionMiddleware } from "./middleware/eviction.js";
 import { createHookMiddleware, getHooks, registerConfiguredHooks } from "../app/hooks/index.js";
-import { createProtectedPathsMiddleware } from "./middleware/protected-paths.js";
+import { registerAppHarnessProfile } from "../app/harness-profile.js";
 import { createHarnessLifecycleMiddleware } from "./middleware/harness-lifecycle.js";
-import { resolveModel, resolveSummarizerModel } from "./model.js";
+import { resolveModel } from "./model.js";
 import { resolveSystemPrompt, withRuntimeContextPrompt } from "./prompt.js";
 import { discoverMemoryFiles, discoverSubAgents, resolveSkillsPaths } from "./discovery.js";
-import { resolveSandboxPolicy, buildPermissions, buildInterruptOn, toAbsoluteDenyGlob } from "./permissions.js";
+import { resolveSandboxPolicy, buildPermissions, buildInterruptOn } from "./permissions.js";
 
 /**
  * Build common agent configuration parts used by both agent-factory and acp-server.
@@ -56,6 +54,10 @@ export function buildAgentConfigParts(
   const middleware: AgentMiddleware[] = [];
   const mwConfig = config.middleware;
   registerConfiguredHooks(config.hooks, workspaceRoot);
+
+  // Register the app harness profile so platform conventions are injected into
+  // every agent (main + subagents) via deepagents' harness-profile mechanism.
+  registerAppHarnessProfile(config);
 
   middleware.push(createHarnessLifecycleMiddleware());
 
@@ -93,22 +95,14 @@ export function buildAgentConfigParts(
     }));
   }
 
-  // Context compaction — compress old messages when approaching context limit
-  if (config.compaction.enabled) {
-    middleware.push(createCompactionMiddleware({
-      config: config.compaction,
-      modelName: config.model.name,
-      summarizer: resolveSummarizerModel(config),
-    }));
-  }
-
-  // Large output eviction — write oversized tool results to backend
-  if (config.eviction.enabled && backend) {
-    middleware.push(createEvictionMiddleware({
-      config: config.eviction,
-      backend: backend as unknown as { write(path: string, content: string): Promise<void> },
-    }));
-  }
+  // Conversation compaction and large-output eviction are now provided by
+  // deepagents' built-ins: createDeepAgent always injects
+  // createSummarizationMiddleware (summarizes old messages, offloads history to
+  // the backend) and createFilesystemMiddleware (evicts oversized tool results).
+  // We no longer add our own to avoid running them twice. The config.compaction
+  // / config.eviction blocks are kept for backward-compat but no longer wired;
+  // to customize summarization, exclude the built-in via a harness profile and
+  // re-add a configured createSummarizationMiddleware.
 
   // Hooks middleware — always included when hooks are registered.
   // Note: hooks registry is module-level (shared across agents in the same process).
@@ -130,20 +124,16 @@ export function buildAgentConfigParts(
     workspaceRoot
   );
 
-  // Protected paths middleware: wraps the tool call regardless of mode.
-  // Needed because `DeepAgentsServer` in ACP mode drops the `permissions`
-  // field from `createDeepAgent`, so the `permissions` array alone
-  // cannot protect files. Gated only on the sandbox's denied paths.
-  if (sandbox.deniedWritePaths.length > 0) {
-    const deniedGlobs = sandbox.deniedWritePaths.map((d) => toAbsoluteDenyGlob(d, workspaceRoot));
-    middleware.push(createProtectedPathsMiddleware({ deniedGlobs }));
-  }
+  // Path-based write protection is enforced by deepagents' built-in
+  // FilesystemMiddleware via the `permissions` array built below. This relies on
+  // the upstream fix that forwards `permissions` through
+  // DeepAgentsServer.createAgent (previously dropped, which is why a custom
+  // protected-paths middleware used to be needed here).
 
   if (mode === "yolo") {
-    // No HITL. Path restrictions are enforced by the protected-paths
-    // middleware (pushed above, regardless of mode) — the `permissions`
-    // array is kept here for non-ACP callers and is dropped by
-    // DeepAgentsServer in ACP mode anyway.
+    // No HITL. Path restrictions are enforced by deepagents' built-in
+    // FilesystemMiddleware via the `permissions` array (forwarded through
+    // DeepAgentsServer.createAgent in ACP mode by the upstream fix).
     interruptOn = {};
     permissions = sandbox.profile === "open"
       ? [{ operations: ["read", "write"], paths: ["/**"], mode: "allow" as const }]

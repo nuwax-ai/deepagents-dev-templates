@@ -1,25 +1,19 @@
 /**
  * ACP Slash-Command Handling
  *
- * Intercepts `/...` prompts before they reach the LLM, runs them through the
- * shared slash-command registry, and streams any text result back to the ACP
- * client. Also holds the small ACP message shapes shared with the lifecycle
- * patch.
+ * Runs `/...` prompts through the shared slash-command registry and streams any
+ * text result back to the ACP client. Invoked from the `onPrompt` lifecycle hook
+ * (see `session-lifecycle.ts`); it takes a plain options bag and no longer
+ * reaches into DeepAgentsServer internals.
  */
 
 import { type AppConfig } from "../../runtime/config/config-loader.js";
-import { type DeepAgentsServerInternals } from "../../runtime/acp-server-internals.js";
 import { executeSlashCommand, type SlashToolInfo } from "../../runtime/slash-commands.js";
 import { appendRuntimeMessage, getRuntimeStorage } from "../../runtime/storage/runtime-storage.js";
 
 export interface AcpPromptBlock {
   type?: string;
   text?: string;
-}
-
-export interface AcpPromptParams {
-  sessionId: string;
-  prompt: AcpPromptBlock[];
 }
 
 export interface AcpConnection {
@@ -35,30 +29,32 @@ export interface AcpConnection {
   }): Promise<void>;
 }
 
+/**
+ * Handle a possible slash command. Returns a stop reason when the prompt was a
+ * recognized slash command (so the turn is short-circuited), or `null` to let
+ * the agent run normally.
+ */
 export async function handleAcpSlashCommand(options: {
-  server: DeepAgentsServerInternals;
-  params: AcpPromptParams;
+  promptText: string | null;
   conn?: AcpConnection;
   config: AppConfig;
   workspaceRoot: string;
+  mode?: string;
+  sessionId: string;
+  tools?: unknown;
 }): Promise<{ stopReason: "end_turn" } | null> {
-  const text = getAcpPromptText(options.params.prompt);
+  const text = options.promptText;
   if (!text?.startsWith("/")) {
     return null;
   }
 
-  const session = options.server.sessions.get(options.params.sessionId);
-  const agentConfig = session
-    ? options.server.agentConfigs.get(session.agentName)
-    : undefined;
-
   const result = executeSlashCommand(text, {
     environment: "acp",
-    tools: toSlashToolInfo(agentConfig?.tools),
+    tools: toSlashToolInfo(options.tools),
     config: options.config,
     workspaceRoot: options.workspaceRoot,
-    mode: session?.mode,
-    sessionId: session?.id,
+    mode: options.mode,
+    sessionId: options.sessionId,
   });
 
   if (!result) {
@@ -66,16 +62,17 @@ export async function handleAcpSlashCommand(options: {
   }
 
   if (result.text && options.conn) {
-    await sendAcpText(options.params.sessionId, options.conn, result.text);
+    await sendAcpText(options.sessionId, options.conn, result.text);
     appendRuntimeMessage(
       { role: "assistant", content: result.text },
-      getRuntimeStorage({ workspaceRoot: options.workspaceRoot, sessionId: options.params.sessionId })
+      getRuntimeStorage({ workspaceRoot: options.workspaceRoot, sessionId: options.sessionId })
     );
   }
 
   return { stopReason: "end_turn" };
 }
 
+/** Extract the trimmed text of the first text block in an ACP prompt. */
 export function getAcpPromptText(prompt: AcpPromptBlock[]): string | null {
   const block = prompt.find((candidate) => candidate.type === "text" && candidate.text);
   return block?.text?.trim() ?? null;

@@ -91,16 +91,23 @@ describe("buildPermissions", () => {
     const deny = perms.find((p) => p.mode === "deny");
     expect(deny).toBeDefined();
     expect(deny!.operations).toEqual(["write"]);
-    // The bug this regression test guards: previously this was `/src/runtime/**`
-    // (a backend-rooted glob) which never matched the OS-absolute file_path the
-    // agent passes. After the fix, it should be the absolute glob.
-    expect(deny!.paths).toEqual(["/Users/dev/my-project/src/runtime/**"]);
+    // Emits both the OS-absolute glob (matches an OS-absolute file_path) and the
+    // workspace-relative "virtual" glob (matches a backend-rooted path).
+    // deepagents' FilesystemMiddleware checks the literal file_path, so covering
+    // both forms keeps the deny robust.
+    expect(deny!.paths).toEqual([
+      "/Users/dev/my-project/src/runtime/**",
+      "/src/runtime/**",
+    ]);
   });
 
   it("appends a trailing / before ** when the input lacks one", () => {
     const perms = buildPermissions(makeConfig(["src/runtime"]), workspaceRoot);
     const deny = perms.find((p) => p.mode === "deny");
-    expect(deny!.paths).toEqual(["/Users/dev/my-project/src/runtime/**"]);
+    expect(deny!.paths).toEqual([
+      "/Users/dev/my-project/src/runtime/**",
+      "/src/runtime/**",
+    ]);
   });
 
   it("preserves an absolute denied path verbatim", () => {
@@ -123,8 +130,14 @@ describe("buildPermissions", () => {
     );
     const denies = perms.filter((p) => p.mode === "deny");
     expect(denies).toHaveLength(2);
-    expect(denies[0]!.paths).toEqual(["/Users/dev/my-project/src/runtime/**"]);
-    expect(denies[1]!.paths).toEqual(["/Users/dev/my-project/prompts/**"]);
+    expect(denies[0]!.paths).toEqual([
+      "/Users/dev/my-project/src/runtime/**",
+      "/src/runtime/**",
+    ]);
+    expect(denies[1]!.paths).toEqual([
+      "/Users/dev/my-project/prompts/**",
+      "/prompts/**",
+    ]);
   });
 
   it("falls back to the backend-rooted glob when workspaceRoot is omitted", () => {
@@ -182,53 +195,47 @@ describe("buildPermissions", () => {
   });
 });
 
-describe("buildAgentConfigParts — protected-paths middleware gating (I-1 regression)", () => {
+describe("buildAgentConfigParts — path-write protection via permissions (I-1 regression)", () => {
   /**
-   * Regression: previously the `createProtectedPathsMiddleware` push lived
-   * inside the `else` branch (mode !== "yolo"), so yolo + workspace-write
-   * and yolo + read-only were silently unprotected (the `permissions` array
-   * is dropped by `DeepAgentsServer` in ACP mode). The middleware is now
-   * gated only on `sandbox.deniedWritePaths.length > 0`, regardless of mode.
+   * Regression (I-1): yolo + workspace-write / read-only must still protect
+   * runtime paths. The custom protected-paths middleware has been removed;
+   * protection now comes from the returned `permissions` array, which
+   * deepagents' built-in FilesystemMiddleware enforces (the upstream fix
+   * forwards `permissions` through DeepAgentsServer.createAgent in ACP mode).
+   * So we assert the write-deny rules are present regardless of mode.
    */
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const findProtectedPaths = (parts: any) =>
-    (parts.middleware as Array<{ name?: string }>).find((m) => m.name === "protected-paths");
+  const writeDenies = (parts: any) =>
+    (parts.permissions as Array<{ mode?: string }>).filter((p) => p.mode === "deny");
 
-  it("yolo + workspace-write pushes protected-paths middleware", () => {
+  it("yolo + workspace-write yields write-deny permissions", () => {
     const parts = buildAgentConfigParts(
       makeFullConfig("yolo", "workspace-write"),
       undefined,
       "/Users/dev/project",
       []
     );
-    expect(findProtectedPaths(parts)).toBeDefined();
+    expect(writeDenies(parts).length).toBeGreaterThan(0);
   });
 
-  it("yolo + read-only pushes protected-paths middleware", () => {
+  it("yolo + read-only yields write-deny permissions", () => {
     const parts = buildAgentConfigParts(
       makeFullConfig("yolo", "read-only"),
       undefined,
       "/Users/dev/project",
       []
     );
-    const mw = findProtectedPaths(parts);
-    expect(mw).toBeDefined();
-    // The /** glob construction is covered by the buildPermissions
-    // "supports read-only and open sandbox profiles" test above; this
-    // test only asserts the middleware is in the stack (the regression
-    // vector for I-1 was missing middleware, not wrong globs).
+    expect(writeDenies(parts).length).toBeGreaterThan(0);
   });
 
-  it("yolo + open does NOT push protected-paths middleware", () => {
-    // open profile → deniedWritePaths = [] → no deny rules → no middleware.
+  it("yolo + open yields NO write-deny permissions", () => {
+    // open profile → deniedWritePaths = [] → no deny rules.
     const config = makeFullConfig("yolo", "open");
-    // The `open` profile ignores the sandbox's deniedWritePaths and returns [].
-    // Confirm by checking the sandbox policy first.
     const policy = resolveSandboxPolicy(config);
     expect(policy.deniedWritePaths).toEqual([]);
 
     const parts = buildAgentConfigParts(config, undefined, "/Users/dev/project", []);
-    expect(findProtectedPaths(parts)).toBeUndefined();
+    expect(writeDenies(parts)).toEqual([]);
   });
 });

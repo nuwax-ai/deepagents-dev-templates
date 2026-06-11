@@ -20,7 +20,6 @@ import { jsonUtilsTool } from "./json-utils.tool.js";
 import { agentMemoryTool } from "./agent-memory.tool.js";
 import { conversationHistoryTool } from "./conversation-history.tool.js";
 import { checkpointTool } from "./checkpoint.tool.js";
-import { createTaskTool } from "./task.tool.js";
 import { createScheduleActionTool } from "./schedule-action.tool.js";
 import { createPlatformApiTool } from "./platform-api.tool.js";
 import { createAgentVariableTool } from "./agent-variable.tool.js";
@@ -71,7 +70,10 @@ export function createTools(ctx: ToolContext): StructuredTool[] {
     conversationHistoryTool,
     checkpointTool,
     createRuntimeInfoTool({ workspaceRoot: ctx.workspaceRoot }),
-    createTaskTool(ctx.config, ctx.workspaceRoot),
+    // NOTE: subagent delegation is provided by deepagents' built-in `task` tool
+    // (createSubAgentMiddleware), fed by the `subagents` discovered in
+    // buildAgentConfigParts. We no longer ship a custom `task` tool — it both
+    // duplicated that behavior and collided with the built-in tool name.
     createPlatformApiTool(ctx.platformClient),
     createAgentVariableTool(ctx.variableManager),
   ];

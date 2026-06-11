@@ -2,9 +2,9 @@
  * Sandbox Policy & Filesystem Permissions
  *
  * Resolves the effective sandbox policy from config/profile and builds the
- * deepagents `FilesystemPermission[]` deny/allow rules. `toAbsoluteDenyGlob`
- * is exported for the agent-config builder, which also feeds the protected-paths
- * middleware with the same absolute globs.
+ * deepagents `FilesystemPermission[]` deny/allow rules. Deny entries are emitted
+ * as both OS-absolute and workspace-relative globs so deepagents' built-in
+ * FilesystemMiddleware enforces them regardless of the path form the model uses.
  */
 
 import { join } from "node:path";
@@ -62,8 +62,8 @@ export function resolveSandboxPolicy(config: AppConfig): SandboxPolicy {
 
 /**
  * Convert a single denied-write path (workspace-relative or absolute) into
- * the absolute glob that `decidePathAccess` / our protected-paths middleware
- * match against the OS-absolute `file_path` the tool receives.
+ * the OS-absolute glob that deepagents' FilesystemMiddleware (decidePathAccess)
+ * matches against the `file_path` the tool receives.
  *
  * Examples (with workspaceRoot = "/Users/dev/project"):
  *   "src/runtime/"     → "/Users/dev/project/src/runtime/**"
@@ -84,6 +84,18 @@ export function toAbsoluteDenyGlob(denied: string, workspaceRoot: string): strin
 }
 
 /**
+ * Workspace-relative ("virtual") absolute deny glob — the path form the model
+ * uses when addressing files relative to the backend root (e.g. "/src/x.ts").
+ * Pairs with `toAbsoluteDenyGlob` so deny rules match whether deepagents'
+ * FilesystemMiddleware receives an OS-absolute or backend-relative path.
+ */
+export function toWorkspaceDenyGlob(denied: string): string {
+  const trimmed = denied.startsWith("/") ? denied : `/${denied}`;
+  const withSlash = trimmed.endsWith("/") ? trimmed : `${trimmed}/`;
+  return `${withSlash}**`;
+}
+
+/**
  * Build filesystem permissions for deepagents.
  *
  * Protects denied paths from writes while allowing everything else. The
@@ -101,9 +113,18 @@ export function buildPermissions(config: AppConfig, workspaceRoot?: string): Fil
   const root = workspaceRoot ?? "/";
 
   for (const denied of sandbox.deniedWritePaths) {
+    // Emit BOTH an OS-absolute glob and a workspace-relative ("virtual")
+    // absolute glob. deepagents' FilesystemMiddleware matches the literal path
+    // the model passes to the tool, which may be either form. Covering both
+    // keeps the deny robust now that the custom protected-paths middleware
+    // (which normalized paths itself) has been removed. Dedup so absolute
+    // inputs (where both globs coincide) yield a single pattern.
+    const denyGlobs = Array.from(
+      new Set([toAbsoluteDenyGlob(denied, root), toWorkspaceDenyGlob(denied)])
+    );
     permissions.push({
       operations: ["write"],
-      paths: [toAbsoluteDenyGlob(denied, root)],
+      paths: denyGlobs,
       mode: "deny" as const,
     });
   }

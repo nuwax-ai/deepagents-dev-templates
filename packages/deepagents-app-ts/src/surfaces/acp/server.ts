@@ -16,7 +16,7 @@ import { loadConfig, resolveConfiguredWorkspaceRoot, type ACPSessionConfig } fro
 import { logger } from "../../runtime/logger.js";
 import { getPackageVersion } from "../../runtime/version.js";
 import { buildACPAgentConfigWithMcpAsync, loadSessionConfigFromEnv } from "./config-builder.js";
-import { patchSessionLifecycle } from "./session-lifecycle.js";
+import { createAcpSessionHooks } from "./session-lifecycle.js";
 
 export {
   buildACPAgentConfig,
@@ -102,12 +102,24 @@ export async function bootstrap(options: ACPServerOptions = {}): Promise<void> {
   // the config leaves it unset. This keeps the version Zed displays
   // in sync with `npm view deepagents-app-ts version`.
   const pkgVersion = getPackageVersion();
+  // Build ACP lifecycle hooks (session config / slash commands / durable state /
+  // MCP forwarding) on deepagents-acp's public hook surface — no monkey-patching.
+  const { hooks, manager } = createAcpSessionHooks({
+    initialConfig: config,
+    initialWorkspaceRoot: workspaceRoot,
+    initialMcpManager: mcpManager,
+    configPath: options.configPath,
+    sessionConfig,
+    useSessionCwd: !options.workspaceRoot && !config.workspace.workingDir,
+  });
+
   const server = new DeepAgentsServer({
     agents: agentConfig,
     serverName: config.agent.name,
     serverVersion: config.agent.version || pkgVersion || "0.0.0",
     workspaceRoot,
     debug: process.env.LOG_LEVEL === "debug",
+    hooks,
   });
 
   log.info("Starting DeepAgentsServer", {
@@ -117,12 +129,6 @@ export async function bootstrap(options: ACPServerOptions = {}): Promise<void> {
     tools: agentConfig.tools?.length,
   });
 
-  // Pass mcpManager so ACP session mcpServers can be forwarded
-  const _sessionManager = patchSessionLifecycle(server, mcpManager, config, workspaceRoot, {
-    configPath: options.configPath,
-    sessionConfig,
-    useSessionCwd: !options.workspaceRoot && !config.workspace.workingDir,
-  });
-  log.info("Active sessions after startup", { count: _sessionManager.count });
+  log.info("ACP session hooks installed", { sessions: manager.count });
   await server.start();
 }

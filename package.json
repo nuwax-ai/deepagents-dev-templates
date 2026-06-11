@@ -20,5 +20,11 @@
     "pack:release": "node scripts/pack-template.js all --release"
   },
   "description": "DeepAgents development templates — monorepo for agent template and dev-agent config",
-  "license": "MIT"
+  "license": "MIT",
+  "pnpm": {
+    "overrides": {
+      "deepagents": "file:../deepagentsjs/libs/deepagents",
+      "deepagents-acp": "file:../deepagentsjs/libs/acp"
+    }
+  }
 }

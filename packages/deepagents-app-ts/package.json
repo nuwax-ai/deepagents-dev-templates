@@ -71,6 +71,7 @@
     "zod": "^3.23.0"
   },
   "devDependencies": {
+    "@agentclientprotocol/sdk": "^0.24.0",
     "@eslint/js": "^9.39.4",
     "@types/node": "^22.0.0",
     "esbuild": "^0.25.0",
