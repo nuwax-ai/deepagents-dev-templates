@@ -105,6 +105,47 @@ sequenceDiagram
     S->>H: onSessionClosed → 持久化 + 清理
 ```
 
+## 4. 上游依赖映射(deepagentsjs fork → app)
+
+本包依赖 deepagentsjs **fork**(`dongdada29/deepagentsjs`,分支
+`feat/acp-permissions-and-lifecycle`),经根 `package.json` 的 `pnpm.overrides`
+以 `file:../deepagentsjs/libs/{deepagents,acp}` 链接 —— **不是 npm 发布版**。fork
+的三处改动在 app 的消费点如下。
+
+```mermaid
+flowchart LR
+    subgraph fork["deepagentsjs fork · libs/acp"]
+      b1["createAgent 转发 permissions"]
+      b2["DeepAgentsServerHooks + SessionConfigurePatch"]
+      ls["handleLoadSession 重建 agent"]
+    end
+    subgraph app["deepagents-app-ts · src/"]
+      ac["runtime/agent-config.ts<br/>permissions 字段"]
+      sl["surfaces/acp/session-lifecycle.ts<br/>hooks 对象"]
+      sv["surfaces/acp/server.ts<br/>DeepAgentsServer ← hooks"]
+    end
+    b1 --> ac
+    b2 --> sl --> sv
+    ls -.->|保护会话恢复| sl
+```
+
+| fork 改动 | app 引用点 | 不改则 |
+|---|---|---|
+| `createAgent` 转发 `permissions` | `runtime/agent-config.ts`(`permissions` 字段，约 :182)→ `server.ts` 的 `new DeepAgentsServer({ agents })` | ACP 模式路径写保护失效(曾靠已删的 `protected-paths` 中间件) |
+| `DeepAgentsServerHooks` / `SessionConfigurePatch` | `surfaces/acp/session-lifecycle.ts`(`import type` :18–22；`const hooks` :112) | 只能猴补丁私有字段(已删的 `acp-server-internals.ts`) |
+| `hooks` 选项 | `surfaces/acp/server.ts`(:121–127) | hooks 不生效，cwd / MCP / slash / durable 状态全失 |
+| `handleLoadSession` patch 后重建 agent | 隐式:`configureSession` 在 `phase:"load"` 返回带 `agentConfig` 的 patch | 带 cwd 切换地恢复会话 → 下个 prompt 抛 `Agent not found` |
+
+**排查提示**
+
+- `DeepAgentsServerHooks` / `SessionConfigurePatch` / `DeepAgentConfig` 是
+  `import type`,**编译后从 `dist/*.js` 擦除** —— 在 `src/*.ts` 里搜,别在
+  `dist` / `bundle.mjs` 里搜。
+- upstream 还导出了 `closeSession()` / `listSessions()`,**本 app 未使用**(用自有
+  `SessionManager` + `runtime/storage`);留给其他 host。
+- 解析校验:`node_modules/deepagents-acp` 应软链到
+  `.pnpm/deepagents-acp@file+..+deepagentsjs+libs+acp_…`。
+
 ## 关键文件
 
 | 区域 | 路径 |
