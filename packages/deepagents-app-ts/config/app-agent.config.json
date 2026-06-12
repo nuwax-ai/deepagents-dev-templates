@@ -7,9 +7,8 @@
     "outputStyle": "concise"
   },
   "model": {
-    "provider": "openai",
-    "name": "mimo-v2.5-pro",
-    "baseUrl": "https://token-plan-cn.xiaomimimo.com/v1",
+    "provider": "anthropic",
+    "name": "claude-sonnet-4-6",
     "settings": {
       "temperature": 0,
       "maxTokens": 16384
@@ -19,9 +18,62 @@
     "configPath": "./config/mcp.default.json",
     "mergeStrategy": "session-wins"
   },
+  "platform": {
+    "apiBaseUrl": "https://api.nuwax.com",
+    "agentId": "",
+    "spaceId": ""
+  },
   "permissions": {
-    "mode": "yolo",
-    "allowedPaths": ["src/app/", "prompts/", "skills/", "config/"],
-    "deniedPaths": ["src/runtime/", "src/surfaces/"]
+    "mode": "ask",
+    "interruptOn": [
+      "write_file",
+      "edit_file",
+      "execute"
+    ],
+    "allowedPaths": [
+      "src/app/",
+      "prompts/",
+      "skills/",
+      "config/"
+    ],
+    "deniedPaths": [
+      "src/runtime/",
+      "src/surfaces/"
+    ]
+  },
+  "skills": {
+    "directories": [
+      "./skills/builtin/",
+      "./skills/platform/"
+    ],
+    "progressiveLoading": true
+  },
+  "agentsDirectories": [
+    "./.agents"
+  ],
+  "memory": {
+    "enabled": true,
+    "dir": "./.agent-memory",
+    "addCacheControl": true
+  },
+  "logging": {
+    "level": "info",
+    "structured": true
+  },
+  "middleware": {
+    "stuckLoopDetection": {
+      "enabled": true,
+      "threshold": 3,
+      "mode": "warn"
+    },
+    "periodicReminder": {
+      "enabled": true,
+      "firstAt": 5,
+      "every": 10
+    },
+    "costTracking": {
+      "enabled": true,
+      "warnAtTokens": 100000
+    }
   }
 }

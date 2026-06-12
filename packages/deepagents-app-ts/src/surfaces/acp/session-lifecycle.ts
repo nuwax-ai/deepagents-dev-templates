@@ -44,8 +44,7 @@ import {
 } from "../../runtime/storage/runtime-storage.js";
 import { buildACPAgentConfigWithMcpAsync } from "./config-builder.js";
 import { SessionManager } from "./session-manager.js";
-import { handleAcpSlashCommand, sendAcpText, type AcpConnection } from "./slash-command-handler.js";
-import { createRAGHandler, loadRAGConfigFromFile, RAGHandler } from "../../app/rag-handler.js";
+import { handleAcpSlashCommand, type AcpConnection } from "./slash-command-handler.js";
 
 /** Per-session context the hooks need across the prompt lifecycle. */
 interface SessionContext {
@@ -110,24 +109,6 @@ export function createAcpSessionHooks(opts: AcpSessionHooksOptions): {
   const ctxFor = (sessionId: string): SessionContext =>
     sessionCtx.get(sessionId) ?? initialCtx();
 
-  // Create RAG handler if configured
-  let ragHandler: RAGHandler | null = null;
-  try {
-    const ragConfig = loadRAGConfigFromFile();
-    if (ragConfig && ragConfig.enabled) {
-      ragHandler = createRAGHandler(opts.initialConfig, ragConfig);
-      if (ragHandler) {
-        log.info("RAG Handler created for ACP sessions", {
-          tools: ragConfig.retrievalTools,
-        });
-      }
-    } else {
-      log.debug("RAG not configured or disabled");
-    }
-  } catch (err) {
-    log.debug("RAG Handler not created", { error: String(err) });
-  }
-
   const hooks: DeepAgentsServerHooks = {
     async configureSession(ctx) {
       let active: SessionContext = initialCtx(ctx.mode ?? "agent");
@@ -187,12 +168,6 @@ export function createAcpSessionHooks(opts: AcpSessionHooksOptions): {
     },
 
     async onPrompt(ctx) {
-      log.info("onPrompt called", { 
-        sessionId: ctx.sessionId, 
-        promptText: ctx.promptText?.substring(0, 100),
-        hasRagHandler: !!ragHandler 
-      });
-      
       const sc = ctxFor(ctx.sessionId);
       const storage = getRuntimeStorage({
         workspaceRoot: sc.workspaceRoot,
@@ -228,38 +203,6 @@ export function createAcpSessionHooks(opts: AcpSessionHooksOptions): {
         completeHarnessTurn(storage);
         manager.touch(ctx.sessionId);
         return slashResult;
-      }
-
-      // RAG fixed flow: when configured, answer through the RAG pipeline and
-      // short-circuit the agent. Like the slash path above, the short-circuit
-      // skips the harness-lifecycle middleware, so the turn is begun/completed
-      // here. The answer must be streamed over the connection — an onPrompt
-      // result carries only a stop reason.
-      if (ragHandler && ctx.promptText) {
-        log.info("Processing through RAG pipeline", { query: ctx.promptText.substring(0, 100) });
-        try {
-          const ragResult = await ragHandler.handle(ctx.promptText);
-          if (ragResult) {
-            log.info("RAG pipeline completed", { resultLength: ragResult.length });
-            beginHarnessTurn(ctx.promptText, storage);
-            const conn = ctx.conn as AcpConnection | undefined;
-            if (conn) {
-              await sendAcpText(ctx.sessionId, conn, ragResult);
-            }
-            appendRuntimeMessage({ role: "assistant", content: ragResult }, storage);
-            completeHarnessTurn(storage);
-            manager.touch(ctx.sessionId);
-            return { stopReason: "end_turn" };
-          }
-          log.info("RAG pipeline returned null, falling back to agent");
-        } catch (err) {
-          log.error("RAG pipeline failed", { error: String(err) });
-        }
-      } else {
-        log.debug("RAG handler not available or no prompt text", {
-          hasHandler: !!ragHandler,
-          hasPrompt: !!ctx.promptText,
-        });
       }
 
       // Normal prompt (or unrecognized "/..."): the agent runs and its

@@ -1,18 +1,20 @@
 /**
- * Agent 节点 - 推理生成
+ * Generate 节点 - 基于检索上下文生成最终回答
  *
  * 职责：
- * 1. 基于上下文生成最终回答
- * 2. 支持流式输出
+ * 1. 基于 prepare 产出的上下文生成回答
+ * 2. 支持流式输出（onToken）
  * 3. 包含来源引用
+ *
+ * 说明：此前命名为 `agentNode`，为避免与 "agent loop" 概念混淆，
+ * 在工作流模板中更名为 `generateNode` —— 它只是图里的一个生成节点。
  */
 
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
+import { resolveModel, type AppConfig } from "deepagents-app-ts/runtime";
 import type { RAGState, RAGConfig, RAGMetadata } from "./types.js";
-import type { AppConfig } from "../../runtime/config/config-loader.js";
-import { resolveModel } from "../../runtime/model.js";
 
-const AGENT_SYSTEM_PROMPT = `你是一个专业的知识助手。基于提供的上下文信息回答用户的问题。
+const GENERATE_SYSTEM_PROMPT = `你是一个专业的知识助手。基于提供的上下文信息回答用户的问题。
 
 规则：
 1. 只基于提供的上下文回答，不要编造信息
@@ -21,15 +23,16 @@ const AGENT_SYSTEM_PROMPT = `你是一个专业的知识助手。基于提供的
 4. 回答要准确、简洁、有条理
 5. 如果是操作指南类问题，提供清晰的步骤`;
 
-export async function agentNode(
+export async function generateNode(
   state: RAGState,
   config: RAGConfig,
   appConfig?: AppConfig,
   callbacks?: {
-    onToken?: (token: string) => void;
+    onToken?: (token: string) => void | Promise<void>;
   }
 ): Promise<Partial<RAGState>> {
-  const { context, sources, rewritten_query, history } = state;
+  const { context, sources, rewritten_query } = state;
+  const { history } = state;
   const query = rewritten_query || state.query;
   const startTime = Date.now();
 
@@ -37,7 +40,7 @@ export async function agentNode(
     // 使用配置中的模型；resolveModel 类型上含 string/undefined，RAG 节点需要实例
     const model = resolveModel(appConfig!);
     if (!model || typeof model === "string") {
-      throw new Error("RAG agent node requires an instantiated chat model");
+      throw new Error("RAG generate node requires an instantiated chat model");
     }
 
     // 构建用户提示
@@ -60,7 +63,7 @@ export async function agentNode(
     userPrompt += `## 用户问题\n\n${query}`;
 
     // 构建消息列表
-    const messages: any[] = [new SystemMessage(AGENT_SYSTEM_PROMPT)];
+    const messages: any[] = [new SystemMessage(GENERATE_SYSTEM_PROMPT)];
 
     // 添加历史对话
     if (history && history.length > 0) {
@@ -80,7 +83,7 @@ export async function agentNode(
         const content = chunk.content;
         if (typeof content === "string") {
           answer += content;
-          callbacks.onToken(content);
+          await callbacks.onToken(content);
         }
       }
 
@@ -102,7 +105,7 @@ export async function agentNode(
       };
     }
   } catch (error) {
-    console.error("[Agent] Error:", error);
+    console.error("[Generate] Error:", error);
     return {
       answer: "抱歉，生成回答时出现错误。请稍后重试。",
       metadata: {
@@ -117,8 +120,7 @@ export async function agentNode(
 function buildMetadata(state: RAGState, startTime: number): RAGMetadata {
   return {
     intent: state.intent,
-    tools_used:
-      state.raw_results?.map((r) => r.tool).filter(Boolean) || [],
+    tools_used: state.raw_results?.map((r) => r.tool).filter(Boolean) || [],
     token_count: state.token_count || 0,
     duration_ms: Date.now() - startTime,
     rewritten_query: state.rewritten_query,

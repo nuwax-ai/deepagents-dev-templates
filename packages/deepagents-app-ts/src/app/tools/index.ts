@@ -24,7 +24,6 @@ import { createScheduleActionTool } from "./schedule-action.tool.js";
 import { createPlatformApiTool } from "./platform-api.tool.js";
 import { createAgentVariableTool } from "./agent-variable.tool.js";
 import { createRuntimeInfoTool } from "./runtime-info.tool.js";
-import { createRAGTool } from "./rag-query.tool.js";
 import type { PlatformClient } from "../../runtime/platform/platform-client.js";
 import type { MCPManager } from "../../runtime/platform/mcp-manager.js";
 import type { VariableManager } from "../../runtime/platform/variable-manager.js";
@@ -78,12 +77,6 @@ export function createTools(ctx: ToolContext): StructuredTool[] {
     createPlatformApiTool(ctx.platformClient),
     createAgentVariableTool(ctx.variableManager),
   ];
-
-  // Add RAG tool if MCP servers are configured
-  const mcpServers = ctx.config?.mcp?.servers || {};
-  if (Object.keys(mcpServers).length > 0) {
-    builtinTools.push(createRAGTool(mcpServers));
-  }
 
   // Mutable set of known schedulable tool names.
   // Starts with builtins; hydrateRuntimeContext adds MCP names after they load.

@@ -1,5 +1,5 @@
 /**
- * RAG Agent 类型定义
+ * RAG Workflow 类型定义
  */
 
 import { BaseMessage } from "@langchain/core/messages";
@@ -12,7 +12,7 @@ export interface Source {
   score?: number;
 }
 
-/** RAG 状态 - 贯穿整个流程 */
+/** RAG 状态 - 贯穿整个工作流的 channel */
 export interface RAGState {
   // 输入
   query: string;
@@ -20,19 +20,23 @@ export interface RAGState {
 
   // Rewrite 输出
   rewritten_query?: string;
-  intent?: string;  // RAGIntent 类型在 Annotation 中用 string
+  intent?: string; // RAGIntent 类型在 Annotation 中用 string
   keywords?: string[];
   mcp_hint?: string;
 
   // Retrieve 输出
   raw_results?: RetrievalResult[];
 
+  // 编排控制（条件边）
+  attempts?: number; // 检索轮次计数：retrieve 每执行一次 +1
+  grade?: string; // grade 节点判定：sufficient | insufficient
+
   // Prepare 输出
   context?: string;
   sources?: Source[];
   token_count?: number;
 
-  // Agent 输出
+  // Generate 输出
   answer?: string;
 
   // 元数据
@@ -41,11 +45,11 @@ export interface RAGState {
 
 /** 意图类型 */
 export type RAGIntent =
-  | "factual"     // 事实查询
-  | "how_to"      // 操作指南
-  | "comparison"  // 对比分析
-  | "latest"      // 最新信息
-  | "explain";    // 概念解释
+  | "factual" // 事实查询
+  | "how_to" // 操作指南
+  | "comparison" // 对比分析
+  | "latest" // 最新信息
+  | "explain"; // 概念解释
 
 /** MCP 工具检索结果 */
 export interface RetrievalResult {

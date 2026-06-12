@@ -1,16 +1,26 @@
 /**
- * RAG Agent Graph - LangGraph StateGraph 定义
+ * RAG Workflow Graph — 显式 LangGraph StateGraph
  *
- * 流程：Query → Rewrite → Retrieve → Prepare → Agent → Response
+ * 这是本模板的主角：Agent 不是"自由 tool loop"，而是按设计好的
+ * 节点连线规则运行的工作流图。
+ *
+ *   START → rewrite → retrieve → grade ─(条件边)─┐
+ *                          ▲                      ├─ insufficient & 未达上限 → rewrite（重试）
+ *                          └──────────────────────┘
+ *                                       └─ 否则 → prepare → generate → END
+ *
+ * 想改编排？改下面的 addNode / addEdge / addConditionalEdges 即可——
+ * 节点与连线都是静态可读、可被 inspector 抽取/可视化的结构。
  */
 
-import { StateGraph, END, START } from "@langchain/langgraph";
-import { Annotation } from "@langchain/langgraph";
+import { StateGraph, END, START, Annotation } from "@langchain/langgraph";
 import { BaseMessage } from "@langchain/core/messages";
+import { logger, type AppConfig } from "deepagents-app-ts/runtime";
 import { rewriteNode } from "./nodes/rewrite.js";
 import { retrieveNode, type RetrieveNodeConfig } from "./nodes/retrieve.js";
+import { gradeNode, routeAfterGrade } from "./nodes/grade.js";
 import { prepareNode } from "./nodes/prepare.js";
-import { agentNode } from "./nodes/agent.js";
+import { generateNode } from "./nodes/generate.js";
 import type {
   RAGConfig,
   RAGMetadata,
@@ -18,13 +28,11 @@ import type {
   RetrievalResult,
   Source,
 } from "./nodes/types.js";
-import type { AppConfig } from "../runtime/config/config-loader.js";
-import { logger } from "../runtime/logger.js";
 
 // ACP stdio 模式下 stdout 是协议通道，日志必须走 logger（stderr）
 const log = logger.child("rag-graph");
 
-/** RAG State 定义 */
+/** RAG State 定义（图的 channels） */
 const RAGStateAnnotation = Annotation.Root({
   // 输入
   query: Annotation<string>,
@@ -39,12 +47,16 @@ const RAGStateAnnotation = Annotation.Root({
   // Retrieve 输出
   raw_results: Annotation<RetrievalResult[]>,
 
+  // 编排控制（条件边）
+  attempts: Annotation<number>,
+  grade: Annotation<string>,
+
   // Prepare 输出
   context: Annotation<string>,
   sources: Annotation<Source[]>,
   token_count: Annotation<number>,
 
-  // Agent 输出
+  // Generate 输出
   answer: Annotation<string>,
 
   // 元数据
@@ -53,7 +65,7 @@ const RAGStateAnnotation = Annotation.Root({
 
 type RAGStateType = typeof RAGStateAnnotation.State;
 
-/** MCP 服务器配置 */
+/** 检索源（MCP）配置 */
 interface MCPServerConfig {
   command?: string;
   args?: string[];
@@ -66,56 +78,65 @@ interface MCPServerConfig {
 export interface CreateRAGGraphConfig extends RAGConfig {
   mcpServers: Record<string, MCPServerConfig>;
   appConfig?: AppConfig;
+  callbacks?: { onToken?: (token: string) => void | Promise<void> };
 }
 
 /**
- * 创建 RAG Graph
+ * 创建 RAG Graph（编译后的 LangGraph 图）
  */
 export function createRAGGraph(config: CreateRAGGraphConfig) {
-  // 构建 Retrieve 节点配置
   const retrieveConfig: RetrieveNodeConfig = {
     mcpServers: config.mcpServers,
     retrievalTools: config.retrievalTools,
     retrieve: config.retrieve,
   };
 
-  log.info("Creating StateGraph with nodes: rewrite, retrieve, prepare, agent");
+  log.info("Creating StateGraph", {
+    nodes: ["rewrite", "retrieve", "grade", "prepare", "generate"],
+  });
 
   const graph = new StateGraph(RAGStateAnnotation)
-    // 添加节点
+    // ── 节点 ────────────────────────────────────────────
     .addNode("rewrite", async (state: RAGStateType) => {
-      log.info("Executing node: rewrite");
       const result = await rewriteNode(state, config.appConfig);
-      log.info("Node rewrite completed", { intent: result.intent });
+      log.info("node rewrite done", { intent: result.intent });
       return result;
     })
     .addNode("retrieve", async (state: RAGStateType) => {
-      log.info("Executing node: retrieve");
       const result = await retrieveNode(state, retrieveConfig);
-      log.info("Node retrieve completed", { resultCount: result.raw_results?.length });
+      log.info("node retrieve done", {
+        resultCount: result.raw_results?.length,
+        attempts: result.attempts,
+      });
       return result;
     })
+    // 节点名 "grade_docs" 不能与 state channel "grade" 同名（LangGraph 限制）
+    .addNode("grade_docs", (state: RAGStateType) => gradeNode(state))
     .addNode("prepare", async (state: RAGStateType) => {
-      log.info("Executing node: prepare");
       const result = await prepareNode(state, config);
-      log.info("Node prepare completed", { tokenCount: result.token_count });
+      log.info("node prepare done", { tokenCount: result.token_count });
       return result;
     })
-    .addNode("agent", async (state: RAGStateType) => {
-      log.info("Executing node: agent");
-      const result = await agentNode(state, config, config.appConfig);
-      log.info("Node agent completed", { answerLength: result.answer?.length });
+    .addNode("generate", async (state: RAGStateType) => {
+      const result = await generateNode(state, config, config.appConfig, config.callbacks);
+      log.info("node generate done", { answerLength: result.answer?.length });
       return result;
     })
 
-    // 定义边
+    // ── 连线（含条件边）─────────────────────────────────
     .addEdge(START, "rewrite")
     .addEdge("rewrite", "retrieve")
-    .addEdge("retrieve", "prepare")
-    .addEdge("prepare", "agent")
-    .addEdge("agent", END);
+    .addEdge("retrieve", "grade_docs")
+    .addConditionalEdges("grade_docs", routeAfterGrade, {
+      rewrite: "rewrite",
+      prepare: "prepare",
+    })
+    .addEdge("prepare", "generate")
+    .addEdge("generate", END);
 
-  log.info("Graph compiled: START → rewrite → retrieve → prepare → agent → END");
+  log.info(
+    "Graph compiled: START → rewrite → retrieve → grade_docs →(cond) rewrite|prepare → generate → END"
+  );
 
   return graph.compile();
 }
@@ -129,12 +150,12 @@ export async function executeRAG(
     config: CreateRAGGraphConfig;
     history?: BaseMessage[];
     callbacks?: {
-      onToken?: (token: string) => void;
+      onToken?: (token: string) => void | Promise<void>;
     };
   }
 ): Promise<RAGResponse> {
-  const { config } = options;
-  const graph = createRAGGraph(config);
+  const { config, callbacks } = options;
+  const graph = createRAGGraph({ ...config, callbacks });
 
   const startTime = Date.now();
 
@@ -171,22 +192,17 @@ export async function executeRAG(
 }
 
 /**
- * 计算置信度
+ * 计算置信度（简单启发式）
  */
 function calculateConfidence(state: RAGStateType): number {
   let confidence = 0.5; // 基础置信度
 
-  // 有上下文提高置信度
   if (state.context && state.context.length > 100) {
     confidence += 0.2;
   }
-
-  // 有来源提高置信度
   if (state.sources && state.sources.length > 0) {
     confidence += 0.1;
   }
-
-  // 多个工具结果提高置信度
   if (state.raw_results && state.raw_results.length > 1) {
     confidence += 0.1;
   }

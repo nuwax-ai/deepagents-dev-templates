@@ -1,0 +1,66 @@
+{
+  "name": "deepagents-flow-ts",
+  "version": "0.1.0",
+  "description": "Flow / workflow-orchestration agent template — the agent runs an explicit, designed LangGraph node graph (not a dynamic tool loop) over ACP. Reuses the deepagents-app-ts runtime. Ships a RAG flow (rewrite → retrieve → grade → prepare → generate) as the bundled example.",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./graph": {
+      "types": "./dist/app/graph.d.ts",
+      "import": "./dist/app/graph.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "bin": {
+    "deepagents-flow-ts": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist/",
+    "dev": "tsx watch --tsconfig tsconfig.json src/index.ts",
+    "start": "node dist/index.js",
+    "start:acp": "tsx src/index.ts",
+    "rag": "tsx src/index.ts rag",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "smoke:acp": "bash scripts/smoke-acp.sh"
+  },
+  "dependencies": {
+    "@langchain/core": "latest",
+    "@langchain/langgraph": "latest",
+    "deepagents-acp": "latest",
+    "deepagents-app-ts": "workspace:*",
+    "dotenv": "^16.4.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.22.4",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "files": [
+    "dist",
+    "config",
+    "prompts"
+  ],
+  "keywords": [
+    "deepagents",
+    "langgraph",
+    "rag",
+    "workflow",
+    "orchestration",
+    "acp",
+    "template"
+  ],
+  "license": "MIT"
+}

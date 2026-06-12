@@ -41,6 +41,7 @@ export {
   createRuntimeContextAsync,
   hydrateRuntimeContext,
   resolveModelString,
+  resolveModel,
   resolveCliSystemPrompt,
   resolveSystemPrompt,
   discoverMemoryFiles,

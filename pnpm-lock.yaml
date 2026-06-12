@@ -76,7 +76,7 @@ importers:
         specifier: ^1.8.17
         version: 1.8.17
       tsx:
-        specifier: ^4.22.4
+        specifier: ^4.19.0
         version: 4.22.4
       typescript:
         specifier: ^5.5.0
@@ -90,6 +90,40 @@ importers:
       zod-to-json-schema:
         specifier: ^3.25.2
         version: 3.25.2(zod@3.25.76)
+
+  packages/deepagents-flow-ts:
+    dependencies:
+      '@langchain/core':
+        specifier: latest
+        version: 1.1.48(openai@6.42.0(zod@3.25.76))
+      '@langchain/langgraph':
+        specifier: latest
+        version: 1.4.1(@langchain/core@1.1.48(openai@6.42.0(zod@3.25.76)))(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76)
+      deepagents-acp:
+        specifier: file:../../../deepagentsjs/libs/acp
+        version: file:../deepagentsjs/libs/acp(@langchain/core@1.1.48(openai@6.42.0(zod@3.25.76)))(@langchain/langgraph@1.4.1(@langchain/core@1.1.48(openai@6.42.0(zod@3.25.76)))(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76))(langsmith@0.7.6(openai@6.42.0(zod@3.25.76)))(openai@6.42.0(zod@3.25.76))(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76)
+      deepagents-app-ts:
+        specifier: workspace:*
+        version: link:../deepagents-app-ts
+      dotenv:
+        specifier: ^16.4.0
+        version: 16.6.1
+      zod:
+        specifier: ^3.23.0
+        version: 3.25.76
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.21
+      tsx:
+        specifier: ^4.22.4
+        version: 4.22.4
+      typescript:
+        specifier: ^5.5.0
+        version: 5.9.3
+      vitest:
+        specifier: ^2.0.0
+        version: 2.1.9(@types/node@22.19.21)
 
   packages/dev-agent: {}
 
