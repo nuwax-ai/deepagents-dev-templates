@@ -13,12 +13,16 @@ import { prepareNode } from "./nodes/prepare.js";
 import { agentNode } from "./nodes/agent.js";
 import type {
   RAGConfig,
+  RAGMetadata,
   RAGResponse,
   RetrievalResult,
   Source,
 } from "./nodes/types.js";
-import { DEFAULT_RAG_CONFIG } from "./nodes/types.js";
 import type { AppConfig } from "../runtime/config/config-loader.js";
+import { logger } from "../runtime/logger.js";
+
+// ACP stdio 模式下 stdout 是协议通道，日志必须走 logger（stderr）
+const log = logger.child("rag-graph");
 
 /** RAG State 定义 */
 const RAGStateAnnotation = Annotation.Root({
@@ -44,7 +48,7 @@ const RAGStateAnnotation = Annotation.Root({
   answer: Annotation<string>,
 
   // 元数据
-  metadata: Annotation<Record<string, any>>,
+  metadata: Annotation<RAGMetadata>,
 });
 
 type RAGStateType = typeof RAGStateAnnotation.State;
@@ -75,32 +79,32 @@ export function createRAGGraph(config: CreateRAGGraphConfig) {
     retrieve: config.retrieve,
   };
 
-  console.log("[RAG Graph] Creating StateGraph with nodes: rewrite, retrieve, prepare, agent");
+  log.info("Creating StateGraph with nodes: rewrite, retrieve, prepare, agent");
 
   const graph = new StateGraph(RAGStateAnnotation)
     // 添加节点
     .addNode("rewrite", async (state: RAGStateType) => {
-      console.log("[RAG Graph] Executing node: rewrite");
+      log.info("Executing node: rewrite");
       const result = await rewriteNode(state, config.appConfig);
-      console.log("[RAG Graph] Node rewrite completed:", { intent: result.intent });
+      log.info("Node rewrite completed", { intent: result.intent });
       return result;
     })
     .addNode("retrieve", async (state: RAGStateType) => {
-      console.log("[RAG Graph] Executing node: retrieve");
+      log.info("Executing node: retrieve");
       const result = await retrieveNode(state, retrieveConfig);
-      console.log("[RAG Graph] Node retrieve completed:", { resultCount: result.raw_results?.length });
+      log.info("Node retrieve completed", { resultCount: result.raw_results?.length });
       return result;
     })
     .addNode("prepare", async (state: RAGStateType) => {
-      console.log("[RAG Graph] Executing node: prepare");
+      log.info("Executing node: prepare");
       const result = await prepareNode(state, config);
-      console.log("[RAG Graph] Node prepare completed:", { tokenCount: result.token_count });
+      log.info("Node prepare completed", { tokenCount: result.token_count });
       return result;
     })
     .addNode("agent", async (state: RAGStateType) => {
-      console.log("[RAG Graph] Executing node: agent");
+      log.info("Executing node: agent");
       const result = await agentNode(state, config, config.appConfig);
-      console.log("[RAG Graph] Node agent completed:", { answerLength: result.answer?.length });
+      log.info("Node agent completed", { answerLength: result.answer?.length });
       return result;
     })
 
@@ -111,7 +115,7 @@ export function createRAGGraph(config: CreateRAGGraphConfig) {
     .addEdge("prepare", "agent")
     .addEdge("agent", END);
 
-  console.log("[RAG Graph] Graph compiled: START → rewrite → retrieve → prepare → agent → END");
+  log.info("Graph compiled: START → rewrite → retrieve → prepare → agent → END");
 
   return graph.compile();
 }
@@ -153,7 +157,7 @@ export async function executeRAG(
       },
     };
   } catch (error) {
-    console.error("[RAG Graph] Error:", error);
+    log.error("RAG execution failed", { error: String(error) });
     return {
       answer: "抱歉，处理您的问题时出现错误。",
       sources: [],

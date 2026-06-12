@@ -8,7 +8,10 @@ import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { executeRAG, type CreateRAGGraphConfig } from "../graph.js";
 import { DEFAULT_RAG_CONFIG } from "../nodes/types.js";
-import type { AppConfig } from "../../runtime/config/config-loader.js";
+import { logger } from "../../runtime/logger.js";
+
+// ACP stdio 模式下 stdout 是协议通道，日志必须走 logger（stderr）
+const log = logger.child("rag-tool");
 
 /**
  * 创建 RAG 查询工具
@@ -22,7 +25,7 @@ export function createRAGTool(mcpServers: Record<string, any>) {
 
   return tool(
     async ({ query }) => {
-      console.log(`[RAG Tool] Processing query: ${query}`);
+      log.info("Processing query", { query });
 
       try {
         const response = await executeRAG(query, { config });

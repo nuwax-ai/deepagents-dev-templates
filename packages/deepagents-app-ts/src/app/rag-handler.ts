@@ -79,11 +79,9 @@ export function loadRAGConfigFromFile(): RAGHandlerConfig | null {
  */
 export class RAGHandler {
   private config: CreateRAGGraphConfig;
-  private appConfig: AppConfig;
   private log = logger.child("rag-handler");
 
   constructor(handlerConfig: RAGHandlerConfig, appConfig: AppConfig) {
-    this.appConfig = appConfig;
     this.config = {
       ...DEFAULT_RAG_CONFIG,
       mcpServers: handlerConfig.mcpServers,

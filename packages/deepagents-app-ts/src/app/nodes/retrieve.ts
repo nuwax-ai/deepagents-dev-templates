@@ -9,7 +9,11 @@
 
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
-import type { RAGState, RetrievalResult, RAGConfig } from "./types.js";
+import type { RAGState, RetrievalResult } from "./types.js";
+import { logger } from "../../runtime/logger.js";
+
+// ACP stdio 模式下 stdout 是协议通道，日志必须走 logger（stderr）
+const log = logger.child("rag-retrieve");
 
 interface JsonRpcResponse {
   id?: number;
@@ -253,9 +257,7 @@ export async function retrieveNode(
     // 根据意图和 mcp_hint 选择工具
     const toolsToUse = selectTools(config.retrievalTools, intent, mcp_hint);
 
-    console.log(
-      `[Retrieve] Using tools: ${toolsToUse.join(", ")} for intent: ${intent}`
-    );
+    log.info("Using retrieval tools", { tools: toolsToUse, intent });
 
     // 并行调用工具
     const results = await Promise.allSettled(
@@ -302,12 +304,12 @@ async function callRetrievalTool(
     throw new Error(`MCP server "${toolName}" is disabled`);
   }
 
-  console.log(`[Retrieve] Calling MCP tool: ${toolName} with query: ${query}`);
+  log.info("Calling MCP tool", { tool: toolName, query });
 
   try {
     // 先列出可用工具
     const tools = await listMcpTools(toolName, serverConfig);
-    console.log(`[Retrieve] ${toolName} has ${tools.length} tools`);
+    log.info("Listed MCP tools", { tool: toolName, toolCount: tools.length });
 
     // 根据服务器选择合适的工具和参数
     let targetTool: string;

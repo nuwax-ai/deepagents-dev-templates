@@ -34,8 +34,11 @@ export async function agentNode(
   const startTime = Date.now();
 
   try {
-    // 使用配置中的模型
+    // 使用配置中的模型；resolveModel 类型上含 string/undefined，RAG 节点需要实例
     const model = resolveModel(appConfig!);
+    if (!model || typeof model === "string") {
+      throw new Error("RAG agent node requires an instantiated chat model");
+    }
 
     // 构建用户提示
     let userPrompt = "";

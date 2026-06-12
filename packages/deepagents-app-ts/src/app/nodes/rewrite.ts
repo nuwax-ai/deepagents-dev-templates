@@ -36,8 +36,11 @@ export async function rewriteNode(
   const { query, history } = state;
 
   try {
-    // 使用配置中的模型
+    // 使用配置中的模型；resolveModel 类型上含 string/undefined，RAG 节点需要实例
     const model = resolveModel(config!);
+    if (!model || typeof model === "string") {
+      throw new Error("RAG rewrite node requires an instantiated chat model");
+    }
 
     // 构建上下文
     let context = "";
