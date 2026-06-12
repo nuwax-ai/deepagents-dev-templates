@@ -38,11 +38,27 @@ pnpm --filter deepagents-flow-ts exec tsx src/index.ts flow -i
 # 默认 flow：ACP 服务（供 nuwaclaw/Zed/JetBrains）
 pnpm --filter deepagents-flow-ts build && node packages/deepagents-flow-ts/dist/index.js
 
-# 跑 RAG 范例
-pnpm --filter deepagents-flow-ts example:rag rag "什么是 LangGraph？"
+# 跑 RAG 范例（CLI）
+pnpm --filter deepagents-flow-ts example:rag:cli "什么是 LangGraph？"
 ```
 
 模型凭证见 [`.env.example`](.env.example)（ACP 模式下通常由 IDE host 注入）。
+
+## 调试
+
+默认 flow 和 RAG 范例各有调试入口（凭证放 `./.env` 或 shell）：
+
+| 目标 | 命令 |
+|---|---|
+| 默认 flow CLI | `pnpm flow "..."` / `pnpm exec tsx src/index.ts flow -i` |
+| 默认 flow ACP 冒烟（rcoder） | `pnpm smoke:acp` |
+| RAG 范例 CLI | `pnpm example:rag:cli "..."` / `pnpm example:rag:interactive` |
+| RAG 范例 ACP 冒烟（rcoder） | `pnpm smoke:rag` |
+| 类型检查 | `pnpm typecheck`（src）/ `pnpm typecheck:examples`（examples + src，noEmit） |
+
+`smoke:acp` / `smoke:rag` 用 rcoder-cli 端到端驱动 ACP（握手 → `onPrompt` → 整图 → 流式答案）；
+`scripts/smoke-acp.sh` 的 `AGENT_ENTRY` 可指向任意 flow 入口。**在 Zed 里 chat 调试**（含 RAG 范例的
+`agent_servers` 配置片段）见 [examples/rag/README.md](examples/rag/README.md) 的「调试」节。
 
 ## 怎么搭你自己的 flow
 

@@ -46,11 +46,11 @@ await bootstrapFlowAcp({ executor, appConfig });   // 或 runFlowCli(executor, .
 pnpm --filter deepagents-app-ts build
 
 # CLI 单次（需在 .env 或 host 提供模型凭证）
-pnpm --filter deepagents-flow-ts exec tsx examples/rag/index.ts rag "什么是 LangGraph？"
+pnpm --filter deepagents-flow-ts example:rag:cli "什么是 LangGraph？"
 # 交互
-pnpm --filter deepagents-flow-ts exec tsx examples/rag/index.ts rag -i
+pnpm --filter deepagents-flow-ts example:rag:interactive
 # ACP 服务
-pnpm --filter deepagents-flow-ts exec tsx examples/rag/index.ts
+pnpm --filter deepagents-flow-ts example:rag
 ```
 
 ## 调试
