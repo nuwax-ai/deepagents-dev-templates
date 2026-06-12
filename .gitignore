@@ -42,7 +42,6 @@ agent-package.release.json
 zip/
 
 logs/
-examples/
 .agent-checkpoints/
 .agent-memory/
 

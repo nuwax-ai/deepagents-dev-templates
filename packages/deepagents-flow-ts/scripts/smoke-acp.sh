@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
-# Smoke-test the RAG workflow ACP agent via rcoder-cli (inline one-shot chat).
+# Smoke-test a flow ACP agent via rcoder-cli (inline one-shot chat).
 #
 # Mirrors deepagents-app-ts/scripts/smoke-acp.sh, adapted for this package.
+# Defaults to the package's DEFAULT flow (src/index.ts). Set AGENT_ENTRY to
+# target another entry — e.g. AGENT_ENTRY=examples/rag/index.ts to smoke the
+# RAG example (the `smoke:rag` npm script does exactly that).
 #
 # Provider-agnostic: the runtime picks the provider from whichever credential
 # family is present, so we forward every relevant credential/model/provider env
@@ -85,10 +88,14 @@ timeout_s="${SMOKE_TIMEOUT:-150}"
 verbose=()
 [[ "${SMOKE_VERBOSE:-0}" == "1" ]] && verbose=( -v )
 
-# rcoder-cli v0.1.1: -c = executable only; --arg repeated for command args.
-# Deliberately no --tsconfig/--config here (see header note).
+# Agent entry: default = package default flow (src/index.ts). Override via env
+# to smoke another flow (e.g. AGENT_ENTRY=examples/rag/index.ts for RAG).
+# Deliberately no --tsconfig/--config flag — rcoder-cli v0.1.1 rejects values
+# that start with '--' (see header); tsx auto-loads tsconfig.json from -w.
+AGENT_ENTRY="${AGENT_ENTRY:-src/index.ts}"
+
 exec pnpm dlx rcoder-cli chat \
-  -c "$TSX_BIN" --arg src/index.ts \
+  -c "$TSX_BIN" --arg "$AGENT_ENTRY" \
   -w "$PKG_DIR" \
   -p "$prompt" \
   --timeout "$timeout_s" \
