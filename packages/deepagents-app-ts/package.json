@@ -53,7 +53,7 @@
     "package:nuwax": "bash scripts/package.sh --format all",
     "package:platforms": "bash scripts/package-platforms.sh",
     "validate:package": "bash scripts/validate-package.sh",
-    "smoke:acp": "pnpm dlx rcoder-cli chat -c 'node dist/bundle.mjs' -w . -p 'hello' --timeout 30 --mode yolo -q",
+    "smoke:acp": "bash scripts/smoke-acp.sh",
     "inspect": "pnpm --filter inspector inspect --"
   },
   "dependencies": {
