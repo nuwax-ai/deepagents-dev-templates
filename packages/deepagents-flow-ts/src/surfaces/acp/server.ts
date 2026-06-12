@@ -1,8 +1,8 @@
 /**
- * ACP Server — 让工作流图成为请求路径
+ * ACP Server — 让工作流图成为请求路径（与具体图解耦）。
  *
  * 关键 seam：deepagents-acp 的 `onPrompt` 钩子在 agent 运行前触发，
- * 返回 `{ stopReason }` 即短路 agent。我们在这里跑 RAG 工作流图，
+ * 返回 `{ stopReason }` 即短路 agent。我们在这里跑传入的 FlowExecutor，
  * 把回答经 `conn` 流式推给客户端，然后短路——deep agent 永不进入请求路径。
  *
  * DeepAgentsServer 仍要求一个 agentConfig（其内部 createDeepAgent 用它），
@@ -15,12 +15,10 @@ import {
   type DeepAgentsServerHooks,
   type StopReason,
 } from "deepagents-acp";
-import { logger, resolveModel } from "deepagents-app-ts/runtime";
-import { loadRagConfig } from "../../runtime/config.js";
-import { executeRAG } from "../../app/graph.js";
-import { buildGraphConfig, formatSourcesFooter } from "../../app/run-rag.js";
+import { logger, resolveModel, type AppConfig } from "deepagents-app-ts/runtime";
+import type { FlowExecutor } from "../flow-types.js";
 
-const log = logger.child("rag-acp");
+const log = logger.child("flow-acp");
 
 /** ACP 连接的最小接口：向客户端推流 agent_message_chunk。 */
 interface AcpConnection {
@@ -48,31 +46,30 @@ async function streamText(
   });
 }
 
-export interface RagAcpOptions {
-  configPath?: string;
+export interface FlowAcpOptions {
+  executor: FlowExecutor;
+  /** 用于 throwaway agent 的身份/模型（agent 永不运行） */
+  appConfig: AppConfig;
   debug?: boolean;
 }
 
-/** 启动 RAG ACP 服务（stdio）。 */
-export async function bootstrapRagAcp(options: RagAcpOptions = {}): Promise<void> {
+/** 启动 Flow ACP 服务（stdio）。任意 FlowExecutor 都能插进来。 */
+export async function bootstrapFlowAcp(options: FlowAcpOptions): Promise<void> {
   if (options.debug) {
     process.env.LOG_LEVEL = "debug";
   }
+  const { executor, appConfig } = options;
 
-  const loaded = loadRagConfig({ configPath: options.configPath });
-  const graphConfig = buildGraphConfig(loaded);
-
-  log.info("RAG ACP bootstrapping", {
-    model: `${loaded.appConfig.model.provider}:${loaded.appConfig.model.name}`,
-    retrievalTools: graphConfig.retrievalTools,
-    configPath: loaded.configPath,
+  log.info("Flow ACP bootstrapping", {
+    agent: appConfig.agent.name,
+    model: `${appConfig.model.provider}:${appConfig.model.name}`,
   });
 
   // 极简 throwaway agent —— onPrompt 会短路，它永不进入请求路径。
   const agentConfig = {
-    name: loaded.appConfig.agent.name,
-    description: loaded.appConfig.agent.description,
-    model: resolveModel(loaded.appConfig),
+    name: appConfig.agent.name,
+    description: appConfig.agent.description,
+    model: resolveModel(appConfig),
     tools: [],
   } as unknown as DeepAgentConfig;
 
@@ -83,23 +80,29 @@ export async function bootstrapRagAcp(options: RagAcpOptions = {}): Promise<void
         return undefined; // 空输入：交回服务器默认处理
       }
       const conn = ctx.conn as AcpConnection;
-      log.info("onPrompt → RAG workflow", {
+      log.info("onPrompt → flow", {
         sessionId: ctx.sessionId,
         query: query.slice(0, 100),
       });
 
       try {
-        const response = await executeRAG(query, {
-          config: { ...graphConfig },
-          callbacks: {
-            onToken: (token) => streamText(conn, ctx.sessionId, token),
+        // 跟踪是否流式：流式则只补 footer，非流式则整段发 answer。
+        let streamed = false;
+        const result = await executor(query, {
+          onToken: (token) => {
+            streamed = true;
+            return streamText(conn, ctx.sessionId, token);
           },
         });
-        // 回答正文已通过 onToken 流式推送；这里补上来源脚注。
-        await streamText(conn, ctx.sessionId, formatSourcesFooter(response));
+        if (!streamed && result.answer) {
+          await streamText(conn, ctx.sessionId, result.answer);
+        }
+        if (result.footer) {
+          await streamText(conn, ctx.sessionId, result.footer);
+        }
         return { stopReason: "end_turn" as StopReason };
       } catch (err) {
-        log.error("onPrompt RAG failed", { error: String(err) });
+        log.error("onPrompt flow failed", { error: String(err) });
         await streamText(conn, ctx.sessionId, "抱歉，处理您的问题时出现错误。");
         return { stopReason: "end_turn" as StopReason };
       }
@@ -108,12 +111,12 @@ export async function bootstrapRagAcp(options: RagAcpOptions = {}): Promise<void
 
   const server = new DeepAgentsServer({
     agents: agentConfig,
-    serverName: loaded.appConfig.agent.name,
-    serverVersion: loaded.appConfig.agent.version || "0.1.0",
+    serverName: appConfig.agent.name,
+    serverVersion: appConfig.agent.version || "0.1.0",
     debug: process.env.LOG_LEVEL === "debug",
     hooks,
   });
 
-  log.info("Starting RAG ACP server (workflow short-circuits agent via onPrompt)");
+  log.info("Starting Flow ACP server (workflow short-circuits agent via onPrompt)");
   await server.start();
 }

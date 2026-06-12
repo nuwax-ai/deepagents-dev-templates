@@ -1,22 +1,25 @@
 #!/usr/bin/env node
 
 /**
- * deepagents-flow-ts — RAG / 工作流编排模板入口
+ * deepagents-flow-ts — 通用工作流编排模板入口
  *
  * 模式：
- *   (默认) / acp     启动 ACP 服务（stdio）—— 供 nuwaclaw/Zed/JetBrains
- *   rag "<问题>"     命令行跑一次 RAG 工作流（测试用）
- *   rag -i           交互模式
+ *   (默认) / acp      启动 ACP 服务（stdio）—— 供 nuwaclaw/Zed/JetBrains
+ *   flow "<输入>"     命令行跑一次默认 flow（测试用）
+ *   flow -i           交互模式
  *
+ * 默认图是占位骨架（prepare → act → decide → respond）。完整范例见 examples/rag。
  * 选项：--config <path>  --debug  -h/--help
  */
 
 import { config as loadDotenv } from "dotenv";
-import { bootstrapRagAcp } from "./surfaces/acp/server.js";
-import { runRagCli } from "./surfaces/cli/run.js";
+import { loadFlowConfig } from "./runtime/config.js";
+import { createDefaultExecutor } from "./app/default-flow.js";
+import { bootstrapFlowAcp } from "./surfaces/acp/server.js";
+import { runFlowCli } from "./surfaces/cli/run.js";
 
 interface ParsedArgs {
-  command: "acp" | "rag";
+  command: "acp" | "flow";
   query?: string;
   configPath?: string;
   debug: boolean;
@@ -46,28 +49,29 @@ function parseArgs(argv: string[]): ParsedArgs {
   }
 
   const first = positional[0];
-  if (first === "rag") {
-    args.command = "rag";
+  if (first === "flow") {
+    args.command = "flow";
     args.query = positional.slice(1).join(" ") || undefined;
   } else if (first && first !== "acp") {
-    // 裸问题（非 acp）视为一次性 rag 查询
-    args.command = "rag";
+    args.command = "flow";
     args.query = positional.join(" ");
   }
 
   return args;
 }
 
-const HELP = `deepagents-flow-ts — RAG 工作流编排模板
+const HELP = `deepagents-flow-ts — 通用工作流编排模板
 
 用法:
   deepagents-flow-ts                启动 ACP 服务（默认，stdio）
   deepagents-flow-ts acp            同上
-  deepagents-flow-ts rag "<问题>"   命令行跑一次工作流
-  deepagents-flow-ts rag -i         交互模式
+  deepagents-flow-ts flow "<输入>"  命令行跑一次默认 flow
+  deepagents-flow-ts flow -i        交互模式
+
+默认图是占位骨架（prepare → act → decide → respond）；完整范例见 examples/rag。
 
 选项:
-  --config <path>   指定配置文件（默认 config/rag-agent.config.json）
+  --config <path>   指定配置文件（默认 config/flow-agent.config.json）
   --debug           调试日志
   -h, --help        显示帮助
 `;
@@ -82,13 +86,16 @@ async function main(): Promise<void> {
   // ACP 模式下凭证由 host(Zed/JetBrains) 注入；dotenv 仅作本地兜底。
   loadDotenv();
 
-  if (args.command === "rag") {
-    await runRagCli(args.query, {
-      configPath: args.configPath,
+  const { appConfig } = loadFlowConfig({ configPath: args.configPath });
+  const executor = createDefaultExecutor();
+
+  if (args.command === "flow") {
+    await runFlowCli(executor, {
+      query: args.query,
       interactive: args.interactive,
     });
   } else {
-    await bootstrapRagAcp({ configPath: args.configPath, debug: args.debug });
+    await bootstrapFlowAcp({ executor, appConfig, debug: args.debug });
   }
 }
 

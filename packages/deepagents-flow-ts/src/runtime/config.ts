@@ -1,12 +1,13 @@
 /**
- * RAG 配置加载
+ * Flow 配置加载（通用）
  *
- * 单一配置文件 `config/rag-agent.config.json` 同时承载：
+ * 单一配置文件同时承载：
  *  - 标准 AppConfig 字段（agent / model / mcp …）→ 交给 app-ts 的 loadConfig 解析
- *    （未知的 `rag` 键会被其 Zod schema 自动剥离）
- *  - 顶层 `rag` 块（图/检索配置）→ 这里单独读原始 JSON 取出
+ *    （未知的自定义键会被其 Zod schema 自动剥离）
+ *  - 任意自定义顶层块 → 这里把完整原始 JSON 一并返回（raw），各 flow 自取所需
+ *    （例：RAG 示例读 raw.rag）
  *
- * 无任何写死路径：配置默认相对包根解析（基于 import.meta.url）。
+ * 无任何写死路径：默认配置相对包根解析（基于 import.meta.url）。
  */
 
 import { readFileSync } from "node:fs";
@@ -14,57 +15,40 @@ import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { loadConfig, type AppConfig } from "deepagents-app-ts/runtime";
 
-// dist/runtime/config.js → 包根在 ../../
+// dist/runtime/config.js → 包根在 ../..
 const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
-/** `rag` 块（与 RAGConfig 对齐，字段可缺省，由 buildGraphConfig 补默认值） */
-export interface RagSettings {
-  enabled?: boolean;
-  retrievalTools?: string[];
-  mcpServers?: Record<string, unknown>;
-  rewrite?: { maxKeywords?: number; intentCategories?: string[] };
-  retrieve?: { maxResults?: number; timeout_ms?: number; retryCount?: number };
-  prepare?: {
-    maxContextTokens?: number;
-    deduplication?: boolean;
-    sortByRelevance?: boolean;
-  };
-  agent?: {
-    streaming?: boolean;
-    includeSources?: boolean;
-    confidenceThreshold?: number;
-  };
-}
-
-export interface LoadedRagConfig {
+export interface LoadedFlowConfig {
   appConfig: AppConfig;
-  rag: RagSettings;
+  /** 完整原始 JSON —— 各 flow 自取自定义块（如 raw.rag） */
+  raw: Record<string, unknown>;
   configPath: string;
 }
 
 /** 解析配置文件路径：显式传入优先，否则用包内默认配置。 */
-export function resolveRagConfigPath(configPath?: string): string {
-  return configPath ?? resolve(PACKAGE_ROOT, "config/rag-agent.config.json");
+export function resolveConfigPath(
+  configPath?: string,
+  fallback = "config/flow-agent.config.json"
+): string {
+  return configPath ?? resolve(PACKAGE_ROOT, fallback);
 }
 
-/** 加载 RAG 配置：返回校验后的 AppConfig + 原始 rag 块。 */
-export function loadRagConfig(
-  opts: { configPath?: string; workspaceRoot?: string } = {}
-): LoadedRagConfig {
-  const configPath = resolveRagConfigPath(opts.configPath);
+/** 加载配置：返回校验后的 AppConfig + 完整原始 JSON。 */
+export function loadFlowConfig(
+  opts: { configPath?: string; workspaceRoot?: string; fallback?: string } = {}
+): LoadedFlowConfig {
+  const configPath = resolveConfigPath(opts.configPath, opts.fallback);
   const appConfig = loadConfig({
     configPath,
     workspaceRoot: opts.workspaceRoot ?? process.cwd(),
   });
 
-  let rag: RagSettings = {};
+  let raw: Record<string, unknown> = {};
   try {
-    const parsed = JSON.parse(readFileSync(configPath, "utf-8")) as { rag?: RagSettings };
-    rag = parsed.rag ?? {};
+    raw = JSON.parse(readFileSync(configPath, "utf-8")) as Record<string, unknown>;
   } catch {
-    // 配置缺失 rag 块时退化为默认（buildGraphConfig 会补全）
-    rag = {};
+    raw = {};
   }
 
-  return { appConfig, rag, configPath };
+  return { appConfig, raw, configPath };
 }

@@ -9,8 +9,8 @@ import {
   gradeNode,
   routeAfterGrade,
   MAX_RETRIEVE_ATTEMPTS,
-} from "../src/app/nodes/grade.js";
-import type { RAGState } from "../src/app/nodes/types.js";
+} from "../nodes/grade.js";
+import type { RAGState } from "../nodes/types.js";
 
 describe("gradeNode", () => {
   it("空检索 → insufficient", () => {

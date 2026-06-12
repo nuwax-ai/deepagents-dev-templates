@@ -1,44 +1,35 @@
 /**
- * RAG CLI — 命令行测试工作流图
+ * Flow CLI — 命令行跑一次工作流（与具体图解耦）。
  *
  * 用法：
- *   tsx src/index.ts rag "什么是 LangGraph？"
- *   tsx src/index.ts rag --interactive
+ *   tsx src/index.ts flow "你的输入"
+ *   tsx src/index.ts flow --interactive
  */
 
 import { createInterface } from "node:readline";
-import { logger } from "deepagents-app-ts/runtime";
-import { loadRagConfig } from "../../runtime/config.js";
-import { executeRAG } from "../../app/graph.js";
-import { buildGraphConfig, formatSourcesFooter } from "../../app/run-rag.js";
+import type { FlowExecutor } from "../flow-types.js";
 
-export interface RagCliOptions {
-  configPath?: string;
+export interface FlowCliOptions {
+  query?: string;
   interactive?: boolean;
+  /** 无参时显示的用法提示（默认指向 src/index.ts flow） */
+  usage?: string;
 }
 
-export async function runRagCli(
-  query?: string,
-  options: RagCliOptions = {}
+export async function runFlowCli(
+  executor: FlowExecutor,
+  options: FlowCliOptions = {}
 ): Promise<void> {
-  const log = logger.child("rag-cli");
-  const loaded = loadRagConfig({ configPath: options.configPath });
-  const graphConfig = buildGraphConfig(loaded);
-
-  log.info("RAG CLI ready", {
-    model: `${loaded.appConfig.model.provider}:${loaded.appConfig.model.name}`,
-    retrievalTools: graphConfig.retrievalTools,
-  });
-
   const ask = async (q: string): Promise<void> => {
     process.stdout.write(`\n❓ ${q}\n⏳ 处理中...\n\n`);
-    const response = await executeRAG(q, { config: { ...graphConfig } });
+    // CLI 非流式：不传 onToken，由 executor 返回完整结果
+    const result = await executor(q, {});
     process.stdout.write("📝 回答：\n");
-    process.stdout.write(response.answer + formatSourcesFooter(response) + "\n");
+    process.stdout.write(result.answer + (result.footer ?? "") + "\n");
   };
 
   if (options.interactive) {
-    process.stdout.write("🤖 RAG 工作流交互模式（输入 'exit' 退出）\n");
+    process.stdout.write("🤖 工作流交互模式（输入 'exit' 退出）\n");
     const rl = createInterface({ input: process.stdin, output: process.stdout });
     const loop = () => {
       rl.question("❓ ", async (input) => {
@@ -52,11 +43,12 @@ export async function runRagCli(
       });
     };
     loop();
-  } else if (query) {
-    await ask(query);
+  } else if (options.query) {
+    await ask(options.query);
   } else {
     process.stdout.write(
-      '用法：\n  tsx src/index.ts rag "你的问题"\n  tsx src/index.ts rag --interactive\n'
+      options.usage ??
+        '用法：\n  tsx src/index.ts flow "你的输入"\n  tsx src/index.ts flow --interactive\n'
     );
   }
 }

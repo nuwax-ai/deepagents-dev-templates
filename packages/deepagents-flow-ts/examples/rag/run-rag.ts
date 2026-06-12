@@ -8,7 +8,7 @@
 import type { CreateRAGGraphConfig } from "./graph.js";
 import type { RAGResponse } from "./nodes/types.js";
 import { DEFAULT_RAG_CONFIG } from "./nodes/types.js";
-import type { LoadedRagConfig } from "../runtime/config.js";
+import type { LoadedRagConfig } from "./config.js";
 
 /** 从 LoadedRagConfig 组装图配置（不含 callbacks）。 */
 export function buildGraphConfig(

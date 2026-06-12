@@ -6,8 +6,8 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { loadRagConfig } from "../src/runtime/config.js";
-import { buildGraphConfig } from "../src/app/run-rag.js";
+import { loadRagConfig } from "../config.js";
+import { buildGraphConfig } from "../run-rag.js";
 
 describe("shipped rag-agent.config.json", () => {
   it("加载为合法的 AppConfig + rag 设置", () => {

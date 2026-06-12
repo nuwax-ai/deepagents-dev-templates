@@ -25,11 +25,18 @@
     "dev": "tsx watch --tsconfig tsconfig.json src/index.ts",
     "start": "node dist/index.js",
     "start:acp": "tsx src/index.ts",
-    "rag": "tsx src/index.ts rag",
+    "flow": "tsx src/index.ts flow",
+    "example:rag": "tsx examples/rag/index.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "smoke:acp": "bash scripts/smoke-acp.sh"
+    "smoke:acp": "bash scripts/smoke-acp.sh",
+    "bundle": "bash scripts/bundle.sh",
+    "package": "bash scripts/package.sh",
+    "package:all": "bash scripts/package.sh --format all",
+    "package:nuwax": "bash scripts/package.sh --format all",
+    "package:platforms": "bash scripts/package-platforms.sh",
+    "validate:package": "bash scripts/validate-package.sh"
   },
   "dependencies": {
     "@langchain/core": "latest",
@@ -42,6 +49,7 @@
   "devDependencies": {
     "@types/node": "^22.0.0",
     "tsx": "^4.22.4",
+    "esbuild": "^0.25.0",
     "typescript": "^5.5.0",
     "vitest": "^2.0.0"
   },
@@ -51,7 +59,9 @@
   "files": [
     "dist",
     "config",
-    "prompts"
+    "prompts",
+    "scripts",
+    "agent-package.json"
   ],
   "keywords": [
     "deepagents",

@@ -39,15 +39,15 @@ vi.mock("deepagents-app-ts/runtime", async (importOriginal) => {
   return { ...actual, resolveModel: () => h.fakeModel };
 });
 
-vi.mock("../src/app/nodes/retrieve.js", () => ({
+vi.mock("../nodes/retrieve.js", () => ({
   retrieveNode: async (state: { attempts?: number }) => ({
     raw_results: h.retrieve.results,
     attempts: (state.attempts ?? 0) + 1,
   }),
 }));
 
-import { executeRAG, type CreateRAGGraphConfig } from "../src/app/graph.js";
-import { DEFAULT_RAG_CONFIG } from "../src/app/nodes/types.js";
+import { executeRAG, type CreateRAGGraphConfig } from "../graph.js";
+import { DEFAULT_RAG_CONFIG } from "../nodes/types.js";
 
 function makeConfig(): CreateRAGGraphConfig {
   return {

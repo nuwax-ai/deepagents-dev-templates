@@ -1,0 +1,15 @@
+{
+  "agent": {
+    "name": "deepagents-flow-ts",
+    "description": "通用工作流编排模板 — Agent 按显式 LangGraph 节点图运行（默认为占位示例图 prepare → act → decide → respond）",
+    "version": "0.1.0"
+  },
+  "model": {
+    "provider": "anthropic",
+    "name": "claude-sonnet-4-6",
+    "settings": {
+      "temperature": 0,
+      "maxTokens": 16384
+    }
+  }
+}

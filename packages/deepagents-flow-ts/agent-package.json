@@ -1,0 +1,90 @@
+{
+  "name": "deepagents-flow-ts",
+  "version": "0.1.0",
+  "description": "RAG / workflow-orchestration agent template — runs an explicit LangGraph StateGraph (rewrite -> retrieve -> grade -> prepare -> generate) over ACP.",
+  "engine": "deepagents-flow-ts",
+  "source": {
+    "type": "s3",
+    "endpoint": "https://s3.nuwax.com:9443",
+    "bucket": "nuwax-packages",
+    "region": "us-east-1",
+    "prefix": "agent-engines/deepagents-flow-ts/versions/0.1.0",
+    "version": "0.1.0",
+    "forcePathStyle": true
+  },
+  "alternativeSources": [
+    {
+      "type": "npm",
+      "package": "deepagents-flow-ts",
+      "registry": "https://registry.npmjs.org",
+      "version": "0.1.0"
+    },
+    {
+      "type": "tgz",
+      "path": "./deepagents-flow-ts-0.1.0.tgz",
+      "version": "0.1.0"
+    },
+    {
+      "type": "git",
+      "url": "https://github.com/nuwax-ai/deepagents-dev-templates.git",
+      "ref": "v0.1.0"
+    },
+    {
+      "type": "s3-channel",
+      "endpoint": "https://s3.nuwax.com:9443",
+      "bucket": "nuwax-packages",
+      "channel": "stable",
+      "pointerPath": "agent-engines/deepagents-flow-ts/channels/stable.json"
+    }
+  ],
+  "bin": {
+    "start": "dist/index.js"
+  },
+  "env": {
+    "required": [],
+    "optional": [
+      "ANTHROPIC_API_KEY",
+      "ANTHROPIC_MODEL",
+      "ANTHROPIC_BASE_URL",
+      "ANTHROPIC_AUTH_TOKEN",
+      "OPENAI_API_KEY",
+      "OPENAI_MODEL",
+      "OPENAI_BASE_URL",
+      "LOG_LEVEL",
+      "LOG_DIR"
+    ],
+    "oneOfRequired": [
+      [
+        "ANTHROPIC_API_KEY"
+      ],
+      [
+        "ANTHROPIC_AUTH_TOKEN"
+      ],
+      [
+        "OPENAI_API_KEY"
+      ]
+    ]
+  },
+  "mcp": {
+    "servers": [
+      "context7",
+      "howtocook-mcp"
+    ]
+  },
+  "platform": {
+    "agentId": "",
+    "spaceId": "",
+    "apiBaseUrl": "https://api.nuwax.com"
+  },
+  "checksum": {
+    "algorithm": "sha256",
+    "value": ""
+  },
+  "metadata": {
+    "templateVersion": "1.0.0",
+    "framework": "deepagents-js",
+    "deepagentsVersion": "^1.10.2",
+    "acpVersion": "latest",
+    "nodeVersion": ">=20.0.0"
+  }
+}
