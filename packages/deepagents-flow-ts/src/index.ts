@@ -8,7 +8,7 @@
  *   flow "<输入>"     命令行跑一次默认 flow（测试用）
  *   flow -i           交互模式
  *
- * 默认图是占位骨架（prepare → act → decide → respond）。完整范例见 examples/rag。
+ * 默认图是 ReAct 式骨架（prepare → plan → act → observe → reflect → respond）。完整范例见 examples/rag。
  * 选项：--config <path>  --debug  -h/--help
  */
 
@@ -68,7 +68,7 @@ const HELP = `deepagents-flow-ts — 通用工作流编排模板
   deepagents-flow-ts flow "<输入>"  命令行跑一次默认 flow
   deepagents-flow-ts flow -i        交互模式
 
-默认图是占位骨架（prepare → act → decide → respond）；完整范例见 examples/rag。
+默认图是 ReAct 式骨架（prepare → plan → act → observe → reflect → respond）；完整范例见 examples/rag。
 
 选项:
   --config <path>   指定配置文件（默认 config/flow-agent.config.json）
@@ -87,7 +87,7 @@ async function main(): Promise<void> {
   loadDotenv();
 
   const { appConfig } = loadFlowConfig({ configPath: args.configPath });
-  const executor = createDefaultExecutor();
+  const executor = createDefaultExecutor(appConfig);
 
   if (args.command === "flow") {
     await runFlowCli(executor, {

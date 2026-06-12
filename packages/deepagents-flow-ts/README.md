@@ -6,19 +6,29 @@
 与 [`deepagents-app-ts`](../deepagents-app-ts)（Coding Agent，agent loop 范式）互补：
 本包复用它的 `runtime` 核心（config / model / logger / 存储），只把"大脑"换成一张显式图。
 
-## 默认图（占位骨架）
+## 默认图（ReAct 式骨架，演示框架常用能力）
 
-开箱即用的默认图是一个**极简占位 flow**，只为展示连线机制（`addNode` / `addEdge` / `addConditionalEdges`）：
+开箱即用的默认图是一个**通用 ReAct 式工作流**，每个节点演示一种常用编排模式，方便照着写：
 
 ```
-START → prepare → act → decide ─(条件边)─┐
-                   ▲                     ├─ retry & 未达上限 → act（再来一轮）
-                   └─────────────────────┘
-                                └─ 否则 → respond → END
+START → prepare → think → act → observe → reflect ─(条件边)─┐
+                       ▲                                  ├─ continue & 未达上限 → think（下一轮）
+                       └──────────────────────────────────┘
+                                                 └─ 否则 → respond → END
 ```
 
-节点逻辑是 trivial 占位（[src/app/nodes/](src/app/nodes/)），`decide` 占位恒返回 `retry` 以演示重试循环，
-`MAX_ACT_ATTEMPTS` 封顶防死循环。**这是你的起手式**——把占位换成你自己的逻辑即可。
+| 节点 | 演示的模式 | 文件 |
+|---|---|---|
+| `prepare` | 纯逻辑节点 + state 初始化 | [nodes/prepare.ts](src/app/nodes/prepare.ts) |
+| `think` | LLM 节点 + 结构化输出 + 无凭证 fallback | [nodes/think.ts](src/app/nodes/think.ts) |
+| `act` | 工具调用节点 + `onToolCall` 透出 | [nodes/act.ts](src/app/nodes/act.ts) |
+| `observe` | state 转换 / 累积 | [nodes/observe.ts](src/app/nodes/observe.ts) |
+| `reflect` | 条件边 + 循环 + 上限（编排核心） | [nodes/reflect.ts](src/app/nodes/reflect.ts) |
+| `respond` | 流式输出（onToken） | [nodes/respond.ts](src/app/nodes/respond.ts) |
+
+内置 demo 工具（`echo` / `calculate` / `time`）让 `act` 不依赖 MCP 即可演示工具调用；无模型凭证时 LLM 节点走启发式 fallback，图始终可跑、可测。
+
+**少用 / 进阶模式**（并行 fan-out、人工介入 `interrupt`、`Command` 动态路由、子图、checkpointer 持久化）见 [docs/flow-patterns.md](docs/flow-patterns.md)。
 
 ## 完整范例
 
@@ -31,7 +41,7 @@ START → prepare → act → decide ─(条件边)─┐
 # 先构建依赖的 runtime 核心
 pnpm --filter deepagents-app-ts build
 
-# 默认 flow（占位）：CLI
+# 默认 flow：CLI
 pnpm --filter deepagents-flow-ts flow "随便说点什么"
 pnpm --filter deepagents-flow-ts exec tsx src/index.ts flow -i
 
