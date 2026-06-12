@@ -27,10 +27,10 @@ function buildRagFlow() {
   const loaded = loadRagConfig();
   const graphConfig = buildGraphConfig(loaded);
 
-  const executor: FlowExecutor = async (query, { onToken }) => {
+  const executor: FlowExecutor = async (query, { onToken, onToolCall }) => {
     const res = await executeRAG(query, {
       config: { ...graphConfig },
-      callbacks: onToken ? { onToken } : undefined,
+      callbacks: { onToken, onToolCall },
     });
     return { answer: res.answer, footer: formatSourcesFooter(res) };
   };

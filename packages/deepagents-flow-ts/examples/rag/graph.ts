@@ -29,6 +29,8 @@ import type {
   Source,
 } from "./nodes/types.js";
 
+import type { ToolCallEvent } from "../../src/surfaces/flow-types.js";
+
 // ACP stdio 模式下 stdout 是协议通道，日志必须走 logger（stderr）
 const log = logger.child("rag-graph");
 
@@ -78,7 +80,10 @@ interface MCPServerConfig {
 export interface CreateRAGGraphConfig extends RAGConfig {
   mcpServers: Record<string, MCPServerConfig>;
   appConfig?: AppConfig;
-  callbacks?: { onToken?: (token: string) => void | Promise<void> };
+  callbacks?: {
+    onToken?: (token: string) => void | Promise<void>;
+    onToolCall?: (e: ToolCallEvent) => void | Promise<void>;
+  };
 }
 
 /**
@@ -89,6 +94,7 @@ export function createRAGGraph(config: CreateRAGGraphConfig) {
     mcpServers: config.mcpServers,
     retrievalTools: config.retrievalTools,
     retrieve: config.retrieve,
+    onToolCall: config.callbacks?.onToolCall,
   };
 
   log.info("Creating StateGraph", {
@@ -151,6 +157,7 @@ export async function executeRAG(
     history?: BaseMessage[];
     callbacks?: {
       onToken?: (token: string) => void | Promise<void>;
+      onToolCall?: (e: ToolCallEvent) => void | Promise<void>;
     };
   }
 ): Promise<RAGResponse> {

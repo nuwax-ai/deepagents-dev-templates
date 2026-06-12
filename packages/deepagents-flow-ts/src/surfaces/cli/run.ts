@@ -23,7 +23,13 @@ export async function runFlowCli(
   const ask = async (q: string): Promise<void> => {
     process.stdout.write(`\n❓ ${q}\n⏳ 处理中...\n\n`);
     // CLI 非流式：不传 onToken，由 executor 返回完整结果
-    const result = await executor(q, {});
+    const result = await executor(q, {
+      onToolCall: (e) => {
+        const tag =
+          e.status === "in_progress" ? "▶" : e.status === "completed" ? "✓" : "✗";
+        process.stdout.write(`${tag} ${e.toolName}${e.status === "in_progress" ? " …\n" : "\n"}`);
+      },
+    });
     process.stdout.write("📝 回答：\n");
     process.stdout.write(result.answer + (result.footer ?? "") + "\n");
   };

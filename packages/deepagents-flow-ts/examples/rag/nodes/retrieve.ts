@@ -8,9 +8,11 @@
  */
 
 import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { createInterface } from "node:readline";
 import type { RAGState, RetrievalResult } from "./types.js";
 import { logger } from "deepagents-app-ts/runtime";
+import type { ToolCallEvent } from "../../../src/surfaces/flow-types.js";
 
 // ACP stdio 模式下 stdout 是协议通道，日志必须走 logger（stderr）
 const log = logger.child("rag-retrieve");
@@ -54,6 +56,8 @@ export interface RetrieveNodeConfig {
   };
   /** 可选：复用 agent 框架已加载的 MCP 工具，避免重复 spawn 进程 */
   toolInvoker?: McpToolInvoker;
+  /** 可选：每个检索工具调用时回调一次（供 surface 展示「工具调用过程」） */
+  onToolCall?: (e: ToolCallEvent) => void | Promise<void>;
 }
 
 /**
@@ -311,11 +315,40 @@ export async function retrieveNode(
 
     log.info("Using retrieval tools", { tools: toolsToUse, intent });
 
-    // 并行调用工具
+    // 并行调用工具；每个工具发一次 tool_call 事件（供 surface 展示「工具调用过程」）
+    const onToolCall = config.onToolCall;
     const results = await Promise.allSettled(
-      toolsToUse.map((toolName) =>
-        callRetrievalTool(toolName, query, config, keywords)
-      )
+      toolsToUse.map(async (toolName) => {
+        const toolCallId = onToolCall ? randomUUID() : "";
+        const args = { query, keywords: keywords ?? [] };
+        if (onToolCall) {
+          await onToolCall({ toolCallId, toolName, args, status: "in_progress" });
+        }
+        try {
+          const res = await callRetrievalTool(toolName, query, config, keywords);
+          if (onToolCall) {
+            await onToolCall({
+              toolCallId,
+              toolName,
+              args,
+              status: "completed",
+              result: res.content,
+            });
+          }
+          return res;
+        } catch (err) {
+          if (onToolCall) {
+            await onToolCall({
+              toolCallId,
+              toolName,
+              args,
+              status: "failed",
+              error: err instanceof Error ? err.message : String(err),
+            });
+          }
+          throw err;
+        }
+      })
     );
 
     // 收集成功的结果
