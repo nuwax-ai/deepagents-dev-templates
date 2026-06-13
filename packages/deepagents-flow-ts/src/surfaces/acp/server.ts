@@ -18,7 +18,12 @@ import {
   type StopReason,
 } from "deepagents-acp";
 import { logger, resolveModel, type AppConfig } from "deepagents-app-ts/runtime";
-import type { FlowExecutor, ToolCallEvent } from "../flow-types.js";
+import type {
+  FlowExecutor,
+  StatefulFlow,
+  FlowCallbacks,
+  ToolCallEvent,
+} from "../flow-types.js";
 
 const log = logger.child("flow-acp");
 
@@ -105,7 +110,8 @@ async function streamText(
 }
 
 export interface FlowAcpOptions {
-  executor: FlowExecutor;
+  /** one-shot FlowExecutor，或支持 human-in-the-loop 的 StatefulFlow */
+  executor: FlowExecutor | StatefulFlow;
   /** 用于 throwaway agent 的身份/模型（agent 永不运行） */
   appConfig: AppConfig;
   debug?: boolean;
@@ -117,6 +123,10 @@ export async function bootstrapFlowAcp(options: FlowAcpOptions): Promise<void> {
     process.env.LOG_LEVEL = "debug";
   }
   const { executor, appConfig } = options;
+  // executor 是 function ⇒ one-shot FlowExecutor；是对象（有 run）⇒ 支持 HITL 的 StatefulFlow。
+  const isStateful = typeof executor !== "function";
+  // 记录哪些 session 正在等用户对 interrupt 的回复（其下一条 prompt 当作 resume）。
+  const awaitingResume = new Set<string>();
 
   log.info("Flow ACP bootstrapping", {
     agent: appConfig.agent.name,
@@ -133,36 +143,60 @@ export async function bootstrapFlowAcp(options: FlowAcpOptions): Promise<void> {
 
   const hooks: DeepAgentsServerHooks = {
     async onPrompt(ctx) {
-      const query = ctx.promptText?.trim();
-      if (!query) {
+      const text = ctx.promptText?.trim();
+      if (!text) {
         return undefined; // 空输入：交回服务器默认处理
       }
       const conn = ctx.conn as AcpConnection;
-      log.info("onPrompt → flow", {
-        sessionId: ctx.sessionId,
-        query: query.slice(0, 100),
-      });
+      const sessionId = ctx.sessionId;
+
+      // 跟踪是否流式：流式则只补 footer/question，非流式则整段发。
+      let streamed = false;
+      const callbacks: FlowCallbacks = {
+        onToken: (token) => {
+          streamed = true;
+          return streamText(conn, sessionId, token);
+        },
+        onToolCall: (e) => emitToolCall(conn, sessionId, e),
+      };
 
       try {
-        // 跟踪是否流式：流式则只补 footer，非流式则整段发 answer。
-        let streamed = false;
-        const result = await executor(query, {
-          onToken: (token) => {
-            streamed = true;
-            return streamText(conn, ctx.sessionId, token);
-          },
-          onToolCall: (e) => emitToolCall(conn, ctx.sessionId, e),
-        });
-        if (!streamed && result.answer) {
-          await streamText(conn, ctx.sessionId, result.answer);
+        if (isStateful) {
+          const flow = executor as StatefulFlow;
+          // 该 session 在等 resume ⇒ 这条 prompt 是用户对上次 interrupt 的回复。
+          const resuming = awaitingResume.has(sessionId);
+          log.info(resuming ? "onPrompt → resume" : "onPrompt → flow(stateful)", {
+            sessionId,
+            text: text.slice(0, 100),
+          });
+          const res = await flow.run(
+            resuming ? { resume: text } : { query: text },
+            sessionId,
+            callbacks
+          );
+          if (res.status === "interrupted") {
+            awaitingResume.add(sessionId); // 等下一轮用户回复
+            if (!streamed && res.question) {
+              await streamText(conn, sessionId, res.question);
+            }
+            return { stopReason: "end_turn" as StopReason };
+          }
+          awaitingResume.delete(sessionId); // 跑到底，清状态
+          if (!streamed && res.answer) await streamText(conn, sessionId, res.answer);
+          if (res.footer) await streamText(conn, sessionId, res.footer);
+          return { stopReason: "end_turn" as StopReason };
         }
-        if (result.footer) {
-          await streamText(conn, ctx.sessionId, result.footer);
-        }
+
+        // one-shot FlowExecutor
+        log.info("onPrompt → flow", { sessionId, query: text.slice(0, 100) });
+        const result = await (executor as FlowExecutor)(text, callbacks);
+        if (!streamed && result.answer) await streamText(conn, sessionId, result.answer);
+        if (result.footer) await streamText(conn, sessionId, result.footer);
         return { stopReason: "end_turn" as StopReason };
       } catch (err) {
         log.error("onPrompt flow failed", { error: String(err) });
-        await streamText(conn, ctx.sessionId, "抱歉，处理您的问题时出现错误。");
+        awaitingResume.delete(sessionId); // 出错清状态，避免卡在 resume
+        await streamText(conn, sessionId, "抱歉，处理您的问题时出现错误。");
         return { stopReason: "end_turn" as StopReason };
       }
     },
