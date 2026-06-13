@@ -38,12 +38,18 @@ human-in-the-loop，可 `interrupt` 暂停→等用户→`resume`）。下面四
 | 示例 | 需求类型 | 拓扑 | LangGraph 特性 | seam |
 |---|---|---|---|---|
 | [examples/rag](examples/rag/) | 检索增强问答 | 线性 + 条件重试 | `addConditionalEdges` 重试 | one-shot |
-| [examples/travel-planner](examples/travel-planner/) | 并行调研聚合 | 并行 map-reduce + HITL | `Send` 扇出 + reducer channel | stateful |
+| [examples/travel-planner](examples/travel-planner/) | 并行调研聚合 | 并行 map-reduce + HITL | `Send` 扇出 + reducer + 真实搜索 MCP | stateful |
 | [examples/project-manager](examples/project-manager/) | 分解-评估-审批 | 评估循环 + HITL | reflection 回边 + 条件边 | stateful |
 | [examples/human-in-loop](examples/human-in-loop/) | 生成→人审→定稿 | 线性 + 中途暂停 | `interrupt` + `Command(resume)` | stateful |
 
 每个示例都**不重写** surface plumbing：写自己的图 + 节点 → 包成 `FlowExecutor`/`StatefulFlow` →
-插进同一套 `bootstrapFlowAcp`/`runFlowCli`。无凭证也能跑（节点走启发式/demo fallback）。
+插进同一套 `bootstrapFlowAcp`/`runFlowCli`。
+
+示例**真实接入**业务依赖（travel 用免 key 的 DuckDuckGo 搜索 MCP，其余 LLM 节点真调大模型），
+**无 demo fallback——未配凭证直接报错**；运行前在 `.env` 配模型凭证（见下）。各示例的图拓扑 / 路由
+仍抽成纯函数单测（`gather`/`fanout`/`routeAfterEvaluate`/`isApproval`），无凭证恒跑；真实接入用例 `skipIf` 无凭证自动跳过。
+
+> 这与**默认 flow**（`src/app`，内置 demo 工具 + 无凭证启发式 fallback、始终可跑）取向不同：默认 flow 重「开箱即跑」，示例重「贴近真实业务」。
 
 ## 运行
 

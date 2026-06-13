@@ -8,8 +8,8 @@
  *   START → compose → review(interrupt 暂停) → finalize → END
  *                         ▲ 把草稿抛给用户、等回复            └ 按回复定稿
  *
- * 这是模板「StatefulFlow」seam 的范例：图 interrupt 暂停后，surface（ACP/CLI）把问题发给用户、
- * 下一轮带 resume 恢复（节点从暂停点重跑，interrupt 直接返回用户回复）。
+ * 真实接入：compose / finalize **真调大模型**生成（无 demo fallback——未配凭证直接报错）。
+ * review 用 interrupt 暂停，复用模板的 StatefulFlow seam（surface 接好 resume）。
  * ⚠️ 节点名不能与 state channel 同名：channel 有 draft，所以"写草稿"的节点叫 compose。
  */
 
@@ -22,12 +22,14 @@ import {
   interrupt,
   Command,
 } from "@langchain/langgraph";
+import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { logger, type AppConfig } from "deepagents-app-ts/runtime";
 import type {
   StatefulFlow,
   FlowRunResult,
   FlowCallbacks,
 } from "../../src/surfaces/flow-types.js";
+import { requireModel, extractText, isApproval } from "../shared.js";
 
 const log = logger.child("hitl-review");
 
@@ -39,15 +41,24 @@ const ReviewState = Annotation.Root({
 });
 type ReviewStateType = typeof ReviewState.State;
 
-/** compose：生成初稿（demo 用模板；真实场景换成 LLM 节点）。 */
-function composeNode(state: ReviewStateType): Partial<ReviewStateType> {
-  const draft = `关于「${state.query}」的初稿：\n这是根据你的要求自动生成的第一版内容，涵盖要点 A、要点 B、要点 C。`;
-  return { draft };
+/** compose：大模型写初稿。 */
+async function composeNode(
+  state: ReviewStateType,
+  appConfig?: AppConfig
+): Promise<Partial<ReviewStateType>> {
+  const model = requireModel(appConfig, "human-in-loop 示例");
+  const res = await model.invoke([
+    new SystemMessage(
+      "你是专业中文文案。根据用户要求写一版初稿，简洁、3–6 句，直接给正文，不要解释或寒暄。"
+    ),
+    new HumanMessage(state.query),
+  ]);
+  return { draft: extractText(res.content).trim() };
 }
 
 /**
  * review：interrupt 暂停，把草稿抛给用户审阅。
- * resume 时本节点**从头重跑**，interrupt 直接返回用户回复（这是 LangGraph 的语义）。
+ * resume 时本节点从头重跑，interrupt 直接返回用户回复（LangGraph 语义）。
  */
 function reviewNode(state: ReviewStateType): Partial<ReviewStateType> {
   const feedback = interrupt({
@@ -56,23 +67,28 @@ function reviewNode(state: ReviewStateType): Partial<ReviewStateType> {
   return { feedback: String(feedback ?? "").trim() };
 }
 
-/** finalize：按用户回复定稿。ok/通过 → 用草稿；否则把意见并进去。 */
-function finalizeNode(state: ReviewStateType): Partial<ReviewStateType> {
-  const fb = (state.feedback ?? "").toLowerCase();
-  const approved =
-    !fb ||
-    ["ok", "通过", "可以", "approve", "lgtm", "yes"].some((w) => fb.includes(w));
-  const output = approved
-    ? `✅ 已通过：\n${state.draft}`
-    : `✏️ 已按意见修订：\n${state.draft}\n\n[修订说明] 应用了你的意见：${state.feedback}`;
-  return { output };
+/** finalize：通过则定稿；否则大模型按意见改写。 */
+async function finalizeNode(
+  state: ReviewStateType,
+  appConfig?: AppConfig
+): Promise<Partial<ReviewStateType>> {
+  const fb = (state.feedback ?? "").trim();
+  if (isApproval(fb)) {
+    return { output: `✅ 已通过：\n${state.draft}` };
+  }
+  const model = requireModel(appConfig, "human-in-loop 示例");
+  const res = await model.invoke([
+    new SystemMessage("根据用户的修改意见改写草稿，只输出改写后的成稿，不要解释。"),
+    new HumanMessage(`原稿：\n${state.draft}\n\n修改意见：${fb}`),
+  ]);
+  return { output: `✏️ 已按意见修订：\n${extractText(res.content).trim()}` };
 }
 
-export function createReviewGraph() {
+export function createReviewGraph(appConfig?: AppConfig) {
   return new StateGraph(ReviewState)
-    .addNode("compose", composeNode)
+    .addNode("compose", (s: ReviewStateType) => composeNode(s, appConfig))
     .addNode("review", reviewNode)
-    .addNode("finalize", finalizeNode)
+    .addNode("finalize", (s: ReviewStateType) => finalizeNode(s, appConfig))
     .addEdge(START, "compose")
     .addEdge("compose", "review")
     .addEdge("review", "finalize")
@@ -81,17 +97,18 @@ export function createReviewGraph() {
 }
 
 /**
- * 把人审图包装成模板的 StatefulFlow（HITL seam）。
- * - run({query}, threadId)：起跑 → 跑到 review 的 interrupt → 返回 {interrupted, question}。
- * - run({resume}, threadId)：用同一 threadId 恢复 → finalize → 返回 {done, answer}。
- * checkpointer 据 threadId 续接状态，所以两次调用之间草稿不丢。
+ * 包装成模板 StatefulFlow：run({query})→跑到 review 的 interrupt；run({resume})→finalize。
+ * checkpointer 据 threadId 续接状态，两次调用之间草稿不丢。
  */
-export function createReviewFlow(_appConfig?: AppConfig): StatefulFlow {
-  const graph = createReviewGraph();
+export function createReviewFlow(appConfig?: AppConfig): StatefulFlow {
+  const graph = createReviewGraph(appConfig);
   return {
-    async run(input, threadId, _callbacks?: FlowCallbacks): Promise<FlowRunResult> {
+    async run(
+      input,
+      threadId,
+      _callbacks?: FlowCallbacks
+    ): Promise<FlowRunResult> {
       const config = { configurable: { thread_id: threadId } };
-      // resume 用 Command({resume})；首跑用 partial state。
       const stream =
         input.resume !== undefined
           ? await graph.stream(new Command({ resume: input.resume }), config)
@@ -112,7 +129,6 @@ export function createReviewFlow(_appConfig?: AppConfig): StatefulFlow {
         log.info("interrupted → 等待人审");
         return { status: "interrupted", question: q };
       }
-
       const snapshot = await graph.getState(config);
       const values = snapshot.values as ReviewStateType;
       return { status: "done", answer: values.output ?? "" };

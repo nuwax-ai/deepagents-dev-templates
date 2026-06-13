@@ -1,7 +1,11 @@
 /**
- * 项目管理 flow 测试 —— 守住评估循环（条件边重规划）+ HITL 审批闭环。
- * 全程无凭证（节点纯逻辑），结果确定。
+ * 项目管理 flow 测试。
+ *  - 纯函数（无凭证、确定性）：routeAfterEvaluate —— 守住评估循环条件边 + MAX_REPLAN 封顶（防死循环）。
+ *  - 真实接入（skipIf 无凭证）：plan/estimate/evaluate/finalize 真调 LLM，验证 reflection 循环 + HITL 审批闭环。
  */
+
+import { config as loadDotenv } from "dotenv";
+loadDotenv();
 
 import { describe, it, expect } from "vitest";
 import { randomUUID } from "node:crypto";
@@ -11,19 +15,27 @@ import {
   MAX_REPLAN,
   type PMStateType,
 } from "../graph.js";
+import { loadFlowConfig } from "../../../src/runtime/config.js";
 
-describe("routeAfterEvaluate (条件边)", () => {
+const hasCreds = ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "OPENAI_API_KEY"].some(
+  (k) => Boolean(process.env[k])
+);
+
+describe("routeAfterEvaluate (条件边, 纯函数, 无凭证)", () => {
   const s = (o: Partial<PMStateType>): PMStateType => ({
     goal: "x",
     tasks: [],
     decision: "",
+    critique: "",
     attempts: 0,
     feedback: "",
     output: "",
     ...o,
   });
   it("incomplete & 未达上限 → plan(重规划)", () => {
-    expect(routeAfterEvaluate(s({ decision: "incomplete", attempts: 1 }))).toBe("plan");
+    expect(routeAfterEvaluate(s({ decision: "incomplete", attempts: 1 }))).toBe(
+      "plan"
+    );
   });
   it("incomplete & 达上限 → approve(防死循环)", () => {
     expect(
@@ -31,41 +43,32 @@ describe("routeAfterEvaluate (条件边)", () => {
     ).toBe("approve");
   });
   it("complete → approve", () => {
-    expect(routeAfterEvaluate(s({ decision: "complete", attempts: 1 }))).toBe("approve");
+    expect(routeAfterEvaluate(s({ decision: "complete", attempts: 1 }))).toBe(
+      "approve"
+    );
   });
 });
 
-describe("project-manager flow (评估循环 + HITL)", () => {
-  it("首轮任务不足 → 重规划补全 → interrupt 出完整计划", async () => {
-    const flow = createPMFlow();
-    const res = await flow.run({ query: "做一个落地页" }, randomUUID());
+describe.skipIf(!hasCreds)("project-manager flow (真实 LLM 评估循环 + HITL)", () => {
+  const { appConfig } = loadFlowConfig();
+
+  it("拆解 → 估时 → 评估 → interrupt 出计划", async () => {
+    const flow = createPMFlow(appConfig);
+    const res = await flow.run({ query: "做一个产品落地页" }, randomUUID());
     expect(res.status).toBe("interrupted");
-    if (res.status === "interrupted") {
-      expect(res.question).toContain("项目计划");
-      // 重规划后补到 4 个任务
-      expect(res.question).toContain("开发实现");
-      expect(res.question).toContain("测试上线");
-    }
-  });
+    if (res.status === "interrupted") expect(res.question).toContain("项目计划");
+  }, 90000);
 
   it("resume 'ok' → 批准 + 甘特排期", async () => {
-    const flow = createPMFlow();
+    const flow = createPMFlow(appConfig);
     const tid = randomUUID();
-    await flow.run({ query: "做一个落地页" }, tid);
+    const first = await flow.run({ query: "做一个产品落地页" }, tid);
+    expect(first.status).toBe("interrupted");
     const done = await flow.run({ resume: "ok" }, tid);
     expect(done.status).toBe("done");
     if (done.status === "done") {
       expect(done.answer).toContain("已批准");
       expect(done.answer).toContain("排期");
     }
-  });
-
-  it("resume 给意见 → 记录调整", async () => {
-    const flow = createPMFlow();
-    const tid = randomUUID();
-    await flow.run({ query: "做一个落地页" }, tid);
-    const done = await flow.run({ resume: "加一个上线评审环节" }, tid);
-    expect(done.status).toBe("done");
-    if (done.status === "done") expect(done.answer).toContain("已按意见调整");
-  });
+  }, 90000);
 });

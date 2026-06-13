@@ -15,7 +15,7 @@ START → compose → review(interrupt 暂停) → finalize → END
 
 | 节点 | 职责 |
 |---|---|
-| `compose` | 生成初稿（demo 用模板；真实场景换 LLM） |
+| `compose` | **真调 LLM**写初稿 |
 | `review` | `interrupt` 暂停，把草稿抛给用户审阅 |
 | `finalize` | 按用户回复定稿（ok→通过；否则并入意见） |
 
@@ -26,7 +26,7 @@ START → compose → review(interrupt 暂停) → finalize → END
 图 `compile({ checkpointer: new MemorySaver() })`，`createReviewFlow()` 返回一个 **`StatefulFlow`**：
 
 ```ts
-const flow = createReviewFlow();
+const flow = createReviewFlow(appConfig); // 真调 LLM，需模型凭证
 const r1 = await flow.run({ query: "写产品介绍" }, threadId); // → { status: "interrupted", question }
 const r2 = await flow.run({ resume: "改短一点" }, threadId);   // → { status: "done", answer }
 ```
@@ -55,9 +55,11 @@ pnpm --filter deepagents-flow-ts exec tsx examples/human-in-loop/index.ts
 > （query→interrupt→发问题）。**多轮 resume 请在 Zed 里手测**（第一条发任务、第二条发审阅意见）——
 > ACP 与 CLI 共用同一套 `StatefulFlow` 状态机（`awaitingResume`），逻辑等价。
 
-无需模型凭证即可跑（节点纯模板）。
+> **真实接入（无 demo fallback）**：`compose`/`finalize` 真调大模型，需在 `.env` 配模型凭证
+> （`ANTHROPIC_API_KEY` / `ANTHROPIC_AUTH_TOKEN` / `OPENAI_API_KEY`，没配会直接报错而非降级）。
+> `review` 的 interrupt/resume 是纯模板逻辑，与模型无关。
 
 ## 测试
 
-`pnpm --filter deepagents-flow-ts test` 会跑 [tests/review.test.ts](tests/review.test.ts)：
-interrupt→resume 闭环（通过 / 给意见两分支）+ 不同 threadId 状态隔离。
+[tests/review.test.ts](tests/review.test.ts)：**纯函数** `isApproval`（通过判定，无凭证恒跑）；
+**真实接入**用例（`skipIf` 无凭证）跑 LLM compose/finalize + interrupt→resume 闭环 + 不同 threadId 状态隔离。
