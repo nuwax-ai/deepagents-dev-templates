@@ -4,10 +4,12 @@
  * deepagents-flow-ts — 通用工作流编排模板入口
  *
  * 模式：
- *   (默认) / acp      启动 ACP 服务（stdio）—— 供 nuwaclaw/Zed/JetBrains
- *   flow "<输入>"     命令行跑一次默认 flow（测试用）
- *   flow -i           交互模式
- *   graph             导出默认图拓扑（JSON；加 --mermaid 出 Mermaid 源）
+ *   (默认) / acp        启动 ACP 服务（stdio）—— 供 nuwaclaw/Zed/JetBrains
+ *   flow "<输入>"       命令行跑一次默认 flow（测试用）
+ *   flow -i             交互模式
+ *   graph               导出默认图拓扑（JSON；加 --mermaid 出 Mermaid 源）
+ *   capabilities        输出能力分层 + 可用工具/MCP/skills（无凭证，供开发 Agent 查询）
+ *   sessions            列出已持久化的会话（thread id）
  *
  * 默认图是标准 LangGraph ReAct（prepare → think ↔ tools → respond）。
  * 工具/会话/压缩/Skills/Subagent 经 FlowRuntime（框架原生能力 + 能力分层配置）驱动。
@@ -20,10 +22,12 @@ import { createFlowRuntime } from "./runtime/flow-runtime.js";
 import { createDefaultExecutor } from "./app/default-flow.js";
 import { bootstrapFlowAcp } from "./surfaces/acp/server.js";
 import { runFlowCli } from "./surfaces/cli/run.js";
+import { runCapabilities } from "./surfaces/cli/capabilities.js";
+import { runSessions } from "./surfaces/cli/sessions.js";
 import { getFlowTopology } from "./app/topology.js";
 
 interface ParsedArgs {
-  command: "acp" | "flow" | "graph";
+  command: "acp" | "flow" | "graph" | "capabilities" | "sessions";
   query?: string;
   configPath?: string;
   debug: boolean;
@@ -59,6 +63,10 @@ function parseArgs(argv: string[]): ParsedArgs {
   const first = positional[0];
   if (first === "graph") {
     args.command = "graph";
+  } else if (first === "capabilities") {
+    args.command = "capabilities";
+  } else if (first === "sessions") {
+    args.command = "sessions";
   } else if (first === "flow") {
     args.command = "flow";
     args.query = positional.slice(1).join(" ") || undefined;
@@ -78,6 +86,8 @@ const HELP = `deepagents-flow-ts — 通用工作流编排模板
   deepagents-flow-ts flow "<输入>"  命令行跑一次默认 flow
   deepagents-flow-ts flow -i        交互模式
   deepagents-flow-ts graph          导出默认图拓扑（JSON；加 --mermaid 出 Mermaid 源）
+  deepagents-flow-ts capabilities   输出能力分层 + 可用工具/MCP/skills（无凭证）
+  deepagents-flow-ts sessions       列出已持久化的会话（thread id）
 
 默认图是标准 LangGraph ReAct（prepare → think ↔ tools → respond）。
 工具/会话/压缩经 FlowRuntime（框架原生 + 能力分层）驱动。
@@ -101,6 +111,16 @@ async function main(): Promise<void> {
     process.stdout.write(
       args.mermaid ? mermaid + "\n" : JSON.stringify({ nodes, edges }, null, 2) + "\n"
     );
+    return;
+  }
+
+  // capabilities / sessions：静态查询（不加载 MCP、不需凭证）——供开发 Agent 查询配置。
+  if (args.command === "capabilities") {
+    await runCapabilities();
+    return;
+  }
+  if (args.command === "sessions") {
+    await runSessions();
     return;
   }
 

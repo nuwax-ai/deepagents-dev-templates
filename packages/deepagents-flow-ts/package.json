@@ -37,6 +37,7 @@
     "example:review": "tsx examples/human-in-loop/index.ts review",
     "example:travel": "tsx examples/travel-planner/index.ts plan",
     "example:pm": "tsx examples/project-manager/index.ts plan",
+    "example:dev-agent": "tsx examples/dev-agent/index.ts",
     "typecheck": "tsc --noEmit",
     "typecheck:examples": "tsc -p tsconfig.examples.json --noEmit",
     "test": "vitest run",

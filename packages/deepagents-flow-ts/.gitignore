@@ -33,3 +33,6 @@ coverage/
 dist-packages/
 agent-package.release.json
 package-checksums.json
+
+# Flow session persistence (FileCheckpointSaver)
+.flow-sessions/

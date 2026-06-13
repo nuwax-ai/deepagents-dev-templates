@@ -1,0 +1,54 @@
+{
+  "$schema": "https://agent.nuwax.com/schemas/nuwax-agent-capability-sources.v1.json",
+  "schemaVersion": "nuwax.agent.capability-sources.v1",
+  "sources": {
+    "acp-dynamic": {
+      "description": "Workspace-specific values delivered by ACP or the Nuwax configuration panel.",
+      "examples": ["systemPrompt", "mcpServers", "skills", "model", "subagents"]
+    },
+    "agent-builtin": {
+      "description": "Capabilities shipped inside the template package and available without platform mutation.",
+      "examples": ["runtimeTools", "compaction", "promptFragments", "packagingHooks"]
+    },
+    "env-builtin": {
+      "description": "Environment values provided by the cloud computer, local machine, CI, or installer.",
+      "examples": ["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_BASE_URL", "LOG_DIR"]
+    },
+    "agent-builtin-file": {
+      "description": "Persistent runtime data stored as files inside the template's own session dir (no DB).",
+      "examples": ["sessionStore"]
+    },
+    "package-placeholder": {
+      "description": "Values replaced when building or installing tar/zip/npm artifacts.",
+      "examples": ["INSTALL_ROOT", "AGENT_ID", "PACKAGE_VERSION"]
+    }
+  },
+  "capabilities": {
+    "systemPrompt": { "source": "acp-dynamic", "fallback": "prompts/flow.base.md" },
+    "mcpServers": { "source": "acp-dynamic", "fallback": "config/mcp.default.json" },
+    "skills": { "source": "acp-dynamic", "fallback": "skills/builtin" },
+    "model": { "source": "acp-dynamic", "fallback": "env-builtin" },
+    "subagents": { "source": "acp-dynamic", "fallback": ".agents/agents" },
+    "openaiApiKey": { "source": "env-builtin", "secret": true },
+    "anthropicApiKey": { "source": "env-builtin", "secret": true },
+    "builtInTools": {
+      "source": "agent-builtin",
+      "items": [
+        "bash",
+        "read_file",
+        "write_file",
+        "edit_file",
+        "grep",
+        "glob",
+        "http_request",
+        "json_utils",
+        "mcp_tool_bridge",
+        "platform_api",
+        "agent_variable"
+      ]
+    },
+    "compaction": { "source": "agent-builtin" },
+    "sessionStore": { "source": "agent-builtin-file", "path": ".flow-sessions" },
+    "installRoot": { "source": "package-placeholder" }
+  }
+}

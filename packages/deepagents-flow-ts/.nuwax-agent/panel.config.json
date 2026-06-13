@@ -1,0 +1,69 @@
+{
+  "$schema": "https://agent.nuwax.com/schemas/nuwax-agent-panel-config.v1.json",
+  "schemaVersion": "nuwax.agent.panel-config.v1",
+  "agent": {
+    "id": "${AGENT_ID}",
+    "displayName": "DeepAgents Flow TS",
+    "description": "工作流编排模板（LangGraph 显式图 over ACP，工具/会话/压缩/Skills/Subagent 经能力分层驱动）",
+    "version": "${PACKAGE_VERSION}"
+  },
+  "model": {
+    "source": "acp-dynamic",
+    "provider": "anthropic",
+    "fields": [
+      { "name": "ANTHROPIC_MODEL", "label": "Model", "type": "string", "default": "${ANTHROPIC_MODEL}", "required": true },
+      { "name": "ANTHROPIC_BASE_URL", "label": "Base URL", "type": "url", "default": "${ANTHROPIC_BASE_URL}", "required": false },
+      { "name": "ANTHROPIC_API_KEY", "label": "API Key", "type": "secret", "default": "${SECRET_ANTHROPIC_API_KEY}", "required": true }
+    ]
+  },
+  "prompt": {
+    "source": "acp-dynamic",
+    "editable": true,
+    "templatePath": "prompts/flow.base.md",
+    "saveOperation": "platform_api.save_prompt"
+  },
+  "mcpServers": {
+    "source": "acp-dynamic",
+    "editable": true,
+    "supportsWorkspaceScopedServers": true
+  },
+  "skills": {
+    "source": "acp-dynamic",
+    "editable": true,
+    "builtinDirectory": "skills/builtin",
+    "platformDirectory": "skills/platform"
+  },
+  "subagents": {
+    "source": "acp-dynamic",
+    "editable": true,
+    "builtinDirectory": ".agents/agents"
+  },
+  "builtinCapabilities": {
+    "source": "agent-builtin",
+    "editable": false,
+    "items": [
+      "bash",
+      "filesystem",
+      "search",
+      "http_request",
+      "json_utils",
+      "agent_variable",
+      "platform_api",
+      "mcp_tool_bridge",
+      "session_store",
+      "compaction"
+    ]
+  },
+  "sandbox": {
+    "source": "acp-dynamic",
+    "editable": true,
+    "profileConfigPath": "config/flow-agent.config.json",
+    "defaultProfile": "workspace-write",
+    "profiles": ["open", "workspace-write", "read-only", "custom"]
+  },
+  "publish": {
+    "source": "package-placeholder",
+    "artifactTypes": ["nuwax-tar", "nuwax-zip", "npm-tgz"],
+    "configPath": ".nuwax-agent/package.config.json"
+  }
+}

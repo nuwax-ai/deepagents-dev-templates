@@ -6,29 +6,30 @@
 与 [`deepagents-app-ts`](../deepagents-app-ts)（Coding Agent，agent loop 范式）互补：
 本包复用它的 `runtime` 核心（config / model / logger / 存储），只把"大脑"换成一张显式图。
 
-## 默认图（ReAct 式骨架，演示框架常用能力）
+## 默认图（标准 LangGraph ReAct）
 
-开箱即用的默认图是一个**通用 ReAct 式工作流**，每个节点演示一种常用编排模式，方便照着写：
+开箱即用的默认图是标准 ReAct，工具/持久化全用框架原生能力：
 
 ```
-START → prepare → think → act → observe → reflect ─(条件边)─┐
-                       ▲                                  ├─ continue & 未达上限 → think（下一轮）
-                       └──────────────────────────────────┘
-                                                 └─ 否则 → respond → END
+START → prepare → think(model.bindTools) ──(toolsCondition)──┐
+                      ▲                                      ├─ 有 tool_calls → tools(ToolNode + onToolCall 透出) → think
+                      └──────────────────────────────────────┘
+                                               └─ 无 tool_calls → respond(流式) → END
 ```
 
-| 节点 | 演示的模式 | 文件 |
+| 节点 | 职责 | 框架能力 |
 |---|---|---|
-| `prepare` | 纯逻辑节点 + state 初始化 | [nodes/prepare.ts](src/app/nodes/prepare.ts) |
-| `think` | LLM 节点 + 结构化输出 + 无凭证 fallback | [nodes/think.ts](src/app/nodes/think.ts) |
-| `act` | 工具调用节点 + `onToolCall` 透出 | [nodes/act.ts](src/app/nodes/act.ts) |
-| `observe` | state 转换 / 累积 | [nodes/observe.ts](src/app/nodes/observe.ts) |
-| `reflect` | 条件边 + 循环 + 上限（编排核心） | [nodes/reflect.ts](src/app/nodes/reflect.ts) |
-| `respond` | 流式输出（onToken） | [nodes/respond.ts](src/app/nodes/respond.ts) |
+| `prepare` | input → HumanMessage；压缩接入点 | `MessagesAnnotation` |
+| `think` | `bindTools` 模型决定调工具或回答 | 原生 function-calling |
+| `tools` | 执行 tool_calls + `onToolCall` 三态透出 | prebuilt `ToolNode` + `toolsCondition` |
+| `respond` | 取回答流式输出（onToken） | — |
 
-内置 demo 工具（`echo` / `calculate` / `time`）让 `act` 不依赖 MCP 即可演示工具调用；无模型凭证时 LLM 节点走启发式 fallback，图始终可跑、可测。
+状态用标准消息流（`MessagesAnnotation`），自动进 `FileCheckpointSaver`（跨重启恢复 + interrupt/resume）。
+工具集来自 `FlowRuntime.allTools`：bash / 文件读写 / search / http / json / mcp-bridge / platform_api / agent_variable + native MCP（context7）+ demo(echo/calculate/time)。
+无模型凭证时 think 走 fallback（回显输入），图始终可跑、可测。见 [src/app/graph.ts](src/app/graph.ts)。
 
-**少用 / 进阶模式**（并行 fan-out、人工介入 `interrupt`、`Command` 动态路由、子图、checkpointer 持久化）见 [docs/flow-patterns.md](docs/flow-patterns.md)。
+**进阶模式**（并行 fan-out、HITL `interrupt`、subgraph 子代理、压缩）见 [docs/flow-patterns.md](docs/flow-patterns.md)；
+能力分层与配置见 [docs/capabilities.md](docs/capabilities.md)。
 
 ## 示例：不同需求 → 不同拓扑
 
@@ -41,6 +42,7 @@ human-in-the-loop，可 `interrupt` 暂停→等用户→`resume`）。下面四
 | [examples/travel-planner](examples/travel-planner/) | 并行调研聚合 | 并行 map-reduce + HITL | `Send` 扇出 + reducer + 真实搜索 MCP | stateful |
 | [examples/project-manager](examples/project-manager/) | 分解-评估-审批 | 评估循环 + HITL | reflection 回边 + 条件边 | stateful |
 | [examples/human-in-loop](examples/human-in-loop/) | 生成→人审→定稿 | 线性 + 中途暂停 | `interrupt` + `Command(resume)` | stateful |
+| [examples/dev-agent](examples/dev-agent/) | 综合能力展示 | 标准 ReAct + subgraph | bindTools/ToolNode/FileCheckpointSaver/compactHistory/subgraph | stateful |
 
 每个示例都**不重写** surface plumbing：写自己的图 + 节点 → 包成 `FlowExecutor`/`StatefulFlow` →
 插进同一套 `bootstrapFlowAcp`/`runFlowCli`。
@@ -83,6 +85,8 @@ pnpm --filter deepagents-flow-ts example:review "写一段产品介绍"
 |---|---|
 | 默认 flow CLI | `pnpm flow "..."` / `pnpm exec tsx src/index.ts flow -i` |
 | 导出图拓扑 | `pnpm graph`（JSON）/ `pnpm graph --mermaid`（Mermaid 源） |
+| 能力分层查询 | `pnpm exec tsx src/index.ts capabilities`（无凭证，工具/MCP/skills） |
+| 已持久化会话 | `pnpm exec tsx src/index.ts sessions` |
 | 默认 flow ACP 冒烟（rcoder） | `pnpm smoke:acp` |
 | RAG 范例 CLI | `pnpm example:rag:cli "..."` / `pnpm example:rag:interactive` |
 | travel/pm/review 范例 CLI | `pnpm example:travel "..."` / `example:pm "..."` / `example:review "..."`（中途暂停等输入；加 `-i` 交互） |
@@ -129,11 +133,16 @@ const { nodes, edges, mermaid } = await getFlowTopology();
 `edges[].conditional` 标出条件边（如 `reflect → think|respond`），数据来自 `getGraphAsync()`，
 与 [src/app/graph.ts](src/app/graph.ts) 的真实连线**永不漂移**。导出逻辑见 [src/app/topology.ts](src/app/topology.ts)。
 
-## 配置
+## 配置与能力分层
 
-[config/flow-agent.config.json](config/flow-agent.config.json)：标准 `agent` / `model` 段（走 `loadFlowConfig`）。
-自定义块可加在顶层、用 `loadFlowConfig().raw` 取出（RAG 范例就是这么放 `rag` 段的）。
-默认模型与 `deepagents-app-ts` 对齐（`anthropic / claude-sonnet-4-6`）；改 OpenAI 兼容端点见 `.env.example`。
+[config/flow-agent.config.json](config/flow-agent.config.json)：标准 `agent` / `model` / `mcp` / `platform` /
+`permissions` / `sandbox` / `skills` / `agentsDirectories` / `memory` / `compaction` / `middleware` 段（走 `loadFlowConfig`
+→ app-ts `loadConfig`，Zod schema 校验）。自定义块加在顶层、用 `loadFlowConfig().raw` 取出（RAG 范例放 `rag` 段）。
+
+**能力分层**（基础内置 / ACP 下发 / 环境 / 文件持久化）见 [docs/capabilities.md](docs/capabilities.md) 与
+[.nuwax-agent/capability-sources.json](.nuwax-agent/capability-sources.json)——`capabilities` 命令查询当前可用工具/MCP/skills。
+
+默认模型 `anthropic / claude-sonnet-4-6`；改 OpenAI 兼容端点见 `.env.example`。
 
 ## 测试
 
