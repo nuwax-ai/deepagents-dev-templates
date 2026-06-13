@@ -3,7 +3,7 @@
  *
  * 判 done / continue:有模型凭证 → LLM 判断是否还需再调工具;无凭证 → 启发式(有观察就够)。
  * 之后用 `addConditionalEdges(routeAfterReflect)` 在运行时选边:
- * continue 且未达 MAX_ITERS → 回 plan(再来一轮);否则 → respond(收尾)。
+ * continue 且未达 MAX_ITERS → 回 think(再来一轮);否则 → respond(收尾)。
  *
  * 这是「带反馈环的图」样板:一条直线流水线由此变成可迭代收敛的循环,且用上限保证不死循环。
  */
@@ -15,11 +15,25 @@ import { getFlowModel } from "./llm.js";
 
 const log = logger.child("flow-reflect");
 
-/** 最大迭代轮次(plan → act → observe → reflect ×N)。封顶防死循环。 */
+/** 最大迭代轮次(think → act → observe → reflect ×N)。封顶防死循环。 */
 export const MAX_ITERS = 3;
 
 const REFLECT_SYSTEM = `你是工作流的"反思"步骤。根据输入和已有工具观察,判断是否还需要再调一次工具。
 只返回 JSON:{"decision":"continue"} 或 {"decision":"done"}`;
+
+/** 从模型输出里解析 decision;只有精确等于 "continue" 才继续,否则 done。 */
+export function parseDecision(text: string): "continue" | "done" {
+  const m = text.match(/\{[\s\S]*\}/);
+  if (m) {
+    try {
+      const parsed = JSON.parse(m[0]) as { decision?: unknown };
+      return parsed.decision === "continue" ? "continue" : "done";
+    } catch {
+      // 解析失败 → 视为 done(安全收敛)
+    }
+  }
+  return "done";
+}
 
 export async function reflectNode(
   state: FlowState,
@@ -39,7 +53,8 @@ export async function reflectNode(
       ]);
       const text =
         typeof res.content === "string" ? res.content : JSON.stringify(res.content);
-      decision = /"continue"/.test(text) ? "continue" : "done";
+      // 只认 JSON 里 decision==="continue";避免模型散文里出现 "continue" 字样误判
+      decision = parseDecision(text);
     } catch {
       decision = "done";
     }

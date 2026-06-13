@@ -1,7 +1,7 @@
 {
   "agent": {
     "name": "deepagents-flow-ts",
-    "description": "通用工作流编排模板 — Agent 按显式 LangGraph 节点图运行（默认为占位示例图 prepare → act → decide → respond）",
+    "description": "通用工作流编排模板 — Agent 按显式 LangGraph 节点图运行（默认 ReAct 式图：prepare → think → act → observe → reflect → respond）",
     "version": "0.1.0"
   },
   "model": {

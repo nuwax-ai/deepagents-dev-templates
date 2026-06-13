@@ -8,7 +8,7 @@
  *   flow "<输入>"     命令行跑一次默认 flow（测试用）
  *   flow -i           交互模式
  *
- * 默认图是 ReAct 式骨架（prepare → plan → act → observe → reflect → respond）。完整范例见 examples/rag。
+ * 默认图是 ReAct 式骨架（prepare → think → act → observe → reflect → respond）。完整范例见 examples/rag。
  * 选项：--config <path>  --debug  -h/--help
  */
 
@@ -17,14 +17,17 @@ import { loadFlowConfig } from "./runtime/config.js";
 import { createDefaultExecutor } from "./app/default-flow.js";
 import { bootstrapFlowAcp } from "./surfaces/acp/server.js";
 import { runFlowCli } from "./surfaces/cli/run.js";
+import { getFlowTopology } from "./app/topology.js";
 
 interface ParsedArgs {
-  command: "acp" | "flow";
+  command: "acp" | "flow" | "graph";
   query?: string;
   configPath?: string;
   debug: boolean;
   interactive: boolean;
   help: boolean;
+  /** graph 命令:输出 Mermaid 源而非 JSON */
+  mermaid: boolean;
 }
 
 function parseArgs(argv: string[]): ParsedArgs {
@@ -33,6 +36,7 @@ function parseArgs(argv: string[]): ParsedArgs {
     debug: false,
     interactive: false,
     help: false,
+    mermaid: false,
   };
   const positional: string[] = [];
 
@@ -41,6 +45,7 @@ function parseArgs(argv: string[]): ParsedArgs {
     if (a === "--debug") args.debug = true;
     else if (a === "--help" || a === "-h") args.help = true;
     else if (a === "--interactive" || a === "-i") args.interactive = true;
+    else if (a === "--mermaid") args.mermaid = true;
     else if (a === "--config" && argv[i + 1]) args.configPath = argv[++i];
     else if (a.startsWith("--")) {
       console.error(`Unknown flag: ${a}`);
@@ -49,7 +54,9 @@ function parseArgs(argv: string[]): ParsedArgs {
   }
 
   const first = positional[0];
-  if (first === "flow") {
+  if (first === "graph") {
+    args.command = "graph";
+  } else if (first === "flow") {
     args.command = "flow";
     args.query = positional.slice(1).join(" ") || undefined;
   } else if (first && first !== "acp") {
@@ -67,8 +74,9 @@ const HELP = `deepagents-flow-ts — 通用工作流编排模板
   deepagents-flow-ts acp            同上
   deepagents-flow-ts flow "<输入>"  命令行跑一次默认 flow
   deepagents-flow-ts flow -i        交互模式
+  deepagents-flow-ts graph          导出默认图拓扑（JSON；加 --mermaid 出 Mermaid 源）
 
-默认图是 ReAct 式骨架（prepare → plan → act → observe → reflect → respond）；完整范例见 examples/rag。
+默认图是 ReAct 式骨架（prepare → think → act → observe → reflect → respond）；完整范例见 examples/rag。
 
 选项:
   --config <path>   指定配置文件（默认 config/flow-agent.config.json）
@@ -80,6 +88,15 @@ async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
   if (args.help) {
     process.stdout.write(HELP);
+    return;
+  }
+
+  // graph：导出图拓扑（静态，不运行图、不需要凭证）——对接可视化 / 文档。
+  if (args.command === "graph") {
+    const { nodes, edges, mermaid } = await getFlowTopology();
+    process.stdout.write(
+      args.mermaid ? mermaid + "\n" : JSON.stringify({ nodes, edges }, null, 2) + "\n"
+    );
     return;
   }
 

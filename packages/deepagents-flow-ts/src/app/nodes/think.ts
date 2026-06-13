@@ -14,6 +14,7 @@ import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import type { AppConfig } from "deepagents-app-ts/runtime";
 import type { FlowState, PlanStep } from "../state.js";
 import { getFlowModel } from "./llm.js";
+import { DEMO_TOOLS } from "./tools.js";
 
 const THINK_SYSTEM = `你是工作流的"思考"步骤。根据用户输入和已有工具观察,决定下一步调用哪个工具。
 可用工具:
@@ -39,6 +40,28 @@ function fallbackPlan(state: FlowState): PlanStep {
   return { tool: "echo", args: { text: state.input }, reason: "fallback: 回显输入" };
 }
 
+/** 解析模型输出的 plan JSON;只接受 tool 已知 + args 为对象的合法结构,否则 null(走 fallback)。 */
+export function safeParsePlan(raw: string): PlanStep | null {
+  try {
+    const p = JSON.parse(raw) as Partial<PlanStep>;
+    if (
+      typeof p.tool === "string" &&
+      DEMO_TOOLS[p.tool] &&
+      typeof p.args === "object" &&
+      p.args
+    ) {
+      return {
+        tool: p.tool,
+        args: p.args as Record<string, unknown>,
+        reason: typeof p.reason === "string" ? p.reason : undefined,
+      };
+    }
+  } catch {
+    // 解析失败 → null(走 fallback)
+  }
+  return null;
+}
+
 export async function thinkNode(
   state: FlowState,
   appConfig?: AppConfig
@@ -59,7 +82,8 @@ export async function thinkNode(
       const text =
         typeof res.content === "string" ? res.content : JSON.stringify(res.content);
       const match = text.match(/\{[\s\S]*\}/);
-      plan = match ? (JSON.parse(match[0]) as PlanStep) : fallbackPlan(state);
+      const parsed = match ? safeParsePlan(match[0]) : null;
+      plan = parsed ?? fallbackPlan(state);
     } catch {
       plan = fallbackPlan(state);
     }

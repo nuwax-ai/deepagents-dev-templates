@@ -61,6 +61,7 @@ pnpm --filter deepagents-flow-ts example:rag:cli "什么是 LangGraph？"
 | 目标 | 命令 |
 |---|---|
 | 默认 flow CLI | `pnpm flow "..."` / `pnpm exec tsx src/index.ts flow -i` |
+| 导出图拓扑 | `pnpm graph`（JSON）/ `pnpm graph --mermaid`（Mermaid 源） |
 | 默认 flow ACP 冒烟（rcoder） | `pnpm smoke:acp` |
 | RAG 范例 CLI | `pnpm example:rag:cli "..."` / `pnpm example:rag:interactive` |
 | RAG 范例 ACP 冒烟（rcoder） | `pnpm smoke:rag` |
@@ -82,6 +83,24 @@ pnpm --filter deepagents-flow-ts example:rag:cli "什么是 LangGraph？"
 [src/surfaces/cli/run.ts](src/surfaces/cli/run.ts) 的 `runFlowCli` 接收任意 executor。
 ACP 路径用 deepagents-acp 的 `onPrompt` 钩子跑 executor、经 `conn` 流式回传、返回 `{ stopReason }`
 **短路 deep agent**——所以不需要 force-tool / 巨型提示词那套把 loop 逼成 workflow 的 hack。
+
+## 导出图拓扑（可视化对接）
+
+显式 StateGraph 的好处之一：节点连线是**静态可提取**的。`./topology` 把编译图反射成结构化数据
+（不运行图、不需要凭证），供 inspector / 文档 / 调试器消费：
+
+```bash
+pnpm graph              # → { nodes, edges } JSON
+pnpm graph --mermaid    # → Mermaid 源，可直接渲染
+```
+
+```ts
+import { getFlowTopology } from "deepagents-flow-ts/topology";
+const { nodes, edges, mermaid } = await getFlowTopology();
+```
+
+`edges[].conditional` 标出条件边（如 `reflect → think|respond`），数据来自 `getGraphAsync()`，
+与 [src/app/graph.ts](src/app/graph.ts) 的真实连线**永不漂移**。导出逻辑见 [src/app/topology.ts](src/app/topology.ts)。
 
 ## 配置
 

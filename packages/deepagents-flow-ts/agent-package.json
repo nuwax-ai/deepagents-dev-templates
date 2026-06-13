@@ -1,7 +1,7 @@
 {
   "name": "deepagents-flow-ts",
   "version": "0.1.0",
-  "description": "RAG / workflow-orchestration agent template — runs an explicit LangGraph StateGraph (rewrite -> retrieve -> grade -> prepare -> generate) over ACP.",
+  "description": "Workflow-orchestration agent template — the agent runs an explicit LangGraph StateGraph (default ReAct flow: prepare -> think -> act -> observe -> reflect -> respond) over ACP, instead of a dynamic tool loop. Ships a RAG flow as a bundled example.",
   "engine": "deepagents-flow-ts",
   "source": {
     "type": "s3",
@@ -66,10 +66,7 @@
     ]
   },
   "mcp": {
-    "servers": [
-      "context7",
-      "howtocook-mcp"
-    ]
+    "servers": []
   },
   "platform": {
     "agentId": "",

@@ -5,12 +5,14 @@ on:
     branches: [main]
     paths:
       - "packages/deepagents-app-ts/**"
+      - "packages/deepagents-flow-ts/**"
       - "packages/inspector/**"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
   pull_request:
     paths:
       - "packages/deepagents-app-ts/**"
+      - "packages/deepagents-flow-ts/**"
       - "packages/inspector/**"
 
 permissions:
@@ -60,3 +62,23 @@ jobs:
       # cross-platform so a missing createRequire shim or unbundled CJS dep
       # surfaces here, not post-install on a client.
       - run: pnpm --filter deepagents-app-ts test:bundle-smoke
+
+  flow:
+    name: flow-ts · typecheck · build · test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # flow-ts 复用 app-ts 的 runtime（workspace 依赖），需先构建它
+      - run: pnpm --filter deepagents-app-ts build
+      - run: pnpm --filter deepagents-flow-ts build
+      - run: pnpm --filter deepagents-flow-ts typecheck:examples
+      # 全套单测在无凭证下跑（节点走启发式 fallback，不调用真实模型）
+      - run: pnpm --filter deepagents-flow-ts test

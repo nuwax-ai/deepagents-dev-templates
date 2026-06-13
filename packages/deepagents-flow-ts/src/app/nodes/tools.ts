@@ -19,6 +19,9 @@ function safeCalc(expression: string): string {
   }
   // 字符集已严格限定为数字与运算符 → Function 求值安全(无法调用任意函数)。
   const value = Function(`"use strict"; return (${expr});`)();
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new Error(`calculate: "${expression}" 未求出有限数值(如 1/0)`);
+  }
   return String(value);
 }
 

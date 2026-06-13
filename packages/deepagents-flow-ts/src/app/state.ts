@@ -14,7 +14,7 @@
 
 import { BaseMessage } from "@langchain/core/messages";
 
-/** 一次工具调用结果(plan → act 产出、observe 累积)。 */
+/** 一次工具调用结果(think → act 产出、observe 累积)。 */
 export interface Observation {
   tool: string;
   args: Record<string, unknown>;
