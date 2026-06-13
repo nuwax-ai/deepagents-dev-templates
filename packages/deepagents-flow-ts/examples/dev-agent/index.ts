@@ -6,7 +6,7 @@
  *  - 标准 LangGraph ReAct（prepare → think ↔ tools → respond），think 用 bindTools
  *  - 真实工具：bash / 文件读写 / search / http / context7 MCP（经 FlowRuntime.allTools）
  *  - 会话持久化：FileCheckpointSaver，多轮用同一 threadId → 跨重启续接历史
- *  - 上下文压缩：compactHistory 在 run 入口对历史裁剪+摘要（见 src/app/compaction.ts）
+ *  - 上下文压缩：src/app/compaction.ts（单测覆盖）；图内写回需 RemoveMessage 替换模式
  *  - Subagent：researcher subgraph（见 ./researcher.ts），框架原生 subgraph 模式
  *
  * 用法：
@@ -21,14 +21,12 @@ import { loadFlowConfig } from "../../src/runtime/config.js";
 import { createFlowRuntime, type FlowRuntime } from "../../src/runtime/flow-runtime.js";
 import { createFlowGraph } from "../../src/app/graph.js";
 import { runFlowCli } from "../../src/surfaces/cli/run.js";
-import { compactHistory } from "../../src/app/compaction.js";
 import type { FlowState } from "../../src/app/state.js";
 import type { StatefulFlow } from "../../src/surfaces/flow-types.js";
-import type { BaseMessage } from "@langchain/core/messages";
 
 /**
  * dev-agent StatefulFlow：复用默认 ReAct 图，多轮用同一 threadId 续接。
- * run 入口对现有历史调 compactHistory（演示压缩接入点；生产可在图节点内做替换）。
+ * 上下文压缩在 src/app/compaction.ts 实现（图内写回用 RemoveMessage 替换模式，见 docs/flow-patterns.md）。
  */
 export function createDevAgentFlow(runtime: FlowRuntime): StatefulFlow {
   return {
@@ -42,17 +40,6 @@ export function createDevAgentFlow(runtime: FlowRuntime): StatefulFlow {
         systemPrompt: runtime.systemPrompt,
         callbacks: { onToken: callbacks?.onToken, onToolCall: callbacks?.onToolCall },
       });
-
-      // 压缩接入点：多轮历史超阈值时裁剪+摘要（演示判定；compaction.ts 已实现）
-      try {
-        const snap = await graph.getState(config);
-        const existing = ((snap.values as FlowState | undefined)?.messages ?? []) as BaseMessage[];
-        if (existing.length > 1) {
-          await compactHistory(existing, runtime.config);
-        }
-      } catch {
-        /* 首轮无历史，忽略 */
-      }
 
       const result = (await graph.invoke(
         { input: input.query ?? "", messages: [] } as unknown as FlowState,

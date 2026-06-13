@@ -5,20 +5,20 @@
  */
 
 import { readdirSync, existsSync, statSync } from "node:fs";
-import { resolve, dirname } from "node:path";
+import { resolve } from "node:path";
 import { homedir } from "node:os";
 import { loadFlowConfig } from "../../runtime/config.js";
 
-function expandDir(dir: string, pkgRoot: string): string {
+function expandDir(dir: string, cwd: string): string {
   let d = dir || "./.flow-sessions";
   if (d.startsWith("~/")) d = resolve(homedir(), d.slice(2));
-  return d.startsWith("/") ? d : resolve(pkgRoot, d);
+  return d.startsWith("/") ? d : resolve(cwd, d);
 }
 
 export async function runSessions(): Promise<void> {
-  const { appConfig, configPath } = loadFlowConfig();
-  const pkgRoot = dirname(dirname(configPath));
-  const dir = expandDir(appConfig.memory.dir, pkgRoot);
+  const { appConfig } = loadFlowConfig();
+  // 与 createFlowRuntime 一致：相对 memoryDir 按 process.cwd() 解析（非 pkgRoot）
+  const dir = expandDir(appConfig.memory.dir, process.cwd());
 
   const sessions: { id: string; mtime: string }[] = [];
   if (existsSync(dir)) {

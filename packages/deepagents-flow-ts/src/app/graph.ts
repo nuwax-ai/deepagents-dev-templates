@@ -97,11 +97,20 @@ export function createFlowGraph(config: CreateFlowGraphConfig = {}) {
         steps: ["think#fallback: no model"],
       };
     }
-    const ai = await boundModel.invoke(withSystemPrompt(state.messages, config.systemPrompt ?? ""));
-    return {
-      messages: [ai],
-      steps: [`think: ${(ai.tool_calls ?? []).length} tool_calls`],
-    };
+    try {
+      const ai = await boundModel.invoke(withSystemPrompt(state.messages, config.systemPrompt ?? ""));
+      return {
+        messages: [ai],
+        steps: [`think: ${(ai.tool_calls ?? []).length} tool_calls`],
+      };
+    } catch (err) {
+      // LLM 抖动（限流/网络/401）→ 降级回显，保证图收敛而非整图抛错
+      log.warn("think invoke failed → fallback", { error: String(err) });
+      return {
+        messages: [new AIMessage({ content: `(模型调用失败，回显输入)\n${state.input}` })],
+        steps: ["think#fallback: invoke error"],
+      };
+    }
   };
 
   // tools：ToolNode 执行 + onToolCall 三态透出（in_progress → completed/failed）。

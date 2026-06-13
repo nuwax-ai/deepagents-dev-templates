@@ -119,8 +119,10 @@ export class FileCheckpointSaver extends MemorySaver {
     checkpoint: Parameters<MemorySaver["put"]>[1],
     metadata: Parameters<MemorySaver["put"]>[2]
   ): Promise<RunnableConfig> {
-    const ret = await super.put(config, checkpoint, metadata);
+    // 防御：若重启后首次操作是 put（而非 getTuple），先 load 旧 checkpoint，避免 persist 覆盖丢失历史
     const tid = config.configurable?.thread_id as string | undefined;
+    if (tid) this.ensureLoaded(tid);
+    const ret = await super.put(config, checkpoint, metadata);
     if (tid) this.persist(tid);
     return ret;
   }
@@ -130,8 +132,9 @@ export class FileCheckpointSaver extends MemorySaver {
     writes: Parameters<MemorySaver["putWrites"]>[1],
     taskId: string
   ): Promise<void> {
-    await super.putWrites(config, writes, taskId);
     const tid = config.configurable?.thread_id as string | undefined;
+    if (tid) this.ensureLoaded(tid);
+    await super.putWrites(config, writes, taskId);
     if (tid) this.persist(tid);
   }
 

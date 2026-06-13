@@ -9,7 +9,7 @@
 | 标准 ReAct 图（think ↔ tools） | `createFlowGraph`（复用默认图） | LangGraph `StateGraph` + `toolsCondition` |
 | 真实工具调度 | `runtime.allTools`（bash/读写/search/http/context7 MCP） | `bindTools` + `ToolNode` |
 | 会话持久化 / 跨重启续接 | `runtime.checkpointer`（FileCheckpointSaver）+ 同一 threadId | `BaseCheckpointSaver` |
-| 上下文压缩 | `compactHistory`（run 入口） | core `trimMessages` + LLM 摘要 |
+| 上下文压缩 | [`compactHistory`](../../src/app/compaction.ts)（单测覆盖；图内写回用 RemoveMessage 替换模式） | core `trimMessages` + LLM 摘要 |
 | Subagent | [`researcher.ts`](./researcher.ts)（subgraph） | LangGraph **subgraph** |
 | 能力分层 / 可查询 | `flow capabilities` / `.nuwax-agent/` | — |
 

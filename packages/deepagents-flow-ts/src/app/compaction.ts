@@ -70,7 +70,9 @@ export async function compactHistory(
 
   const oldCount = messages.length - recent.length;
   if (oldCount <= 0) return recent;
-  const oldMessages = messages.slice(0, oldCount);
+  // oldMessages 排除 system（trimMessages includeSystem:true 已把 system 留在 recent 头，
+  // 否则摘要它会在返回值里产出第二条 SystemMessage）
+  const oldMessages = messages.slice(0, oldCount).filter((m) => m._getType() !== "system");
 
   if (!hasCredentials(config)) {
     log.warn("超阈值但无凭证 → 仅裁剪不摘要", { oldCount });
