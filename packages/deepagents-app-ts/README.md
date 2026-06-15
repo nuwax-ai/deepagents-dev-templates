@@ -57,13 +57,17 @@ npm test
 
 ### Windows (PowerShell)
 
-No bash required. Packaging uses Node scripts directly:
+No bash required for local dev and packaging:
 
 ```powershell
 pnpm run check:tools      # verify rsync / zip (optional)
 pnpm run setup:tools      # install via Chocolatey if missing
 pnpm run package:platforms
+pnpm run validate:package -- --artifact dist-packages/...
+pnpm run smoke:acp
 ```
+
+Install / upgrade / release-to-S3 scripts remain bash (Linux server + CI).
 
 ## Key Concepts
 

@@ -54,8 +54,9 @@
     "package:all": "node scripts/package.mjs --format all",
     "package:nuwax": "node scripts/package.mjs --format all",
     "package:platforms": "node scripts/package-platforms.mjs",
-    "validate:package": "bash scripts/validate-package.sh",
-    "smoke:acp": "bash scripts/smoke-acp.sh",
+    "validate:package": "node scripts/validate-package.mjs",
+    "smoke:acp": "node scripts/smoke-acp.mjs",
+    "smoke:acp:debug": "node scripts/smoke-acp.mjs --debug --dry-run",
     "inspect": "pnpm --filter inspector inspect --"
   },
   "dependencies": {

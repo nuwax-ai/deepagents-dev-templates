@@ -65,7 +65,7 @@
       "scripts/lib/bundle.mjs",
       "scripts/lib/staging.mjs",
       "scripts/lib/tools.mjs",
-      "scripts/validate-package.sh",
+      "scripts/validate-package.mjs",
       "scripts/publish-s3.sh",
       "scripts/release.sh",
       "scripts/s3-fetch.sh",

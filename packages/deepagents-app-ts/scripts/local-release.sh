@@ -285,7 +285,7 @@ if [[ "$SKIP_TESTS" -eq 1 ]]; then
 fi
 node scripts/package.mjs "${PKG_ARGS[@]}"
 
-bash scripts/validate-package.sh \
+node scripts/validate-package.mjs \
   --artifact "dist-packages/deepagents-dev-templates-${VERSION}-nuwax.zip" \
   --require-node-modules
 

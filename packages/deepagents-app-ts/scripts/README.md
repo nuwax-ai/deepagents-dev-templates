@@ -24,7 +24,7 @@ Build, development, and distribution scripts for the template package.
 | `package.mjs` | Distribution archives (.tgz, .zip, .tar.gz), cross-platform |
 | `package-platforms.mjs` | Per-platform archives + `platforms.json`, cross-platform |
 | `lib/staging.mjs` | Staging copy / archive helpers (used by package scripts) |
-| `validate-package.sh` | Validate package contents and structure |
+| `validate-package.mjs` | Validate package contents and structure |
 | `local-release.sh` | Create a local release for testing |
 
 ### Windows packaging tools (optional, recommended)
