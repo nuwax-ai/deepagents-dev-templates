@@ -37,6 +37,9 @@ scripts/       — Build, esbuild bundle, package, install/upgrade/release tooli
 # Install dependencies
 npm install
 
+# Windows only (optional): install rsync + zip for packaging
+# pnpm run setup:tools
+
 # Copy and configure environment
 cp .env.example .env
 # Edit .env with your model/API settings
@@ -50,6 +53,16 @@ npm start
 
 # Run tests
 npm test
+```
+
+### Windows (PowerShell)
+
+No bash required. Packaging uses Node scripts directly:
+
+```powershell
+pnpm run check:tools      # verify rsync / zip (optional)
+pnpm run setup:tools      # install via Chocolatey if missing
+pnpm run package:platforms
 ```
 
 ## Key Concepts
