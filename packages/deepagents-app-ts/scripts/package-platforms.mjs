@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 /**
- * Cross-platform per-platform packaging (PowerShell / bash).
- * Replaces scripts/package-platforms.sh logic.
+ * Cross-platform per-platform packaging (Node; no bash required).
  */
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";

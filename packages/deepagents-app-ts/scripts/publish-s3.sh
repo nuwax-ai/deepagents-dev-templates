@@ -168,7 +168,7 @@ for required in \
   "$OUT_DIR/agent-package.release.json"; do
   if [[ ! -f "$required" ]]; then
     echo "Missing artifact: $required" >&2
-    echo "Run 'bash scripts/package.sh --format all' first." >&2
+    echo "Run 'node scripts/package.mjs --format all' first." >&2
     exit 1
   fi
 done
@@ -200,7 +200,11 @@ SCRIPT_FILES=(
   "scripts/install.sh"
   "scripts/upgrade.sh"
   "scripts/uninstall.sh"
-  "scripts/package.sh"
+  "scripts/package.mjs"
+  "scripts/package-platforms.mjs"
+  "scripts/lib/bundle.mjs"
+  "scripts/lib/staging.mjs"
+  "scripts/lib/tools.mjs"
   "scripts/validate-package.sh"
   "scripts/publish-s3.sh"
   "scripts/release.sh"

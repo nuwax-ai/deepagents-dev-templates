@@ -278,12 +278,12 @@ fi
 # ─── 打包 ─────────────────────────────────────────────────────
 
 echo
-echo "▶ package.sh"
+echo "▶ package.mjs"
 PKG_ARGS=(--format all)
 if [[ "$SKIP_TESTS" -eq 1 ]]; then
   PKG_ARGS+=(--skip-tests)
 fi
-bash scripts/package.sh "${PKG_ARGS[@]}"
+node scripts/package.mjs "${PKG_ARGS[@]}"
 
 bash scripts/validate-package.sh \
   --artifact "dist-packages/deepagents-dev-templates-${VERSION}-nuwax.zip" \

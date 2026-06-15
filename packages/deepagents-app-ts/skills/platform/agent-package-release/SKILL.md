@@ -70,7 +70,8 @@ npm test
 
 ### Step 3: Generate Checksum
 ```bash
-bash scripts/package.sh
+pnpm run package
+# or: node scripts/package.mjs --format all
 ```
 This creates the distributable artifact and computes the sha256 checksum.
 

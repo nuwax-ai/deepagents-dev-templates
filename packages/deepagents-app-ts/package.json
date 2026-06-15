@@ -49,7 +49,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
-    "clean": "rm -rf dist/",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "package": "node scripts/package.mjs",
     "package:all": "node scripts/package.mjs --format all",
     "package:nuwax": "node scripts/package.mjs --format all",

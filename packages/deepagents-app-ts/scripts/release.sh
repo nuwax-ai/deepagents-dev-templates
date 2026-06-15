@@ -9,7 +9,7 @@
 #   1. Read version from the supplied git tag.
 #   2. Refuse to proceed if the working tree is dirty, unless --allow-dirty.
 #   3. Refuse to proceed if package.json + agent-package.json do not match the tag.
-#   4. Run scripts/package.sh --format all to regenerate artifacts.
+#   4. Run scripts/package.mjs --format all to regenerate artifacts.
 #   5. Run scripts/publish-s3.sh --from-tag <tag> to push to MinIO/S3.
 #
 # Requires: bash, git, node, the aws cli, jq.
@@ -32,11 +32,11 @@ Usage:
 
 Options:
   --allow-dirty        Proceed even if the working tree has uncommitted changes
-  --skip-package       Do not run scripts/package.sh (assume artifacts exist)
+  --skip-package       Do not run scripts/package.mjs (assume artifacts exist)
   --skip-publish       Do not run scripts/publish-s3.sh (only rebuild locally)
-  --skip-tests         Skip vitest during package.sh (default)
-  --no-skip-tests      Run vitest during package.sh
-  --dry-run            Forward --dry-run to package.sh and publish-s3.sh
+  --skip-tests         Skip vitest during package.mjs (default)
+  --no-skip-tests      Run vitest during package.mjs
+  --dry-run            Forward --dry-run to package.mjs and publish-s3.sh
   -h, --help           Show help
 
 Examples:
@@ -133,21 +133,21 @@ fi
 # 4. Build the artifacts.
 if [[ "$SKIP_PACKAGE" -eq 0 ]]; then
   echo
-  echo "▶ package.sh"
+  echo "▶ package.mjs"
   PKG_ARGS=(--format all)
   if [[ "$SKIP_TESTS" -eq 1 || "$DRY_RUN" -eq 1 ]]; then
     PKG_ARGS+=(--skip-tests)
   fi
-  bash scripts/package.sh "${PKG_ARGS[@]}"
+  node scripts/package.mjs "${PKG_ARGS[@]}"
 
   echo
-  echo "▶ package-platforms.sh"
+  echo "▶ package-platforms.mjs"
   # Per-platform archives ({agentName}-{os}-{arch}-{version}.{ext}) + platforms.json
   # for nuwax-file-server. --verbose so progress shows up in CI logs.
   AGENT_NAME=$(node -p "require('./agent-package.json').name")
-  bash scripts/package-platforms.sh "$AGENT_NAME" "$VERSION" dist-packages --verbose
+  node scripts/package-platforms.mjs "$AGENT_NAME" "$VERSION" dist-packages --verbose
 else
-  echo "▶ package.sh (skipped)"
+  echo "▶ package.mjs (skipped)"
 fi
 
 # 5. Publish.

@@ -1,6 +1,6 @@
 /**
  * Cross-platform staging helpers (Windows PowerShell / macOS / Linux).
- * Used by package-platforms.mjs, package.mjs, and thin bash wrappers.
+ * Used by package-platforms.mjs and package.mjs.
  */
 import { spawn, spawnSync } from "node:child_process";
 import { cp, mkdir, readdir, rm, stat } from "node:fs/promises";

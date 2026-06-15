@@ -20,15 +20,16 @@ Build, development, and distribution scripts for the template package.
 | Script | Description |
 |--------|-------------|
 | `build.sh` | Compile TypeScript to `dist/` |
-| `bundle.sh` | Wrapper → `lib/bundle.mjs` (esbuild bundle, cross-platform) |
-| `package.sh` | Wrapper → `package.mjs` (distribution archives, cross-platform) |
-| `package-platforms.sh` | Wrapper → `package-platforms.mjs` (per-platform archives + `platforms.json`, cross-platform) |
+| `lib/bundle.mjs` | esbuild bundle (`dist/bundle.mjs`), cross-platform |
+| `package.mjs` | Distribution archives (.tgz, .zip, .tar.gz), cross-platform |
+| `package-platforms.mjs` | Per-platform archives + `platforms.json`, cross-platform |
+| `lib/staging.mjs` | Staging copy / archive helpers (used by package scripts) |
 | `validate-package.sh` | Validate package contents and structure |
 | `local-release.sh` | Create a local release for testing |
 
 ### Windows packaging tools (optional, recommended)
 
-Packaging scripts are **pure Node** (`package.mjs`, `package-platforms.mjs`) and run in **PowerShell without bash**. For faster, more reliable archives, install native CLI tools once:
+Packaging scripts are **pure Node** (`package.mjs`, `package-platforms.mjs`) and run in **PowerShell without bash**.
 
 ```powershell
 # Admin not required for choco install if Chocolatey is already set up

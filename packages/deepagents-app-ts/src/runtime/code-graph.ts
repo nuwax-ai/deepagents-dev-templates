@@ -241,7 +241,7 @@ export function generateCodeGraph(root = process.cwd()): CodeGraph {
     ["config:platform", "Platform endpoint config", "config/platform.json"],
     ["manifest:template", "Template manifest", "template.manifest.json"],
     ["manifest:package", "Agent package manifest", "agent-package.json"],
-    ["script:package", "Package script", "scripts/package.sh"],
+    ["script:package", "Package script", "scripts/package.mjs"],
   ] as const) {
     addIfExists(nodes, root, {
       id,
