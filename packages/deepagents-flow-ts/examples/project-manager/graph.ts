@@ -22,12 +22,13 @@ import {
   Annotation,
   MemorySaver,
   interrupt,
-  Command,
+  type BaseCheckpointSaver,
 } from "@langchain/langgraph";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { logger, type AppConfig } from "deepagents-app-ts/runtime";
-import type { StatefulFlow, FlowRunResult } from "../../src/surfaces/flow-types.js";
-import { requireModel, extractText, isApproval } from "../shared.js";
+import type { StatefulFlow } from "../../src/surfaces/flow-types.js";
+import { createStatefulFlow } from "../../src/surfaces/stateful-flow.js";
+import { requireModel, extractText, isApproval, durableCheckpointer } from "../shared.js";
 
 const log = logger.child("pm");
 
@@ -189,7 +190,10 @@ async function finalizeNode(
   };
 }
 
-export function createPMGraph(appConfig?: AppConfig) {
+export function createPMGraph(
+  appConfig?: AppConfig,
+  checkpointer: BaseCheckpointSaver = new MemorySaver()
+) {
   return new StateGraph(PMState)
     .addNode("plan", (s: PMStateType) => planNode(s, appConfig))
     .addNode("estimate", (s: PMStateType) => estimateNode(s, appConfig))
@@ -205,36 +209,21 @@ export function createPMGraph(appConfig?: AppConfig) {
     })
     .addEdge("approve", "finalize")
     .addEdge("finalize", END)
-    .compile({ checkpointer: new MemorySaver() });
+    .compile({ checkpointer });
 }
 
-/** 包装成模板 StatefulFlow：run({query})→评估循环跑到 approve 的 interrupt；run({resume})→finalize。 */
-export function createPMFlow(appConfig?: AppConfig): StatefulFlow {
-  const graph = createPMGraph(appConfig);
-  return {
-    async run(input, threadId): Promise<FlowRunResult> {
-      const config = { configurable: { thread_id: threadId } };
-      const stream =
-        input.resume !== undefined
-          ? await graph.stream(new Command({ resume: input.resume }), config)
-          : await graph.stream({ goal: input.query ?? "" }, config);
-
-      let interruptValue: unknown;
-      for await (const chunk of stream) {
-        const intr = (chunk as Record<string, unknown>).__interrupt__ as
-          | Array<{ value?: unknown }>
-          | undefined;
-        if (intr && intr.length) interruptValue = intr[0]?.value;
-      }
-
-      if (interruptValue !== undefined) {
-        const q =
-          (interruptValue as { question?: string })?.question ??
-          String(interruptValue);
-        return { status: "interrupted", question: q };
-      }
-      const snapshot = await graph.getState(config);
-      return { status: "done", answer: (snapshot.values as PMStateType).output ?? "" };
-    },
-  };
+/**
+ * 包装成模板 StatefulFlow：run({query})→评估循环跑到 approve 的 interrupt；run({resume})→finalize。
+ * 经 createStatefulFlow 统一 run-loop + 持久化 resume（默认 FileCheckpointSaver，跨重启续跑）。
+ */
+export function createPMFlow(
+  appConfig?: AppConfig,
+  opts: { checkpointer?: BaseCheckpointSaver } = {}
+): StatefulFlow {
+  return createStatefulFlow<PMStateType>({
+    buildGraph: (cp) => createPMGraph(appConfig, cp),
+    toInput: (query) => ({ goal: query }),
+    toResult: (v) => ({ answer: v.output ?? "" }),
+    checkpointer: durableCheckpointer(appConfig, opts.checkpointer),
+  });
 }

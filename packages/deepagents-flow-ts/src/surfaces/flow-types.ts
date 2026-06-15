@@ -23,10 +23,29 @@ export interface ToolCallEvent {
   error?: string;
 }
 
-/** 回调集合（流式 token + 工具调用事件）——one-shot 与 stateful flow 共用。 */
+/**
+ * 阶段/进度事件 —— 长任务多阶段流水线（如 plan → research → draft → review）的可视化。
+ * 与 ToolCallEvent 互补：tool 事件是「调了什么外部能力」，stage 事件是「现在走到流水线哪一步」。
+ * surface 据此给客户端推进度（CLI 打印 / ACP 发 message chunk）。节点经
+ * `config.configurable.onStage` 触发（与 onToolCall 同机制，可穿透 Send 并行实例）。
+ */
+export interface StageEvent {
+  /** 阶段名（如 "调研" / "撰写初稿" / "质量评审"）。 */
+  stage: string;
+  /** 可选：当前第几步（1-based）。 */
+  index?: number;
+  /** 可选：总步数。 */
+  total?: number;
+  /** 可选：本步细节（如正在调研的章节标题）。 */
+  detail?: string;
+}
+
+/** 回调集合（流式 token + 工具调用事件 + 阶段进度）——one-shot 与 stateful flow 共用。 */
 export interface FlowCallbacks {
   onToken?: (token: string) => void | Promise<void>;
   onToolCall?: (e: ToolCallEvent) => void | Promise<void>;
+  /** 长任务阶段推进（可选）。 */
+  onStage?: (e: StageEvent) => void | Promise<void>;
 }
 
 /**
@@ -57,4 +76,16 @@ export interface StatefulFlow {
     threadId: string,
     callbacks?: FlowCallbacks
   ): Promise<FlowRunResult>;
+  /**
+   * 该 thread 是否**已经开始过**（checkpointer 里已有该会话的 checkpoint）。可选。
+   *
+   * 长任务关键 seam：surface 据此判断「下一条用户消息是续跑、还是开新任务」。
+   * **一个会话 = 一个主题/项目**：首条消息开题（无 checkpoint → 新任务），之后每条都续跑同一项目
+   * （有 checkpoint → resume），无论它停在 interrupt、错在某节点、还是已跑完——
+   * 都不会被误当成「新主题」重头开始。
+   *
+   * 实现应**从 checkpointer 状态推断**（`graph.getState()` 是否有 checkpoint），而非进程内存——
+   * 这样进程/IDE 重启后仍准（见 createStatefulFlow）。未实现时 surface 退回内存跟踪。
+   */
+  hasStarted?(threadId: string): Promise<boolean>;
 }

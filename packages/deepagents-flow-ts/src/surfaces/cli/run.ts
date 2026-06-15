@@ -20,12 +20,17 @@ export interface FlowCliOptions {
   interactive?: boolean;
   /** 无参时显示的用法提示（默认指向 src/index.ts flow） */
   usage?: string;
+  /**
+   * 固定 threadId（仅 StatefulFlow）：长任务可在多次 CLI 调用间续跑。
+   * 缺省每次进程随机一个 thread（单次会话内驱动 HITL）。
+   */
+  threadId?: string;
 }
 
 const DEFAULT_USAGE =
   '用法：\n  tsx src/index.ts flow "你的输入"\n  tsx src/index.ts flow --interactive\n';
 
-/** 工具调用过程打印（▶ 进行中 / ✓ 完成 / ✗ 失败）——one-shot 与 stateful 共用。 */
+/** 工具调用 + 阶段进度打印（▶/✓/✗ 工具，▸ 阶段）——one-shot 与 stateful 共用。 */
 const toolCallbacks: FlowCallbacks = {
   onToolCall: (e) => {
     const tag =
@@ -33,6 +38,11 @@ const toolCallbacks: FlowCallbacks = {
     process.stdout.write(
       `${tag} ${e.toolName}${e.status === "in_progress" ? " …\n" : "\n"}`
     );
+  },
+  onStage: (e) => {
+    const pos = e.index && e.total ? ` [${e.index}/${e.total}]` : "";
+    const detail = e.detail ? ` · ${e.detail}` : "";
+    process.stdout.write(`▸${pos} ${e.stage}${detail}\n`);
   },
 };
 
@@ -86,14 +96,18 @@ async function runStatefulCli(
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   const prompt = (p: string): Promise<string> =>
     new Promise((resolve) => rl.question(p, resolve));
-  const threadId = randomUUID();
+  const threadId = options.threadId ?? randomUUID();
 
   // 驱动一轮完整对话：首个 input 起跑，遇 interrupt 就问用户并 resume，直到 done。
-  const drive = async (first: {
-    query?: string;
-    resume?: string;
-  }): Promise<void> => {
-    let input = first;
+  // 一个会话 = 一个主题：若该 thread 已开过题（--thread 复用、上次/别的进程没跑完），
+  // 这条输入按 resume 续跑同一项目，而不是重起新任务（与 ACP surface 同口径）。
+  const drive = async (firstText: string): Promise<void> => {
+    const resuming = flow.hasStarted
+      ? await flow.hasStarted(threadId)
+      : false;
+    let input: { query?: string; resume?: string } = resuming
+      ? { resume: firstText }
+      : { query: firstText };
     while (true) {
       const res = await flow.run(input, threadId, toolCallbacks);
       if (res.status === "done") {
@@ -118,12 +132,12 @@ async function runStatefulCli(
         if (q === "exit" || q === "quit") break;
         if (q) {
           process.stdout.write("⏳ 处理中...\n");
-          await drive({ query: q });
+          await drive(q);
         }
       }
     } else if (options.query) {
       process.stdout.write(`\n❓ ${options.query}\n⏳ 处理中...\n`);
-      await drive({ query: options.query });
+      await drive(options.query);
     } else {
       process.stdout.write(options.usage ?? DEFAULT_USAGE);
     }

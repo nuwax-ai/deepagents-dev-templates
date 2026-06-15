@@ -23,6 +23,7 @@ import type {
   StatefulFlow,
   FlowCallbacks,
   ToolCallEvent,
+  StageEvent,
 } from "../flow-types.js";
 
 const log = logger.child("flow-acp");
@@ -109,6 +110,13 @@ async function streamText(
   });
 }
 
+/** 长任务阶段事件 → 一行进度文本（作为 message chunk 推给客户端）。 */
+function formatStage(e: StageEvent): string {
+  const pos = e.index && e.total ? ` [${e.index}/${e.total}]` : "";
+  const detail = e.detail ? ` · ${e.detail}` : "";
+  return `\n▸${pos} ${e.stage}${detail}\n`;
+}
+
 export interface FlowAcpOptions {
   /** one-shot FlowExecutor，或支持 human-in-the-loop 的 StatefulFlow */
   executor: FlowExecutor | StatefulFlow;
@@ -125,8 +133,12 @@ export async function bootstrapFlowAcp(options: FlowAcpOptions): Promise<void> {
   const { executor, appConfig } = options;
   // executor 是 function ⇒ one-shot FlowExecutor；是对象（有 run）⇒ 支持 HITL 的 StatefulFlow。
   const isStateful = typeof executor !== "function";
-  // 记录哪些 session 正在等用户对 interrupt 的回复（其下一条 prompt 当作 resume）。
-  const awaitingResume = new Set<string>();
+  // 一个会话 = 一个主题：首条 prompt 开题，之后每条都续跑同一项目（不重头开新主题）。
+  // 该判断优先从 flow 的 checkpointer 推断（hasStarted），跨进程/IDE 重启仍准；
+  // 仅当 flow 未实现 hasStarted 时，退回进程内存 Set（重启即丢，老式 flow 的兜底）。
+  const durableResume =
+    isStateful && typeof (executor as StatefulFlow).hasStarted === "function";
+  const fallbackResume = new Set<string>();
 
   log.info("Flow ACP bootstrapping", {
     agent: appConfig.agent.name,
@@ -158,15 +170,20 @@ export async function bootstrapFlowAcp(options: FlowAcpOptions): Promise<void> {
           return streamText(conn, sessionId, token);
         },
         onToolCall: (e) => emitToolCall(conn, sessionId, e),
+        // 阶段进度作为独立 message chunk 推送，不影响 streamed（仍会补发最终 answer/question）。
+        onStage: (e) => streamText(conn, sessionId, formatStage(e)),
       };
 
       try {
         if (isStateful) {
           const flow = executor as StatefulFlow;
-          // 该 session 在等 resume ⇒ 这条 prompt 是用户对上次 interrupt 的回复。
-          const resuming = awaitingResume.has(sessionId);
+          // 该 session 是否已开题：持久化 flow 读 checkpointer（已有 checkpoint ⇒ 续跑），否则查内存兜底。
+          const resuming = durableResume
+            ? await flow.hasStarted!(sessionId)
+            : fallbackResume.has(sessionId);
           log.info(resuming ? "onPrompt → resume" : "onPrompt → flow(stateful)", {
             sessionId,
+            durable: durableResume,
             text: text.slice(0, 100),
           });
           const res = await flow.run(
@@ -175,13 +192,13 @@ export async function bootstrapFlowAcp(options: FlowAcpOptions): Promise<void> {
             callbacks
           );
           if (res.status === "interrupted") {
-            awaitingResume.add(sessionId); // 等下一轮用户回复
+            if (!durableResume) fallbackResume.add(sessionId); // 老式 flow：内存记「等回复」
             if (!streamed && res.question) {
               await streamText(conn, sessionId, res.question);
             }
             return { stopReason: "end_turn" as StopReason };
           }
-          awaitingResume.delete(sessionId); // 跑到底，清状态
+          if (!durableResume) fallbackResume.delete(sessionId); // 跑到底，清兜底状态
           if (!streamed && res.answer) await streamText(conn, sessionId, res.answer);
           if (res.footer) await streamText(conn, sessionId, res.footer);
           return { stopReason: "end_turn" as StopReason };
@@ -195,7 +212,7 @@ export async function bootstrapFlowAcp(options: FlowAcpOptions): Promise<void> {
         return { stopReason: "end_turn" as StopReason };
       } catch (err) {
         log.error("onPrompt flow failed", { error: String(err) });
-        awaitingResume.delete(sessionId); // 出错清状态，避免卡在 resume
+        if (isStateful && !durableResume) fallbackResume.delete(sessionId); // 出错清兜底状态，避免卡在 resume
         await streamText(conn, sessionId, "抱歉，处理您的问题时出现错误。");
         return { stopReason: "end_turn" as StopReason };
       }

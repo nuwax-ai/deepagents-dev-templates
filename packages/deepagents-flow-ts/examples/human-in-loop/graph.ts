@@ -20,18 +20,13 @@ import {
   Annotation,
   MemorySaver,
   interrupt,
-  Command,
+  type BaseCheckpointSaver,
 } from "@langchain/langgraph";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
-import { logger, type AppConfig } from "deepagents-app-ts/runtime";
-import type {
-  StatefulFlow,
-  FlowRunResult,
-  FlowCallbacks,
-} from "../../src/surfaces/flow-types.js";
-import { requireModel, extractText, isApproval } from "../shared.js";
-
-const log = logger.child("hitl-review");
+import { type AppConfig } from "deepagents-app-ts/runtime";
+import type { StatefulFlow } from "../../src/surfaces/flow-types.js";
+import { createStatefulFlow } from "../../src/surfaces/stateful-flow.js";
+import { requireModel, extractText, isApproval, durableCheckpointer } from "../shared.js";
 
 const ReviewState = Annotation.Root({
   query: Annotation<string>,
@@ -84,7 +79,10 @@ async function finalizeNode(
   return { output: `✏️ 已按意见修订：\n${extractText(res.content).trim()}` };
 }
 
-export function createReviewGraph(appConfig?: AppConfig) {
+export function createReviewGraph(
+  appConfig?: AppConfig,
+  checkpointer: BaseCheckpointSaver = new MemorySaver()
+) {
   return new StateGraph(ReviewState)
     .addNode("compose", (s: ReviewStateType) => composeNode(s, appConfig))
     .addNode("review", reviewNode)
@@ -93,45 +91,22 @@ export function createReviewGraph(appConfig?: AppConfig) {
     .addEdge("compose", "review")
     .addEdge("review", "finalize")
     .addEdge("finalize", END)
-    .compile({ checkpointer: new MemorySaver() });
+    .compile({ checkpointer });
 }
 
 /**
  * 包装成模板 StatefulFlow：run({query})→跑到 review 的 interrupt；run({resume})→finalize。
- * checkpointer 据 threadId 续接状态，两次调用之间草稿不丢。
+ * 经 createStatefulFlow 统一 run-loop + 持久化 resume；checkpointer 默认 FileCheckpointSaver
+ * （durableCheckpointer），两次调用/重启之间草稿不丢。单测可注入 MemorySaver。
  */
-export function createReviewFlow(appConfig?: AppConfig): StatefulFlow {
-  const graph = createReviewGraph(appConfig);
-  return {
-    async run(
-      input,
-      threadId,
-      _callbacks?: FlowCallbacks
-    ): Promise<FlowRunResult> {
-      const config = { configurable: { thread_id: threadId } };
-      const stream =
-        input.resume !== undefined
-          ? await graph.stream(new Command({ resume: input.resume }), config)
-          : await graph.stream({ query: input.query ?? "" }, config);
-
-      let interruptValue: unknown;
-      for await (const chunk of stream) {
-        const intr = (chunk as Record<string, unknown>).__interrupt__ as
-          | Array<{ value?: unknown }>
-          | undefined;
-        if (intr && intr.length) interruptValue = intr[0]?.value;
-      }
-
-      if (interruptValue !== undefined) {
-        const q =
-          (interruptValue as { question?: string })?.question ??
-          String(interruptValue);
-        log.info("interrupted → 等待人审");
-        return { status: "interrupted", question: q };
-      }
-      const snapshot = await graph.getState(config);
-      const values = snapshot.values as ReviewStateType;
-      return { status: "done", answer: values.output ?? "" };
-    },
-  };
+export function createReviewFlow(
+  appConfig?: AppConfig,
+  opts: { checkpointer?: BaseCheckpointSaver } = {}
+): StatefulFlow {
+  return createStatefulFlow<ReviewStateType>({
+    buildGraph: (cp) => createReviewGraph(appConfig, cp),
+    toInput: (query) => ({ query }),
+    toResult: (v) => ({ answer: v.output ?? "" }),
+    checkpointer: durableCheckpointer(appConfig, opts.checkpointer),
+  });
 }

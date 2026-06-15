@@ -3,15 +3,42 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { HumanMessage, AIMessage } from "@langchain/core/messages";
+import { HumanMessage, AIMessage, RemoveMessage } from "@langchain/core/messages";
 import { AppConfigSchema, type AppConfig } from "deepagents-app-ts/runtime";
-import { estimateTokens, compactHistory } from "../src/app/compaction.js";
+import { estimateTokens, compactHistory, compactionUpdate } from "../src/app/compaction.js";
 
 describe("estimateTokens", () => {
   it("按 char/4 向上取整", () => {
     expect(estimateTokens([new HumanMessage("abcd")])).toBe(1);
     expect(estimateTokens([new HumanMessage("ab")])).toBe(1);
     expect(estimateTokens([new HumanMessage("abcdefgh")])).toBe(2);
+  });
+});
+
+describe("compactionUpdate（替换更新，纯函数）", () => {
+  const withIds = (n: number) =>
+    Array.from({ length: n }, (_, i) => new HumanMessage({ id: `m${i}`, content: `msg-${i}` }));
+
+  it("压缩变短 → 先删全部旧消息(RemoveMessage)，再写回压缩结果", () => {
+    const prior = withIds(10);
+    const compacted = [new AIMessage({ id: "sum", content: "摘要" }), prior[8]!, prior[9]!];
+    const update = compactionUpdate(prior, compacted);
+    // 前 10 条是删除指令（按 id），其后接 3 条压缩结果
+    expect(update.length).toBe(13);
+    expect(update.slice(0, 10).every((m) => m instanceof RemoveMessage)).toBe(true);
+    expect((update[0] as RemoveMessage).id).toBe("m0");
+    expect(update.slice(10)).toEqual(compacted);
+  });
+
+  it("没变短（没触发压缩）→ 返回 []（调用方跳过 updateState）", () => {
+    const prior = withIds(5);
+    expect(compactionUpdate(prior, prior)).toEqual([]);
+  });
+
+  it("旧消息无 id（删不了）→ 返回 []", () => {
+    const prior = [new HumanMessage("a"), new HumanMessage("b")];
+    const compacted = [new HumanMessage("a")];
+    expect(compactionUpdate(prior, compacted)).toEqual([]);
   });
 });
 

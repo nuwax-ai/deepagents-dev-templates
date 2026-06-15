@@ -28,7 +28,7 @@ START → prepare → think(model.bindTools) ──(toolsCondition)──┐
 工具集来自 `FlowRuntime.allTools`：bash / 文件读写 / search / http / json / mcp-bridge / platform_api / agent_variable + native MCP（context7）+ demo(echo/calculate/time)。
 无模型凭证时 think 走 fallback（回显输入），图始终可跑、可测。见 [src/app/graph.ts](src/app/graph.ts)。
 
-**进阶模式**（并行 fan-out、HITL `interrupt`、subgraph 子代理、压缩）见 [docs/flow-patterns.md](docs/flow-patterns.md)；
+**进阶模式**（并行 fan-out、HITL `interrupt`、subgraph 子代理、压缩、**长任务硬化**：跨重启续跑 / 阶段进度 / 单步护栏）见 [docs/flow-patterns.md](docs/flow-patterns.md)；
 能力分层与配置见 [docs/capabilities.md](docs/capabilities.md)。
 
 ## 示例：不同需求 → 不同拓扑
@@ -43,10 +43,12 @@ human-in-the-loop，可 `interrupt` 暂停→等用户→`resume`）。下面四
 | [examples/project-manager](examples/project-manager/) | 分解-评估-审批 | 评估循环 + HITL | reflection 回边 + 条件边 | stateful |
 | [examples/human-in-loop](examples/human-in-loop/) | 生成→人审→定稿 | 线性 + 中途暂停 | `interrupt` + `Command(resume)` | stateful |
 | [examples/dev-agent](examples/dev-agent/) | 综合能力展示 | 标准 ReAct + subgraph | bindTools/ToolNode/FileCheckpointSaver/compactHistory/subgraph | stateful |
-| [examples/deep-research](examples/deep-research/) | 深度研究报告（长任务） | 多阶段流水线 + 双层 reflection | 3 轮 HITL + Send 并行调研 + 条件边循环 | stateful |
+| [examples/deep-research](examples/deep-research/) | 深度研究报告（长任务） | 多阶段流水线 + 双层 reflection + 持续会话 | 2 确认门 + Send 并行调研 + 条件边循环 + 报告后持续会话 + 跨重启续跑/阶段进度/护栏 | stateful |
 
 每个示例都**不重写** surface plumbing：写自己的图 + 节点 → 包成 `FlowExecutor`/`StatefulFlow` →
-插进同一套 `bootstrapFlowAcp`/`runFlowCli`。
+插进同一套 `bootstrapFlowAcp`/`runFlowCli`。其中 4 个有状态示例共用 **`createStatefulFlow`**
+（`src/surfaces/stateful-flow.ts`）基座 —— 统一 interrupt/resume run-loop + 默认 `FileCheckpointSaver`
+持久化 + 从 checkpointer 推断续跑（`hasStarted`：一个会话一个主题，首条开题、之后续跑同一项目），**长任务跨进程/IDE 重启可续跑**。
 
 示例**真实接入**业务依赖（travel 用免 key 的 DuckDuckGo 搜索 MCP，其余 LLM 节点真调大模型），
 **无 demo fallback——未配凭证直接报错**；运行前在 `.env` 配模型凭证（见下）。各示例的图拓扑 / 路由
@@ -108,8 +110,10 @@ pnpm --filter deepagents-flow-ts example:review "写一段产品介绍"
 **两类 flow**（[src/surfaces/flow-types.ts](src/surfaces/flow-types.ts)）：
 - `FlowExecutor`：one-shot，`(query, cb) => Promise<FlowResult>`。适合问答 / 检索 / 批处理（见 examples/rag）。
 - `StatefulFlow`：支持 human-in-the-loop，`run({query|resume}, threadId, cb) => {done|interrupted}`。图里
-  `interrupt` 暂停 → surface 把问题发给用户 → 下一轮 `resume`（见 examples/{travel-planner,project-manager,human-in-loop}）。
-  机制：`MemorySaver` checkpointer + `Command({resume})`，thread_id = ACP sessionId。
+  `interrupt` 暂停 → surface 把问题发给用户 → 下一轮 `resume`（见 examples/{deep-research,travel-planner,project-manager,human-in-loop}）。
+  机制：checkpointer + `Command({resume})`，thread_id = ACP sessionId。**别手写 run-loop**——用
+  `createStatefulFlow`（`src/surfaces/stateful-flow.ts`）：默认 `FileCheckpointSaver` 持久化、
+  可选 `hasStarted` 让 surface 从 checkpointer 判断续跑（一个会话一个主题：首条开题、之后续跑同一项目，跨重启仍准），onStage 阶段进度 + recursionLimit 护栏一并到位。
 
 **关键 seam**：surface 与具体图解耦。[src/surfaces/acp/server.ts](src/surfaces/acp/server.ts) 的 `bootstrapFlowAcp`
 和 [src/surfaces/cli/run.ts](src/surfaces/cli/run.ts) 的 `runFlowCli` 按 `typeof executor` 自动分流两类 flow。

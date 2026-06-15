@@ -17,9 +17,11 @@
  * 真实工具调用需配 ANTHROPIC_API_KEY（或 OPENAI_API_KEY）。
  */
 
+import type { BaseMessage } from "@langchain/core/messages";
 import { loadFlowConfig } from "../../src/runtime/config.js";
 import { createFlowRuntime, type FlowRuntime } from "../../src/runtime/flow-runtime.js";
 import { createFlowGraph } from "../../src/app/graph.js";
+import { compactHistory, compactionUpdate } from "../../src/app/compaction.js";
 import { runFlowCli } from "../../src/surfaces/cli/run.js";
 import type { FlowState } from "../../src/app/state.js";
 import type { StatefulFlow } from "../../src/surfaces/flow-types.js";
@@ -40,6 +42,17 @@ export function createDevAgentFlow(runtime: FlowRuntime): StatefulFlow {
         systemPrompt: runtime.systemPrompt,
         callbacks: { onToken: callbacks?.onToken, onToolCall: callbacks?.onToolCall },
       });
+
+      // 长任务上下文压缩：多轮累积超阈值时，摘要旧历史 + RemoveMessage 替换，再跑本轮
+      // （config.compaction 控制；无凭证仅裁剪不摘要。见 src/app/compaction.ts）。
+      const prior =
+        ((await graph.getState(config)).values as Partial<FlowState> | undefined)
+          ?.messages ?? [];
+      if (prior.length) {
+        const compacted = await compactHistory(prior as BaseMessage[], runtime.config);
+        const update = compactionUpdate(prior as BaseMessage[], compacted);
+        if (update.length) await graph.updateState(config, { messages: update });
+      }
 
       const result = (await graph.invoke(
         { input: input.query ?? "", messages: [] } as unknown as FlowState,

@@ -9,8 +9,6 @@
  * 不再各自裸调 resolveModel / appConfig。
  */
 
-import { resolve as resolvePath } from "node:path";
-import { homedir } from "node:os";
 import type { StructuredTool } from "@langchain/core/tools";
 import {
   createRuntimeContextAsync,
@@ -24,7 +22,7 @@ import {
 } from "deepagents-app-ts/runtime";
 import { createFlowTools } from "../app/tools/index.js";
 import { getFlowSandboxPolicy, type FlowSandboxPolicy } from "./sandbox.js";
-import { FileCheckpointSaver } from "./file-checkpoint-saver.js";
+import { FileCheckpointSaver, createFileCheckpointer } from "./file-checkpoint-saver.js";
 
 export interface FlowRuntime {
   config: AppConfig;
@@ -45,12 +43,6 @@ export interface FlowRuntime {
   checkpointer: FileCheckpointSaver;
 }
 
-/** 展开 ~/ 前缀（config.memory.dir 可能是 ~/...）。 */
-function expandHome(p: string): string {
-  if (p.startsWith("~/")) return resolvePath(homedir(), p.slice(2));
-  return p;
-}
-
 export async function createFlowRuntime(
   appConfig: AppConfig,
   options: { sessionConfig?: ACPSessionConfig; workspaceRoot?: string } = {}
@@ -63,11 +55,8 @@ export async function createFlowRuntime(
   const skillsPaths = resolveSkillsPaths(appConfig);
   const subAgents = discoverSubAgents(appConfig, workspaceRoot);
 
-  const memoryDir = expandHome(appConfig.memory.dir || "./.flow-sessions");
-  const sessionDir = memoryDir.startsWith("/")
-    ? memoryDir
-    : resolvePath(workspaceRoot, memoryDir);
-  const checkpointer = new FileCheckpointSaver({ dir: sessionDir });
+  // 文件后端 checkpointer：与 createStatefulFlow 共用 resolveSessionDir 口径（见 file-checkpoint-saver）。
+  const checkpointer = createFileCheckpointer(appConfig, workspaceRoot);
 
   return {
     config: appConfig,

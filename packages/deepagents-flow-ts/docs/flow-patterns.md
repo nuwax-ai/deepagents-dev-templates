@@ -86,11 +86,52 @@ const graph = createFlowGraph().compile({ checkpointer: new MemorySaver() });
 await graph.invoke({ input: "..." }, { configurable: { thread_id: "t1" } });
 ```
 
-> 生产持久化换成可序列化的 store(Redis / Postgres / S3),`MemorySaver` 仅进程内。
+> `MemorySaver` 仅进程内 —— 一旦进程/IDE 重启，暂停点就丢了。模板因此自带
+> **`FileCheckpointSaver`**（`src/runtime/file-checkpoint-saver.ts`）：标准 checkpointer 协议 +
+> 文件落盘，跨进程/重启也能 `getState`/resume。生产规模可换 sqlite/postgres saver（接口已对齐）。
+>
+> ⚠️ 落盘要点：MemorySaver 的 storage 里存的是 serde 产出的 `Uint8Array`；朴素 `JSON.stringify`
+> 会把它变成 `{"0":..}` 普通对象、重载即报 `loadsTyped` 错。`FileCheckpointSaver` 用 base64 包装
+> 保真（见该文件 `replaceBytes`/`reviveBytes`）。自定义文件型 saver 时务必处理二进制。
+
+## 6. 长任务硬化:多轮 + 跨重启 + 进度 + 护栏
+
+多阶段、多轮 HITL 的**长任务**（如 [deep-research](../examples/deep-research/)）光有 `interrupt` 不够——
+还要解决「跑到一半重启了怎么续」「N 步流水线进度看不见」「reflection 回边/LLM 挂死跑飞」。
+模板把这些收进 **`createStatefulFlow`**（`src/surfaces/stateful-flow.ts`），有状态示例都基于它：
+
+```ts
+import { createStatefulFlow } from "../../src/surfaces/stateful-flow.js";
+import { durableCheckpointer } from "../shared.js";
+
+export function createMyFlow(appConfig?, opts: { checkpointer?: BaseCheckpointSaver } = {}) {
+  return createStatefulFlow<MyState>({
+    buildGraph: (cp) => createMyGraph(appConfig, cp),   // 图工厂接收 checkpointer
+    toInput: (query) => ({ goal: query }),               // 新任务：query → 初始 state
+    toResult: (v) => ({ answer: v.output ?? "" }),       // 终态 → 回答
+    checkpointer: durableCheckpointer(appConfig, opts.checkpointer), // 默认 FileCheckpointSaver
+    configurable: { appConfig },     // 透传给 Send 并行实例（onToolCall/onStage 基座自动注入）
+    recursionLimit: 50,              // 护栏:防 reflection 回边死循环
+  });
+}
+```
+
+它一处实现了所有有状态示例原本各自重抄的 run-loop，并叠加四个长任务硬化点：
+
+| 硬化点 | 怎么做 | 为什么 |
+|---|---|---|
+| **跨重启续跑** | checkpointer 默认 `FileCheckpointSaver`（落盘） | 重启后暂停点不丢 |
+| **一个会话一个主题** | `hasStarted()` 读 `graph.getState()` 是否已有 checkpoint，**非进程内存** | 首条 prompt 开题，之后每条都续跑同一项目（停在 interrupt / 出错 / 已完成皆然）→ 绝不把消息误当「新主题」重头开始；且重启后仍准 |
+| **阶段进度** | 节点 `emitStage(config, { stage, detail })` → `onStage` 回调 | 长流水线每步可见（CLI 打印 `▸`，ACP 发 message chunk） |
+| **单步护栏** | `recursionLimit` + `withTimeout(model.invoke(...), ms)` | 回边/挂死步骤不拖垮整图 |
+
+> **长任务上下文压缩**:多轮消息累积超阈值时，`compactHistory` 摘要旧历史，再用
+> `compactionUpdate`（`RemoveMessage` 替换模式）写回 channel。见 [dev-agent](../examples/dev-agent/) 的 run-loop
+> 与 `src/app/compaction.ts`（`config.compaction` 控制触发）。
 
 ---
 
-**何时该读这里**:默认图是顺序 ReAct 式(够覆盖大多数编排)。一旦你要 **并行处理多路、需要人审、动态多分支路由、复用整张子图、或要断点续跑** ——回来看对应小节。每段都是最小可抄片段;贴进 `graph.ts` 的连线和节点即可。
+**何时该读这里**:默认图是顺序 ReAct 式(够覆盖大多数编排)。一旦你要 **并行处理多路、需要人审、动态多分支路由、复用整张子图、断点续跑、或做跨重启的长任务** ——回来看对应小节。每段都是最小可抄片段;贴进 `graph.ts` 的连线和节点即可。
 
 ---
 
@@ -103,7 +144,10 @@ await graph.invoke({ input: "..." }, { configurable: { thread_id: "t1" } });
 | `Send` 并行 map-reduce + reducer | [examples/travel-planner](../examples/travel-planner/)（并行 research 4 路 + 聚合） |
 | `interrupt` 人审 / HITL | [examples/human-in-loop](../examples/human-in-loop/)、[travel-planner](../examples/travel-planner/)、[project-manager](../examples/project-manager/) |
 | 条件边循环（评估重试） | [examples/project-manager](../examples/project-manager/)、默认图 `reflect` |
-| 多阶段流水线 + 多轮 HITL + 双层 reflection + 并行调研 | [examples/deep-research](../examples/deep-research/)（长任务示例：选题确认 → 大纲规划 → Send 并行调研 → 初稿生成 → 质量评审 → 定稿，3 轮 interrupt + 2 个 reflection 循环） |
+| 多阶段流水线 + 多轮 HITL + 双层 reflection + 并行调研 + **持续会话** | [examples/deep-research](../examples/deep-research/)（长任务示例：选题确认 → 大纲规划 → Send 并行调研 → 初稿 → 质量评审 → 报告 → **converse↔respond 持续会话回路**，2 确认门 + 2 reflection 循环 + 报告后就同一研究反复改/问，回「结束」定稿） |
+| 长任务硬化（跨重启续跑 + 阶段进度 + 单步护栏） | `createStatefulFlow`（`src/surfaces/stateful-flow.ts`）——deep-research / travel / pm / human-in-loop 全部基于它；持久化默认 `FileCheckpointSaver` |
+| 长任务上下文压缩（摘要 + `RemoveMessage` 替换） | [examples/dev-agent](../examples/dev-agent/) run-loop + `src/app/compaction.ts` |
 
 > `interrupt` 的"采集回复 → resume"已由模板的 **`StatefulFlow`** seam 在 acp/cli surface 接好——
-> 不用自己写 host 端恢复逻辑（见各示例的 `createXxxFlow`）。
+> 不用自己写 host 端恢复逻辑。且续跑状态由 checkpointer 推断（`hasStarted`）——**一个会话一个主题**：
+> 首条开题、之后都续跑同一项目，**进程/IDE 重启后仍能续跑**（见各示例的 `createXxxFlow` 与第 6 节）。

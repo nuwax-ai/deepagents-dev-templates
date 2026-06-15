@@ -9,10 +9,41 @@
  */
 
 import { randomUUID } from "node:crypto";
+import { MemorySaver, type BaseCheckpointSaver } from "@langchain/langgraph";
 import { resolveModel, logger, type AppConfig } from "deepagents-app-ts/runtime";
-import type { ToolCallEvent } from "../src/surfaces/flow-types.js";
+import { createFileCheckpointer } from "../src/runtime/file-checkpoint-saver.js";
+import type { ToolCallEvent, StageEvent } from "../src/surfaces/flow-types.js";
 
 const log = logger.child("example-shared");
+
+/**
+ * 长任务默认持久化：有 appConfig → FileCheckpointSaver（跨重启续跑）；
+ * 无 appConfig（极少数纯单测）→ MemorySaver。单测可注入自己的 checkpointer 覆盖。
+ * 各有状态示例的 createXxxFlow 统一经此决定 checkpointer，避免「示例忘了持久化」回归。
+ */
+export function durableCheckpointer(
+  appConfig?: AppConfig,
+  injected?: BaseCheckpointSaver
+): BaseCheckpointSaver {
+  if (injected) return injected;
+  return appConfig ? createFileCheckpointer(appConfig) : new MemorySaver();
+}
+
+/**
+ * 给长任务里的单步加超时护栏（如一次 LLM 调用挂死不至于卡住整条流水线）。
+ * 超时即 reject，由调用方决定降级/重试；clearTimeout 防泄漏。
+ */
+export async function withTimeout<T>(p: Promise<T>, ms: number, label = "操作"): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label}超时（${ms}ms）`)), ms);
+  });
+  try {
+    return await Promise.race([p, timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
 
 /**
  * 有凭证 → 返回 chat model；无凭证（本地 / CI）→ 返回 null。
@@ -78,6 +109,45 @@ export async function runTool(
     }
     return { result: message, ok: false };
   }
+}
+
+/**
+ * 给长任务里的不稳定步骤加重试（指数退避）——限流 429 / 网络抖动 / 偶发超时不该直接掐死整条流水线。
+ * 重试用尽仍失败才抛，交调用方决定降级（见 deep-research 的 grader 容错）。
+ */
+export async function withRetry<T>(
+  fn: () => Promise<T>,
+  opts: { attempts?: number; baseDelayMs?: number; label?: string } = {}
+): Promise<T> {
+  const attempts = opts.attempts ?? 3;
+  const base = opts.baseDelayMs ?? 800;
+  let lastErr: unknown;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      if (i < attempts - 1) {
+        log.warn(`${opts.label ?? "步骤"}失败，重试 ${i + 1}/${attempts - 1}`, {
+          error: String(err),
+        });
+        await new Promise((r) => setTimeout(r, base * 2 ** i));
+      }
+    }
+  }
+  throw lastErr;
+}
+
+/**
+ * 长任务阶段进度透出 —— 从节点 config.configurable 取 onStage（与 onToolCall 同机制，
+ * 可穿透 Send 并行实例）。节点在阶段切换处调用，surface 渲染成进度行。无 onStage 时静默。
+ */
+export async function emitStage(
+  config: { configurable?: { onStage?: (e: StageEvent) => void | Promise<void> } } | undefined,
+  e: StageEvent
+): Promise<void> {
+  const onStage = config?.configurable?.onStage;
+  if (onStage) await onStage(e);
 }
 
 /**

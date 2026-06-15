@@ -16,9 +16,10 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, unlinkSync } from "node:fs";
 import { resolve, join } from "node:path";
+import { homedir } from "node:os";
 import { MemorySaver } from "@langchain/langgraph";
 import type { RunnableConfig } from "@langchain/core/runnables";
-import { logger } from "deepagents-app-ts/runtime";
+import { logger, type AppConfig } from "deepagents-app-ts/runtime";
 
 const log = logger.child("file-checkpoint");
 
@@ -27,9 +28,60 @@ export interface FileCheckpointOptions {
   dir: string;
 }
 
+/** 展开 ~/ 前缀（config.memory.dir 可能是 ~/...）。 */
+function expandHome(p: string): string {
+  if (p.startsWith("~/")) return resolve(homedir(), p.slice(2));
+  return p;
+}
+
+/**
+ * 由 AppConfig 解析会话存储目录 —— 与 createFlowRuntime 同口径（memory.dir，缺省 ./.flow-sessions）。
+ * 抽出来供 FlowRuntime 与 createStatefulFlow 共用，避免两处目录解析漂移。
+ */
+export function resolveSessionDir(appConfig: AppConfig, workspaceRoot = process.cwd()): string {
+  const memoryDir = expandHome(appConfig.memory?.dir || "./.flow-sessions");
+  return memoryDir.startsWith("/") ? memoryDir : resolve(workspaceRoot, memoryDir);
+}
+
+/**
+ * 由 AppConfig 造一个文件后端 checkpointer（跨重启恢复 + interrupt/resume 持久化）。
+ * StatefulFlow 默认走这个 → 长任务默认就是持久的，而非内存态。
+ */
+export function createFileCheckpointer(
+  appConfig: AppConfig,
+  workspaceRoot = process.cwd()
+): FileCheckpointSaver {
+  return new FileCheckpointSaver({ dir: resolveSessionDir(appConfig, workspaceRoot) });
+}
+
 interface ThreadFileData {
   storage?: Record<string, unknown>;
   writes?: Record<string, unknown>;
+}
+
+/**
+ * MemorySaver 的 storage/writes 里存的是 serde 产出的 **Uint8Array**（二进制 checkpoint/metadata）。
+ * 朴素 JSON.stringify 会把 Uint8Array 序列化成 `{"0":..,"1":..}` 普通对象，重载后
+ * serde.loadsTyped 期望 ArrayBufferView → 抛 "list argument must be ... ArrayBufferView"。
+ * 故用 base64 包装保真：落盘时编码（replacer），载入时还原成 Uint8Array（reviver）。
+ * 这是 FileCheckpointSaver 跨进程/重启续跑真正生效的关键（纯 MemorySaver 不落盘，无此问题）。
+ */
+const U8_TAG = "__u8a_b64__";
+function replaceBytes(_key: string, value: unknown): unknown {
+  if (value instanceof Uint8Array) {
+    return { [U8_TAG]: Buffer.from(value).toString("base64") };
+  }
+  return value;
+}
+function reviveBytes(_key: string, value: unknown): unknown {
+  if (
+    value &&
+    typeof value === "object" &&
+    typeof (value as Record<string, unknown>)[U8_TAG] === "string"
+  ) {
+    return new Uint8Array(Buffer.from((value as Record<string, string>)[U8_TAG]!, "base64"));
+  }
+  return value;
 }
 
 export class FileCheckpointSaver extends MemorySaver {
@@ -58,7 +110,7 @@ export class FileCheckpointSaver extends MemorySaver {
     const file = this.threadFile(threadId);
     if (!existsSync(file)) return;
     try {
-      const data = JSON.parse(readFileSync(file, "utf-8")) as ThreadFileData;
+      const data = JSON.parse(readFileSync(file, "utf-8"), reviveBytes) as ThreadFileData;
       const storage = this.storage as unknown as Record<string, unknown>;
       const writes = this.writes as unknown as Record<string, unknown>;
       if (data.storage?.[threadId]) storage[threadId] = data.storage[threadId];
@@ -87,7 +139,10 @@ export class FileCheckpointSaver extends MemorySaver {
     try {
       writeFileSync(
         this.threadFile(threadId),
-        JSON.stringify({ storage: { [threadId]: threadStorage }, writes: writesForThread })
+        JSON.stringify(
+          { storage: { [threadId]: threadStorage }, writes: writesForThread },
+          replaceBytes
+        )
       );
     } catch (err) {
       log.warn("failed to persist checkpoint", { threadId, error: String(err) });

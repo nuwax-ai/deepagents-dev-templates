@@ -22,17 +22,14 @@ import {
   Send,
   MemorySaver,
   interrupt,
-  Command,
+  type BaseCheckpointSaver,
   type LangGraphRunnableConfig,
 } from "@langchain/langgraph";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { logger, type AppConfig } from "deepagents-app-ts/runtime";
-import type {
-  StatefulFlow,
-  FlowRunResult,
-  FlowCallbacks,
-} from "../../src/surfaces/flow-types.js";
-import { requireModel, extractText, runTool, isApproval } from "../shared.js";
+import type { StatefulFlow, FlowCallbacks } from "../../src/surfaces/flow-types.js";
+import { createStatefulFlow } from "../../src/surfaces/stateful-flow.js";
+import { requireModel, extractText, runTool, isApproval, durableCheckpointer } from "../shared.js";
 import { callMcpTool, rateLimited, type McpServerConfig } from "../mcp-client.js";
 
 const log = logger.child("travel");
@@ -171,7 +168,10 @@ async function finalizeNode(
   return { output: `✏️ 已按意见调整：\n${extractText(res.content).trim()}` };
 }
 
-export function createTravelGraph(appConfig?: AppConfig) {
+export function createTravelGraph(
+  appConfig?: AppConfig,
+  checkpointer: BaseCheckpointSaver = new MemorySaver()
+) {
   return new StateGraph(TravelState)
     .addNode("gather", gatherNode)
     .addNode("research", researchNode)
@@ -184,41 +184,22 @@ export function createTravelGraph(appConfig?: AppConfig) {
     .addEdge("aggregate", "confirm")
     .addEdge("confirm", "finalize")
     .addEdge("finalize", END)
-    .compile({ checkpointer: new MemorySaver() });
+    .compile({ checkpointer });
 }
 
 /**
  * 包装成模板 StatefulFlow：run({query})→并行搜索+整理后在 confirm interrupt；run({resume})→finalize。
- * onToolCall 经 config.configurable 透传给并行的 research 实例。
+ * 经 createStatefulFlow 统一 run-loop + 持久化 resume；onToolCall 由基座经 configurable 透传给并行
+ * research 实例。checkpointer 默认 FileCheckpointSaver（跨重启续跑），单测可注入 MemorySaver。
  */
-export function createTravelFlow(appConfig?: AppConfig): StatefulFlow {
-  const graph = createTravelGraph(appConfig);
-  return {
-    async run(input, threadId, callbacks): Promise<FlowRunResult> {
-      const config = {
-        configurable: { thread_id: threadId, onToolCall: callbacks?.onToolCall },
-      };
-      const stream =
-        input.resume !== undefined
-          ? await graph.stream(new Command({ resume: input.resume }), config)
-          : await graph.stream({ query: input.query ?? "" }, config);
-
-      let interruptValue: unknown;
-      for await (const chunk of stream) {
-        const intr = (chunk as Record<string, unknown>).__interrupt__ as
-          | Array<{ value?: unknown }>
-          | undefined;
-        if (intr && intr.length) interruptValue = intr[0]?.value;
-      }
-
-      if (interruptValue !== undefined) {
-        const q =
-          (interruptValue as { question?: string })?.question ??
-          String(interruptValue);
-        return { status: "interrupted", question: q };
-      }
-      const snapshot = await graph.getState(config);
-      return { status: "done", answer: (snapshot.values as TravelStateType).output ?? "" };
-    },
-  };
+export function createTravelFlow(
+  appConfig?: AppConfig,
+  opts: { checkpointer?: BaseCheckpointSaver } = {}
+): StatefulFlow {
+  return createStatefulFlow<TravelStateType>({
+    buildGraph: (cp) => createTravelGraph(appConfig, cp),
+    toInput: (query) => ({ query }),
+    toResult: (v) => ({ answer: v.output ?? "" }),
+    checkpointer: durableCheckpointer(appConfig, opts.checkpointer),
+  });
 }
