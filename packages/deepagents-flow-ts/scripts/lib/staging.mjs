@@ -3,7 +3,7 @@
  * 供 package-platforms.mjs 与 package.mjs 使用。
  */
 import { spawn, spawnSync } from "node:child_process";
-import { cp, mkdir, readdir, rm, stat } from "node:fs/promises";
+import { cp, lstat, mkdir, readdir, rm, stat } from "node:fs/promises";
 import { createWriteStream } from "node:fs";
 import path from "node:path";
 import { createGzip } from "node:zlib";
@@ -35,6 +35,7 @@ export const STAGING_EXCLUDES = [
   "tsconfig.*.json",
   "vitest.config.*",
   "CLAUDE.md",
+  "AGENTS.md", // 常为指向 CLAUDE.md 的符号链接，发布包不需要
   "QUICKSTART.md",
   "*.tgz",
   "*.tar.gz",
@@ -123,7 +124,11 @@ export async function pruneReleaseResidue(stageRoot) {
   async function walk(dir) {
     for (const name of await readdir(dir)) {
       const full = path.join(dir, name);
-      const st = await stat(full);
+      // 使用 lstat 避免跟随符号链接；staging 中可能存在指向已排除文件的悬空链接
+      const st = await lstat(full);
+      if (st.isSymbolicLink()) {
+        continue;
+      }
       if (st.isDirectory()) {
         await walk(full);
         continue;
