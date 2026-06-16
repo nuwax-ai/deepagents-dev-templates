@@ -62,6 +62,20 @@ export function mapStreamChunk(mode: string, chunk: unknown): SurfaceStreamEvent
         ...(s.total !== undefined ? { total: s.total } : {}),
         ...(s.detail !== undefined ? { detail: s.detail } : {}),
       });
+    } else if (payload.type === "plan") {
+      const p = payload as {
+        entries?: Array<{
+          content: string;
+          priority?: "high" | "medium" | "low";
+          status: "pending" | "in_progress" | "completed" | "skipped";
+        }>;
+      };
+      if (Array.isArray(p.entries) && p.entries.length) {
+        events.push({ type: "plan", entries: p.entries });
+      }
+    } else if (payload.type === "text") {
+      const t = payload as { text?: string };
+      if (t.text) events.push({ type: "text", text: t.text });
     } else if (payload.type === "tool") {
       const t = payload as {
         id?: string;
@@ -90,7 +104,11 @@ export function mapStreamChunk(mode: string, chunk: unknown): SurfaceStreamEvent
   if (mode === "updates") {
     const updates = chunk as Record<string, Record<string, unknown>> | undefined;
     if (updates && typeof updates === "object") {
-      for (const delta of Object.values(updates)) {
+      const candidates =
+        INTERRUPT in updates
+          ? [updates as Record<string, unknown>]
+          : Object.values(updates);
+      for (const delta of candidates) {
         if (!delta || typeof delta !== "object") continue;
         const intr = delta[INTERRUPT] as
           | Array<{ value?: { question?: string } | string }>

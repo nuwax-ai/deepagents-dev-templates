@@ -13,7 +13,7 @@ import { randomUUID } from "node:crypto";
 import { MemorySaver, type BaseCheckpointSaver } from "@langchain/langgraph";
 import { resolveModel, logger, type AppConfig } from "../src/vendor/runtime/index.js";
 import { createFileCheckpointer } from "../src/runtime/file-checkpoint-saver.js";
-import type { ToolCallEvent, StageEvent } from "../src/surfaces/flow-types.js";
+import type { ToolCallEvent, StageEvent, PlanEvent } from "../src/surfaces/flow-types.js";
 
 // 模板级 LLM 韧性 —— 从 deep-research 实战反哺，默认图/compaction 同源实现
 export {
@@ -96,6 +96,21 @@ export async function runTool(
   }
   try {
     const result = await fn();
+    // MCP 有时返回 "Unknown tool: xxx" 但不抛错 —— 视为失败，避免 ACP 显示 completed。
+    const unknownTool =
+      typeof result === "string" && /^Unknown tool:/i.test(result.trim());
+    if (unknownTool) {
+      if (onToolCall) {
+        await onToolCall({
+          toolCallId,
+          toolName,
+          args,
+          status: "failed",
+          error: result,
+        });
+      }
+      return { result, ok: false };
+    }
     if (onToolCall) {
       await onToolCall({ toolCallId, toolName, args, status: "completed", result });
     }
@@ -110,15 +125,64 @@ export async function runTool(
 }
 
 /**
- * 长任务阶段进度透出 —— 从节点 config.configurable 取 onStage（与 onToolCall 同机制，
- * 可穿透 Send 并行实例）。节点在阶段切换处调用，surface 渲染成进度行。无 onStage 时静默。
+ * LangGraph custom writer —— 经 streamMode:"custom" 进入 mapStreamChunk 归一管线。
+ * 与 configurable.onStage/onPlan 双轨：writer 走多模式 stream，callbacks 兼容旧路径。
  */
+type StreamWriter = (payload: Record<string, unknown>) => void;
+
+function getWriter(
+  config: { writer?: StreamWriter } | undefined
+): StreamWriter | undefined {
+  return config?.writer;
+}
+
+/** 阶段进度：writer + onStage 双发。 */
 export async function emitStage(
-  config: { configurable?: { onStage?: (e: StageEvent) => void | Promise<void> } } | undefined,
+  config:
+    | {
+        writer?: StreamWriter;
+        configurable?: { onStage?: (e: StageEvent) => void | Promise<void> };
+      }
+    | undefined,
   e: StageEvent
 ): Promise<void> {
+  const writer = getWriter(config);
+  if (writer) {
+    writer({ type: "stage", ...e });
+    return;
+  }
   const onStage = config?.configurable?.onStage;
   if (onStage) await onStage(e);
+}
+
+/** 结构化 Plan：writer + onPlan 双发。 */
+export async function emitPlan(
+  config:
+    | {
+        writer?: StreamWriter;
+        configurable?: { onPlan?: (e: PlanEvent) => void | Promise<void> };
+      }
+    | undefined,
+  entries: PlanEvent["entries"]
+): Promise<void> {
+  if (!entries.length) return;
+  const writer = getWriter(config);
+  if (writer) {
+    writer({ type: "plan", entries });
+    return;
+  }
+  const onPlan = config?.configurable?.onPlan;
+  if (onPlan) await onPlan({ entries });
+}
+
+/** 流式文本 token：经 custom writer 进入 onToken 管线。 */
+export function emitTextToken(
+  config: { writer?: StreamWriter } | undefined,
+  text: string
+): void {
+  if (!text) return;
+  const writer = getWriter(config);
+  if (writer) writer({ type: "text", text });
 }
 
 /**

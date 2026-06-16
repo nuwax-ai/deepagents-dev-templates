@@ -38,7 +38,7 @@ import {
   invokeWithResilience,
   resolveLlmResilience,
 } from "../shared.js";
-import { callMcpTool, rateLimited, type McpServerConfig } from "../mcp-client.js";
+import { callResolvedMcpTool, rateLimited, type McpServerConfig } from "../mcp-client.js";
 
 const log = logger.child("travel");
 
@@ -120,7 +120,15 @@ async function researchNode(
   const { result, ok } = await runTool(
     "duckduckgo_search",
     { query },
-    () => rateLimited(() => callMcpTool(SEARCH_MCP, "duckduckgo_search", { query, count: 5 }, 20000)),
+    () =>
+      rateLimited(() =>
+        callResolvedMcpTool(
+          SEARCH_MCP,
+          "duckduckgo_search",
+          { query, count: 5 },
+          { timeoutMs: 20000 }
+        )
+      ),
     onToolCall
   );
   // 截断原始搜索结果，交给 aggregate 的 LLM 整理

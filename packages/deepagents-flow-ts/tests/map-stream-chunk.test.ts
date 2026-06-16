@@ -25,6 +25,15 @@ describe("mapStreamChunk", () => {
     expect(out).toEqual([{ type: "stage", stage: "调研", index: 1, total: 3, detail: "背景" }]);
   });
 
+  it("custom mode plan", () => {
+    const entries = [
+      { content: "背景（搜索：background）", priority: "medium", status: "pending" },
+      { content: "架构（搜索：architecture）", priority: "high", status: "in_progress" },
+    ] as const;
+    const out = mapStreamChunk("custom", { type: "plan", entries });
+    expect(out).toEqual([{ type: "plan", entries }]);
+  });
+
   it("custom mode tool in_progress → tool_start", () => {
     const out = mapStreamChunk("custom", { type: "tool", id: "t1", name: "search", status: "in_progress", input: { q: "x" } });
     expect(out).toEqual([{ type: "tool_start", id: "t1", name: "search", input: { q: "x" } }]);

@@ -140,6 +140,70 @@ export async function callMcpTool(
   return extractMcpText(result);
 }
 
+/** 列出 MCP server 暴露的工具名（tools/list）。 */
+export async function listMcpTools(
+  config: McpServerConfig,
+  timeoutMs = 15000
+): Promise<string[]> {
+  const result = await callStdioMcp(config, "tools/list", {}, timeoutMs);
+  const tools = (result as { tools?: Array<{ name?: string }> } | undefined)?.tools ?? [];
+  return tools.map((t) => t.name).filter((n): n is string => Boolean(n));
+}
+
+/**
+ * 解析真实工具名 —— 不同 DuckDuckGo MCP 包版本可能不叫 duckduckgo_search。
+ * 优先精确匹配 preferred，再试 aliases，再模糊匹配，最后若仅一个工具则用之。
+ */
+export async function resolveMcpToolName(
+  config: McpServerConfig,
+  preferred: string,
+  aliases: string[] = [],
+  timeoutMs = 15000
+): Promise<string> {
+  const available = await listMcpTools(config, timeoutMs);
+  return chooseMcpToolName(available, preferred, aliases);
+}
+
+/** 纯函数：从 tools/list 的名称里选择最合适的工具名。 */
+export function chooseMcpToolName(
+  available: string[],
+  preferred: string,
+  aliases: string[] = []
+): string {
+  if (available.includes(preferred)) return preferred;
+  for (const alias of aliases) {
+    if (available.includes(alias)) return alias;
+  }
+  const prefLower = preferred.toLowerCase();
+  const fuzzy = available.find(
+    (n) =>
+      n.toLowerCase().includes(prefLower) ||
+      prefLower.includes(n.toLowerCase()) ||
+      /search|duck/i.test(n)
+  );
+  if (fuzzy) return fuzzy;
+  if (available.length === 1) return available[0]!;
+  throw new Error(
+    `MCP 工具未找到: ${preferred}；可用工具: ${available.join(", ") || "(none)"}`
+  );
+}
+
+/** 先 resolve 工具名再调用（示例节点推荐入口）。 */
+export async function callResolvedMcpTool(
+  config: McpServerConfig,
+  preferred: string,
+  args: Record<string, unknown>,
+  options: { aliases?: string[]; timeoutMs?: number } = {}
+): Promise<string> {
+  const toolName = await resolveMcpToolName(
+    config,
+    preferred,
+    options.aliases ?? ["search", "duckduckgo", "web_search", "duckduckgo-search"],
+    options.timeoutMs ?? 15000
+  );
+  return callMcpTool(config, toolName, args, options.timeoutMs ?? 15000);
+}
+
 /**
  * 全局节流：把并发调用串行化，且每次之间至少间隔 minGapMs。
  * 接有 rate limit 的免费 API（如 DDG 1/秒）必备——图并行，但外部请求错峰执行。

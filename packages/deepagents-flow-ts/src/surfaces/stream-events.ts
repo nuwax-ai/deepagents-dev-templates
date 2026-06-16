@@ -5,9 +5,18 @@
  * 这是 surface 内部薄契约，不是新的执行抽象（执行仍是 graph.stream）。
  */
 
+/** ACP plan entry —— 与 deepagents-acp PlanEntry 对齐。 */
+export interface SurfacePlanEntry {
+  content: string;
+  priority?: "high" | "medium" | "low";
+  status: "pending" | "in_progress" | "completed" | "skipped";
+}
+
 export type SurfaceStreamEvent =
-  /** 模型文本增量（messages mode，回答节点）。 */
+  /** 模型文本增量（messages mode 或 custom writer）。 */
   | { type: "text"; text: string }
+  /** 研究大纲 / 任务清单（custom writer → ACP sessionUpdate: plan）。 */
+  | { type: "plan"; entries: SurfacePlanEntry[] }
   /** 工具开始（tools mode 的 ToolNode，或 custom mode 自定义检索）。 */
   | { type: "tool_start"; id: string; name: string; input?: unknown }
   /** 工具完成/失败。 */

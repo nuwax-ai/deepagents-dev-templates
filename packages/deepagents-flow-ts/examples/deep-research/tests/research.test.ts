@@ -23,6 +23,7 @@ import {
   routeAfterConverse,
   isEndSignal,
   fanoutToResearch,
+  outlineToPlanEntries,
   MAX_OUTLINE_REVIEW,
   MAX_DRAFT_REVIEW,
   type ResearchStateType,
@@ -172,6 +173,22 @@ describe("fanoutToResearch (Send 扇出, 纯函数, 无凭证)", () => {
     const state = makeState({ outline: [] });
     const sends = fanoutToResearch(state);
     expect(sends.length).toBe(0);
+  });
+});
+
+describe("outlineToPlanEntries (ACP Plan 映射, 纯函数, 无凭证)", () => {
+  it("将 outline 映射为固定顺序的 ACP plan entries", () => {
+    const entries = outlineToPlanEntries(
+      [
+        { title: "背景", query: "background" },
+        { title: "架构", query: "architecture" },
+      ],
+      { currentTitle: "架构", completedTitles: ["背景"] }
+    );
+    expect(entries).toEqual([
+      { content: "背景（搜索：background）", priority: "medium", status: "completed" },
+      { content: "架构（搜索：architecture）", priority: "medium", status: "in_progress" },
+    ]);
   });
 });
 

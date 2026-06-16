@@ -24,16 +24,26 @@ import type {
   FlowCallbacks,
   ToolCallEvent,
   StageEvent,
+  PlanEvent,
 } from "../flow-types.js";
 
 const log = logger.child("flow-acp");
 
-/** ACP 连接的最小接口：向客户端推 sessionUpdate（agent_message_chunk / tool_call[_update]）。 */
+/** ACP 连接的最小接口：向客户端推 sessionUpdate。 */
 interface AcpConnection {
   sessionUpdate(params: {
     sessionId: string;
     update:
       | { sessionUpdate: "agent_message_chunk"; content: { type: "text"; text: string } }
+      | { sessionUpdate: "agent_thought_chunk"; content: { type: "text"; text: string } }
+      | {
+          sessionUpdate: "plan";
+          entries: Array<{
+            content: string;
+            priority?: "high" | "medium" | "low";
+            status: "pending" | "in_progress" | "completed" | "skipped";
+          }>;
+        }
       | {
           sessionUpdate: "tool_call";
           toolCallId: string;
@@ -98,19 +108,36 @@ async function emitToolCall(
 async function streamText(
   conn: AcpConnection,
   sessionId: string,
-  text: string
+  text: string,
+  kind: "agent" | "thought" = "agent"
 ): Promise<void> {
   if (!text) return;
   await conn.sessionUpdate({
     sessionId,
     update: {
-      sessionUpdate: "agent_message_chunk",
+      sessionUpdate: kind === "thought" ? "agent_thought_chunk" : "agent_message_chunk",
       content: { type: "text", text },
     },
   });
 }
 
-/** 长任务阶段事件 → 一行进度文本（作为 message chunk 推给客户端）。 */
+/** 结构化 Plan → ACP sessionUpdate: plan。 */
+async function emitPlan(
+  conn: AcpConnection,
+  sessionId: string,
+  e: PlanEvent
+): Promise<void> {
+  if (!e.entries.length) return;
+  await conn.sessionUpdate({
+    sessionId,
+    update: {
+      sessionUpdate: "plan",
+      entries: e.entries,
+    },
+  });
+}
+
+/** 长任务阶段事件 → thought chunk（不污染主回答区）。 */
 function formatStage(e: StageEvent): string {
   const pos = e.index && e.total ? ` [${e.index}/${e.total}]` : "";
   const detail = e.detail ? ` · ${e.detail}` : "";
@@ -167,11 +194,12 @@ export async function bootstrapFlowAcp(options: FlowAcpOptions): Promise<void> {
       const callbacks: FlowCallbacks = {
         onToken: (token) => {
           streamed = true;
-          return streamText(conn, sessionId, token);
+          return streamText(conn, sessionId, token, "agent");
         },
         onToolCall: (e) => emitToolCall(conn, sessionId, e),
-        // 阶段进度作为独立 message chunk 推送，不影响 streamed（仍会补发最终 answer/question）。
-        onStage: (e) => streamText(conn, sessionId, formatStage(e)),
+        // 阶段进度作为 thought chunk，与主回答区分。
+        onStage: (e) => streamText(conn, sessionId, formatStage(e), "thought"),
+        onPlan: (e) => emitPlan(conn, sessionId, e),
       };
 
       try {
@@ -193,7 +221,8 @@ export async function bootstrapFlowAcp(options: FlowAcpOptions): Promise<void> {
           );
           if (res.status === "interrupted") {
             if (!durableResume) fallbackResume.add(sessionId); // 老式 flow：内存记「等回复」
-            if (!streamed && res.question) {
+            // interrupt 问题是下一轮交互提示；即使前面已流式输出报告正文，也要发出。
+            if (res.question) {
               await streamText(conn, sessionId, res.question);
             }
             return { stopReason: "end_turn" as StopReason };

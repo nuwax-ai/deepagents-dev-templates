@@ -13,7 +13,8 @@
  *     而非进程内存 Set → 一个会话只一个主题：首条开题、之后都续跑同一项目（interrupt/出错/已完成
  *     都不重头来），且重启后仍准。
  *  3. **递归护栏**：recursionLimit 防节点循环（reflection 回边）跑飞。
- *  4. **阶段/工具回调穿透**：onStage / onToolCall 经 configurable 注入，Send 并行实例也拿得到。
+ *  4. **多模式 stream**：`streamMode: ["messages","tools","custom","updates"]` + mapStreamChunk
+ *     归一后分发给 onToken/onPlan/onStage/onToolCall；Send 并行实例经 custom writer 也能透出。
  */
 
 import {
@@ -29,8 +30,14 @@ import type {
   FlowRunResult,
   FlowCallbacks,
 } from "./flow-types.js";
+import { mapStreamChunk } from "./map-stream-chunk.js";
+import { dispatchSurfaceEvent } from "./dispatch-surface-event.js";
 
 const log = logger.child("stateful-flow");
+
+/** LangGraph 多模式 stream 的 streamMode 列表。 */
+const STREAM_MODES = ["messages", "tools", "custom", "updates"] as const;
+type StreamRunnableConfig = RunnableConfig & { streamMode?: string[] };
 
 /**
  * createStatefulFlow 需要的「图」最小结构 —— LangGraph `.compile()` 的产物天然满足。
@@ -78,6 +85,53 @@ function pickInterruptValue(chunk: Record<string, unknown>): unknown {
   return intr && intr.length ? intr[intr.length - 1]?.value : undefined;
 }
 
+/** 判断 stream chunk 是否为多模式 `[mode, payload]` 元组。 */
+function isModeChunk(chunk: unknown): chunk is [string, unknown] {
+  return Array.isArray(chunk) && typeof chunk[0] === "string" && chunk.length === 2;
+}
+
+/**
+ * 消费 LangGraph stream，归一事件并分发给 callbacks；返回最后一个 interrupt question（若有）。
+ */
+async function consumeStream(
+  stream: AsyncIterable<unknown>,
+  callbacks?: FlowCallbacks
+): Promise<string | undefined> {
+  let interruptQuestion: string | undefined;
+  let multiMode = false;
+
+  for await (const raw of stream) {
+    if (isModeChunk(raw)) {
+      multiMode = true;
+      const [mode, payload] = raw;
+      const events = mapStreamChunk(mode, payload);
+      for (const ev of events) {
+        if (ev.type === "interrupt") {
+          interruptQuestion = ev.question;
+          continue;
+        }
+        const meta =
+          mode === "messages" && Array.isArray(payload)
+            ? (payload[1] as { langgraph_node?: string } | undefined)
+            : undefined;
+        await dispatchSurfaceEvent(ev, callbacks, meta);
+      }
+      continue;
+    }
+
+    // 兜底：旧式单模式 updates chunk（无 streamMode 时）
+    if (!multiMode) {
+      const v = pickInterruptValue(raw as Record<string, unknown>);
+      if (v !== undefined) {
+        interruptQuestion =
+          (v as { question?: string })?.question ?? String(v);
+      }
+    }
+  }
+
+  return interruptQuestion;
+}
+
 /**
  * 把图包成模板 StatefulFlow —— run-loop + 持久化 resume 一处实现，全示例共享。
  */
@@ -90,10 +144,13 @@ export function createStatefulFlow<S = Record<string, unknown>>(
 
   const baseConfig = (threadId: string, callbacks?: FlowCallbacks): RunnableConfig => ({
     configurable: {
-      ...options.configurable,      // 基础配置先展开
-      thread_id: threadId,          // per-run 值最后，始终覆盖选项里的同名键
+      ...options.configurable,
+      thread_id: threadId,
+      // 节点仍可直接读 callbacks（与 writer 双轨兼容过渡期）
       onToolCall: callbacks?.onToolCall,
       onStage: callbacks?.onStage,
+      onPlan: callbacks?.onPlan,
+      onToken: callbacks?.onToken,
     },
     recursionLimit,
   });
@@ -106,19 +163,17 @@ export function createStatefulFlow<S = Record<string, unknown>>(
           ? new Command({ resume: input.resume })
           : options.toInput(input.query ?? "");
 
-      const stream = await graph.stream(streamInput, config);
-      let interruptValue: unknown;
-      for await (const chunk of stream) {
-        const v = pickInterruptValue(chunk as Record<string, unknown>);
-        if (v !== undefined) interruptValue = v;
-      }
+      const streamConfig: StreamRunnableConfig = {
+        ...config,
+        streamMode: [...STREAM_MODES],
+      };
+      const stream = await graph.stream(streamInput, streamConfig);
 
-      if (interruptValue !== undefined) {
-        const question =
-          (interruptValue as { question?: string })?.question ??
-          String(interruptValue);
+      const interruptQuestion = await consumeStream(stream, callbacks);
+
+      if (interruptQuestion !== undefined) {
         log.info("interrupted → 等待用户 resume", { threadId });
-        return { status: "interrupted", question };
+        return { status: "interrupted", question: interruptQuestion };
       }
 
       const snapshot = await graph.getState(config);
@@ -129,8 +184,6 @@ export function createStatefulFlow<S = Record<string, unknown>>(
     /**
      * 持久化推断：该 thread 是否已有 checkpoint（开过题）。
      * 有 checkpoint ⇒ 同一会话的续跑（interrupt / 出错 / 已完成皆然）；无 ⇒ 全新会话、首条开题。
-     * 用 checkpoint_id 而非 next>0：next>0 只覆盖「停在 interrupt/出错」，漏掉「已完成」——
-     * 而已完成的会话再收到消息，也该续跑同一项目、不开新主题。
      */
     async hasStarted(threadId): Promise<boolean> {
       const snapshot = await graph.getState({

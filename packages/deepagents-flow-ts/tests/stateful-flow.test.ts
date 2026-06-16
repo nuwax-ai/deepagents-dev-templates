@@ -21,6 +21,7 @@ import {
   END,
   Annotation,
   Send,
+  INTERRUPT,
   interrupt,
   MemorySaver,
   type BaseCheckpointSaver,
@@ -104,6 +105,48 @@ describe("createStatefulFlow run-loop（无凭证，确定性）", () => {
     const again = await flow.run({ resume: "另一个话题" }, tid);
     expect(again.status).toBe("done");
     if (again.status === "done") expect(again.answer).toBe("done:ok"); // 不是 "done:另一个话题"
+  });
+
+  it("多模式 stream → 分发 text/stage/plan/tool/interrupt callbacks", async () => {
+    const events: string[] = [];
+    const fakeGraph = {
+      async stream() {
+        async function* gen() {
+          yield ["custom", { type: "plan", entries: [{ content: "A", status: "pending" }] }];
+          yield ["custom", { type: "stage", stage: "调研", detail: "A" }];
+          yield ["tools", { event: "on_tool_start", toolCallId: "t1", name: "search", input: "{\"q\":\"x\"}" }];
+          yield ["tools", { event: "on_tool_end", toolCallId: "t1", output: { kwargs: { content: "ok", status: "success" } } }];
+          yield ["messages", [{ content: "hello" }, { langgraph_node: "respond" }]];
+          yield ["updates", { wait: { [INTERRUPT]: [{ value: { question: "继续？" } }] } }];
+        }
+        return gen();
+      },
+      async getState() {
+        return { values: { output: "done" }, config: { configurable: { checkpoint_id: "cp" } } };
+      },
+    };
+    const flow = createStatefulFlow<{ output: string }>({
+      buildGraph: () => fakeGraph,
+      toInput: (query) => ({ query }),
+      toResult: (v) => ({ answer: v.output }),
+      checkpointer: new MemorySaver(),
+    });
+
+    const res = await flow.run({ query: "hi" }, "tid", {
+      onPlan: (e) => events.push(`plan:${e.entries.length}`),
+      onStage: (e) => events.push(`stage:${e.stage}:${e.detail}`),
+      onToolCall: (e) => events.push(`tool:${e.status}:${e.toolName}`),
+      onToken: (t) => events.push(`text:${t}`),
+    });
+
+    expect(res).toEqual({ status: "interrupted", question: "继续？" });
+    expect(events).toEqual([
+      "plan:1",
+      "stage:调研:A",
+      "tool:in_progress:search",
+      "tool:completed:t1",
+      "text:hello",
+    ]);
   });
 });
 

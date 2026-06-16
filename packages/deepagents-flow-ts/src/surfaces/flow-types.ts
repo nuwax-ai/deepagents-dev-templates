@@ -23,6 +23,18 @@ export interface ToolCallEvent {
   error?: string;
 }
 
+/** ACP Plan 单条条目（与 deepagents-acp PlanEntry 对齐）。 */
+export interface PlanEntry {
+  content: string;
+  priority?: "high" | "medium" | "low";
+  status: "pending" | "in_progress" | "completed" | "skipped";
+}
+
+/** 结构化 Plan 更新（研究大纲 / 任务清单）。 */
+export interface PlanEvent {
+  entries: PlanEntry[];
+}
+
 /**
  * 阶段/进度事件 —— 长任务多阶段流水线（如 plan → research → draft → review）的可视化。
  * 与 ToolCallEvent 互补：tool 事件是「调了什么外部能力」，stage 事件是「现在走到流水线哪一步」。
@@ -40,12 +52,14 @@ export interface StageEvent {
   detail?: string;
 }
 
-/** 回调集合（流式 token + 工具调用事件 + 阶段进度）——one-shot 与 stateful flow 共用。 */
+/** 回调集合（流式 token + 工具调用 + 阶段 + Plan）——one-shot 与 stateful flow 共用。 */
 export interface FlowCallbacks {
   onToken?: (token: string) => void | Promise<void>;
   onToolCall?: (e: ToolCallEvent) => void | Promise<void>;
   /** 长任务阶段推进（可选）。 */
   onStage?: (e: StageEvent) => void | Promise<void>;
+  /** 结构化 Plan 更新（ACP sessionUpdate: plan）。 */
+  onPlan?: (e: PlanEvent) => void | Promise<void>;
 }
 
 /**
