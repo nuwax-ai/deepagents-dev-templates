@@ -1,5 +1,6 @@
 /** 大纲与报告质量评审节点。 */
 
+import { Command } from "@langchain/langgraph";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { logger, type AppConfig } from "../../../src/runtime/index.js";
 import { extractText, requireModel } from "../../shared.js";
@@ -20,11 +21,12 @@ export const MAX_DRAFT_REVIEW = 2;
 export async function outlineReviewNode(
   state: ResearchStateShape,
   appConfig?: AppConfig
-): Promise<Partial<ResearchStateShape>> {
+): Promise<Command> {
   const model = requireModel(appConfig, "deep-research 示例");
   const findingsSummary = state.findings
     .map((f) => `## ${f.title}\n${f.summary.slice(0, 200)}...`)
     .join("\n\n");
+  let update: Partial<ResearchStateShape>;
   try {
     const res = await invokeLLM(model, [
       new SystemMessage(
@@ -38,11 +40,13 @@ export async function outlineReviewNode(
     const v = parseJson<{ verdict?: string; critique?: string }>(extractText(res.content));
     const decision = v.verdict === "insufficient" ? "insufficient" : "sufficient";
     log.info("outline_review", { decision, findings: state.findings.length });
-    return { outlineDecision: decision, outlineCritique: v.critique ?? "" };
+    update = { outlineDecision: decision, outlineCritique: v.critique ?? "" };
   } catch (err) {
     log.warn("outline_review 失败 → 按 sufficient 放行", { error: String(err) });
-    return { outlineDecision: "sufficient", outlineCritique: "(评审异常，已放行)" };
+    update = { outlineDecision: "sufficient", outlineCritique: "(评审异常，已放行)" };
   }
+  const goto = routeAfterOutlineReview({ ...state, ...update });
+  return new Command({ goto, update });
 }
 
 /**
@@ -65,8 +69,9 @@ export function routeAfterOutlineReview(state: ResearchStateShape): "plan" | "wr
 export async function qualityReviewNode(
   state: ResearchStateShape,
   appConfig?: AppConfig
-): Promise<Partial<ResearchStateShape>> {
+): Promise<Command> {
   const model = requireModel(appConfig, "deep-research 示例");
+  let update: Partial<ResearchStateShape>;
   try {
     const res = await invokeLLM(model, [
       new SystemMessage(
@@ -80,11 +85,14 @@ export async function qualityReviewNode(
     const v = parseJson<{ verdict?: string; critique?: string }>(extractText(res.content));
     const decision = v.verdict === "fail" ? "fail" : "pass";
     log.info("quality_review", { decision, attempt: state.draftAttempts, apiOk: true });
-    return { draftDecision: decision, draftCritique: v.critique ?? "" };
+    update = { draftDecision: decision, draftCritique: v.critique ?? "" };
   } catch (err) {
     log.warn("quality_review API 失败 → 按 pass 放行", { error: String(err), apiOk: false });
-    return { draftDecision: "pass", draftCritique: "(评审异常，已放行)" };
+    update = { draftDecision: "pass", draftCritique: "(评审异常，已放行)" };
   }
+  const route = routeAfterQualityReview({ ...state, ...update });
+  const goto = route === "write_draft" ? "write_draft" : "converse";
+  return new Command({ goto, update });
 }
 
 /**

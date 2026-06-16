@@ -1,5 +1,10 @@
 /**
  * deep-research 节点共享 helper。
+ *
+ * LLM 调用约定（框架优先对照）：
+ *  - 模型自主选工具 → bindTools + ToolNode + toolsCondition（见 research/subgraph.ts）
+ *  - 确定性流水线步骤（plan/draft/review）→ invokeLLM 直调（LangGraph 无预置 plan 节点）
+ *  - 固定入参的外部工具 → StructuredTool.invoke（不必强行套 ToolNode）
  */
 
 import type { BaseMessage } from "@langchain/core/messages";

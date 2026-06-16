@@ -1,6 +1,6 @@
 /** 报告完成后的持续会话节点。 */
 
-import { interrupt, type LangGraphRunnableConfig } from "@langchain/langgraph";
+import { Command, interrupt, type LangGraphRunnableConfig } from "@langchain/langgraph";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { logger, type AppConfig } from "../../../src/runtime/index.js";
 import { isApproval, requireModel } from "../../shared.js";
@@ -19,7 +19,7 @@ export function isEndSignal(msg: string): boolean {
  * converse：interrupt —— 报告完成后进入【持续会话】。
  * 展示当前报告（首轮）或上一轮回应（后续轮），收集用户下一条消息。
  */
-export function converseNode(state: ResearchStateShape): Partial<ResearchStateShape> {
+export function converseNode(state: ResearchStateShape): Command {
   const isFirst = state.conversation.length === 0;
   const current = state.lastAnswer || state.finalReport || state.draft;
   const currentWasStreamed = isFirst ? state.draftStreamed : state.lastAnswerStreamed;
@@ -33,7 +33,13 @@ export function converseNode(state: ResearchStateShape): Partial<ResearchStateSh
       : `${current}\n\n---\n还需要什么？（继续修改/提问，或回复「结束」收尾）`,
   });
   const msg = String(feedback ?? "").trim();
-  return { userMessage: msg, conversation: [{ role: "user", content: msg }] };
+  const update = {
+    userMessage: msg,
+    conversation: [{ role: "user" as const, content: msg }],
+  };
+  const route = routeAfterConverse({ ...state, ...update });
+  const goto = route === "wrapup" ? "delivery" : "respond";
+  return new Command({ goto, update });
 }
 
 /** 路由（纯函数，导出供单测）：用户收尾 → delivery 定稿；否则 → respond 持续会话。 */

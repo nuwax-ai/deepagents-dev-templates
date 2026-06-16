@@ -1,7 +1,7 @@
 /** 选题确认与大纲规划节点。 */
 
 import { Command, interrupt, type LangGraphRunnableConfig } from "@langchain/langgraph";
-import { fanoutToResearch } from "./research.js";
+import { fanoutToResearch } from "./fanout.js";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import type { AppConfig } from "../../../src/runtime/index.js";
 import { extractText, emitPlan, isApproval, requireModel } from "../../shared.js";
@@ -77,8 +77,9 @@ export async function planNode(
 
 /**
  * outlineGate：interrupt② — 把大纲抛给用户确认。
+ * 路由用 Command（框架优先）：用户改大纲 → goto plan；确认 → Send 扇出 research 子图。
  */
-export function outlineGateNode(state: ResearchStateShape): Partial<ResearchStateShape> {
+export function outlineGateNode(state: ResearchStateShape): Command {
   const list = state.outline
     .map((s, i) => `${i + 1}. ${s.title}（搜索：${s.query}）`)
     .join("\n");
@@ -90,14 +91,25 @@ export function outlineGateNode(state: ResearchStateShape): Partial<ResearchStat
   const fb = String(feedback ?? "").trim();
   const languageHint = extractLanguageHint(fb);
   if (fb && !isApproval(fb)) {
-    return {
-      outlineCritique: fb,
-      outlineDecision: "user_revise",
-      ...(languageHint ? { languageHint } : {}),
-    };
+    return new Command({
+      goto: "plan",
+      update: {
+        outlineCritique: fb,
+        outlineDecision: "user_revise",
+        ...(languageHint ? { languageHint } : {}),
+      },
+    });
   }
-  return {
+  const nextState = {
+    ...state,
     outlineDecision: "ok",
     ...(languageHint ? { languageHint } : {}),
   };
+  return new Command({
+    goto: fanoutToResearch(nextState),
+    update: {
+      outlineDecision: "ok",
+      ...(languageHint ? { languageHint } : {}),
+    },
+  });
 }

@@ -145,7 +145,8 @@ function createThinkNode(searchTool: StructuredTool, appConfig?: AppConfig) {
  * 与默认图 `src/app/nodes/tools.ts` 同模式。
  */
 function createToolsNode(searchTool: StructuredTool) {
-  const toolNode = new ToolNode([searchTool]);
+  // handleToolErrors: 即便工具抛错也落成 ToolMessage，不掐断子图
+  const toolNode = new ToolNode([searchTool], { handleToolErrors: true });
 
   return async (
     state: SectionState,
@@ -196,11 +197,36 @@ function createToolsNode(searchTool: StructuredTool) {
       .join("\n")
       .trim();
 
+    // 搜索失败时仍写入 rawMaterial，summarize 可降级继续
+    const failedSearch = toolMsgs.some(
+      (tm) =>
+        tm.status === "error" ||
+        (typeof tm.content === "string" && /（搜索失败|搜索无结果）/.test(tm.content))
+    );
+    if (failedSearch) {
+      log.warn("research 搜索未成功，继续 summarize 降级", {
+        section: state.currentSection.title,
+      });
+    }
+
     return {
       messages: toolMsgs,
       ...(chunk ? { rawMaterial: chunk } : {}),
     };
   };
+}
+
+/** 搜索失败后不再回 think 重试，直接 summarize（防 ReAct 在 TLS 抖动时空转）。 */
+function routeAfterTools(state: SectionState): "think" | "summarize" {
+  const toolMsgs = state.messages.filter((m): m is ToolMessage => m._getType() === "tool");
+  if (toolMsgs.length >= 2) return "summarize";
+  const last = toolMsgs[toolMsgs.length - 1];
+  if (!last) return "think";
+  const text = typeof last.content === "string" ? last.content : JSON.stringify(last.content);
+  if (last.status === "error" || /（搜索失败|搜索无结果）/.test(text)) {
+    return "summarize";
+  }
+  return "think";
 }
 
 /** summarize：把 ToolMessage 检索结果整理成结构化章节摘要，写回父图 findings。 */
@@ -262,7 +288,10 @@ export function createResearchSectionSubgraph(appConfig?: AppConfig) {
       tools: "tools",
       [END]: "summarize",
     })
-    .addEdge("tools", "think")
+    .addConditionalEdges("tools", routeAfterTools, {
+      think: "think",
+      summarize: "summarize",
+    })
     .addEdge("summarize", END)
     .compile();
 }

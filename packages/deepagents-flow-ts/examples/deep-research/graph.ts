@@ -21,11 +21,12 @@
  *                                                       └─(用户「结束」)→ wrapup → END
  *
  * 对应 LangGraph 官方模式组合：
- *   多轮 HITL + Send map-reduce + Reflection/evaluator-optimizer + 条件边循环 + 持续会话回路
+ *   多轮 HITL(interrupt) + Send map-reduce + Reflection + Command 节点内路由 +
+ *   research 子图(mini ReAct: bindTools + ToolNode + toolsCondition)
  *
  * 真实接入（无 demo fallback——未配凭证直接报错）：
  *  - plan / research / draft / outline_review / quality_review / finalize **真调大模型**
- *  - research 调 duckduckgo MCP（免 key 网络搜索）做真实资料搜集
+ *  - research 子图：StructuredTool(duckduckgo) + ToolNode + toolsCondition（框架优先，非手写 MCP）
  *  - onToolCall 透出每次搜索；HITL 用 interrupt 暂停。
  *
  * 长任务韧性（防一处抖动掐死整条长流水线）：
@@ -64,7 +65,7 @@ import {
   outlineGateNode,
   planNode,
   qualityReviewNode,
-  researchNode,
+  createResearchSectionSubgraph,
   respondNode,
   routeAfterConverse,
   routeAfterOutlineReview,
@@ -79,6 +80,7 @@ import type {
 
 export {
   fanoutToResearch,
+  createResearchSectionSubgraph,
   isEndSignal,
   MAX_DRAFT_REVIEW,
   MAX_OUTLINE_REVIEW,
@@ -158,17 +160,19 @@ export function createResearchGraph(
       });
       return planNode(s, appConfig, c);
     })
-    .addNode("outline_gate", outlineGateNode)
-    .addNode("research", (s: ResearchStateType, c?: LangGraphRunnableConfig) =>
-      researchNode(s, c)
+    .addNode("outline_gate", outlineGateNode, { ends: ["plan", "research"] })
+    .addNode("research", createResearchSectionSubgraph(appConfig))
+    .addNode(
+      "outline_review",
+      async (s: ResearchStateType, c?: LangGraphRunnableConfig) => {
+        await emitStage(c, { stage: "评审调研" });
+        await emitPlan(c, outlineToPlanEntries(s.outline, {
+          completedTitles: s.findings.map((f) => f.title),
+        }));
+        return outlineReviewNode(s, appConfig);
+      },
+      { ends: ["plan", "write_draft"] }
     )
-    .addNode("outline_review", async (s: ResearchStateType, c?: LangGraphRunnableConfig) => {
-      await emitStage(c, { stage: "评审调研" });
-      await emitPlan(c, outlineToPlanEntries(s.outline, {
-        completedTitles: s.findings.map((f) => f.title),
-      }));
-      return outlineReviewNode(s, appConfig);
-    })
     .addNode("write_draft", async (s: ResearchStateType, c?: LangGraphRunnableConfig) => {
       await emitStage(c, {
         stage: "撰写初稿",
@@ -176,14 +180,18 @@ export function createResearchGraph(
       });
       return draftNode(s, appConfig, c);
     })
-    .addNode("quality_review", async (s: ResearchStateType, c?: LangGraphRunnableConfig) => {
-      await emitStage(c, { stage: "质量评审" });
-      await emitPlan(c, outlineToPlanEntries(s.outline, {
-        completedTitles: s.outline.map((section) => section.title),
-      }));
-      return qualityReviewNode(s, appConfig);
-    })
-    .addNode("converse", converseNode)
+    .addNode(
+      "quality_review",
+      async (s: ResearchStateType, c?: LangGraphRunnableConfig) => {
+        await emitStage(c, { stage: "质量评审" });
+        await emitPlan(c, outlineToPlanEntries(s.outline, {
+          completedTitles: s.outline.map((section) => section.title),
+        }));
+        return qualityReviewNode(s, appConfig);
+      },
+      { ends: ["write_draft", "converse"] }
+    )
+    .addNode("converse", converseNode, { ends: ["respond", "delivery"] })
     .addNode("respond", async (s: ResearchStateType, c?: LangGraphRunnableConfig) => {
       await emitStage(c, { stage: "回应", detail: s.userMessage.slice(0, 30) });
       return respondNode(s, appConfig, c);
@@ -195,26 +203,9 @@ export function createResearchGraph(
     .addEdge(START, "clarify")
     .addEdge("clarify", "plan")
     .addEdge("plan", "outline_gate")
-    .addConditionalEdges("outline_gate", (state: ResearchStateType) => {
-      // 用户要改大纲 → 回 plan；确认 → 并行 research 扇出
-      if (state.outlineDecision === "user_revise") return "plan";
-      return fanoutToResearch(state);
-    })
+    // outline_gate / outline_review / quality_review / converse 节点内 Command 路由（无静态条件边）
     .addEdge("research", "outline_review")
-    .addConditionalEdges("outline_review", routeAfterOutlineReview, {
-      plan: "plan",
-      write_draft: "write_draft",
-    })
     .addEdge("write_draft", "quality_review")
-    .addConditionalEdges("quality_review", routeAfterQualityReview, {
-      write_draft: "write_draft",
-      approve: "converse", // 质量通过 → 进入持续会话
-    })
-    // 持续会话回路：converse(interrupt 收消息) → respond(回应) → converse … 直到用户收尾
-    .addConditionalEdges("converse", routeAfterConverse, {
-      respond: "respond",
-      wrapup: "delivery",
-    })
     .addEdge("respond", "converse")
     .addEdge("delivery", END)
     .compile({ checkpointer });

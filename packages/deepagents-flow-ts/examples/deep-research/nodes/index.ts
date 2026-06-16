@@ -9,9 +9,11 @@ export {
   planNode,
 } from "./planning.js";
 
+export { fanoutToResearch } from "./fanout.js";
+
 export {
-  fanoutToResearch,
-  researchNode,
+  createResearchSectionSubgraph,
+  createDuckDuckGoSearchTool,
 } from "./research.js";
 
 export {
