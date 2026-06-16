@@ -97,7 +97,7 @@ pnpm --filter deepagents-flow-ts example:review "写一段产品介绍"
 | 类型检查 | `pnpm typecheck`（src）/ `pnpm typecheck:examples`（examples + src，noEmit） |
 
 `smoke:acp` / `smoke:rag` / `smoke:travel` / `smoke:pm` / `smoke:review` 用 rcoder-cli 端到端驱动 ACP
-（握手 → `onPrompt` → 整图 → 流式答案）；`scripts/smoke-acp.sh` 的 `AGENT_ENTRY` 可指向任意 flow 入口。
+（握手 → `onPrompt` → 整图 → 流式答案）；`scripts/smoke-acp.mjs` 的 `--entry` 或 `AGENT_ENTRY` 可指向任意 flow 入口。
 **在 Zed 里 chat 调试**全部 5 个入口的 `agent_servers` 配置 + HITL 两轮玩法见 [docs/zed-debug.md](docs/zed-debug.md)。
 
 ## 怎么搭你自己的 flow

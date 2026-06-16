@@ -1,0 +1,42 @@
+# Scripts
+
+`deepagents-flow-ts` 的构建、打包与冒烟测试脚本。全部为 **纯 Node `.mjs`**，可在 Windows PowerShell、macOS 与 Linux 下运行。
+
+## Build & Bundle
+
+| Script | npm 命令 | 说明 |
+|--------|----------|------|
+| `lib/bundle.mjs` | `pnpm run bundle` | esbuild 打包为 `dist/bundle.mjs` |
+| `package.mjs` | `pnpm run package` | npm tgz + Nuwax tar/zip |
+| `package-platforms.mjs` | `pnpm run package:platforms` | 按平台归档 + `platforms.json` |
+| `validate-package.mjs` | `pnpm run validate:package` | 校验制品完整性 |
+
+## Smoke tests
+
+| Script | npm 命令 | 说明 |
+|--------|----------|------|
+| `smoke-acp.mjs` | `pnpm run smoke:acp` | 默认 flow（`src/index.ts`） |
+| | `pnpm run smoke:rag` 等 | `--entry examples/...` 指向各示例 |
+
+`--entry` 或环境变量 `AGENT_ENTRY` 可指定入口；`--debug --dry-run` 可在无 API key 时检查命令。
+
+## Windows 打包工具（可选）
+
+```powershell
+pnpm run setup:tools   # Chocolatey 安装 rsync、zip
+pnpm run check:tools   # 检测工具是否就绪
+```
+
+| 工具 | 用途 | 缺失时 fallback |
+|------|------|-----------------|
+| `rsync` | staging 复制 | Node `fs.cp` |
+| `zip` | Windows `.zip` | PowerShell `Compress-Archive` |
+| `gzip` / `tar` | `.tar.gz` | Node `zlib` + `tar` |
+
+## 共享库
+
+| 路径 | 说明 |
+|------|------|
+| `lib/bundle.mjs` | esbuild 打包 |
+| `lib/staging.mjs` | staging 复制与归档 |
+| `lib/tools.mjs` | CLI 工具检测 |

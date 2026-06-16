@@ -66,7 +66,7 @@ pnpm example:rag:cli "什么是 LangGraph？"   # 或交互:pnpm example:rag:int
 **rcoder-cli ACP 冒烟**(端到端:握手 → `onPrompt` → 整图 → 流式答案):
 ```bash
 pnpm smoke:rag
-# 等价于:AGENT_ENTRY=examples/rag/index.ts bash scripts/smoke-acp.sh
+# 等价于: pnpm run smoke:rag
 # 默认 prompt 用 SMOKE_PROMPT 覆盖;smoke:acp(默认 flow)的入口也可经 AGENT_ENTRY 切换
 ```
 
