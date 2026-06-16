@@ -18,6 +18,7 @@
 
 import {
   Command,
+  INTERRUPT,
   MemorySaver,
   type BaseCheckpointSaver,
 } from "@langchain/langgraph";
@@ -73,7 +74,7 @@ export interface StatefulFlowOptions<S = Record<string, unknown>> {
 
 /** 从 stream 各 chunk 里取最后一个 interrupt 的 value（沿用各示例既有约定）。 */
 function pickInterruptValue(chunk: Record<string, unknown>): unknown {
-  const intr = chunk.__interrupt__ as Array<{ value?: unknown }> | undefined;
+  const intr = chunk[INTERRUPT] as Array<{ value?: unknown }> | undefined;
   return intr && intr.length ? intr[intr.length - 1]?.value : undefined;
 }
 

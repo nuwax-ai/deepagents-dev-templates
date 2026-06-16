@@ -33,10 +33,10 @@ export function estimateTokens(messages: BaseMessage[], charPerToken = 4): numbe
   return Math.ceil(chars / charPerToken);
 }
 
-function hasCredentials(config: AppConfig): boolean {
+export function hasModelCredentials(config?: AppConfig): boolean {
   const vars = ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "OPENAI_API_KEY"];
-  if (config.model.apiKeyEnv) vars.push(config.model.apiKeyEnv);
-  if (config.model.authTokenEnv) vars.push(config.model.authTokenEnv);
+  if (config?.model.apiKeyEnv) vars.push(config.model.apiKeyEnv);
+  if (config?.model.authTokenEnv) vars.push(config.model.authTokenEnv);
   return vars.some((v) => Boolean(process.env[v]));
 }
 
@@ -62,7 +62,8 @@ export function compactionUpdate(
   prior: BaseMessage[],
   compacted: BaseMessage[]
 ): BaseMessage[] {
-  if (compacted.length >= prior.length) return [];
+  // 同引用 = compactHistory 未触发（未超阈值）；更长 = 防御性兜底
+  if (compacted === prior || compacted.length > prior.length) return [];
   const removals = prior
     .filter((m) => m.id)
     .map((m) => new RemoveMessage({ id: m.id! }));
@@ -96,7 +97,7 @@ export async function compactHistory(
   // 否则摘要它会在返回值里产出第二条 SystemMessage）
   const oldMessages = messages.slice(0, oldCount).filter((m) => m._getType() !== "system");
 
-  if (!hasCredentials(config)) {
+  if (!hasModelCredentials(config)) {
     log.warn("超阈值但无凭证 → 仅裁剪不摘要", { oldCount });
     return recent;
   }

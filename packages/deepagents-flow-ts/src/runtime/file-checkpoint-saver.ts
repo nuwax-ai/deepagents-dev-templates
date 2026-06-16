@@ -95,29 +95,33 @@ export class FileCheckpointSaver extends MemorySaver {
     log.info("FileCheckpointSaver ready", { dir: this.dir });
   }
 
-  /** thread_id → 安全文件名（防路径穿越；非安全字符 hex 编码）。 */
+  /** thread_id → 安全文件名（防路径穿越；非安全字符加 __hex__ 前缀编码，保证可逆）。 */
   private threadFile(threadId: string): string {
     const safe = /^[\w\-]+$/.test(threadId)
       ? threadId
-      : Buffer.from(threadId).toString("hex");
+      : `__hex__${Buffer.from(threadId).toString("hex")}`;
     return join(this.dir, `${safe}.json`);
   }
 
   /** 首次访问某 thread 时，从文件懒载入内存（合并进 MemorySaver 的 storage/writes）。 */
   private ensureLoaded(threadId: string): void {
     if (!threadId || this.loaded.has(threadId)) return;
-    this.loaded.add(threadId);
     const file = this.threadFile(threadId);
-    if (!existsSync(file)) return;
+    if (!existsSync(file)) {
+      this.loaded.add(threadId);
+      return;
+    }
     try {
       const data = JSON.parse(readFileSync(file, "utf-8"), reviveBytes) as ThreadFileData;
       const storage = this.storage as unknown as Record<string, unknown>;
       const writes = this.writes as unknown as Record<string, unknown>;
       if (data.storage?.[threadId]) storage[threadId] = data.storage[threadId];
       if (data.writes) for (const [k, v] of Object.entries(data.writes)) writes[k] = v;
+      this.loaded.add(threadId);
       log.debug("loaded checkpoint from file", { threadId });
     } catch (err) {
       log.warn("failed to load checkpoint file", { threadId, error: String(err) });
+      // 不加入 loaded —— 下次访问可重试（文件损坏时不永久丢失会话）
     }
   }
 
@@ -160,10 +164,9 @@ export class FileCheckpointSaver extends MemorySaver {
     if (tid) {
       this.ensureLoaded(tid);
     } else if (existsSync(this.dir)) {
-      // 扫描目录所有 thread 文件，懒载入内存后交给基类 list
-      for (const f of readdirSync(this.dir)) {
-        const m = f.match(/^(.+)\.json$/);
-        if (m) this.ensureLoaded(m[1]!);
+      // 扫描目录所有 thread 文件，懒载入内存后交给基类 list（经 listThreadIds 解码真实 ID）
+      for (const realId of this.listThreadIds()) {
+        this.ensureLoaded(realId);
       }
     }
     yield* super.list(config, options as Parameters<MemorySaver["list"]>[1]);
@@ -198,7 +201,12 @@ export class FileCheckpointSaver extends MemorySaver {
     if (!existsSync(this.dir)) return [];
     return readdirSync(this.dir)
       .filter((f) => f.endsWith(".json"))
-      .map((f) => f.slice(0, -".json".length));
+      .map((f) => {
+        const stem = f.slice(0, -".json".length);
+        return stem.startsWith("__hex__")
+          ? Buffer.from(stem.slice("__hex__".length), "hex").toString("utf-8")
+          : stem;
+      });
   }
 
   /** 删除某 thread 的持久化文件 + 内存。 */

@@ -546,9 +546,9 @@ async function respondNode(
   };
 }
 
-/** wrapup：用户收尾 —— 定稿为当前报告（finalReport 已是最新修订，否则取 draft）。 */
+/** wrapup：用户收尾 —— 定稿为当前报告（lastAnswer 优先：短修订只落 lastAnswer；再取 finalReport；最后 draft）。 */
 function wrapupNode(state: ResearchStateType): Partial<ResearchStateType> {
-  return { finalReport: state.finalReport || state.draft };
+  return { finalReport: state.lastAnswer || state.finalReport || state.draft };
 }
 
 // ── 图组装 ──────────────────────────────────────────────

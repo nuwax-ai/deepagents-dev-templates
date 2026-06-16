@@ -13,6 +13,7 @@
  * （空 tools + MemorySaver），不加载 MCP、不需要凭证、不 invoke 节点。
  */
 
+import { randomUUID } from "node:crypto";
 import {
   StateGraph,
   START,
@@ -30,6 +31,7 @@ import {
 } from "@langchain/core/messages";
 import type { StructuredTool } from "@langchain/core/tools";
 import { resolveModel, logger, type AppConfig } from "deepagents-app-ts/runtime";
+import { hasModelCredentials } from "./compaction.js";
 import { FlowStateAnnotation, type FlowState } from "./state.js";
 import type { FlowCallbacks } from "../surfaces/flow-types.js";
 
@@ -55,18 +57,10 @@ function withSystemPrompt(messages: BaseMessage[], systemPrompt: string): BaseMe
   return [new SystemMessage(systemPrompt), ...messages];
 }
 
-/** 是否存在任一可用模型凭证（无则 think 走 fallback，不 invoke 模型）。 */
-function hasCredentials(config?: AppConfig): boolean {
-  const vars = ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "OPENAI_API_KEY"];
-  if (config?.model.apiKeyEnv) vars.push(config.model.apiKeyEnv);
-  if (config?.model.authTokenEnv) vars.push(config.model.authTokenEnv);
-  return vars.some((v) => Boolean(process.env[v]));
-}
-
 export function createFlowGraph(config: CreateFlowGraphConfig = {}) {
   const { allTools = [], checkpointer = new MemorySaver(), callbacks } = config;
 
-  const hasCreds = hasCredentials(config.config);
+  const hasCreds = hasModelCredentials(config.config);
   let boundModel: BoundModel | null = null;
   if (config.config && hasCreds) {
     try {
@@ -82,7 +76,7 @@ export function createFlowGraph(config: CreateFlowGraphConfig = {}) {
   }
 
   // prepare：首次把 input 转 HumanMessage 加入 messages（历史由 checkpointer 恢复）。
-  // W5 上下文压缩在此接入（compactHistory）。
+  // 多轮上下文压缩见 examples/dev-agent（compactHistory + updateState + RemoveMessage 替换模式）。
   const prepareNode = async (state: FlowState): Promise<Partial<FlowState>> => {
     if (!state.input) return {};
     return { messages: [new HumanMessage(state.input)] };
@@ -193,10 +187,7 @@ export async function executeFlow(
   callbacks: FlowCallbacks = {}
 ): Promise<{ output: string; steps: string[] }> {
   const graph = createFlowGraph({ ...deps, callbacks });
-  const threadId =
-    typeof crypto !== "undefined" && crypto.randomUUID
-      ? crypto.randomUUID()
-      : Math.random().toString(36).slice(2);
+  const threadId = randomUUID();
   const result = (await graph.invoke(
     { input, messages: [] } as unknown as FlowState,
     { configurable: { thread_id: threadId } }
