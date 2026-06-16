@@ -27,6 +27,22 @@ export function clarifyNode(state: ResearchStateShape): Partial<ResearchStateSha
   };
 }
 
+/** 规范化 plan 输出的大纲章节（修剪 libraryHint、过滤空项）。 */
+export function normalizeOutlineSections(sections: OutlineSection[]): OutlineSection[] {
+  return sections
+    .map((s) => {
+      const title = String(s.title ?? "").trim();
+      const query = String(s.query ?? "").trim();
+      const hint = String(s.libraryHint ?? "").trim();
+      return {
+        title,
+        query,
+        ...(hint ? { libraryHint: hint } : {}),
+      };
+    })
+    .filter((s) => s.title && s.query);
+}
+
 /** 大纲 → ACP Plan entries；可按当前章节/已完成章节标记状态。 */
 export function outlineToPlanEntries(
   outline: OutlineSection[],
@@ -34,7 +50,9 @@ export function outlineToPlanEntries(
 ) {
   const completed = new Set(opts.completedTitles ?? []);
   return outline.map((section) => ({
-    content: `${section.title}（搜索：${section.query}）`,
+    content: section.libraryHint
+      ? `${section.title}（搜索：${section.query}；库：${section.libraryHint}）`
+      : `${section.title}（搜索：${section.query}）`,
     priority: "medium" as const,
     status: completed.has(section.title)
       ? ("completed" as const)
@@ -58,14 +76,15 @@ export async function planNode(
   const res = await invokeLLM(model, [
     new SystemMessage(
       `你是资深研究分析师。为给定主题制定一份研究报告大纲，包含 3-5 个章节（Section）。` +
-        `每章节含 title（标题）和 query（用于文档检索的关键词，英文优先）。` +
-        `只输出 JSON 数组：[{"title":"...","query":"..."}]，不要解释。` +
+        `每章节含：title（标题）、query（检索关键词，英文优先）、libraryHint（可选，Context7 文档库名，如 langgraph、react、typescript；` +
+        `涉及具体框架/SDK/API 的章节应填写，纯概念/行业综述章节可省略或留空字符串）。` +
+        `只输出 JSON 数组：[{"title":"...","query":"...","libraryHint":"..."}]，不要解释。` +
         (isReplan ? `\n上一轮评审意见（据此改进大纲）：${state.outlineCritique}` : "") +
         langClause(state.languageHint)
     ),
     new HumanMessage(`研究主题：${state.refinedTopic}`),
   ], appConfig);
-  const sections = parseJson<OutlineSection[]>(extractText(res.content));
+  const sections = normalizeOutlineSections(parseJson<OutlineSection[]>(extractText(res.content)));
   await emitPlan(config, outlineToPlanEntries(sections));
   const isUserRevise = state.outlineDecision === "user_revise";
   return {
@@ -81,7 +100,10 @@ export async function planNode(
  */
 export function outlineGateNode(state: ResearchStateShape): Command {
   const list = state.outline
-    .map((s, i) => `${i + 1}. ${s.title}（搜索：${s.query}）`)
+    .map((s, i) => {
+      const lib = s.libraryHint ? `；库：${s.libraryHint}` : "";
+      return `${i + 1}. ${s.title}（搜索：${s.query}${lib}）`;
+    })
     .join("\n");
   const feedback = interrupt({
     question:

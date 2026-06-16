@@ -1,12 +1,10 @@
 /**
- * research 子图 —— 单章节调研（确定性搜索 + LLM 摘要）。
+ * research 子图 —— 单章节调研（双源并行检索 + LLM 摘要）。
  *
- *   START → prepare(阶段进度) → search(StructuredTool 一次) → summarize → END
+ *   START → prepare → search(Context7 ∥ DDG 取优合并) → summarize → END
  *
- * 不用 ReAct 循环：每章节固定 `section.query` 搜一次，避免模型重复调工具放大 DDG 限流。
- * Send 扇出 N 路时，search 经 invokeDuckDuckGoSearch 内全局 rateLimited 串行错峰。
- *
- * 编译后作为父图 `research` 节点。
+ * 每章节固定各搜一次；DDG 走 rateLimited 闸门，Context7 独立并行。
+ * Send 扇出 N 路时，DDG 请求在章节间全局串行错峰。
  */
 
 import {
@@ -29,6 +27,8 @@ import {
 import type { OutlineSection, ResearchFinding } from "../types.js";
 import { invokeLLM, langClause } from "../helpers.js";
 import { outlineToPlanEntries } from "../planning.js";
+import { invokeContext7Search } from "./context7.js";
+import { mergeResearchSources, type ResearchSourceResult } from "./merge.js";
 import { invokeDuckDuckGoSearch } from "./tools.js";
 
 const log = logger.child("deep-research");
@@ -62,9 +62,59 @@ function createPrepareNode() {
 }
 
 /**
- * search：每章节确定性调用一次 duckduckgo_search（StructuredTool 底层实现）。
- * runTool 透出 onToolCall 三态，与 travel-planner / 旧版 deep-research 一致。
+ * 并行拉 Context7 文档 + DuckDuckGo 网络，merge 取优后写入 rawMaterial。
+ * libraryHint 来自 plan 大纲，优先用于 Context7 resolve-library-id。
  */
+async function fetchDualSources(
+  query: string,
+  libraryHint: string | undefined,
+  onToolCall: FlowCallbacks["onToolCall"] | undefined
+): Promise<ResearchSourceResult[]> {
+  let c7Meta: { ok: boolean; libraryId?: string } = { ok: false };
+  let ddgMeta: { ok: boolean } = { ok: false };
+
+  const c7Args = libraryHint ? { query, libraryHint } : { query };
+
+  const context7Task = runTool(
+    "context7_query",
+    c7Args,
+    async () => {
+      const r = await invokeContext7Search(query, libraryHint);
+      c7Meta = { ok: r.ok, libraryId: r.libraryId };
+      return r.text;
+    },
+    onToolCall
+  );
+
+  const ddgTask = runTool(
+    "duckduckgo_search",
+    { query },
+    async () => {
+      const r = await invokeDuckDuckGoSearch(query);
+      ddgMeta = { ok: r.ok };
+      return r.text;
+    },
+    onToolCall
+  );
+
+  const [c7, ddg] = await Promise.all([context7Task, ddgTask]);
+
+  return [
+    {
+      source: "context7",
+      text: c7.result,
+      ok: c7Meta.ok,
+      libraryId: c7Meta.libraryId,
+    },
+    {
+      source: "duckduckgo",
+      text: ddg.result,
+      ok: ddgMeta.ok,
+    },
+  ];
+}
+
+/** search：双源并行检索 + 取优合并。 */
 function createSearchNode() {
   return async (
     state: SectionState,
@@ -75,25 +125,26 @@ function createSearchNode() {
       | undefined;
     const section = state.currentSection;
     const query = section.query;
+    const libraryHint = section.libraryHint;
 
-    const { result, ok } = await runTool(
-      "duckduckgo_search",
-      { query },
-      async () => {
-        const { text } = await invokeDuckDuckGoSearch(query);
-        return text;
-      },
-      onToolCall
-    );
+    const sources = await fetchDualSources(query, libraryHint, onToolCall);
+    const rawMaterial = mergeResearchSources(sources, query);
+    const anyOk = sources.some((s) => s.ok);
 
-    if (!ok) {
-      log.warn("research 搜索未成功，summarize 将降级", {
+    if (!anyOk) {
+      log.warn("research 双源均未成功，summarize 将降级", {
         section: section.title,
-        snippet: result.slice(0, 80),
+        snippet: rawMaterial.slice(0, 80),
+      });
+    } else {
+      log.info("research 双源合并完成", {
+        section: section.title,
+        libraryHint: libraryHint ?? null,
+        sources: sources.map((s) => ({ source: s.source, ok: s.ok })),
       });
     }
 
-    return { rawMaterial: result };
+    return { rawMaterial };
   };
 }
 
@@ -114,7 +165,8 @@ function createSummarizeNode(appConfig?: AppConfig) {
           new SystemMessage(
             `你是技术分析师。根据检索资料，为章节「${section.title}」写一段 200-400 字的结构化摘要。` +
               `提取关键事实、数据、结论，不要堆砌链接。只输出摘要正文。` +
-              `若资料标明搜索失败，可结合主题常识简要推断，并注明依据有限。` +
+              `资料可能含 Context7 文档与 DuckDuckGo 网络两路来源，请综合主源与补充。` +
+              `若资料标明检索失败，可结合主题常识简要推断，并注明依据有限。` +
               langClause(state.languageHint)
           ),
           new HumanMessage(

@@ -4,6 +4,7 @@
 
 export {
   clarifyNode,
+  normalizeOutlineSections,
   outlineToPlanEntries,
   outlineGateNode,
   planNode,
@@ -15,6 +16,8 @@ export {
   createResearchSectionSubgraph,
   createDuckDuckGoSearchTool,
   isDdgErrorText,
+  mergeResearchSources,
+  scoreResearchSource,
 } from "./research.js";
 
 export {

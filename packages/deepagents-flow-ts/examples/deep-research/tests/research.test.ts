@@ -25,6 +25,9 @@ import {
   fanoutToResearch,
   outlineToPlanEntries,
   isDdgErrorText,
+  mergeResearchSources,
+  scoreResearchSource,
+  normalizeOutlineSections,
   MAX_OUTLINE_REVIEW,
   MAX_DRAFT_REVIEW,
   type ResearchStateType,
@@ -164,6 +167,77 @@ describe("长任务持久化：clarify interrupt 跨实例续跑（无凭证，f
   });
 });
 
+describe("normalizeOutlineSections (大纲规范化, 纯函数, 无凭证)", () => {
+  it("保留 libraryHint 并过滤空章节", () => {
+    const out = normalizeOutlineSections([
+      { title: " 架构 ", query: "langgraph architecture", libraryHint: " langgraph " },
+      { title: "", query: "skip" },
+      { title: "背景", query: "industry overview", libraryHint: "" },
+    ]);
+    expect(out).toEqual([
+      { title: "架构", query: "langgraph architecture", libraryHint: "langgraph" },
+      { title: "背景", query: "industry overview" },
+    ]);
+  });
+});
+
+describe("mergeResearchSources (双源取优, 纯函数, 无凭证)", () => {
+  const c7Docs =
+    "LangGraph StateGraph API. Use Annotation.Root for state. Version 1.4 supports Command routing.";
+  const ddgFail =
+    "（搜索失败：DDG detected an anomaly in the request, you are likely making requests too quickly.）";
+
+  it("Context7 成功 + DDG 失败 → 以 Context7 为主源", () => {
+    const merged = mergeResearchSources(
+      [
+        { source: "context7", text: c7Docs, ok: true, libraryId: "/langchain-ai/langgraph" },
+        { source: "duckduckgo", text: ddgFail, ok: false },
+      ],
+      "langgraph StateGraph Command"
+    );
+    expect(merged).toContain("Context7");
+    expect(merged).toContain("StateGraph");
+    expect(merged).not.toContain("DDG detected");
+  });
+
+  it("两路成功 → 高分为主、次高分为补充", () => {
+    const merged = mergeResearchSources(
+      [
+        {
+          source: "duckduckgo",
+          text: "Short web snippet about langgraph.",
+          ok: true,
+        },
+        {
+          source: "context7",
+          text: c7Docs,
+          ok: true,
+          libraryId: "/langchain-ai/langgraph",
+        },
+      ],
+      "langgraph StateGraph"
+    );
+    expect(merged).toContain("主源");
+    expect(merged).toContain("Context7");
+    expect(scoreResearchSource("context7", c7Docs, true, "langgraph StateGraph", {
+      libraryId: "/langchain-ai/langgraph",
+    })).toBeGreaterThan(
+      scoreResearchSource("duckduckgo", "Short web snippet about langgraph.", true, "langgraph StateGraph")
+    );
+  });
+
+  it("两路均失败 → 降级文案", () => {
+    const merged = mergeResearchSources(
+      [
+        { source: "context7", text: "（Context7 检索失败：timeout）", ok: false },
+        { source: "duckduckgo", text: ddgFail, ok: false },
+      ],
+      "langgraph"
+    );
+    expect(merged).toMatch(/检索失败|Context7|搜索失败/);
+  });
+});
+
 describe("isDdgErrorText (DDG 限流正文检测, 纯函数, 无凭证)", () => {
   it("识别 DDG anomaly / too quickly 类错误正文", () => {
     expect(
@@ -196,17 +270,21 @@ describe("fanoutToResearch (Send 扇出, 纯函数, 无凭证)", () => {
 });
 
 describe("outlineToPlanEntries (ACP Plan 映射, 纯函数, 无凭证)", () => {
-  it("将 outline 映射为固定顺序的 ACP plan entries", () => {
+  it("将 outline 映射为固定顺序的 ACP plan entries（含 libraryHint）", () => {
     const entries = outlineToPlanEntries(
       [
         { title: "背景", query: "background" },
-        { title: "架构", query: "architecture" },
+        { title: "架构", query: "architecture", libraryHint: "langgraph" },
       ],
       { currentTitle: "架构", completedTitles: ["背景"] }
     );
     expect(entries).toEqual([
       { content: "背景（搜索：background）", priority: "medium", status: "completed" },
-      { content: "架构（搜索：architecture）", priority: "medium", status: "in_progress" },
+      {
+        content: "架构（搜索：architecture；库：langgraph）",
+        priority: "medium",
+        status: "in_progress",
+      },
     ]);
   });
 });

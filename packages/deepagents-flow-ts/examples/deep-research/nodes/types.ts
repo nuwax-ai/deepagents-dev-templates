@@ -2,7 +2,13 @@
 
 export interface OutlineSection {
   title: string;
+  /** 用于 DuckDuckGo / 通用检索的英文关键词。 */
   query: string;
+  /**
+   * Context7 resolve-library-id 的 libraryName 提示（如 langgraph、typescript）。
+   * 非技术章节可省略；plan 节点由 LLM 按需填充。
+   */
+  libraryHint?: string;
 }
 
 export interface ResearchFinding {

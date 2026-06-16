@@ -5,7 +5,7 @@
  *  - 多阶段流水线：选题确认 → 大纲规划 → 并行调研 → 初稿生成 → 质量评审 → 报告
  *  - 多轮 HITL：2 个一次性确认门（确认主题、确认大纲）+ 报告后的持续会话回路
  *  - 双层 reflection 循环：大纲评审重试 + 初稿质量评审重试
- *  - Send 并行扇出：每章节独立调研（MCP 搜索 + LLM 整理）
+ *  - Send 并行扇出：每章节独立调研（Context7 文档 + DDG 网络，plan 产出 libraryHint）
  *  - **持续会话（一个会话一份研究）**：报告生成后不收场，用户可反复改/补/问，
  *    每轮复用同一份 findings + 报告上下文，直到「结束」才定稿
  *  - 复杂状态管理：大纲/章节/调研结果/初稿/报告/对话历史跨阶段累积
@@ -22,11 +22,11 @@
  *
  * 对应 LangGraph 官方模式组合：
  *   多轮 HITL(interrupt) + Send map-reduce + Reflection + Command 节点内路由 +
- *   research 子图(每章节 StructuredTool 搜一次 + rateLimited 串行错峰)
+ *   research 子图(每章节 Context7 ∥ DDG 并行取优 + rateLimited 串行错峰)
  *
  * 真实接入（无 demo fallback——未配凭证直接报错）：
  *  - plan / research / draft / outline_review / quality_review / finalize **真调大模型**
- *  - research 子图：invokeDuckDuckGoSearch（DDG 限流检测 + 4.5s 闸门 + 长退避重试）
+ *  - research：Context7 文档 + DuckDuckGo 网络并行，启发式取优合并；DDG 限流检测 + 4.5s 闸门
  *  - onToolCall 透出每次搜索；HITL 用 interrupt 暂停。
  *
  * 长任务韧性（防一处抖动掐死整条长流水线）：
@@ -63,10 +63,13 @@ import {
   MAX_OUTLINE_REVIEW,
   outlineReviewNode,
   outlineToPlanEntries,
+  normalizeOutlineSections,
   outlineGateNode,
   planNode,
   qualityReviewNode,
   createResearchSectionSubgraph,
+  mergeResearchSources,
+  scoreResearchSource,
   respondNode,
   routeAfterConverse,
   routeAfterOutlineReview,
@@ -83,10 +86,13 @@ export {
   fanoutToResearch,
   createResearchSectionSubgraph,
   isDdgErrorText,
+  mergeResearchSources,
+  scoreResearchSource,
   isEndSignal,
   MAX_DRAFT_REVIEW,
   MAX_OUTLINE_REVIEW,
   outlineToPlanEntries,
+  normalizeOutlineSections,
   routeAfterConverse,
   routeAfterOutlineReview,
   routeAfterQualityReview,

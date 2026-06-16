@@ -2,7 +2,7 @@
  * deep-research 节点共享 helper。
  *
  * LLM 调用约定（框架优先对照）：
- *  - 外部搜索 → StructuredTool（tools.ts）+ runTool 透出；Send 并行时 rateLimited 串行
+ *  - 外部搜索 → Context7 + DuckDuckGo 并行（merge 取优）；DDG 走 rateLimited 串行
  *  - 确定性流水线步骤（plan/draft/review）→ invokeLLM 直调
  */
 
