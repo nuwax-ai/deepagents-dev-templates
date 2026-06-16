@@ -12,7 +12,7 @@ loadDotenv();
 
 import { describe, it, expect, afterAll } from "vitest";
 import { randomUUID } from "node:crypto";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { MemorySaver } from "@langchain/langgraph";
@@ -28,6 +28,11 @@ import {
   MAX_DRAFT_REVIEW,
   type ResearchStateType,
 } from "../graph.js";
+import {
+  artifactParentDir,
+  markdownToHtml,
+  writeDeliveryArtifacts,
+} from "../nodes/delivery.js";
 import { loadFlowConfig } from "../../../src/runtime/config.js";
 import { FileCheckpointSaver } from "../../../src/runtime/file-checkpoint-saver.js";
 
@@ -56,6 +61,8 @@ function makeState(over: Partial<ResearchStateType>): ResearchStateType {
     conversation: [],
     userMessage: "",
     lastAnswer: "",
+    artifactMarkdownPath: "",
+    artifactHtmlPath: "",
     ...over,
   } as ResearchStateType;
 }
@@ -192,6 +199,32 @@ describe("outlineToPlanEntries (ACP Plan 映射, 纯函数, 无凭证)", () => {
   });
 });
 
+describe("delivery artifacts (最终交付, 纯函数, 无凭证)", () => {
+  const dirs: string[] = [];
+  afterAll(() => {
+    for (const d of dirs) rmSync(d, { recursive: true, force: true });
+  });
+
+  it("生成 Markdown 与 HTML 文件", () => {
+    const dir = mkdtempSync(join(tmpdir(), "research-artifacts-"));
+    dirs.push(dir);
+    const artifacts = writeDeliveryArtifacts("# 标题\n\n- 要点", {
+      topic: "测试 报告",
+      outputDir: dir,
+    });
+    expect(existsSync(artifacts.markdownPath)).toBe(true);
+    expect(existsSync(artifacts.htmlPath)).toBe(true);
+    expect(readFileSync(artifacts.markdownPath, "utf-8")).toContain("# 标题");
+    expect(readFileSync(artifacts.htmlPath, "utf-8")).toContain("<h1>标题</h1>");
+    expect(artifactParentDir(artifacts.markdownPath)).toBe(dir);
+  });
+
+  it("Markdown HTML 包装会转义危险字符", () => {
+    const html = markdownToHtml("# <script>alert(1)</script>");
+    expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
+  });
+});
+
 describe.skipIf(!runIntegration)(
   "deep-research flow (真实 LLM + MCP, 多阶段 + 多轮 HITL)",
   () => {
@@ -241,9 +274,18 @@ describe.skipIf(!runIntegration)(
         const r4 = await flow.run({ resume: "再补充一段与 Go 的对比" }, tid);
         expect(r4.status).toBe("interrupted");
 
-        // 回复「结束」→ wrapup 定稿 → done
+        // 回复「结束」→ delivery 节点问询保存目录
         const r5 = await flow.run({ resume: "结束" }, tid);
-        expect(r5.status).toBe("done");
+        expect(r5.status).toBe("interrupted");
+        if (r5.status === "interrupted") expect(r5.question).toContain("保存目录");
+
+        // 直接回车 → 使用默认会话 artifacts 目录并完成
+        const r6 = await flow.run({ resume: "" }, tid);
+        expect(r6.status).toBe("done");
+        if (r6.status === "done") {
+          expect(r6.answer).toContain("Markdown");
+          expect(r6.answer).toContain("HTML");
+        }
       },
       300000
     );
