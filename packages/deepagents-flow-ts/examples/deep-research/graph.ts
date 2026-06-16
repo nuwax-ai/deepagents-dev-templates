@@ -104,9 +104,22 @@ export {
 
 const ResearchState = Annotation.Root({
   topic: Annotation<string>,
-  refinedTopic: Annotation<string>,
-  outline: Annotation<OutlineSection[]>,
-  currentSection: Annotation<OutlineSection>,
+  refinedTopic: Annotation<string>({
+    // Send 并行调研时，每个章节分支都会携带同一个 refinedTopic 进入 research 子图。
+    // 父图只需要保留该主题值；显式 reducer 避免并发分支回写触发 LastValue 冲突。
+    reducer: (_a, b) => b,
+  }),
+  outline: Annotation<OutlineSection[]>({
+    // Send 扇出会把完整 outline 传给每个 research 分支，用于 ACP plan 进度展示。
+    // 多个分支在同一步回写的是同一份大纲，保留最后一次即可。
+    reducer: (_a, b) => b,
+    default: () => [],
+  }),
+  currentSection: Annotation<OutlineSection>({
+    // currentSection 是单个 research 子图的局部入参；父图后续不依赖它的最终值。
+    // 多章节并行完成时会产生多个 currentSection 更新，使用 reducer 接住这些并发写入。
+    reducer: (_a, b) => b,
+  }),
   findings: Annotation<ResearchFinding[]>({
     // null 作为清空信号（planNode 重规划时重置）；Send 扇出每个分支追加单条。
     reducer: (a, b) => (b == null ? [] : [...a, ...b]),
