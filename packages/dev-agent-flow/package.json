@@ -1,0 +1,7 @@
+{
+  "name": "@deepagents/dev-agent-flow-config",
+  "version": "0.1.0",
+  "private": true,
+  "description": "开发 Agent（Flow 版）的系统提示词和 Skills 配置 — 用于 nuwax 平台基于 deepagents-flow-ts 工作流编排模板的 Agent 开发助手",
+  "license": "MIT"
+}
