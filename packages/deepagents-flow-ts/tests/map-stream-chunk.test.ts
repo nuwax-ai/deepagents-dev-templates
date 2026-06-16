@@ -57,8 +57,38 @@ describe("mapStreamChunk", () => {
     expect(mapStreamChunk("updates", { thinkNode: { output: "x" } })).toEqual([]);
   });
 
-  it("tools mode 暂不映射（待 spike）", () => {
-    expect(mapStreamChunk("tools", { whatever: true })).toEqual([]);
+  it("tools mode on_tool_start → tool_start（input JSON 解析）", () => {
+    const out = mapStreamChunk("tools", {
+      event: "on_tool_start",
+      toolCallId: "c1",
+      name: "echo",
+      input: '{"x":"hi"}',
+    });
+    expect(out).toEqual([{ type: "tool_start", id: "c1", name: "echo", input: { x: "hi" } }]);
+  });
+
+  it("tools mode on_tool_end success → tool_update completed", () => {
+    const out = mapStreamChunk("tools", {
+      event: "on_tool_end",
+      toolCallId: "c1",
+      name: "echo",
+      output: { kwargs: { content: "echo:hi", status: "success" } },
+    });
+    expect(out).toEqual([{ type: "tool_update", id: "c1", status: "completed", output: "echo:hi" }]);
+  });
+
+  it("tools mode on_tool_end error → tool_update failed", () => {
+    const out = mapStreamChunk("tools", {
+      event: "on_tool_end",
+      toolCallId: "c1",
+      name: "echo",
+      output: { kwargs: { content: "boom", status: "error" } },
+    });
+    expect(out).toEqual([{ type: "tool_update", id: "c1", status: "failed", output: "boom" }]);
+  });
+
+  it("tools mode 无 event 字段不发事件", () => {
+    expect(mapStreamChunk("tools", { name: "echo" })).toEqual([]);
   });
 
   it("未知 mode 不发事件", () => {

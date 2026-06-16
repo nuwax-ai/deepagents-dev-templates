@@ -106,7 +106,44 @@ export function mapStreamChunk(mode: string, chunk: unknown): SurfaceStreamEvent
     return events;
   }
 
-  // tools mode（ToolNode 生命周期）：形状待 spike（@langchain/langgraph 版本），
-  // surface 接入时按实际事件补全 tool_start/tool_update。当前不映射，避免基于错误形状。
+  if (mode === "tools") {
+    // ToolNode 生命周期（spike 确认 @langchain/langgraph 多模式）：
+    //   { event: "on_tool_start"|"on_tool_end", toolCallId, name, input<string>, output?<ToolMessage 序列化> }
+    //   output 为 LangChain 序列化 ToolMessage：{ kwargs: { content, status:"success"|"error", ... } }
+    const e = chunk as {
+      event?: string;
+      toolCallId?: string;
+      name?: string;
+      input?: string;
+      output?: { kwargs?: { content?: unknown; status?: string } };
+    } | undefined;
+    if (!e || !e.event) return events;
+    const id = e.toolCallId ?? e.name ?? "";
+    if (e.event === "on_tool_start" && e.name) {
+      let parsed: unknown = e.input;
+      try {
+        parsed = e.input ? JSON.parse(e.input) : undefined;
+      } catch {
+        parsed = e.input;
+      }
+      events.push({
+        type: "tool_start",
+        id,
+        name: e.name,
+        ...(parsed !== undefined ? { input: parsed } : {}),
+      });
+    } else if (e.event === "on_tool_end") {
+      const k = e.output?.kwargs;
+      const status: "completed" | "failed" = k?.status === "error" ? "failed" : "completed";
+      events.push({
+        type: "tool_update",
+        id,
+        status,
+        ...(k?.content !== undefined ? { output: k.content } : {}),
+      });
+    }
+    return events;
+  }
+
   return events;
 }
