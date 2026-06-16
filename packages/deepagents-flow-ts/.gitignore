@@ -36,3 +36,6 @@ package-checksums.json
 
 # Flow session persistence (FileCheckpointSaver)
 .flow-sessions/
+
+.logs/
+.agents/

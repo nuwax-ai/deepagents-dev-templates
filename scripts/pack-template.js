@@ -16,7 +16,7 @@ const isRelease = process.argv.includes('--release')
 if (!templateName) {
   console.error('❌ 请指定模板名称')
   console.log('用法: node scripts/pack-template.js <template-name> [--release]')
-  console.log('可用模板: ts, py, all')
+  console.log('可用模板: ts, flow-ts, py, all')
   console.log('  --release  生成稳定文件名（无时间戳），用于发布')
   process.exit(1)
 }
@@ -24,9 +24,15 @@ if (!templateName) {
 // 模板配置
 const templates = {
   ts: {
-    name: 'TypeScript 模板',
+    name: 'TypeScript 模板 (app)',
     dir: 'packages/deepagents-app-ts',
     outputName: 'deepagents-app-ts',
+    versionFile: 'package.json',
+  },
+  'flow-ts': {
+    name: 'TypeScript 模板 (flow)',
+    dir: 'packages/deepagents-flow-ts',
+    outputName: 'deepagents-flow-ts',
     versionFile: 'package.json',
   },
   py: {
@@ -135,7 +141,6 @@ function getExcludePatterns(templateDir) {
     '.vscode',
     '.env',
     '.env.local',
-    '.env.example',
     '*.tgz',
     '*.tar.gz',
     '*.zip',

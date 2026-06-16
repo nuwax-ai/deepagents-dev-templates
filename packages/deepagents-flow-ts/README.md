@@ -3,8 +3,10 @@
 **通用工作流编排模板** —— Agent 按"设计好的节点连线规则(node + edge)"作为 LangGraph 工作流运行，
 而不是自由的 tool loop。
 
-与 [`deepagents-app-ts`](../deepagents-app-ts)（Coding Agent，agent loop 范式）互补：
-本包复用它的 `runtime` 核心（config / model / logger / 存储），只把"大脑"换成一张显式图。
+> **独立模板**：解压后在本目录 `pnpm install && pnpm build` 即可使用。
+> 底层配置/模型/MCP 经 npm 依赖 `deepagents-app-ts/runtime` 提供；扩展见 [CLAUDE.md](CLAUDE.md)。
+
+本模板是 **工作流编排 Agent**（显式 LangGraph 图），与 Coding Agent（tool loop）产品形态不同；运行时基础能力由上述 npm 包承担，「大脑」是一张可设计的节点图。
 
 ## 默认图（标准 LangGraph ReAct）
 
@@ -58,24 +60,26 @@ human-in-the-loop，可 `interrupt` 暂停→等用户→`resume`）。下面四
 
 ## 运行
 
+在项目根目录（本 `package.json` 所在目录）：
+
 ```bash
-# 先构建依赖的 runtime 核心
-pnpm --filter deepagents-app-ts build
+pnpm install
+pnpm build
 
 # 默认 flow：CLI
-pnpm --filter deepagents-flow-ts flow "随便说点什么"
-pnpm --filter deepagents-flow-ts exec tsx src/index.ts flow -i
+pnpm flow "随便说点什么"
+pnpm exec tsx src/index.ts flow -i
 
 # 默认 flow：ACP 服务（供 nuwaclaw/Zed/JetBrains）
-pnpm --filter deepagents-flow-ts build && node packages/deepagents-flow-ts/dist/index.js
+pnpm start:acp
 
 # 跑 RAG 范例（CLI）
-pnpm --filter deepagents-flow-ts example:rag:cli "什么是 LangGraph？"
+pnpm example:rag:cli "什么是 LangGraph？"
 
 # 其它范例（CLI；travel/pm/review 会在中途暂停等你输入确认/审阅）
-pnpm --filter deepagents-flow-ts example:travel "东京 3 天 美食优先"
-pnpm --filter deepagents-flow-ts example:pm "做一个落地页"
-pnpm --filter deepagents-flow-ts example:review "写一段产品介绍"
+pnpm example:travel "东京 3 天 美食优先"
+pnpm example:pm "做一个落地页"
+pnpm example:review "写一段产品介绍"
 ```
 
 模型凭证见 [`.env.example`](.env.example)（ACP 模式下通常由 IDE host 注入）。
@@ -152,7 +156,7 @@ const { nodes, edges, mermaid } = await getFlowTopology();
 ## 测试
 
 ```bash
-pnpm --filter deepagents-flow-ts test
+pnpm test
 ```
 
 - `tests/` — 默认图（条件边决策表 + 收敛）、纯函数（safeCalc 注入边界等）、图拓扑导出

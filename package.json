@@ -13,8 +13,9 @@
     "typecheck": "pnpm --filter deepagents-app-ts typecheck && pnpm --filter deepagents-flow-ts typecheck",
     "graph": "pnpm --filter deepagents-app-ts graph",
     "inspect": "pnpm --filter inspector inspect --",
-    "pack": "node scripts/pack-template.js",
+    "pack": "node scripts/pack-template.js all",
     "pack:ts": "node scripts/pack-template.js ts",
+    "pack:flow-ts": "node scripts/pack-template.js flow-ts",
     "pack:py": "node scripts/pack-template.js py",
     "pack:all": "node scripts/pack-template.js all",
     "pack:release": "node scripts/pack-template.js all --release"
