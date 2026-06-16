@@ -85,12 +85,26 @@ export async function compactHistory(
 
   log.info("compacting history", { beforeTokens: total, threshold });
 
-  const recent = (await trimMessages(messages, {
-    maxTokens: cc.keepRecentTokens,
-    strategy: "last",
-    tokenCounter: (msgs) => estimateTokens(msgs as BaseMessage[]),
-    includeSystem: true,
-  })) as BaseMessage[];
+  // 有凭证时优先用 model 作 tokenCounter（精确裁剪）；无凭证或 model 不支持 token counting 回退 estimateTokens。
+  const rawModel = hasModelCredentials(config) ? resolveModel(config) : null;
+  const countModel = rawModel && typeof rawModel !== "string" ? rawModel : null;
+  let recent: BaseMessage[];
+  try {
+    recent = (await trimMessages(messages, {
+      maxTokens: cc.keepRecentTokens,
+      strategy: "last",
+      tokenCounter: countModel ?? ((msgs: BaseMessage[]) => estimateTokens(msgs)),
+      includeSystem: true,
+    })) as BaseMessage[];
+  } catch {
+    log.warn("model tokenCounter 不可用 → 回退 estimateTokens 裁剪");
+    recent = (await trimMessages(messages, {
+      maxTokens: cc.keepRecentTokens,
+      strategy: "last",
+      tokenCounter: (msgs: BaseMessage[]) => estimateTokens(msgs),
+      includeSystem: true,
+    })) as BaseMessage[];
+  }
 
   const oldCount = messages.length - recent.length;
   if (oldCount <= 0) return recent;
