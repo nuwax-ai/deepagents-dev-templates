@@ -24,6 +24,7 @@ import {
   isEndSignal,
   fanoutToResearch,
   outlineToPlanEntries,
+  isDdgErrorText,
   MAX_OUTLINE_REVIEW,
   MAX_DRAFT_REVIEW,
   type ResearchStateType,
@@ -160,6 +161,17 @@ describe("长任务持久化：clarify interrupt 跨实例续跑（无凭证，f
       checkpointer: new FileCheckpointSaver({ dir }),
     });
     expect(await flowB.hasStarted!(tid)).toBe(true);
+  });
+});
+
+describe("isDdgErrorText (DDG 限流正文检测, 纯函数, 无凭证)", () => {
+  it("识别 DDG anomaly / too quickly 类错误正文", () => {
+    expect(
+      isDdgErrorText(
+        "Error: DDG detected an anomaly in the request, you are likely making requests too quickly."
+      )
+    ).toBe(true);
+    expect(isDdgErrorText("正常搜索结果 snippet")).toBe(false);
   });
 });
 

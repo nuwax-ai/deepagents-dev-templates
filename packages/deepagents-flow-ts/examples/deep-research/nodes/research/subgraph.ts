@@ -1,13 +1,12 @@
 /**
- * research 子图 —— 单章节调研的 mini ReAct（框架优先）。
+ * research 子图 —— 单章节调研（确定性搜索 + LLM 摘要）。
  *
- *   START → prepare(注入 messages) → think(bindTools) ── toolsCondition ──┐
- *                                      ▲                                ├─ tool_calls → tools(ToolNode) → think
- *                                      └────────────────────────────────┘
- *                                               └─ 无 tool_calls → summarize → END
+ *   START → prepare(阶段进度) → search(StructuredTool 一次) → summarize → END
  *
- * 编译后作为父图 `research` 节点；父图 Send 扇出时每个 section 跑一份子图实例。
- * 子图与父图共享 currentSection / refinedTopic / outline / languageHint / findings channel。
+ * 不用 ReAct 循环：每章节固定 `section.query` 搜一次，避免模型重复调工具放大 DDG 限流。
+ * Send 扇出 N 路时，search 经 invokeDuckDuckGoSearch 内全局 rateLimited 串行错峰。
+ *
+ * 编译后作为父图 `research` 节点。
  */
 
 import {
@@ -15,51 +14,32 @@ import {
   START,
   END,
   Annotation,
-  messagesStateReducer,
   type LangGraphRunnableConfig,
 } from "@langchain/langgraph";
-import { ToolNode, toolsCondition } from "@langchain/langgraph/prebuilt";
-import {
-  AIMessage,
-  HumanMessage,
-  SystemMessage,
-  ToolMessage,
-  type BaseMessage,
-} from "@langchain/core/messages";
-import type { StructuredTool } from "@langchain/core/tools";
+import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { logger, type AppConfig } from "../../../../src/runtime/index.js";
 import type { FlowCallbacks } from "../../../../src/surfaces/flow-types.js";
 import {
   emitPlan,
   emitStage,
   extractText,
-  invokeWithResilience,
   requireModel,
-  resolveLlmResilience,
+  runTool,
 } from "../../../shared.js";
 import type { OutlineSection, ResearchFinding } from "../types.js";
 import { invokeLLM, langClause } from "../helpers.js";
 import { outlineToPlanEntries } from "../planning.js";
-import { createDuckDuckGoSearchTool } from "./tools.js";
+import { invokeDuckDuckGoSearch } from "./tools.js";
 
 const log = logger.child("deep-research");
 
-/** 子图 state：与父图重叠字段 + ReAct messages 通道。 */
+/** 子图 state：与父图重叠字段 + 本章检索原文。 */
 const ResearchSectionState = Annotation.Root({
   currentSection: Annotation<OutlineSection>,
   refinedTopic: Annotation<string>,
   languageHint: Annotation<string>,
   outline: Annotation<OutlineSection[]>,
-  /** ReAct 消息流（子图内部；summarize 后不再写回父图）。 */
-  messages: Annotation<BaseMessage[]>({
-    reducer: messagesStateReducer,
-    default: () => [],
-  }),
-  /** 从 ToolMessage 累积的原始检索文本，供 summarize 降级使用。 */
-  rawMaterial: Annotation<string>({
-    reducer: (a, b) => (b ? `${a}\n${b}`.trim() : a),
-    default: () => "",
-  }),
+  rawMaterial: Annotation<string>,
   findings: Annotation<ResearchFinding[]>({
     reducer: (a, b) => [...a, ...b],
     default: () => [],
@@ -68,18 +48,7 @@ const ResearchSectionState = Annotation.Root({
 
 type SectionState = typeof ResearchSectionState.State;
 
-type BoundModel = { invoke: (m: BaseMessage[]) => Promise<AIMessage> };
-
-/** 从 messages 里抽出全部 ToolMessage 正文。 */
-function extractToolMaterial(messages: BaseMessage[]): string {
-  return messages
-    .filter((m): m is ToolMessage => m._getType() === "tool")
-    .map((m) => (typeof m.content === "string" ? m.content : JSON.stringify(m.content)))
-    .join("\n")
-    .trim();
-}
-
-/** prepare：透出阶段进度，并注入「必须用搜索工具」的初始 messages。 */
+/** prepare：透出阶段进度与 ACP Plan。 */
 function createPrepareNode() {
   return async (
     state: SectionState,
@@ -88,66 +57,15 @@ function createPrepareNode() {
     const section = state.currentSection;
     await emitPlan(config, outlineToPlanEntries(state.outline, { currentTitle: section.title }));
     await emitStage(config, { stage: "调研", detail: section.title });
-
-    return {
-      messages: [
-        new SystemMessage(
-          `你是研究助理。必须使用 duckduckgo_search 工具检索章节资料，可基于建议检索词改写 query。` +
-            `检索到足够资料后，用一句话说明「检索完成」，不要输出长文摘要（摘要由后续节点完成）。` +
-            langClause(state.languageHint)
-        ),
-        new HumanMessage(
-          `研究主题：${state.refinedTopic}\n` +
-            `章节：${section.title}\n` +
-            `建议检索词：${section.query}\n` +
-            `请调用 duckduckgo_search 检索相关资料。`
-        ),
-      ],
-      rawMaterial: "",
-    };
-  };
-}
-
-/** think：bindTools 后由模型决定是否/如何调搜索工具（prebuilt toolsCondition 路由）。 */
-function createThinkNode(searchTool: StructuredTool, appConfig?: AppConfig) {
-  const model = appConfig ? requireModel(appConfig, "deep-research 示例") : null;
-  const bound: BoundModel | null =
-    model && typeof model !== "string"
-      ? (model as unknown as { bindTools: (t: StructuredTool[]) => BoundModel }).bindTools([
-          searchTool,
-        ])
-      : null;
-
-  return async (state: SectionState): Promise<Partial<SectionState>> => {
-    if (!bound) {
-      return {
-        messages: [
-          new AIMessage({
-            content: `（无模型凭证，跳过工具检索；建议检索词：${state.currentSection.query}）`,
-          }),
-        ],
-      };
-    }
-    const { shortTimeoutMs } = resolveLlmResilience(appConfig);
-    const ai = await invokeWithResilience(bound, state.messages, {
-      timeoutMs: shortTimeoutMs,
-      label: "deep-research research-think",
-      retryLabel: "deep-research research-think LLM",
-      useSharedLimiter: true,
-      config: appConfig,
-    });
-    return { messages: [ai] };
+    return { rawMaterial: "" };
   };
 }
 
 /**
- * tools：prebuilt ToolNode 执行 tool_calls + onToolCall 三态透出。
- * 与默认图 `src/app/nodes/tools.ts` 同模式。
+ * search：每章节确定性调用一次 duckduckgo_search（StructuredTool 底层实现）。
+ * runTool 透出 onToolCall 三态，与 travel-planner / 旧版 deep-research 一致。
  */
-function createToolsNode(searchTool: StructuredTool) {
-  // handleToolErrors: 即便工具抛错也落成 ToolMessage，不掐断子图
-  const toolNode = new ToolNode([searchTool], { handleToolErrors: true });
-
+function createSearchNode() {
   return async (
     state: SectionState,
     config?: LangGraphRunnableConfig
@@ -155,87 +73,35 @@ function createToolsNode(searchTool: StructuredTool) {
     const onToolCall = config?.configurable?.onToolCall as
       | FlowCallbacks["onToolCall"]
       | undefined;
-    const last = state.messages[state.messages.length - 1] as AIMessage;
-    const calls = (last?.tool_calls ?? []) as Array<{
-      id?: string;
-      name: string;
-      args: Record<string, unknown>;
-    }>;
+    const section = state.currentSection;
+    const query = section.query;
 
-    for (const c of calls) {
-      if (onToolCall && c.id) {
-        await onToolCall({
-          toolCallId: c.id,
-          toolName: c.name,
-          args: c.args,
-          status: "in_progress",
-        });
-      }
-    }
-
-    const result = (await toolNode.invoke({ messages: state.messages })) as {
-      messages?: ToolMessage[];
-    };
-    const toolMsgs = result?.messages ?? [];
-
-    for (const tm of toolMsgs) {
-      if (onToolCall) {
-        const failed = tm.status === "error";
-        const text = typeof tm.content === "string" ? tm.content : JSON.stringify(tm.content);
-        await onToolCall({
-          toolCallId: tm.tool_call_id,
-          toolName: tm.name ?? "duckduckgo_search",
-          args: {},
-          status: failed ? "failed" : "completed",
-          ...(failed ? { error: text } : { result: text }),
-        });
-      }
-    }
-
-    const chunk = toolMsgs
-      .map((tm) => (typeof tm.content === "string" ? tm.content : JSON.stringify(tm.content)))
-      .join("\n")
-      .trim();
-
-    // 搜索失败时仍写入 rawMaterial，summarize 可降级继续
-    const failedSearch = toolMsgs.some(
-      (tm) =>
-        tm.status === "error" ||
-        (typeof tm.content === "string" && /（搜索失败|搜索无结果）/.test(tm.content))
+    const { result, ok } = await runTool(
+      "duckduckgo_search",
+      { query },
+      async () => {
+        const { text } = await invokeDuckDuckGoSearch(query);
+        return text;
+      },
+      onToolCall
     );
-    if (failedSearch) {
-      log.warn("research 搜索未成功，继续 summarize 降级", {
-        section: state.currentSection.title,
+
+    if (!ok) {
+      log.warn("research 搜索未成功，summarize 将降级", {
+        section: section.title,
+        snippet: result.slice(0, 80),
       });
     }
 
-    return {
-      messages: toolMsgs,
-      ...(chunk ? { rawMaterial: chunk } : {}),
-    };
+    return { rawMaterial: result };
   };
 }
 
-/** 搜索失败后不再回 think 重试，直接 summarize（防 ReAct 在 TLS 抖动时空转）。 */
-function routeAfterTools(state: SectionState): "think" | "summarize" {
-  const toolMsgs = state.messages.filter((m): m is ToolMessage => m._getType() === "tool");
-  if (toolMsgs.length >= 2) return "summarize";
-  const last = toolMsgs[toolMsgs.length - 1];
-  if (!last) return "think";
-  const text = typeof last.content === "string" ? last.content : JSON.stringify(last.content);
-  if (last.status === "error" || /（搜索失败|搜索无结果）/.test(text)) {
-    return "summarize";
-  }
-  return "think";
-}
-
-/** summarize：把 ToolMessage 检索结果整理成结构化章节摘要，写回父图 findings。 */
+/** summarize：把检索结果整理成结构化章节摘要，写回父图 findings。 */
 function createSummarizeNode(appConfig?: AppConfig) {
   return async (state: SectionState): Promise<Partial<SectionState>> => {
     const section = state.currentSection;
-    const fromTools = extractToolMaterial(state.messages);
     const rawMaterial =
-      fromTools ||
       state.rawMaterial ||
       `（未检索到资料；将基于主题常识整理。建议检索词：${section.query}）`;
 
@@ -248,6 +114,7 @@ function createSummarizeNode(appConfig?: AppConfig) {
           new SystemMessage(
             `你是技术分析师。根据检索资料，为章节「${section.title}」写一段 200-400 字的结构化摘要。` +
               `提取关键事实、数据、结论，不要堆砌链接。只输出摘要正文。` +
+              `若资料标明搜索失败，可结合主题常识简要推断，并注明依据有限。` +
               langClause(state.languageHint)
           ),
           new HumanMessage(
@@ -259,8 +126,8 @@ function createSummarizeNode(appConfig?: AppConfig) {
       summary = extractText(res.content).trim();
     } catch (err) {
       log.warn("research summarize 失败 → 降级", { section: section.title, error: String(err) });
-      summary = fromTools
-        ? fromTools.slice(0, 400)
+      summary = state.rawMaterial
+        ? state.rawMaterial.slice(0, 400)
         : `（${section.title} 资料获取失败，该章节将基于其他已有内容推断）`;
     }
 
@@ -271,27 +138,15 @@ function createSummarizeNode(appConfig?: AppConfig) {
   };
 }
 
-/**
- * 编译单章节调研子图；父图 `.addNode("research", createResearchSectionSubgraph(appConfig))`。
- */
+/** 编译单章节调研子图；父图 `.addNode("research", createResearchSectionSubgraph(appConfig))`。 */
 export function createResearchSectionSubgraph(appConfig?: AppConfig) {
-  const searchTool = createDuckDuckGoSearchTool();
-
   return new StateGraph(ResearchSectionState)
     .addNode("prepare", createPrepareNode())
-    .addNode("think", createThinkNode(searchTool, appConfig))
-    .addNode("tools", createToolsNode(searchTool))
+    .addNode("search", createSearchNode())
     .addNode("summarize", createSummarizeNode(appConfig))
     .addEdge(START, "prepare")
-    .addEdge("prepare", "think")
-    .addConditionalEdges("think", toolsCondition, {
-      tools: "tools",
-      [END]: "summarize",
-    })
-    .addConditionalEdges("tools", routeAfterTools, {
-      think: "think",
-      summarize: "summarize",
-    })
+    .addEdge("prepare", "search")
+    .addEdge("search", "summarize")
     .addEdge("summarize", END)
     .compile();
 }

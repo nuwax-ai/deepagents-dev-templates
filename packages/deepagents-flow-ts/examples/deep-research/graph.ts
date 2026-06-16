@@ -22,11 +22,11 @@
  *
  * 对应 LangGraph 官方模式组合：
  *   多轮 HITL(interrupt) + Send map-reduce + Reflection + Command 节点内路由 +
- *   research 子图(mini ReAct: bindTools + ToolNode + toolsCondition)
+ *   research 子图(每章节 StructuredTool 搜一次 + rateLimited 串行错峰)
  *
  * 真实接入（无 demo fallback——未配凭证直接报错）：
  *  - plan / research / draft / outline_review / quality_review / finalize **真调大模型**
- *  - research 子图：StructuredTool(duckduckgo) + ToolNode + toolsCondition（框架优先，非手写 MCP）
+ *  - research 子图：invokeDuckDuckGoSearch（DDG 限流检测 + 4.5s 闸门 + 长退避重试）
  *  - onToolCall 透出每次搜索；HITL 用 interrupt 暂停。
  *
  * 长任务韧性（防一处抖动掐死整条长流水线）：
@@ -57,6 +57,7 @@ import {
   draftNode,
   fanoutToResearch,
   formatDeliveryAnswer,
+  isDdgErrorText,
   isEndSignal,
   MAX_DRAFT_REVIEW,
   MAX_OUTLINE_REVIEW,
@@ -81,6 +82,7 @@ import type {
 export {
   fanoutToResearch,
   createResearchSectionSubgraph,
+  isDdgErrorText,
   isEndSignal,
   MAX_DRAFT_REVIEW,
   MAX_OUTLINE_REVIEW,
