@@ -208,5 +208,6 @@ export class FileCheckpointSaver extends MemorySaver {
     }
     const file = this.threadFile(threadId);
     if (existsSync(file)) unlinkSync(file);
+    this.loaded.delete(threadId);  // 允许同进程内以相同 threadId 重新开题
   }
 }

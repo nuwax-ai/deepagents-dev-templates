@@ -73,8 +73,10 @@ export const MAX_OUTLINE_REVIEW = 2;
 export const MAX_DRAFT_REVIEW = 2;
 /** 单次 research 节点的 MCP 搜索超时。 */
 const SEARCH_TIMEOUT_MS = 20000;
-/** 单次 LLM 调用超时（长任务护栏：一步挂死不拖垮整条流水线）。 */
+/** 短 LLM 调用超时（plan / review / 摘要：输出短，60s 足够）。 */
 const LLM_TIMEOUT_MS = 60000;
+/** 长 LLM 调用超时（write_draft / respond：800-2000 字生成，慢模型可能超 60s）。 */
+const LLM_LONG_TIMEOUT_MS = 180000;
 
 /** 网络搜索 MCP（duckduckgo-mcp-server，免 key；与 travel-planner 同源）。
  *  注：早期版本误用 context7（仅库文档检索、无通用 search 工具）→ 每次搜索 -32602 失败。 */
@@ -110,7 +112,8 @@ const ResearchState = Annotation.Root({
   outline: Annotation<OutlineSection[]>,
   currentSection: Annotation<OutlineSection>,
   findings: Annotation<ResearchFinding[]>({
-    reducer: (a, b) => [...a, ...b],
+    // null 作为清空信号（planNode 重规划时重置）；Send 扇出每个分支追加单条。
+    reducer: (a, b) => (b == null ? [] : [...a, ...b]),
     default: () => [],
   }),
   outlineDecision: Annotation<string>,
@@ -132,10 +135,36 @@ const ResearchState = Annotation.Root({
   userMessage: Annotation<string>,
   /** 助手最近一次回应（修订后的报告或答疑），converse 据此展示。 */
   lastAnswer: Annotation<string>,
+  /**
+   * 用户指定的输出语言偏好（从 clarify/outlineGate 的用户回复中提取）。
+   * 一旦设置不被空串覆盖，持久注入到后续所有 LLM 的 system prompt 中。
+   * 与 outlineCritique 解耦：outlineReviewNode 只写 outlineCritique，不碰这个字段。
+   */
+  languageHint: Annotation<string>({
+    reducer: (a, b) => b || a,
+    default: () => "",
+  }),
 });
 export type ResearchStateType = typeof ResearchState.State;
 
 // ── 工具函数 ────────────────────────────────────────────
+
+/**
+ * 从用户自由文本中提取语言偏好指令（"用中文" → "请以中文输出"）。无明确偏好返回 ""。
+ * 捕获后存入 languageHint 字段，持久注入到后续所有 LLM system prompt，不依赖 outlineCritique。
+ */
+function extractLanguageHint(text: string): string {
+  if (/用?中文|chinese/i.test(text)) return "请以中文输出";
+  if (/用?英文|english/i.test(text)) return "Please output in English";
+  if (/用?日(语|文)|japanese/i.test(text)) return "日本語で出力してください";
+  if (/용?한국어|korean/i.test(text)) return "한국어로 출력해 주세요";
+  return "";
+}
+
+/** 生成追加在 SystemMessage 末尾的语言要求子句（空字符串表示无偏好）。 */
+function langClause(hint: string): string {
+  return hint ? `\n\n**语言要求：${hint}**` : "";
+}
 
 /**
  * 从 LLM 文本里抽出第一段 JSON（容忍 ```json 围栏与前后说明文字）。
@@ -152,9 +181,13 @@ function parseJson<T>(text: string): T {
 
 /** 调模型 + 超时护栏 + 重试（限流/抖动/挂死都不直接掐死长流水线；重试用尽才抛）。 */
 type LLMLike = { invoke: (messages: BaseMessage[]) => Promise<{ content: unknown }> };
-function invokeLLM(m: LLMLike, messages: BaseMessage[]): Promise<{ content: unknown }> {
+function invokeLLM(
+  m: LLMLike,
+  messages: BaseMessage[],
+  timeoutMs = LLM_TIMEOUT_MS
+): Promise<{ content: unknown }> {
   return withRetry(
-    () => withTimeout(m.invoke(messages), LLM_TIMEOUT_MS, "deep-research 调模型"),
+    () => withTimeout(m.invoke(messages), timeoutMs, "deep-research 调模型"),
     { attempts: 3, baseDelayMs: 1000, label: "deep-research LLM" }
   );
 }
@@ -173,8 +206,10 @@ function clarifyNode(state: ResearchStateType): Partial<ResearchStateType> {
       `直接回复「ok」确认，或输入你的调整。`,
   });
   const fb = String(feedback ?? "").trim();
+  const languageHint = extractLanguageHint(fb);
   return {
     refinedTopic: fb && !isApproval(fb) ? `${state.topic}（方向：${fb}）` : state.topic,
+    ...(languageHint ? { languageHint } : {}),
   };
 }
 
@@ -193,7 +228,8 @@ async function planNode(
       `你是资深研究分析师。为给定主题制定一份研究报告大纲，包含 3-5 个章节（Section）。` +
         `每章节含 title（标题）和 query（用于文档检索的关键词，英文优先）。` +
         `只输出 JSON 数组：[{"title":"...","query":"..."}]，不要解释。` +
-        (isReplan ? `\n上一轮评审意见（据此改进大纲）：${state.outlineCritique}` : "")
+        (isReplan ? `\n上一轮评审意见（据此改进大纲）：${state.outlineCritique}` : "") +
+        langClause(state.languageHint)
     ),
     new HumanMessage(`研究主题：${state.refinedTopic}`),
   ]);
@@ -203,10 +239,12 @@ async function planNode(
     attempt: state.outlineAttempts + 1,
     isReplan,
   });
+  // 用户主导的大纲修订不消耗 LLM 评审重试配额；null 触发 findings reducer 的清空逻辑。
+  const isUserRevise = state.outlineDecision === "user_revise";
   return {
     outline: sections,
-    findings: [],
-    outlineAttempts: state.outlineAttempts + 1,
+    findings: null as unknown as ResearchFinding[],
+    outlineAttempts: isUserRevise ? state.outlineAttempts : state.outlineAttempts + 1,
   };
 }
 
@@ -223,13 +261,18 @@ function outlineGateNode(state: ResearchStateType): Partial<ResearchStateType> {
       `确认大纲开始调研，或回复调整意见。\n直接回复「ok」确认。`,
   });
   const fb = String(feedback ?? "").trim();
+  const languageHint = extractLanguageHint(fb);
   if (fb && !isApproval(fb)) {
     return {
       outlineCritique: fb,
       outlineDecision: "user_revise",
+      ...(languageHint ? { languageHint } : {}),
     };
   }
-  return { outlineDecision: "ok" };
+  return {
+    outlineDecision: "ok",
+    ...(languageHint ? { languageHint } : {}),
+  };
 }
 
 /**
@@ -242,6 +285,7 @@ export function fanoutToResearch(state: ResearchStateType): Send[] {
       new Send("research", {
         currentSection: section,
         refinedTopic: state.refinedTopic,
+        languageHint: state.languageHint,
       })
   );
 }
@@ -287,7 +331,8 @@ async function researchNode(
     const res = await invokeLLM(model, [
       new SystemMessage(
         `你是技术分析师。根据检索资料，为章节「${section.title}」写一段 200-400 字的结构化摘要。` +
-          `提取关键事实、数据、结论，不要堆砌链接。只输出摘要正文。`
+          `提取关键事实、数据、结论，不要堆砌链接。只输出摘要正文。` +
+          langClause(state.languageHint)
       ),
       new HumanMessage(
         `主题：${state.refinedTopic}\n章节：${section.title}\n检索关键词：${query}\n检索资料：\n${rawMaterial}`
@@ -295,9 +340,9 @@ async function researchNode(
     ]);
     summary = extractText(res.content).trim();
   } catch (err) {
-    // 整理失败也不崩并行分支：退回截断的原始素材，让流水线继续
-    log.warn("research 整理失败 → 降级用原始素材", { section: section.title, error: String(err) });
-    summary = rawMaterial.slice(0, 400);
+    // 整理失败也不崩并行分支：有搜索结果则截断原文，否则写明该章节获取失败（避免错误信息污染 findings）。
+    log.warn("research 整理失败 → 降级", { section: section.title, error: String(err) });
+    summary = ok ? rawMaterial.slice(0, 400) : `（${section.title} 资料获取失败，该章节将基于其他已有内容推断）`;
   }
   log.info("research done", { section: section.title, summaryLen: summary.length });
   return {
@@ -365,15 +410,23 @@ async function draftNode(
   const material = state.findings
     .map((f) => `## ${f.title}\n${f.summary}`)
     .join("\n\n---\n\n");
-  const res = await invokeLLM(model, [
-    new SystemMessage(
-      `你是资深技术写作专家。根据调研资料，为「${state.refinedTopic}」撰写一份结构清晰、逻辑连贯的研究报告。` +
-        `报告应包含引言、各章节分析、结论与建议。Markdown 格式，800-2000 字。不要堆砌链接，聚焦洞察。` +
-        (isRewrite ? `\n质量评审意见（据此改进）：${state.draftCritique}` : "")
-    ),
-    new HumanMessage(`调研资料：\n${material}`),
-  ]);
-  const draft = extractText(res.content).trim();
+  let draft: string;
+  try {
+    const res = await invokeLLM(model, [
+      new SystemMessage(
+        `你是资深技术写作专家。根据调研资料，为「${state.refinedTopic}」撰写一份结构清晰、逻辑连贯的研究报告。` +
+          `报告应包含引言、各章节分析、结论与建议。Markdown 格式，800-2000 字。不要堆砌链接，聚焦洞察。` +
+          (isRewrite ? `\n质量评审意见（据此改进）：${state.draftCritique}` : "") +
+          langClause(state.languageHint)
+      ),
+      new HumanMessage(`调研资料：\n${material}`),
+    ], LLM_LONG_TIMEOUT_MS);
+    draft = extractText(res.content).trim();
+  } catch (err) {
+    // 重试耗尽也不崩图：复用上一版草稿（若有），并触发质量评审降级放行，让用户介入。
+    log.warn("draft 生成失败 → 复用上一版草稿", { attempt: state.draftAttempts + 1, error: String(err) });
+    draft = state.draft || material.slice(0, 2000);
+  }
   log.info("draft", { length: draft.length, attempt: state.draftAttempts + 1, isRewrite });
   return { draft, draftAttempts: state.draftAttempts + 1 };
 }
@@ -463,8 +516,10 @@ async function respondNode(
   const findingsSummary = state.findings
     .map((f) => `## ${f.title}\n${f.summary}`)
     .join("\n\n");
-  // 只带最近若干轮，避免长会话把 prompt 撑爆
+  // converseNode 已把当前用户消息追加进 conversation，而 prompt 末尾会单独放 userMessage，
+  // 排除最后一条（当前轮用户消息）避免在 prompt 里重复出现。
   const convo = state.conversation
+    .slice(0, -1)
     .slice(-6)
     .map((t) => `${t.role === "user" ? "用户" : "助手"}：${t.content}`)
     .join("\n");
@@ -473,15 +528,16 @@ async function respondNode(
     new SystemMessage(
       `你在就一份研究报告与用户持续对话。依据【研究资料】与【当前报告】回应用户最新消息：\n` +
         `- 若要求修改/补充报告 → 输出修订后的【完整报告】（Markdown，保持原结构与语境）；\n` +
-        `- 若是提问 → 直接简洁作答，不必重发报告。\n只输出正文。`
+        `- 若是提问 → 直接简洁作答，不必重发报告。\n只输出正文。` +
+        langClause(state.languageHint)
     ),
     new HumanMessage(
       `主题：${state.refinedTopic}\n\n【研究资料】\n${findingsSummary}\n\n【当前报告】\n${current}\n\n【对话】\n${convo}\n\n用户最新消息：${state.userMessage}`
     ),
-  ]);
+  ], LLM_LONG_TIMEOUT_MS);
   const answer = extractText(res.content).trim();
   // 看起来像完整报告（够长 + 有 Markdown 标题）→ 视为修订，更新 finalReport
-  const looksLikeReport = answer.length > 500 && /(^|\n)#{1,3}\s/.test(answer);
+  const looksLikeReport = answer.length > 800 && /(^|\n)#{1,3}\s/.test(answer);
   log.info("respond", { revised: looksLikeReport, answerLen: answer.length });
   return {
     ...(looksLikeReport ? { finalReport: answer } : {}),
@@ -587,7 +643,7 @@ export function createResearchFlow(
 ): StatefulFlow {
   return createStatefulFlow<ResearchStateType>({
     buildGraph: (cp) => createResearchGraph(appConfig, cp),
-    toInput: (query) => ({ topic: query, outlineAttempts: 0, draftAttempts: 0 }),
+    toInput: (query) => ({ topic: query, outlineAttempts: 0, draftAttempts: 0, languageHint: "" }),
     toResult: (v) => ({ answer: v.finalReport || v.lastAnswer || v.draft || "" }),
     checkpointer: durableCheckpointer(appConfig, opts.checkpointer),
     configurable: { appConfig },

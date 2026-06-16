@@ -89,10 +89,10 @@ export function createStatefulFlow<S = Record<string, unknown>>(
 
   const baseConfig = (threadId: string, callbacks?: FlowCallbacks): RunnableConfig => ({
     configurable: {
-      thread_id: threadId,
+      ...options.configurable,      // 基础配置先展开
+      thread_id: threadId,          // per-run 值最后，始终覆盖选项里的同名键
       onToolCall: callbacks?.onToolCall,
       onStage: callbacks?.onStage,
-      ...options.configurable,
     },
     recursionLimit,
   });
