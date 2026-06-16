@@ -9,7 +9,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { dirname, resolve, join } from "node:path";
 import { loadFlowConfig } from "../../runtime/flow-config.js";
 import { discoverSkills, discoverSubAgents } from "../../runtime/index.js";
-import { resolveSessionDir } from "../../runtime/services/file-checkpoint-saver.js";
+import { resolveFlowHome } from "../../runtime/services/file-checkpoint-saver.js";
 
 const BUILTIN_TOOLS = [
   { name: "bash", layer: "agent-builtin", desc: "shell 执行（cwd=workspace，受 sandbox 约束）" },
@@ -79,7 +79,7 @@ export async function runCapabilities(): Promise<void> {
       contextWindow: appConfig.compaction.contextWindow,
       triggerThreshold: appConfig.compaction.triggerThreshold,
     },
-    memoryDir: resolveSessionDir(appConfig, process.cwd()),
+    memoryDir: resolveFlowHome(appConfig, process.cwd()),
     capabilitySources,
   };
 

@@ -1,8 +1,8 @@
 /**
  * flow sessions —— 会话生命周期 CLI（列出 / 删除已持久化的 thread）。
  *
- * 静态读取 resolveSessionDir(appConfig)（与 createFlowRuntime / createStatefulFlow 同口径，
- * 默认 ~/.flowagents/<workspace 散列>），不加载 MCP、不需凭证。
+ * 静态读取 resolveCheckpointDir(appConfig)（= ~/.flowagents/sessions/<workspace 散列>/，
+ * 与 createFileCheckpointer 同口径），不加载 MCP、不需凭证。
  * 「恢复某个会话」走 ACP：同一 sessionId → checkpointer 续跑（见 surfaces/acp/server.ts），
  * 此处仅做 list / delete 管理。
  */
@@ -12,7 +12,7 @@ import { join } from "node:path";
 import { loadFlowConfig } from "../../runtime/flow-config.js";
 import {
   FileCheckpointSaver,
-  resolveSessionDir,
+  resolveCheckpointDir,
 } from "../../runtime/services/file-checkpoint-saver.js";
 
 export interface SessionsArgs {
@@ -29,7 +29,7 @@ function decodeId(stem: string): string {
 
 export async function runSessions(args: SessionsArgs = {}): Promise<void> {
   const { appConfig } = loadFlowConfig();
-  const dir = resolveSessionDir(appConfig, process.cwd());
+  const dir = resolveCheckpointDir(appConfig, process.cwd());
 
   if (args.action === "delete") {
     if (!args.id) {

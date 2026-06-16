@@ -18,7 +18,7 @@
 
 import { config as loadDotenv } from "dotenv";
 import { loadFlowConfig } from "./runtime/flow-config.js";
-import { destroyRuntimeContext } from "./runtime/index.js";
+import { destroyRuntimeContext, setLogAgent } from "./runtime/index.js";
 import { createFlowRuntime } from "./compose/flow-runtime.js";
 import { createDefaultExecutor } from "./app/default-flow.js";
 import { bootstrapFlowAcp } from "./surfaces/acp/server.js";
@@ -139,6 +139,8 @@ async function main(): Promise<void> {
   // server 身份用一次轻量配置解析（loadFlowConfig 不触 MCP；MCP 在 createFlowRuntime
   // 内按 session 加载）。
   const baseConfig = loadFlowConfig({ configPath: args.configPath });
+  // 设全局 agent 名（log 文件名前缀），早于任何 session log。
+  setLogAgent(baseConfig.appConfig.agent.name);
 
   if (args.command === "flow") {
     // CLI one-shot：单 runtime 共用即可，无需 per-session。

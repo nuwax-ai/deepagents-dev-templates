@@ -48,5 +48,5 @@ export {
   type DiscoveredSkill,
   type RuntimeContext,
 } from "./context/helpers.js";
-export { Logger, logger, type LogLevel } from "./logger.js";
+export { Logger, logger, setLogAgent, setLogSession, type LogLevel } from "./logger.js";
 export { getPackageVersion } from "./version.js";

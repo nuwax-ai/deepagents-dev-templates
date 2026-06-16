@@ -14,6 +14,7 @@
 import { createInterface } from "node:readline";
 import { randomUUID } from "node:crypto";
 import type { FlowExecutor, StatefulFlow, FlowCallbacks } from "../../core/flow-types.js";
+import { setLogSession } from "../../runtime/index.js";
 
 export interface FlowCliOptions {
   query?: string;
@@ -50,9 +51,11 @@ export async function runFlowCli(
   flow: FlowExecutor | StatefulFlow,
   options: FlowCliOptions = {}
 ): Promise<void> {
+  const sessionId = options.threadId ?? randomUUID();
+  setLogSession(sessionId);
   // 对象（有 run）⇒ StatefulFlow（支持 HITL）；function ⇒ one-shot。
   if (typeof flow !== "function") {
-    return runStatefulCli(flow, options);
+    return runStatefulCli(flow, { ...options, threadId: sessionId });
   }
 
   const ask = async (q: string): Promise<void> => {

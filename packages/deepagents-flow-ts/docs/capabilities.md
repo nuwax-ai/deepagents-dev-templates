@@ -10,7 +10,7 @@
 | `acp-dynamic` | ACP 会话 / nuwax 配置面板 / config | systemPrompt、mcpServers、skills、model、subagents | ✅ |
 | `agent-builtin` | 模板包内置 | bash / 文件读写 / search / http / json / mcp-bridge / platform_api / agent_variable / load_skill / task / compaction / demo | ❌（改源码） |
 | `env-builtin` | 环境变量 | API key、base URL、LOG_DIR | env |
-| `agent-builtin-file` | 用户级会话目录（文件，无 DB） | sessionStore（默认 `~/.flowagents/<workspace 散列>/`，可经 `config.memory.dir` opt-out 回 `./.flow-sessions`） | ❌ |
+| `agent-builtin-file` | 用户级会话目录（文件，无 DB） | sessionStore（默认 `~/.flowagents/sessions/<workspace 散列>/`，可经 `config.memory.dir` opt-out 回 `./.flow-sessions`） | ❌ |
 | `package-placeholder` | 打包/安装时替换 | `${AGENT_ID}`、`${PACKAGE_VERSION}` | ❌ |
 
 完整映射：[.nuwax-agent/capability-sources.json](../.nuwax-agent/capability-sources.json)；面板字段：[.nuwax-agent/panel.config.json](../.nuwax-agent/panel.config.json)。

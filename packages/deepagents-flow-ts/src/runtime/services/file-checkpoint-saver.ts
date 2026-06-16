@@ -35,30 +35,36 @@ function expandHome(p: string): string {
   return p;
 }
 
-/** 默认会话根：用户目录下 ~/.flowagents（按 workspace 散列隔离，多项目不串话）。 */
-export const DEFAULT_SESSION_HOME = "~/.flowagents";
+// 路径/命名常量统一维护在 runtime/paths.ts（FLOWAGENTS_HOME / SESSIONS/ARTIFACTS/LOGS_SUBDIR）。
+// 此处 import 自用 + re-export 兼容已有的 `from "./file-checkpoint-saver.js"` 调用（delivery / tests）。
+import { FLOWAGENTS_HOME, SESSIONS_SUBDIR, ARTIFACTS_SUBDIR, LOGS_SUBDIR } from "../paths.js";
+export { FLOWAGENTS_HOME, SESSIONS_SUBDIR, ARTIFACTS_SUBDIR, LOGS_SUBDIR };
 
-/** workspace 绝对路径 → 12 位 sha256，作为 ~/.flowagents 下的隔离子目录名。 */
-function workspaceHash(workspaceRoot: string): string {
+/** workspace 绝对路径 → 12 位 sha256，作为 sessions/artifacts 下的按项目隔离子目录名。 */
+export function workspaceHash(workspaceRoot: string): string {
   return createHash("sha256").update(resolve(workspaceRoot)).digest("hex").slice(0, 12);
 }
 
 /**
- * 由 AppConfig 解析会话存储目录 —— 与 createFlowRuntime / runSessions 同口径。
- * 抽出来供 FlowRuntime、createStatefulFlow、CLI sessions 共用，避免目录解析漂移。
- *
- * - 默认 `~/.flowagents`（或显式指向它）→ 追加 `<workspace 散列>` 子目录：会话集中在用户目录、
- *   跨终端/重启可恢复，又按 workspace 隔离避免不同项目 thread_id 互串。
- * - 用户显式设其它目录（绝对 / 相对 / 其它 ~/ 路径，如 `./.flow-sessions`）→ 原样解析
- *   （opt-out + 向后兼容）。
+ * 数据根目录：expand config.memory.dir（默认 FLOWAGENTS_HOME=~/.flowagents）。
+ * 绝对路径原样用；相对路径按 workspaceRoot 解析（opt-out 回项目内，如 ./.flow-sessions）。
+ * 注意：返回的是**根**（不含 workspace hash）——hash 在 sessions/artifacts 子目录下分组。
  */
-export function resolveSessionDir(appConfig: AppConfig, workspaceRoot = process.cwd()): string {
-  const configured = appConfig.memory?.dir || DEFAULT_SESSION_HOME;
-  if (configured === DEFAULT_SESSION_HOME || configured === "~/.flowagents/") {
-    return join(resolve(homedir(), ".flowagents"), workspaceHash(workspaceRoot));
-  }
+export function resolveFlowHome(appConfig: AppConfig, workspaceRoot = process.cwd()): string {
+  const configured = appConfig.memory?.dir || FLOWAGENTS_HOME;
   const expanded = expandHome(configured);
   return expanded.startsWith("/") ? expanded : resolve(workspaceRoot, expanded);
+}
+
+/**
+ * checkpoint 目录：~/.flowagents/sessions/<workspace hash>/。与 artifacts 等其他数据隔离；
+ * sessions CLI、createFileCheckpointer 共用此口径。
+ */
+export function resolveCheckpointDir(
+  appConfig: AppConfig,
+  workspaceRoot = process.cwd()
+): string {
+  return join(resolveFlowHome(appConfig, workspaceRoot), SESSIONS_SUBDIR, workspaceHash(workspaceRoot));
 }
 
 /**
@@ -69,7 +75,7 @@ export function createFileCheckpointer(
   appConfig: AppConfig,
   workspaceRoot = process.cwd()
 ): FileCheckpointSaver {
-  return new FileCheckpointSaver({ dir: resolveSessionDir(appConfig, workspaceRoot) });
+  return new FileCheckpointSaver({ dir: resolveCheckpointDir(appConfig, workspaceRoot) });
 }
 
 interface ThreadFileData {
@@ -81,23 +87,37 @@ interface ThreadFileData {
  * MemorySaver 的 storage/writes 里存的是 serde 产出的 **Uint8Array**（二进制 checkpoint/metadata）。
  * 朴素 JSON.stringify 会把 Uint8Array 序列化成 `{"0":..,"1":..}` 普通对象，重载后
  * serde.loadsTyped 期望 ArrayBufferView → 抛 "list argument must be ... ArrayBufferView"。
- * 故用 base64 包装保真：落盘时编码（replacer），载入时还原成 Uint8Array（reviver）。
- * 这是 FileCheckpointSaver 跨进程/重启续跑真正生效的关键（纯 MemorySaver 不落盘，无此问题）。
+ *
+ * 明文存储（用户诉求）：serde 的 Uint8Array 本就是 UTF-8 JSON 文本，落盘时解码内联成可读对象
+ * （__u8a_json__），载入时 JSON.stringify → TextEncoder 还原字节。语义级 round-trip 安全
+ * （serde 载入也是 JSON.parse）。非 UTF-8/非 JSON 的真正二进制回退 base64（__u8a_b64__）保真；
+ * 旧 base64 文件仍能 revive。这是跨进程/重启续跑真正生效的关键（纯 MemorySaver 不落盘，无此问题）。
  */
-const U8_TAG = "__u8a_b64__";
+const U8_JSON_TAG = "__u8a_json__";
+const U8_B64_TAG = "__u8a_b64__";
 function replaceBytes(_key: string, value: unknown): unknown {
   if (value instanceof Uint8Array) {
-    return { [U8_TAG]: Buffer.from(value).toString("base64") };
+    try {
+      // fatal:true → 非法 UTF-8 抛错走 base64 回退，避免静默替换字符损坏字节。
+      const text = new TextDecoder("utf-8", { fatal: true }).decode(value);
+      return { [U8_JSON_TAG]: JSON.parse(text) };
+    } catch {
+      return { [U8_B64_TAG]: Buffer.from(value).toString("base64") };
+    }
   }
   return value;
 }
 function reviveBytes(_key: string, value: unknown): unknown {
-  if (
-    value &&
-    typeof value === "object" &&
-    typeof (value as Record<string, unknown>)[U8_TAG] === "string"
-  ) {
-    return new Uint8Array(Buffer.from((value as Record<string, string>)[U8_TAG]!, "base64"));
+  if (value && typeof value === "object") {
+    const v = value as Record<string, unknown>;
+    // 明文：对象 → JSON.stringify → UTF-8 字节（语义级还原；serde 再 JSON.parse）。
+    if (v[U8_JSON_TAG] !== undefined) {
+      return new TextEncoder().encode(JSON.stringify(v[U8_JSON_TAG]));
+    }
+    // 兼容旧 base64 文件。
+    if (typeof v[U8_B64_TAG] === "string") {
+      return new Uint8Array(Buffer.from(v[U8_B64_TAG] as string, "base64"));
+    }
   }
   return value;
 }
@@ -163,7 +183,8 @@ export class FileCheckpointSaver extends MemorySaver {
         this.threadFile(threadId),
         JSON.stringify(
           { storage: { [threadId]: threadStorage }, writes: writesForThread },
-          replaceBytes
+          replaceBytes,
+          2
         )
       );
     } catch (err) {

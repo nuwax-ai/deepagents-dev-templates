@@ -6,7 +6,11 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve, join, dirname } from "node:path";
 import { interrupt, type LangGraphRunnableConfig } from "@langchain/langgraph";
 import { AppConfigSchema, type AppConfig } from "../../../src/runtime/index.js";
-import { resolveSessionDir } from "../../../src/runtime/services/file-checkpoint-saver.js";
+import {
+  resolveFlowHome,
+  workspaceHash,
+  ARTIFACTS_SUBDIR,
+} from "../../../src/runtime/services/file-checkpoint-saver.js";
 import type { DeliveryArtifacts, ResearchStateShape } from "./types.js";
 
 function safeSegment(text: string): string {
@@ -74,8 +78,8 @@ ${body}
 }
 
 function defaultArtifactDir(appConfig: AppConfig | undefined, threadId: string): string {
-  const sessionDir = resolveSessionDir(appConfig ?? AppConfigSchema.parse({}));
-  return join(sessionDir, "artifacts", safeSegment(threadId));
+  const home = resolveFlowHome(appConfig ?? AppConfigSchema.parse({}));
+  return join(home, ARTIFACTS_SUBDIR, workspaceHash(process.cwd()), safeSegment(threadId));
 }
 
 function resolveArtifactDir(

@@ -33,7 +33,7 @@
 - **model** —— `resolveModel(appConfig)` 取自 `config.model`（ACP session / env / config / defaults）。
 - **skills** —— `resolveSkillsPaths(appConfig)` 发现 `skills/builtin/`、`skills/platform/`、`.agents/*/skills/`。
 - **subagents** —— `discoverSubAgents(appConfig)` 解析 `.agents/agents/<name>/AGENT.md`。
-- **sessionStore** —— `FileCheckpointSaver`（继承 `MemorySaver`）持久化到 `config.memory.dir`（默认 `~/.flowagents/<workspace 散列>/`，可显式 opt-out 回 `./.flow-sessions`）；线程隔离、重启存活、恢复 interrupt/resume。
+- **sessionStore** —— `FileCheckpointSaver`（继承 `MemorySaver`）持久化到 `config.memory.dir`（默认 `~/.flowagents/sessions/<workspace 散列>/`，可显式 opt-out 回 `./.flow-sessions`）；线程隔离、重启存活、恢复 interrupt/resume。
 - **builtInTools** —— `createFlowTools(ctx)` 组合 bash/fs/search/http/json/mcp-bridge/platform_api/agent_variable + demo 工具；经 `bindTools` 绑定到模型，由 `ToolNode` 执行。
 
 运行时查询：`deepagents-flow-ts capabilities`（无需凭证）。

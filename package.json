@@ -25,7 +25,9 @@
   "pnpm": {
     "overrides": {
       "deepagents": "file:../deepagentsjs/libs/deepagents",
-      "deepagents-acp": "file:../deepagentsjs/libs/acp"
+      "deepagents-acp": "file:../deepagentsjs/libs/acp",
+      "@langchain/core": "1.1.48",
+      "@langchain/langgraph": "1.4.1"
     }
   }
 }

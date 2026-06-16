@@ -27,6 +27,7 @@ import {
   deepAgentsHome,
   resolvePath,
 } from "./config-paths.js";
+import { FLOWAGENTS_HOME } from "../paths.js";
 import { mergeConfigLayer, setNestedValue } from "./config-merge.js";
 import {
   loadJsonFile,
@@ -94,6 +95,18 @@ export function loadConfig(options: LoadConfigOptions = {}): AppConfig {
   const userMcp = mcpOverlayFromFile(join(userDir, "mcp.json"));
   if (userMcp) {
     config = mergeConfigLayer(config, userMcp);
+  }
+
+  // Layer 2b: flowagents 用户级配置（~/.flowagents/config.json，与 sessions/artifacts/logs 同根；
+  //           覆盖 ~/.deepagents，被项目 config 覆盖）。存 agent 参数 + 模型（models.json）。
+  const flowHome = resolvePath(FLOWAGENTS_HOME);
+  const flowConfig = loadJsonFile(join(flowHome, "config.json"));
+  if (flowConfig) {
+    config = mergeConfigLayer(config, flowConfig as Partial<AppConfig>);
+  }
+  const flowModels = modelsOverlayFromFile(join(flowHome, "models.json"));
+  if (flowModels) {
+    config = mergeConfigLayer(config, flowModels);
   }
 
   const workspaceRoot = resolveConfiguredWorkspaceRoot(
