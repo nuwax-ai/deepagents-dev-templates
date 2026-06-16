@@ -25,7 +25,7 @@ import {
   type BaseCheckpointSaver,
 } from "@langchain/langgraph";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
-import { logger, type AppConfig } from "../../src/vendor/runtime/index.js";
+import { logger, type AppConfig } from "../../src/runtime/index.js";
 import type { StatefulFlow } from "../../src/surfaces/flow-types.js";
 import { createStatefulFlow } from "../../src/surfaces/stateful-flow.js";
 import {

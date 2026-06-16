@@ -13,7 +13,7 @@
  */
 
 import type { BaseMessage } from "@langchain/core/messages";
-import { logger, type AppConfig } from "../vendor/runtime/index.js";
+import { logger, type AppConfig } from "../index.js";
 
 const log = logger.child("llm-resilience");
 

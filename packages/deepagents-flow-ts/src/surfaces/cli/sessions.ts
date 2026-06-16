@@ -7,7 +7,7 @@
 import { readdirSync, existsSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import { homedir } from "node:os";
-import { loadFlowConfig } from "../../runtime/config.js";
+import { loadFlowConfig } from "../../runtime/flow-config.js";
 
 function expandDir(dir: string, cwd: string): string {
   let d = dir || "./.flow-sessions";

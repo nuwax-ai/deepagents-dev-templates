@@ -5,8 +5,8 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve, join, dirname } from "node:path";
 import { interrupt, type LangGraphRunnableConfig } from "@langchain/langgraph";
-import type { AppConfig } from "../../../src/vendor/runtime/index.js";
-import { resolveSessionDir } from "../../../src/runtime/file-checkpoint-saver.js";
+import type { AppConfig } from "../../../src/runtime/index.js";
+import { resolveSessionDir } from "../../../src/runtime/services/file-checkpoint-saver.js";
 import type { DeliveryArtifacts, ResearchStateShape } from "./types.js";
 
 function safeSegment(text: string): string {

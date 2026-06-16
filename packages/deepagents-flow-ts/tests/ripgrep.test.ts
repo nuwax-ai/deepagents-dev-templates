@@ -15,7 +15,7 @@ import {
   resolveRipgrepBinary,
   ripgrepGrep,
   ripgrepGlob,
-} from "../src/runtime/ripgrep.js";
+} from "../src/runtime/fs/ripgrep.js";
 
 function mockRgFound(bin = "/usr/bin/rg") {
   spawnSyncMock.mockImplementation((cmd: string) => ({

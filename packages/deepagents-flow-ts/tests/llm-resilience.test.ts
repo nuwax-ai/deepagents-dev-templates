@@ -4,14 +4,14 @@
 
 import { describe, it, expect, vi } from "vitest";
 import { HumanMessage } from "@langchain/core/messages";
-import { AppConfigSchema } from "../src/vendor/runtime/index.js";
+import { AppConfigSchema } from "../src/runtime/index.js";
 import {
   withTimeout,
   withRetry,
   createConcurrencyLimiter,
   resolveLlmResilience,
   invokeWithResilience,
-} from "../src/runtime/llm-resilience.js";
+} from "../src/runtime/services/llm-resilience.js";
 
 describe("resolveLlmResilience", () => {
   it("默认短/长超时与并发", () => {

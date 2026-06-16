@@ -15,7 +15,7 @@ import {
   MAX_REPLAN,
   type PMStateType,
 } from "../graph.js";
-import { loadFlowConfig } from "../../../src/runtime/config.js";
+import { loadFlowConfig } from "../../../src/runtime/flow-config.js";
 
 const hasCreds = ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "OPENAI_API_KEY"].some(
   (k) => Boolean(process.env[k])

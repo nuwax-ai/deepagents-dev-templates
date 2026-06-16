@@ -24,12 +24,12 @@ import {
   type BaseCheckpointSaver,
 } from "@langchain/langgraph";
 import type { RunnableConfig } from "@langchain/core/runnables";
-import { logger } from "../vendor/runtime/index.js";
+import { logger } from "../runtime/index.js";
 import type {
   StatefulFlow,
   FlowRunResult,
   FlowCallbacks,
-} from "./flow-types.js";
+} from "../core/flow-types.js";
 import { mapStreamChunk } from "./map-stream-chunk.js";
 import { dispatchSurfaceEvent } from "./dispatch-surface-event.js";
 

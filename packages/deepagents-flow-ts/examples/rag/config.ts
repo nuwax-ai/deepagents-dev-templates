@@ -7,8 +7,8 @@
 
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { loadFlowConfig } from "../../src/runtime/config.js";
-import type { AppConfig } from "../../src/vendor/runtime/index.js";
+import { loadFlowConfig } from "../../src/runtime/flow-config.js";
+import type { AppConfig } from "../../src/runtime/index.js";
 
 const EXAMPLE_ROOT = dirname(fileURLToPath(import.meta.url));
 

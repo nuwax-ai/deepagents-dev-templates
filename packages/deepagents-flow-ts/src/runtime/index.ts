@@ -1,9 +1,9 @@
 /**
- * Runtime Layer — Barrel Export (vendored from deepagents-app-ts)
+ * Runtime 底层运行时 —— Barrel Export。
  *
- * 精简：去掉 flow-ts 不用的 agent-factory / code-graph，以及换成
- * @langchain/mcp-adapters 后不再需要的 MCPManager barrel（MCP 由 runtime-context
- * 内部用 MultiServerMCPClient 自管，不从此处导出）。
+ * 模板自有、自包含的底层运行时门面:config 加载、模型解析、日志、平台 API、runtime-context。
+ * MCP 经 @langchain/mcp-adapters 的 MultiServerMCPClient 由 runtime-context 内部自管，不从此处导出。
+ * app / surfaces / compose 统一从这里取底层能力。
  */
 
 export {
@@ -42,6 +42,6 @@ export {
   discoverSubAgents,
   type DiscoveredSubAgent,
   type RuntimeContext,
-} from "./helpers.js";
+} from "./context/helpers.js";
 export { Logger, logger, type LogLevel } from "./logger.js";
 export { getPackageVersion } from "./version.js";

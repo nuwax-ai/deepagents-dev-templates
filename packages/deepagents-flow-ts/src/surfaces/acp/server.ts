@@ -17,7 +17,7 @@ import {
   type DeepAgentsServerHooks,
   type StopReason,
 } from "deepagents-acp";
-import { logger, resolveModel, type AppConfig } from "../../vendor/runtime/index.js";
+import { logger, resolveModel, type AppConfig } from "../../runtime/index.js";
 import type {
   FlowExecutor,
   StatefulFlow,
@@ -25,7 +25,7 @@ import type {
   ToolCallEvent,
   StageEvent,
   PlanEvent,
-} from "../flow-types.js";
+} from "../../core/flow-types.js";
 
 const log = logger.child("flow-acp");
 

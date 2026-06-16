@@ -27,7 +27,7 @@ import {
   type BaseCheckpointSaver,
 } from "@langchain/langgraph";
 import { createStatefulFlow } from "../src/surfaces/stateful-flow.js";
-import { FileCheckpointSaver } from "../src/runtime/file-checkpoint-saver.js";
+import { FileCheckpointSaver } from "../src/runtime/services/file-checkpoint-saver.js";
 
 // ── 玩具图：ask(interrupt 暂停) → finish(定稿) ──────────────
 const ToyState = Annotation.Root({

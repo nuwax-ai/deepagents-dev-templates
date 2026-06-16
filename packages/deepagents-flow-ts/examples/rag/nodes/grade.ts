@@ -8,7 +8,7 @@
  * 这把一条直线流水线变成了带反馈环的图，且用 attempts 上限保证收敛。
  */
 
-import { logger } from "../../../src/vendor/runtime/index.js";
+import { logger } from "../../../src/runtime/index.js";
 import type { RAGState } from "./types.js";
 
 const log = logger.child("rag-grade");

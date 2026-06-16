@@ -20,8 +20,8 @@ import {
   RemoveMessage,
   type BaseMessage,
 } from "@langchain/core/messages";
-import { resolveModel, logger, type AppConfig } from "../vendor/runtime/index.js";
-import { invokeWithResilience, resolveLlmResilience } from "../runtime/llm-resilience.js";
+import { resolveModel, logger, type AppConfig } from "../runtime/index.js";
+import { invokeWithResilience, resolveLlmResilience } from "../runtime/services/llm-resilience.js";
 
 const log = logger.child("compaction");
 

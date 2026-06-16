@@ -7,7 +7,7 @@
 
 import { readFileSync, existsSync } from "node:fs";
 import { dirname, resolve, join } from "node:path";
-import { loadFlowConfig } from "../../runtime/config.js";
+import { loadFlowConfig } from "../../runtime/flow-config.js";
 
 const BUILTIN_TOOLS = [
   { name: "bash", layer: "agent-builtin", desc: "shell 执行（cwd=workspace，受 sandbox 约束）" },
@@ -16,8 +16,8 @@ const BUILTIN_TOOLS = [
   { name: "edit_file", layer: "agent-builtin", desc: "查找替换编辑" },
   { name: "grep", layer: "agent-builtin", desc: "正则搜索文件内容" },
   { name: "glob", layer: "agent-builtin", desc: "按 glob 列文件" },
-  { name: "http_request", layer: "agent-builtin", desc: "HTTP 调用（复用 app-ts）" },
-  { name: "json_utils", layer: "agent-builtin", desc: "JSON 解析/校验/合并（复用 app-ts）" },
+  { name: "http_request", layer: "agent-builtin", desc: "HTTP 调用" },
+  { name: "json_utils", layer: "agent-builtin", desc: "JSON 解析/校验/合并" },
   { name: "mcp_tool_bridge", layer: "agent-builtin", desc: "列出/调用任意 MCP server 工具" },
   { name: "platform_api", layer: "agent-builtin", desc: "nuwax 平台 API（查询组件/保存 prompt/读写变量）" },
   { name: "agent_variable", layer: "agent-builtin", desc: "agent 变量读写（放 API key/config）" },

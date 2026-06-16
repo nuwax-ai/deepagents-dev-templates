@@ -11,8 +11,8 @@
 
 import { randomUUID } from "node:crypto";
 import { MemorySaver, type BaseCheckpointSaver } from "@langchain/langgraph";
-import { resolveModel, logger, type AppConfig } from "../src/vendor/runtime/index.js";
-import { createFileCheckpointer } from "../src/runtime/file-checkpoint-saver.js";
+import { resolveModel, logger, type AppConfig } from "../src/runtime/index.js";
+import { createFileCheckpointer } from "../src/runtime/services/file-checkpoint-saver.js";
 import type { ToolCallEvent, StageEvent, PlanEvent } from "../src/surfaces/flow-types.js";
 
 // 模板级 LLM 韧性 —— 从 deep-research 实战反哺，默认图/compaction 同源实现
@@ -26,7 +26,7 @@ export {
   LLM_TIMEOUT_SHORT_MS,
   LLM_TIMEOUT_LONG_MS,
   LLM_DEFAULT_MAX_CONCURRENT,
-} from "../src/runtime/llm-resilience.js";
+} from "../src/runtime/services/llm-resilience.js";
 
 const log = logger.child("example-shared");
 

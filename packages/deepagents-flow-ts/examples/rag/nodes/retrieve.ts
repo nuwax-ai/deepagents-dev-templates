@@ -11,7 +11,7 @@ import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { createInterface } from "node:readline";
 import type { RAGState, RetrievalResult } from "./types.js";
-import { logger } from "../../../src/vendor/runtime/index.js";
+import { logger } from "../../../src/runtime/index.js";
 import type { ToolCallEvent } from "../../../src/surfaces/flow-types.js";
 
 // ACP stdio 模式下 stdout 是协议通道，日志必须走 logger（stderr）

@@ -87,7 +87,7 @@ await graph.invoke({ input: "..." }, { configurable: { thread_id: "t1" } });
 ```
 
 > `MemorySaver` 仅进程内 —— 一旦进程/IDE 重启，暂停点就丢了。模板因此自带
-> **`FileCheckpointSaver`**（`src/runtime/file-checkpoint-saver.ts`）：标准 checkpointer 协议 +
+> **`FileCheckpointSaver`**（`src/runtime/services/file-checkpoint-saver.ts`）：标准 checkpointer 协议 +
 > 文件落盘，跨进程/重启也能 `getState`/resume。生产规模可换 sqlite/postgres saver（接口已对齐）。
 >
 > ⚠️ 落盘要点：MemorySaver 的 storage 里存的是 serde 产出的 `Uint8Array`；朴素 `JSON.stringify`

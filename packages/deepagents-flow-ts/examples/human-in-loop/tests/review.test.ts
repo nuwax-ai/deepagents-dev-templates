@@ -10,7 +10,7 @@ loadDotenv();
 import { describe, it, expect } from "vitest";
 import { randomUUID } from "node:crypto";
 import { createReviewFlow } from "../graph.js";
-import { loadFlowConfig } from "../../../src/runtime/config.js";
+import { loadFlowConfig } from "../../../src/runtime/flow-config.js";
 import { isApproval } from "../../shared.js";
 
 const hasCreds = ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "OPENAI_API_KEY"].some(

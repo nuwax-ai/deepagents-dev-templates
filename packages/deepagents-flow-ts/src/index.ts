@@ -17,8 +17,8 @@
  */
 
 import { config as loadDotenv } from "dotenv";
-import { loadFlowConfig } from "./runtime/config.js";
-import { createFlowRuntime } from "./runtime/flow-runtime.js";
+import { loadFlowConfig } from "./runtime/flow-config.js";
+import { createFlowRuntime } from "./compose/flow-runtime.js";
 import { createDefaultExecutor } from "./app/default-flow.js";
 import { bootstrapFlowAcp } from "./surfaces/acp/server.js";
 import { runFlowCli } from "./surfaces/cli/run.js";

@@ -4,7 +4,7 @@
 
 import type { BaseMessage } from "@langchain/core/messages";
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
-import type { AppConfig } from "../../../src/vendor/runtime/index.js";
+import type { AppConfig } from "../../../src/runtime/index.js";
 import {
   extractText,
   getSharedLlmLimiter,

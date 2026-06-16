@@ -5,7 +5,7 @@
  * - Windows 上 `path.relative()` 产出反斜杠，glob 正则按 `/` 分段会匹配失败；
  * - `process.env.HOME` 在 Windows 常未设置，应使用 `os.homedir()`；
  * - 模型常传 `/test.txt` 表示 workspace 根相对路径，在 Windows 上若直接 `resolve(ws, '/test.txt')`
- *   会落到盘符根（如 `C:\test.txt`），需与 app-ts fs-path-resolver 语义对齐。
+ *   会落到盘符根（如 `C:\test.txt`），需正确处理盘符根语义。
  *
  * 约定：
  * - 逻辑层（glob 匹配、workspace 边界比较）统一 POSIX 斜杠；

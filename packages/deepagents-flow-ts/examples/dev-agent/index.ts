@@ -18,7 +18,7 @@
  */
 
 import type { BaseMessage } from "@langchain/core/messages";
-import { loadFlowConfig } from "../../src/runtime/config.js";
+import { loadFlowConfig } from "../../src/runtime/flow-config.js";
 import { createFlowRuntime, type FlowRuntime } from "../../src/runtime/flow-runtime.js";
 import { createFlowGraph } from "../../src/app/graph.js";
 import { compactHistory, compactionUpdate } from "../../src/app/compaction.js";

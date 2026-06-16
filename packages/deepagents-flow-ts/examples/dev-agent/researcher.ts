@@ -15,7 +15,7 @@
 import { StateGraph, START, END, Annotation, messagesStateReducer } from "@langchain/langgraph";
 import { AIMessage, SystemMessage, type BaseMessage } from "@langchain/core/messages";
 import type { StructuredTool } from "@langchain/core/tools";
-import { resolveModel, type AppConfig } from "../../src/vendor/runtime/index.js";
+import { resolveModel, type AppConfig } from "../../src/runtime/index.js";
 import { invokeWithResilience, resolveLlmResilience } from "../shared.js";
 
 const ResearcherState = Annotation.Root({

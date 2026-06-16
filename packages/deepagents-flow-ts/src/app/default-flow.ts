@@ -7,7 +7,7 @@
  */
 
 import type { FlowRuntime } from "../runtime/flow-runtime.js";
-import type { FlowExecutor } from "../surfaces/flow-types.js";
+import type { FlowExecutor } from "../core/flow-types.js";
 import { executeFlow } from "./graph.js";
 
 export function createDefaultExecutor(runtime: FlowRuntime): FlowExecutor {

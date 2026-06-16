@@ -9,7 +9,7 @@
 
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { type AppConfig, type ACPSessionConfig } from "./config/config-loader.js";
+import { type AppConfig, type ACPSessionConfig } from "../config/config-loader.js";
 import { PLATFORM_CONVENTIONS } from "./harness-profile.js";
 
 /**

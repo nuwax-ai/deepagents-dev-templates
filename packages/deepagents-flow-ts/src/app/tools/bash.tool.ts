@@ -11,7 +11,7 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { spawn } from "node:child_process";
-import type { FlowSandboxPolicy } from "../../runtime/sandbox.js";
+import type { FlowSandboxPolicy } from "../../runtime/fs/sandbox.js";
 
 export function createBashTool(opts: { workspaceRoot: string; policy: FlowSandboxPolicy }) {
   return tool(

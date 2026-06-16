@@ -1,7 +1,7 @@
 /** 大纲与报告质量评审节点。 */
 
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
-import { logger, type AppConfig } from "../../../src/vendor/runtime/index.js";
+import { logger, type AppConfig } from "../../../src/runtime/index.js";
 import { extractText, requireModel } from "../../shared.js";
 import type { ResearchStateShape } from "./types.js";
 import { invokeLLM, parseJson } from "./helpers.js";

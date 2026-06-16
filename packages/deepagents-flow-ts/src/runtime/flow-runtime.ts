@@ -1,34 +1,29 @@
 /**
- * FlowRuntime —— 把 app-ts 的散装 runtime 能力收成一处，注入图节点。
+ * FlowRuntime —— 图节点启动时拿到的「装配好的运行时」契约。
  *
- * 包装 createRuntimeContextAsync（拿 mcpTools/mcpServerConfigs/platformClient/variableManager + 平台 MCP
- * hydration），叠加 resolveSystemPrompt / resolveSkillsPaths / discoverSubAgents /
- * FlowSandboxPolicy / FileCheckpointSaver / createFlowTools。
+ * 本文件**只定义接口**（纯类型，仅引用 runtime 层类型 → app→runtime 合法下行）。
+ * 装配逻辑 `createFlowRuntime`（要 import app 层的 createFlowTools）在 `compose/flow-runtime.ts`，
+ * 以免 runtime→app 依赖倒挂；此处仅 **re-export** 它，保持历史 import 路径
+ * （`src/runtime/flow-runtime.js`）对 examples / 对外消费者可用。
  *
  * 图节点经 FlowRuntime 拿到 allTools（bindTools）/ systemPrompt / checkpointer，
  * 不再各自裸调 resolveModel / appConfig。
  */
 
 import type { StructuredTool } from "@langchain/core/tools";
-import {
-  createRuntimeContextAsync,
-  resolveSystemPrompt,
-  resolveSkillsPaths,
-  discoverSubAgents,
-  type AppConfig,
-  type ACPSessionConfig,
-  type RuntimeContext,
-  type DiscoveredSubAgent,
-} from "../vendor/runtime/index.js";
-import { createFlowTools } from "../app/tools/index.js";
-import { getFlowSandboxPolicy, type FlowSandboxPolicy } from "./sandbox.js";
-import { FileCheckpointSaver, createFileCheckpointer } from "./file-checkpoint-saver.js";
+import type {
+  AppConfig,
+  RuntimeContext,
+  DiscoveredSubAgent,
+} from "./index.js";
+import type { FlowSandboxPolicy } from "./fs/sandbox.js";
+import type { FileCheckpointSaver } from "./services/file-checkpoint-saver.js";
 
 export interface FlowRuntime {
   config: AppConfig;
   /** runtime context（含 mcpServerConfigs/mcpTools/platformClient/variableManager + 平台 MCP hydration）。 */
   ctx: RuntimeContext;
-  /** 全部工具（app-ts 通用 + flow 自补 + native MCP）—— 供 think 节点 bindTools。 */
+  /** 全部工具（内置通用 + flow 自补 + native MCP）—— 供 think 节点 bindTools。 */
   allTools: StructuredTool[];
   /** 解析后的系统提示词（ACP > config > prompts/ 文件 > fallback）。 */
   systemPrompt: string;
@@ -43,30 +38,6 @@ export interface FlowRuntime {
   checkpointer: FileCheckpointSaver;
 }
 
-export async function createFlowRuntime(
-  appConfig: AppConfig,
-  options: { sessionConfig?: ACPSessionConfig; workspaceRoot?: string } = {}
-): Promise<FlowRuntime> {
-  const workspaceRoot = options.workspaceRoot ?? process.cwd();
-  const ctx = await createRuntimeContextAsync(appConfig, options.sessionConfig, workspaceRoot);
-  const sandbox = getFlowSandboxPolicy(appConfig);
-  const allTools = createFlowTools(ctx, { workspaceRoot, policy: sandbox });
-  const systemPrompt = resolveSystemPrompt(appConfig, options.sessionConfig, workspaceRoot);
-  const skillsPaths = resolveSkillsPaths(appConfig);
-  const subAgents = discoverSubAgents(appConfig, workspaceRoot);
-
-  // 文件后端 checkpointer：与 createStatefulFlow 共用 resolveSessionDir 口径（见 file-checkpoint-saver）。
-  const checkpointer = createFileCheckpointer(appConfig, workspaceRoot);
-
-  return {
-    config: appConfig,
-    ctx,
-    allTools,
-    systemPrompt,
-    skillsPaths,
-    subAgents,
-    sandbox,
-    workspaceRoot,
-    checkpointer,
-  };
-}
+// 装配工厂在 compose 层（组合根）；此处 re-export 仅为兼容历史 import 路径。
+// 分层守卫（tests/layering.test.ts）对本行的 runtime→compose 上行 import 做了显式 allowlist。
+export { createFlowRuntime } from "../compose/flow-runtime.js";

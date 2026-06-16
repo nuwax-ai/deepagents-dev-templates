@@ -2,7 +2,7 @@
  * Flow 配置加载（通用）
  *
  * 单一配置文件同时承载：
- *  - 标准 AppConfig 字段（agent / model / mcp …）→ 交给 app-ts 的 loadConfig 解析
+ *  - 标准 AppConfig 字段（agent / model / mcp …）→ 交给底层 loadConfig 解析
  *    （未知的自定义键会被其 Zod schema 自动剥离）
  *  - 任意自定义顶层块 → 这里把完整原始 JSON 一并返回（raw），各 flow 自取所需
  *    （例：RAG 示例读 raw.rag）
@@ -13,9 +13,9 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { loadConfig, type AppConfig } from "../vendor/runtime/index.js";
+import { loadConfig, type AppConfig } from "./index.js";
 
-// dist/runtime/config.js → 包根在 ../..
+// dist/runtime/flow-config.js → 包根在 ../..
 const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
 export interface LoadedFlowConfig {

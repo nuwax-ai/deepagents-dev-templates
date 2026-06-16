@@ -15,7 +15,7 @@ import {
   fanoutToResearch,
   type TravelStateType,
 } from "../graph.js";
-import { loadFlowConfig } from "../../../src/runtime/config.js";
+import { loadFlowConfig } from "../../../src/runtime/flow-config.js";
 import type { ToolCallEvent } from "../../../src/surfaces/flow-types.js";
 
 const hasCreds = ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "OPENAI_API_KEY"].some(

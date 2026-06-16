@@ -7,7 +7,7 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
-import { isPathAllowed, toAbsolutePath, type FlowSandboxPolicy } from "../../runtime/sandbox.js";
+import { isPathAllowed, toAbsolutePath, type FlowSandboxPolicy } from "../../runtime/fs/sandbox.js";
 
 export function createFsTools(opts: { workspaceRoot: string; policy: FlowSandboxPolicy }) {
   const readFile = tool(

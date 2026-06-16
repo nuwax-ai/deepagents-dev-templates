@@ -24,14 +24,14 @@ deepagents-flow-ts sessions       # 已持久化的会话
 
 ## 每项能力从哪进图
 
-`FlowRuntime`（[src/runtime/flow-runtime.ts](../src/runtime/flow-runtime.ts)）在启动时把各层组装成一处，注入图节点：
+`FlowRuntime`（接口 [src/runtime/flow-runtime.ts](../src/runtime/flow-runtime.ts)，装配工厂 `createFlowRuntime` 见 [src/compose/flow-runtime.ts](../src/compose/flow-runtime.ts)）在启动时把各层组装成一处，注入图节点：
 
 - **systemPrompt** — `resolveSystemPrompt`，优先级 ACP session > `config.agent.systemPrompt` > `prompts/flow.base.md` > inline fallback。
-- **mcpServers** — `MCPManager` 三层合并（`config/mcp.default.json` < 平台绑定 MCP < ACP/session MCP，`mergeStrategy: session-wins`），native 工具由 `loadMcpTools` 加载。
+- **mcpServers** — 三层合并（`config/mcp.default.json` < 平台绑定 MCP < ACP/session MCP，`session-wins`），native 工具经 `@langchain/mcp-adapters`（`MultiServerMCPClient`）由 runtime-context 加载（已不再用 `MCPManager`）。
 - **model** — `resolveModel`（ACP session > env > config > 默认）。
 - **skills** — `resolveSkillsPaths` 发现 `skills/builtin/`、`skills/platform/`、`.agents/*/skills/`。
 - **subagents** — `discoverSubAgents` 解析 `.agents/agents/<name>/AGENT.md`；在图里用 subgraph 调用。
-- **builtInTools** — `createFlowTools(ctx)` 组装（app-ts 通用 + flow 自补 + native MCP + demo），`bindTools` 绑给模型、`ToolNode` 执行。
+- **builtInTools** — `createFlowTools(ctx)` 组装（内置通用 http/json/platform_api/agent_variable + flow 自补 bash/fs/search/mcp-bridge + native MCP + demo，全在 `src/app/tools/`），`bindTools` 绑给模型、`ToolNode` 执行。
 - **compaction** — [src/app/compaction.ts](../src/app/compaction.ts)，消费 `config.compaction`。
 - **sessionStore** — `FileCheckpointSaver`（继承 `MemorySaver`），持久化到 `config.memory.dir`。
 

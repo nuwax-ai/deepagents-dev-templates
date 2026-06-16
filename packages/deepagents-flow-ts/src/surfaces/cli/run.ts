@@ -13,7 +13,7 @@
 
 import { createInterface } from "node:readline";
 import { randomUUID } from "node:crypto";
-import type { FlowExecutor, StatefulFlow, FlowCallbacks } from "../flow-types.js";
+import type { FlowExecutor, StatefulFlow, FlowCallbacks } from "../../core/flow-types.js";
 
 export interface FlowCliOptions {
   query?: string;

@@ -2,12 +2,12 @@
  * Flow 工具沙箱策略 —— 从 AppConfig 解析出工具执行前的路径/能力校验规则。
  *
  * flow-ts 走显式图、不用 deepagents FilesystemMiddleware，故工具（bash/fs/search）
- * 在执行前自己用这套策略校验。语义对齐 app-ts 的 sandbox profile
- * （workspace-write / read-only / open / custom），但实现是 flow-ts 自管的轻量匹配。
+ * 在执行前自己用这套策略校验。语义对齐标准 sandbox profile
+ * （workspace-write / read-only / open / custom），实现是模板自管的轻量匹配。
  */
 
 import { relative } from "node:path";
-import type { AppConfig } from "../vendor/runtime/index.js";
+import type { AppConfig } from "../index.js";
 import {
   toAbsolutePath,
   matchPosixGlob,
@@ -22,7 +22,7 @@ export interface FlowSandboxPolicy {
   deniedWritePaths: string[];
 }
 
-/** 从 AppConfig 解析出工具沙箱策略（对齐 app-ts resolveSandboxPolicy 语义）。 */
+/** 从 AppConfig 解析出工具沙箱策略。 */
 export function getFlowSandboxPolicy(config: AppConfig): FlowSandboxPolicy {
   const sandbox = config.sandbox;
   if (sandbox.profile === "open") {

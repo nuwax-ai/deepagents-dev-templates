@@ -12,7 +12,7 @@
 import { config as loadDotenv } from "dotenv";
 import { bootstrapFlowAcp } from "../../src/surfaces/acp/server.js";
 import { runFlowCli } from "../../src/surfaces/cli/run.js";
-import { loadFlowConfig } from "../../src/runtime/config.js";
+import { loadFlowConfig } from "../../src/runtime/flow-config.js";
 import { createTravelFlow } from "./graph.js";
 
 const argv = process.argv.slice(2);

@@ -4,7 +4,7 @@
  * stateful-flow 多模式 stream 与 ACP surface 共用，避免两处重复映射逻辑。
  */
 
-import type { FlowCallbacks } from "./flow-types.js";
+import type { FlowCallbacks } from "../core/flow-types.js";
 import type { SurfaceStreamEvent } from "./stream-events.js";
 
 /** 仅对用户可见的回答节点放行 messages mode 文本（避免 plan/review JSON token 泄漏）。 */

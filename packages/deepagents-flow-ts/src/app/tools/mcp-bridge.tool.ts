@@ -11,8 +11,8 @@
 
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import { callMcpTool, listMcpTools, type McpServerConfig } from "../../runtime/mcp-stdio.js";
-import type { McpServerEntry } from "../../vendor/runtime/runtime-context.js";
+import { callMcpTool, listMcpTools, type McpServerConfig } from "../../runtime/services/mcp-stdio.js";
+import type { McpServerEntry } from "../../runtime/context/runtime-context.js";
 
 function toServerConfig(cfg: McpServerEntry): McpServerConfig | null {
   if (!cfg.command) return null;

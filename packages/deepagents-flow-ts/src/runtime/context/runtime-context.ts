@@ -1,22 +1,22 @@
 /**
- * Runtime Context (vendored from deepagents-app-ts)
+ * Runtime Context —— 装配运行时上下文（平台 client / 变量管理 / native MCP 工具）。
  *
- * 相对原版的改动（flow-ts 去 app-ts 依赖）：
- * - MCP 不再用 MCPManager：合并 default(含 configPath 文件) + platform + session
+ * 设计要点：
+ * - MCP：合并 default(含 configPath 文件) + platform + session
  *   （session-wins：default < platform < session），用 @langchain/mcp-adapters 的
  *   MultiServerMCPClient.getTools() 加载 native MCP 工具。
  * - onConnectionError="warn"：单个 server 连不上只告警，不炸掉其余 server 的工具。
- * - 不再调用 createTools：tools 不由本 context 创建（flow-ts 的 createFlowTools 自创建）。
+ * - tools 不由本 context 创建（由 app/tools 的 createFlowTools 组装）。
  */
 
 import type { StructuredTool } from "@langchain/core/tools";
 import { MultiServerMCPClient } from "@langchain/mcp-adapters";
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { type AppConfig, type ACPSessionConfig } from "./config/config-loader.js";
-import { PlatformClient } from "./platform/platform-client.js";
-import { VariableManager } from "./platform/variable-manager.js";
-import { logger } from "./logger.js";
+import { type AppConfig, type ACPSessionConfig } from "../config/config-loader.js";
+import { PlatformClient } from "../platform/platform-client.js";
+import { VariableManager } from "../platform/variable-manager.js";
+import { logger } from "../logger.js";
 
 /** MCP server 配置（stdio command 或 http url）。 */
 export interface McpServerEntry {
@@ -65,7 +65,7 @@ function mergeServers(
 
 /**
  * 从 config.mcp.servers + configPath/configPaths 指向的文件加载 default MCP servers。
- * 对照原 app-ts MCPManager.loadDefaultConfig —— 不读 configPath 会丢失 mcp.default.json
+ * 注意:不读 configPath 会丢失 mcp.default.json
  * 里的默认 server（如 context7）。
  */
 function resolveDefaultMcpServers(config: AppConfig): Record<string, McpServerEntry> {

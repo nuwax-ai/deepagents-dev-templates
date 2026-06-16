@@ -1,8 +1,9 @@
 /** 选题确认与大纲规划节点。 */
 
-import { interrupt, type LangGraphRunnableConfig } from "@langchain/langgraph";
+import { Command, interrupt, type LangGraphRunnableConfig } from "@langchain/langgraph";
+import { fanoutToResearch } from "./research.js";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
-import type { AppConfig } from "../../../src/vendor/runtime/index.js";
+import type { AppConfig } from "../../../src/runtime/index.js";
 import { extractText, emitPlan, isApproval, requireModel } from "../../shared.js";
 import type { OutlineSection, ResearchFinding, ResearchStateShape } from "./types.js";
 import { extractLanguageHint, invokeLLM, langClause, parseJson } from "./helpers.js";

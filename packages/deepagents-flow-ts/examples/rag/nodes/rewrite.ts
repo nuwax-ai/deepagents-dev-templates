@@ -9,7 +9,7 @@
  */
 
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
-import { resolveModel, type AppConfig } from "../../../src/vendor/runtime/index.js";
+import { resolveModel, type AppConfig } from "../../../src/runtime/index.js";
 import { invokeWithResilience, resolveLlmResilience } from "../../shared.js";
 import type { RAGState, RAGIntent } from "./types.js";
 

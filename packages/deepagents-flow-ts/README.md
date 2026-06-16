@@ -7,9 +7,9 @@
 > - **源码开发**（git / npm 源码包，含 `src/`、`examples/`、`tsconfig`）：本目录 `pnpm install && pnpm build` 即可改默认图、跑示例、扩展能力——开发指南见 [CLAUDE.md](CLAUDE.md)。
 > - **Nuwax 运行时制品**（平台分发的 `.tar.gz` / `.zip`）：自包含 `dist/bundle.mjs`，由平台直接运行，**无需 `build`**；不含 `src/`，随包的 `examples/` 仅作**只读参考源码**（其 `import "../../src"` 在制品内不解析，需完整源码仓库才能运行）。
 >
-> 底层配置/模型/MCP 经 `deepagents-app-ts/runtime` 提供。
+> 底层配置/模型/MCP 由模板**自包含**提供（[src/runtime/](src/runtime/)，无外部 runtime 依赖；MCP 用 `@langchain/mcp-adapters`）。
 
-本模板是 **工作流编排 Agent**（显式 LangGraph 图），与 Coding Agent（tool loop）产品形态不同；运行时基础能力由上述 npm 包承担，「大脑」是一张可设计的节点图。
+本模板是 **工作流编排 Agent**（显式 LangGraph 图），与 Coding Agent（tool loop）产品形态不同；运行时基础能力由模板**自包含的底层运行时**（`src/runtime/`）承担，「大脑」是一张可设计的节点图。
 
 ## 默认图（标准 LangGraph ReAct）
 
@@ -149,7 +149,7 @@ const { nodes, edges, mermaid } = await getFlowTopology();
 
 [config/flow-agent.config.json](config/flow-agent.config.json)：标准 `agent` / `model` / `mcp` / `platform` /
 `permissions` / `sandbox` / `skills` / `agentsDirectories` / `memory` / `compaction` / `middleware` 段（走 `loadFlowConfig`
-→ app-ts `loadConfig`，Zod schema 校验）。自定义块加在顶层、用 `loadFlowConfig().raw` 取出（RAG 范例放 `rag` 段）。
+→ 底层 `loadConfig`（[src/runtime/](src/runtime/)），Zod schema 校验）。自定义块加在顶层、用 `loadFlowConfig().raw` 取出（RAG 范例放 `rag` 段）。
 
 **能力分层**（基础内置 / ACP 下发 / 环境 / 文件持久化）见 [docs/capabilities.md](docs/capabilities.md) 与
 [.nuwax-agent/capability-sources.json](.nuwax-agent/capability-sources.json)——`capabilities` 命令查询当前可用工具/MCP/skills。

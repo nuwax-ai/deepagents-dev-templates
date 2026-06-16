@@ -15,7 +15,7 @@
 
 import { StateGraph, END, START, Annotation } from "@langchain/langgraph";
 import { BaseMessage } from "@langchain/core/messages";
-import { logger, type AppConfig } from "../../src/vendor/runtime/index.js";
+import { logger, type AppConfig } from "../../src/runtime/index.js";
 import { rewriteNode } from "./nodes/rewrite.js";
 import { retrieveNode, type RetrieveNodeConfig } from "./nodes/retrieve.js";
 import { gradeNode, routeAfterGrade } from "./nodes/grade.js";

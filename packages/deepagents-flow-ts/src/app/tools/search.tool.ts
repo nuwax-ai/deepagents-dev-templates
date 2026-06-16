@@ -12,9 +12,9 @@ import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { isPathAllowed, toAbsolutePath, type FlowSandboxPolicy } from "../../runtime/sandbox.js";
-import { toPosixPath, toWorkspaceRelativePosix } from "../../runtime/path-utils.js";
-import { isRipgrepAvailable, ripgrepGlob, ripgrepGrep } from "../../runtime/ripgrep.js";
+import { isPathAllowed, toAbsolutePath, type FlowSandboxPolicy } from "../../runtime/fs/sandbox.js";
+import { toPosixPath, toWorkspaceRelativePosix } from "../../runtime/fs/path-utils.js";
+import { isRipgrepAvailable, ripgrepGlob, ripgrepGrep } from "../../runtime/fs/ripgrep.js";
 
 const SKIP = new Set(["node_modules", ".git", "dist", ".flow-sessions", ".pnpm"]);
 

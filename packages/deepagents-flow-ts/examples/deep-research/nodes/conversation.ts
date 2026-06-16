@@ -2,7 +2,7 @@
 
 import { interrupt, type LangGraphRunnableConfig } from "@langchain/langgraph";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
-import { logger, type AppConfig } from "../../../src/vendor/runtime/index.js";
+import { logger, type AppConfig } from "../../../src/runtime/index.js";
 import { isApproval, requireModel } from "../../shared.js";
 import type { ResearchStateShape } from "./types.js";
 import { langClause, llmLongTimeout, streamLLMText } from "./helpers.js";

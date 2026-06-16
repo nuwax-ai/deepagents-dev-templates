@@ -10,7 +10,7 @@ import {
   toAbsolutePath,
   toWorkspaceRelativePosix,
   matchPosixGlob,
-} from "../src/runtime/path-utils.js";
+} from "../src/runtime/fs/path-utils.js";
 
 describe("toPosixPath", () => {
   it("反斜杠转成正斜杠", () => {
