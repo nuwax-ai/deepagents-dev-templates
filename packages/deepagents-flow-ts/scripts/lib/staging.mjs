@@ -16,6 +16,7 @@ export const STAGING_EXCLUDES = [
   ".idea",
   ".vscode",
   ".DS_Store",
+  ".flow-sessions", // 本地 CLI 会话状态，不应打入发布包
   "node_modules",
   "dist-packages",
   "logs",
