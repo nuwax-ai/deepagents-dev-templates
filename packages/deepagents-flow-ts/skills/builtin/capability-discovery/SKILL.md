@@ -21,7 +21,7 @@ deepagents-flow-ts sessions       # 已持久化的会话
 | **基础能力**（agent-builtin） | 模板内置 | bash / 文件读写 / search / http / json / mcp_tool_bridge / platform_api / agent_variable / demo | 否（改源码） |
 | **扩展能力**（acp-dynamic） | ACP / nuwax 面板 / config | MCP servers / Skills / Subagent / 系统提示词 / 模型 | 是 |
 | 环境（env-builtin） | 环境变量 | API key / base URL | env |
-| 文件持久化（agent-builtin-file） | 模板会话目录 | sessionStore（`.flow-sessions/`） | 否 |
+| 文件持久化（agent-builtin-file） | 用户目录（按 workspace 散列隔离） | sessionStore（默认 `~/.flowagents/`） | 否 |
 
 完整映射见 `.nuwax-agent/capability-sources.json`。
 

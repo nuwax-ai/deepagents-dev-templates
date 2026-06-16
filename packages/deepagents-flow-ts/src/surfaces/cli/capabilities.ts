@@ -8,6 +8,8 @@
 import { readFileSync, existsSync } from "node:fs";
 import { dirname, resolve, join } from "node:path";
 import { loadFlowConfig } from "../../runtime/flow-config.js";
+import { discoverSkills, discoverSubAgents } from "../../runtime/index.js";
+import { resolveSessionDir } from "../../runtime/services/file-checkpoint-saver.js";
 
 const BUILTIN_TOOLS = [
   { name: "bash", layer: "agent-builtin", desc: "shell 执行（cwd=workspace，受 sandbox 约束）" },
@@ -21,6 +23,8 @@ const BUILTIN_TOOLS = [
   { name: "mcp_tool_bridge", layer: "agent-builtin", desc: "列出/调用任意 MCP server 工具" },
   { name: "platform_api", layer: "agent-builtin", desc: "nuwax 平台 API（查询组件/保存 prompt/读写变量）" },
   { name: "agent_variable", layer: "agent-builtin", desc: "agent 变量读写（放 API key/config）" },
+  { name: "load_skill", layer: "agent-builtin", desc: "按需读取已发现 skill 的完整 SKILL.md" },
+  { name: "task", layer: "agent-builtin", desc: "委派任务给 .agents/agents 下的声明式 subagent" },
   { name: "echo", layer: "agent-builtin", desc: "demo：回显（无凭证 fallback）" },
   { name: "calculate", layer: "agent-builtin", desc: "demo：算术求值" },
   { name: "time", layer: "agent-builtin", desc: "demo：当前时间" },
@@ -47,6 +51,18 @@ export async function runCapabilities(): Promise<void> {
     join(pkgRoot, ".nuwax-agent", "capability-sources.json")
   );
 
+  // 静态发现（只读文件，不加载 MCP / 不需凭证）：实际可用的 skills / subagents。
+  const skills = discoverSkills(appConfig, process.cwd()).map((s) => ({
+    name: s.name,
+    description: s.description,
+  }));
+  const subagents = discoverSubAgents(appConfig, process.cwd()).map((a) => ({
+    name: a.name,
+    description: a.description,
+    ...(a.model ? { model: a.model } : {}),
+    ...(a.workdir ? { workdir: a.workdir } : {}),
+  }));
+
   const result = {
     agent: appConfig.agent.name,
     description: appConfig.agent.description,
@@ -54,14 +70,16 @@ export async function runCapabilities(): Promise<void> {
     builtinTools: BUILTIN_TOOLS,
     mcpServers,
     skillsDirectories: appConfig.skills.directories,
+    skills,
     agentsDirectories: appConfig.agentsDirectories,
+    subagents,
     sandbox: { profile: appConfig.sandbox.profile, writablePaths: appConfig.sandbox.writablePaths },
     compaction: {
       enabled: appConfig.compaction.enabled,
       contextWindow: appConfig.compaction.contextWindow,
       triggerThreshold: appConfig.compaction.triggerThreshold,
     },
-    memoryDir: appConfig.memory.dir,
+    memoryDir: resolveSessionDir(appConfig, process.cwd()),
     capabilitySources,
   };
 

@@ -42,7 +42,7 @@
   "agentsDirectories": ["./.agents"],
   "memory": {
     "enabled": true,
-    "dir": "./.flow-sessions",
+    "dir": "~/.flowagents",
     "addCacheControl": true
   },
   "logging": {

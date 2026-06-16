@@ -48,7 +48,7 @@
       ]
     },
     "compaction": { "source": "agent-builtin" },
-    "sessionStore": { "source": "agent-builtin-file", "path": ".flow-sessions" },
+    "sessionStore": { "source": "agent-builtin-file", "path": "~/.flowagents" },
     "installRoot": { "source": "package-placeholder" }
   }
 }

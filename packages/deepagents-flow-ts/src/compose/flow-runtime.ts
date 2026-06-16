@@ -17,7 +17,10 @@ import {
   createRuntimeContextAsync,
   resolveSystemPrompt,
   resolveSkillsPaths,
+  discoverSkills,
   discoverSubAgents,
+  renderSkillsSection,
+  renderSubagentsSection,
   type AppConfig,
   type ACPSessionConfig,
 } from "../runtime/index.js";
@@ -33,10 +36,27 @@ export async function createFlowRuntime(
   const workspaceRoot = options.workspaceRoot ?? process.cwd();
   const ctx = await createRuntimeContextAsync(appConfig, options.sessionConfig, workspaceRoot);
   const sandbox = getFlowSandboxPolicy(appConfig);
-  const allTools = createFlowTools(ctx, { workspaceRoot, policy: sandbox });
-  const systemPrompt = resolveSystemPrompt(appConfig, options.sessionConfig, workspaceRoot);
+
   const skillsPaths = resolveSkillsPaths(appConfig);
+  const skills = discoverSkills(appConfig, workspaceRoot);
   const subAgents = discoverSubAgents(appConfig, workspaceRoot);
+  const progressiveSkills = appConfig.skills.progressiveLoading;
+
+  // skills → load_skill 工具；subAgents → task 委派工具（沙箱按 workspaceRoot / 各自 workdir）。
+  const allTools = createFlowTools(ctx, {
+    workspaceRoot,
+    policy: sandbox,
+    skills: progressiveSkills ? skills : [],
+    subAgents,
+  });
+
+  // 系统提示词追加「Available Skills」「Subagents」清单 → 模型知道可 load_skill / task 委派。
+  const baseSystemPrompt = resolveSystemPrompt(appConfig, options.sessionConfig, workspaceRoot);
+  const sections = [
+    renderSkillsSection(skills, progressiveSkills),
+    renderSubagentsSection(subAgents),
+  ].filter(Boolean);
+  const systemPrompt = sections.length ? `${baseSystemPrompt}\n\n${sections.join("\n\n")}` : baseSystemPrompt;
 
   // 文件后端 checkpointer：与 createStatefulFlow 共用 resolveSessionDir 口径（见 file-checkpoint-saver）。
   const checkpointer = createFileCheckpointer(appConfig, workspaceRoot);
@@ -47,6 +67,7 @@ export async function createFlowRuntime(
     allTools,
     systemPrompt,
     skillsPaths,
+    skills,
     subAgents,
     sandbox,
     workspaceRoot,

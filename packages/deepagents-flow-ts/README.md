@@ -156,6 +156,10 @@ const { nodes, edges, mermaid } = await getFlowTopology();
 
 默认模型 `openai / deepseek-chat`（见 [config/flow-agent.config.json](config/flow-agent.config.json)，已对齐国内 OpenAI 兼容端点；切回 Anthropic 把 `model.provider` 设为 `anthropic`）。各端点配置见 [`.env.example`](.env.example)。
 
+> 升级提示：会话/checkpoint 默认目录已从项目内 `./.flow-sessions` 调整为用户目录
+> `~/.flowagents/<workspace 散列>/`。如果需要继续读取旧会话，把 `config.memory.dir`
+> 显式设回 `./.flow-sessions`；新项目建议保留默认值，避免会话文件混进源码包。
+
 ## 测试
 
 ```bash

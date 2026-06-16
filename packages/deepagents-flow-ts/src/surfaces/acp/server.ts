@@ -5,6 +5,10 @@
  * 返回 `{ stopReason }` 即短路 agent。我们在这里跑传入的 FlowExecutor，
  * 把回答经 `conn` 流式推给客户端，然后短路——deep agent 永不进入请求路径。
  *
+ * per-session 配置（D）：`createExecutor` 工厂 + `configureSession` 钩子让 ACP `session/new`
+ * 下发的 `cwd` / `mcpServers` / `model` 经 loadConfig（ACP 最高优先级）装配**每会话独立** runtime；
+ * `onSessionClosed` 释放该会话资源（MCP stdio 子进程）。未传 createExecutor 时退回单 executor 模式。
+ *
  * DeepAgentsServer 仍要求一个 agentConfig（其内部 createDeepAgent 用它），
  * 所以我们给一个极简、零自定义工具的 throwaway agent，它从不被调用。
  */
@@ -17,7 +21,12 @@ import {
   type DeepAgentsServerHooks,
   type StopReason,
 } from "deepagents-acp";
-import { logger, resolveModel, type AppConfig } from "../../runtime/index.js";
+import {
+  logger,
+  resolveModel,
+  type AppConfig,
+  type ACPSessionConfig,
+} from "../../runtime/index.js";
 import type {
   FlowExecutor,
   StatefulFlow,
@@ -144,32 +153,89 @@ function formatStage(e: StageEvent): string {
   return `\n▸${pos} ${e.stage}${detail}\n`;
 }
 
-export interface FlowAcpOptions {
-  /** one-shot FlowExecutor，或支持 human-in-the-loop 的 StatefulFlow */
+/** per-session 装配产物：executor + 资源释放钩子。 */
+export interface SessionExecutor {
   executor: FlowExecutor | StatefulFlow;
-  /** 用于 throwaway agent 的身份/模型（agent 永不运行） */
+  /** 释放该 session 的运行时资源（如 MCP stdio 子进程）。session 关闭时调用。 */
+  dispose?: () => Promise<void>;
+}
+
+export interface FlowAcpOptions {
+  /**
+   * 单 executor 模式：one-shot FlowExecutor 或支持 HITL 的 StatefulFlow，所有 session 共用
+   * （无 per-session 配置）。与 createExecutor 二选一；createExecutor 优先。
+   */
+  executor?: FlowExecutor | StatefulFlow;
+  /**
+   * per-session 工厂模式：按 ACP session 的 cwd / mcpServers / model 装配**每会话独立** runtime
+   * （ACP 最高优先级，见 loadConfig 第 6 层）。在 configureSession 阶段调用，onSessionClosed 释放。
+   */
+  createExecutor?: (args: {
+    sessionConfig: ACPSessionConfig;
+    workspaceRoot: string;
+  }) => Promise<SessionExecutor>;
+  /** throwaway agent 的身份/模型（agent 永不运行） */
   appConfig: AppConfig;
   debug?: boolean;
 }
 
-/** 启动 Flow ACP 服务（stdio）。任意 FlowExecutor 都能插进来。 */
+/** ACP session/new 的 mcpServers（数组 [{name,...}] 或 record）→ 我们的 Record<name, cfg>。 */
+export function acpMcpToRecord(raw: unknown): Record<string, unknown> | undefined {
+  if (!raw) return undefined;
+  if (Array.isArray(raw)) {
+    const rec: Record<string, unknown> = {};
+    for (const s of raw) {
+      if (s && typeof s === "object" && typeof (s as { name?: unknown }).name === "string") {
+        const { name, ...rest } = s as { name: string } & Record<string, unknown>;
+        rec[name] = rest;
+      }
+    }
+    return Object.keys(rec).length ? rec : undefined;
+  }
+  if (typeof raw === "object") return raw as Record<string, unknown>;
+  return undefined;
+}
+
+/** 从 ACP session/new|load 的 raw params 提取 cwd / mcpServers / model → ACPSessionConfig。 */
+export function sessionConfigFromParams(params: Record<string, unknown>): {
+  sessionConfig: ACPSessionConfig;
+  workspaceRoot: string;
+} {
+  const cwd = typeof params.cwd === "string" && params.cwd ? params.cwd : process.cwd();
+  const mcpServers = acpMcpToRecord(params.mcpServers);
+  const model = typeof params.model === "string" ? params.model : undefined;
+  const sessionConfig: ACPSessionConfig = {
+    cwd,
+    ...(mcpServers ? { mcpServers } : {}),
+    ...(model ? { model } : {}),
+  };
+  return { sessionConfig, workspaceRoot: cwd };
+}
+
+/** 启动 Flow ACP 服务（stdio）。任意 FlowExecutor / per-session 工厂都能插进来。 */
 export async function bootstrapFlowAcp(options: FlowAcpOptions): Promise<void> {
   if (options.debug) {
     process.env.LOG_LEVEL = "debug";
   }
-  const { executor, appConfig } = options;
-  // executor 是 function ⇒ one-shot FlowExecutor；是对象（有 run）⇒ 支持 HITL 的 StatefulFlow。
-  const isStateful = typeof executor !== "function";
-  // 一个会话 = 一个主题：首条 prompt 开题，之后每条都续跑同一项目（不重头开新主题）。
-  // 该判断优先从 flow 的 checkpointer 推断（hasStarted），跨进程/IDE 重启仍准；
-  // 仅当 flow 未实现 hasStarted 时，退回进程内存 Set（重启即丢，老式 flow 的兜底）。
-  const durableResume =
-    isStateful && typeof (executor as StatefulFlow).hasStarted === "function";
+  const { appConfig } = options;
+
+  // per-session executor 缓存（createExecutor 模式）；单 executor 模式下恒空。
+  const sessions = new Map<string, SessionExecutor>();
+  // configureSession 下发的 workspace/cwd 也缓存下来；若 hook 未能立即建好 executor，
+  // 后续懒建也必须沿用同一 session 配置，不能退回进程 cwd。
+  const sessionConfigs = new Map<
+    string,
+    { sessionConfig: ACPSessionConfig; workspaceRoot: string }
+  >();
+  const sessionFailures = new Map<string, string>();
+  // 一个会话 = 一个主题：老式 flow（未实现 hasStarted）的「等回复」内存兜底，按 sessionId 跟踪。
+  // 实现了 hasStarted 的 flow 优先从 checkpointer 推断续跑（跨进程/IDE 重启仍准）。
   const fallbackResume = new Set<string>();
 
   log.info("Flow ACP bootstrapping", {
     agent: appConfig.agent.name,
     model: `${appConfig.model.provider}:${appConfig.model.name}`,
+    mode: options.createExecutor ? "per-session" : "single-executor",
   });
 
   // 极简 throwaway agent —— onPrompt 会短路，它永不进入请求路径。
@@ -180,7 +246,59 @@ export async function bootstrapFlowAcp(options: FlowAcpOptions): Promise<void> {
     tools: [],
   } as unknown as DeepAgentConfig;
 
+  /** 取该 session 的 executor：优先 per-session 缓存，回退单 executor；createExecutor 模式下缺失则懒建。 */
+  async function resolveExecutor(
+    sessionId: string
+  ): Promise<FlowExecutor | StatefulFlow | undefined> {
+    const cached = sessions.get(sessionId);
+    if (cached) return cached.executor;
+    if (options.createExecutor) {
+      const failure = sessionFailures.get(sessionId);
+      if (failure) {
+        throw new Error(`ACP session runtime 初始化失败: ${failure}`);
+      }
+      const configured = sessionConfigs.get(sessionId);
+      // configureSession 未触发时的最后兜底：只能用于 host 未发 session/new 的场景。
+      const built = await options.createExecutor({
+        sessionConfig: configured?.sessionConfig ?? { cwd: process.cwd() },
+        workspaceRoot: configured?.workspaceRoot ?? process.cwd(),
+      });
+      sessions.set(sessionId, built);
+      return built.executor;
+    }
+    return options.executor;
+  }
+
   const hooks: DeepAgentsServerHooks = {
+    // session/new | session/load：按 ACP cwd/mcpServers/model 装配 per-session runtime。
+    async configureSession(ctx) {
+      if (!options.createExecutor) return undefined;
+      const { sessionConfig, workspaceRoot } = sessionConfigFromParams(ctx.params);
+      sessionConfigs.set(ctx.sessionId, { sessionConfig, workspaceRoot });
+      try {
+        const built = await options.createExecutor({ sessionConfig, workspaceRoot });
+        // session/load 重配时先 dispose 旧资源，避免泄漏。
+        await sessions.get(ctx.sessionId)?.dispose?.();
+        sessions.set(ctx.sessionId, built);
+        sessionFailures.delete(ctx.sessionId);
+        log.info("configureSession → per-session runtime", {
+          sessionId: ctx.sessionId,
+          phase: ctx.phase,
+          cwd: workspaceRoot,
+          mcpServers: sessionConfig.mcpServers ? Object.keys(sessionConfig.mcpServers) : [],
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        sessionFailures.set(ctx.sessionId, message);
+        log.error("configureSession failed; session runtime disabled until reconfigured", {
+          sessionId: ctx.sessionId,
+          error: message,
+        });
+      }
+      // 让 deepagents-acp 内置 backend 也用同一 workspace 根。
+      return { workspaceRoot };
+    },
+
     async onPrompt(ctx) {
       const text = ctx.promptText?.trim();
       if (!text) {
@@ -188,6 +306,16 @@ export async function bootstrapFlowAcp(options: FlowAcpOptions): Promise<void> {
       }
       const conn = ctx.conn as AcpConnection;
       const sessionId = ctx.sessionId;
+
+      const executor = await resolveExecutor(sessionId);
+      if (!executor) {
+        log.warn("onPrompt: no executor available for session", { sessionId });
+        return undefined;
+      }
+      // executor 是 function ⇒ one-shot FlowExecutor；是对象（有 run）⇒ 支持 HITL 的 StatefulFlow。
+      const isStateful = typeof executor !== "function";
+      const durableResume =
+        isStateful && typeof (executor as StatefulFlow).hasStarted === "function";
 
       // 跟踪是否流式：流式则只补 footer/question，非流式则整段发。
       let streamed = false;
@@ -241,10 +369,27 @@ export async function bootstrapFlowAcp(options: FlowAcpOptions): Promise<void> {
         return { stopReason: "end_turn" as StopReason };
       } catch (err) {
         log.error("onPrompt flow failed", { error: String(err) });
-        if (isStateful && !durableResume) fallbackResume.delete(sessionId); // 出错清兜底状态，避免卡在 resume
+        if (!durableResume) fallbackResume.delete(sessionId); // 出错清兜底状态，避免卡在 resume
         await streamText(conn, sessionId, "抱歉，处理您的问题时出现错误。");
         return { stopReason: "end_turn" as StopReason };
       }
+    },
+
+    // session 关闭：释放 per-session 资源（MCP stdio 子进程等）+ 清兜底状态。
+    async onSessionClosed(ctx) {
+      const entry = sessions.get(ctx.sessionId);
+      if (entry) {
+        try {
+          await entry.dispose?.();
+        } catch {
+          /* best-effort teardown */
+        }
+        sessions.delete(ctx.sessionId);
+      }
+      sessionConfigs.delete(ctx.sessionId);
+      sessionFailures.delete(ctx.sessionId);
+      fallbackResume.delete(ctx.sessionId);
+      log.info("session closed", { sessionId: ctx.sessionId });
     },
   };
 

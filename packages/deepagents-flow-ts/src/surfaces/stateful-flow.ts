@@ -24,12 +24,13 @@ import {
   type BaseCheckpointSaver,
 } from "@langchain/langgraph";
 import type { RunnableConfig } from "@langchain/core/runnables";
-import { logger } from "../runtime/index.js";
+import { logger, type AppConfig } from "../runtime/index.js";
 import type {
   StatefulFlow,
   FlowRunResult,
   FlowCallbacks,
 } from "../core/flow-types.js";
+import { applyCompaction } from "../app/compaction.js";
 import { mapStreamChunk } from "./map-stream-chunk.js";
 import { dispatchSurfaceEvent } from "./dispatch-surface-event.js";
 
@@ -56,6 +57,8 @@ export interface RunnableGraph {
     /** 当前 checkpoint 的定位 config —— 有 checkpoint_id ⇒ 该 thread 已开过题（见 hasStarted）。 */
     config?: { configurable?: { checkpoint_id?: string } };
   }>;
+  /** 写回状态（自动压缩用 RemoveMessage 替换历史；LangGraph compile 产物天然支持）。 */
+  updateState(config: RunnableConfig, values: Record<string, unknown>): Promise<unknown>;
 }
 
 export interface StatefulFlowOptions<S = Record<string, unknown>> {
@@ -77,6 +80,11 @@ export interface StatefulFlowOptions<S = Record<string, unknown>> {
   configurable?: Record<string, unknown>;
   /** 递归上限（防 reflection 回边死循环）。默认 50。 */
   recursionLimit?: number;
+  /**
+   * 传入则在「新 query（非 resume）」入口自动压缩 checkpoint 中累积的 `state.messages`
+   * （超阈值摘要 + RemoveMessage 替换，见 app/compaction）。状态无 messages 或未超阈值时 no-op。
+   */
+  appConfig?: AppConfig;
 }
 
 /** 从 stream 各 chunk 里取最后一个 interrupt 的 value（沿用各示例既有约定）。 */
@@ -158,6 +166,13 @@ export function createStatefulFlow<S = Record<string, unknown>>(
   return {
     async run(input, threadId, callbacks): Promise<FlowRunResult> {
       const config = baseConfig(threadId, callbacks);
+
+      // 自动压缩：仅「新 query（非 resume）」入口——checkpoint 累积历史超阈值则摘要+替换后再跑。
+      // resume（HITL 续跑）分支不动历史，避免干扰挂起的 interrupt。
+      if (options.appConfig && input.resume === undefined) {
+        await applyCompaction(graph, config, options.appConfig);
+      }
+
       const streamInput =
         input.resume !== undefined
           ? new Command({ resume: input.resume })

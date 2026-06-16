@@ -11,6 +11,7 @@ export {
   createRuntimeContext,
   createRuntimeContextAsync,
   hydrateRuntimeContext,
+  destroyRuntimeContext,
   type RuntimeContext,
 } from "./runtime-context.js";
 export { resolveModelString, resolveModel } from "./model.js";
@@ -19,5 +20,9 @@ export {
   discoverMemoryFiles,
   resolveSkillsPaths,
   discoverSubAgents,
+  discoverSkills,
+  renderSkillsSection,
+  renderSubagentsSection,
   type DiscoveredSubAgent,
+  type DiscoveredSkill,
 } from "./discovery.js";

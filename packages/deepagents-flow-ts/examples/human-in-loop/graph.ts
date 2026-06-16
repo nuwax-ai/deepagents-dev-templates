@@ -125,5 +125,6 @@ export function createReviewFlow(
     toInput: (query) => ({ query }),
     toResult: (v) => ({ answer: v.output ?? "" }),
     checkpointer: durableCheckpointer(appConfig, opts.checkpointer),
+    appConfig, // 自动压缩（基座在新 query 入口按阈值压 messages）
   });
 }

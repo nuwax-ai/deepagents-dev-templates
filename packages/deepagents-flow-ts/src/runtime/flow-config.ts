@@ -13,7 +13,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { loadConfig, type AppConfig } from "./index.js";
+import { loadConfig, type AppConfig, type ACPSessionConfig } from "./index.js";
 
 // dist/runtime/flow-config.js → 包根在 ../..
 const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -35,12 +35,19 @@ export function resolveConfigPath(
 
 /** 加载配置：返回校验后的 AppConfig + 完整原始 JSON。 */
 export function loadFlowConfig(
-  opts: { configPath?: string; workspaceRoot?: string; fallback?: string } = {}
+  opts: {
+    configPath?: string;
+    workspaceRoot?: string;
+    fallback?: string;
+    /** ACP 会话级覆盖（model/cwd/mcpServers/…，最高优先级，见 loadConfig 第 6 层）。 */
+    sessionConfig?: ACPSessionConfig;
+  } = {}
 ): LoadedFlowConfig {
   const configPath = resolveConfigPath(opts.configPath, opts.fallback);
   const appConfig = loadConfig({
     configPath,
     workspaceRoot: opts.workspaceRoot ?? process.cwd(),
+    sessionConfig: opts.sessionConfig,
   });
 
   let raw: Record<string, unknown> = {};

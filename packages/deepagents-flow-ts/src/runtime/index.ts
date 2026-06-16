@@ -33,6 +33,7 @@ export {
   createRuntimeContext,
   createRuntimeContextAsync,
   hydrateRuntimeContext,
+  destroyRuntimeContext,
   resolveModelString,
   resolveModel,
   resolveCliSystemPrompt,
@@ -40,7 +41,11 @@ export {
   discoverMemoryFiles,
   resolveSkillsPaths,
   discoverSubAgents,
+  discoverSkills,
+  renderSkillsSection,
+  renderSubagentsSection,
   type DiscoveredSubAgent,
+  type DiscoveredSkill,
   type RuntimeContext,
 } from "./context/helpers.js";
 export { Logger, logger, type LogLevel } from "./logger.js";

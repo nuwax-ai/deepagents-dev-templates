@@ -15,6 +15,7 @@ import type {
   AppConfig,
   RuntimeContext,
   DiscoveredSubAgent,
+  DiscoveredSkill,
 } from "./index.js";
 import type { FlowSandboxPolicy } from "./fs/sandbox.js";
 import type { FileCheckpointSaver } from "./services/file-checkpoint-saver.js";
@@ -29,6 +30,8 @@ export interface FlowRuntime {
   systemPrompt: string;
   /** 已发现的 skills 目录（deepagents progressive skills）。 */
   skillsPaths: string[];
+  /** 已发现的 skills 清单（name/description/path）→ load_skill 工具 + 提示词清单。 */
+  skills: DiscoveredSkill[];
   /** 已发现的声明式 subagent（.agents/agents/&lt;name&gt;/AGENT.md）。 */
   subAgents: DiscoveredSubAgent[];
   /** 工具沙箱策略（bash/fs 执行前校验）。 */

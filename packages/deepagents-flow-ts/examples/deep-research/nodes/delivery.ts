@@ -5,7 +5,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve, join, dirname } from "node:path";
 import { interrupt, type LangGraphRunnableConfig } from "@langchain/langgraph";
-import type { AppConfig } from "../../../src/runtime/index.js";
+import { AppConfigSchema, type AppConfig } from "../../../src/runtime/index.js";
 import { resolveSessionDir } from "../../../src/runtime/services/file-checkpoint-saver.js";
 import type { DeliveryArtifacts, ResearchStateShape } from "./types.js";
 
@@ -74,9 +74,7 @@ ${body}
 }
 
 function defaultArtifactDir(appConfig: AppConfig | undefined, threadId: string): string {
-  const sessionDir = appConfig
-    ? resolveSessionDir(appConfig)
-    : resolve(process.cwd(), ".flow-sessions");
+  const sessionDir = resolveSessionDir(appConfig ?? AppConfigSchema.parse({}));
   return join(sessionDir, "artifacts", safeSegment(threadId));
 }
 
@@ -117,7 +115,8 @@ export function formatDeliveryAnswer(artifacts: DeliveryArtifacts): string {
 /**
  * delivery：最终交付节点。
  *
- * 节点先用 interrupt 问询保存位置；用户直接回车时使用 `.flow-sessions/artifacts/<thread_id>/`。
+ * 节点先用 interrupt 问询保存位置；用户直接回车时使用默认 session 目录下的
+ * `artifacts/<thread_id>/`（默认 `~/.flowagents/<workspace 散列>/artifacts/...`）。
  * 这样目录选择属于运行时用户决策，而不是模板硬编码一个新规范。
  */
 export function deliveryNode(

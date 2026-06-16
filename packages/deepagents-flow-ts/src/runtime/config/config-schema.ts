@@ -132,7 +132,12 @@ export const WorkspaceConfigSchema = z.object({
 
 export const MemoryConfigSchema = z.object({
   enabled: z.boolean().default(true),
-  dir: z.string().default("~/.deepagents/workspaces"),
+  /**
+   * 会话/checkpoint 存储目录。默认 `~/.flowagents` → 由 resolveSessionDir 追加
+   * `<workspace 散列>` 子目录（按 workspace 隔离）。设为相对路径（如 `./.flow-sessions`）
+   * 可 opt-out 回项目内存储。
+   */
+  dir: z.string().default("~/.flowagents"),
   addCacheControl: z.boolean().default(true),
 });
 

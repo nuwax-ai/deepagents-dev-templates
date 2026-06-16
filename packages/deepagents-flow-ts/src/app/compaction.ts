@@ -20,6 +20,7 @@ import {
   RemoveMessage,
   type BaseMessage,
 } from "@langchain/core/messages";
+import type { RunnableConfig } from "@langchain/core/runnables";
 import { resolveModel, logger, type AppConfig } from "../runtime/index.js";
 import { invokeWithResilience, resolveLlmResilience } from "../runtime/services/llm-resilience.js";
 
@@ -70,6 +71,34 @@ export function compactionUpdate(
     .map((m) => new RemoveMessage({ id: m.id! }));
   if (removals.length === 0) return [];
   return [...removals, ...compacted];
+}
+
+/** 一张「可压缩」的图：能读状态、能写回状态（LangGraph `.compile()` 产物天然满足）。 */
+export interface CompactableGraph {
+  getState(config: RunnableConfig): Promise<{ values: unknown }>;
+  updateState(config: RunnableConfig, values: Record<string, unknown>): Promise<unknown>;
+}
+
+/**
+ * 对一张带 checkpointer 的图，就地压缩其 `state.messages`（超阈值时摘要+RemoveMessage 替换）。
+ *
+ * 把「读 checkpoint 历史 → compactHistory → compactionUpdate → updateState」收成一处，
+ * 供 createStatefulFlow（自动）与自定义有状态 flow（dev-agent）共用，避免各处重写。
+ * 状态无 `messages`（如 topic/plan 型 flow）或未超阈值时为 no-op，返回 false。
+ */
+export async function applyCompaction(
+  graph: CompactableGraph,
+  config: RunnableConfig,
+  appConfig: AppConfig
+): Promise<boolean> {
+  const values = (await graph.getState(config)).values as { messages?: BaseMessage[] } | undefined;
+  const prior = values?.messages ?? [];
+  if (!prior.length) return false;
+  const compacted = await compactHistory(prior, appConfig);
+  const update = compactionUpdate(prior, compacted);
+  if (!update.length) return false;
+  await graph.updateState(config, { messages: update });
+  return true;
 }
 
 export async function compactHistory(

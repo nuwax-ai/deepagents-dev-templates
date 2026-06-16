@@ -16,7 +16,7 @@
 | ACP 动态 | 系统提示词、MCP 服务、skills、模型、subagent | Nuwax 平台与工作区配置 |
 | Agent 内置 | 运行时工具（bash/fs/search/http/mcp-bridge）、压缩、demo 工具 | 模板包 |
 | 环境内置 | API key、base URL、日志路径 | 云计算机 / 本机 / 安装器 |
-| Agent 内置文件 | 会话存储（文件 JSON checkpointer） | 模板包（`.flow-sessions/`） |
+| Agent 内置文件 | 会话存储（文件 JSON checkpointer） | 用户目录（`~/.flowagents/<workspace 散列>/`） |
 | 包占位符 | `${INSTALL_ROOT}`、`${AGENT_ID}`、`${PACKAGE_VERSION}` | 构建与安装流水线 |
 
 ## 文件
@@ -33,7 +33,7 @@
 - **model** —— `resolveModel(appConfig)` 取自 `config.model`（ACP session / env / config / defaults）。
 - **skills** —— `resolveSkillsPaths(appConfig)` 发现 `skills/builtin/`、`skills/platform/`、`.agents/*/skills/`。
 - **subagents** —— `discoverSubAgents(appConfig)` 解析 `.agents/agents/<name>/AGENT.md`。
-- **sessionStore** —— `FileCheckpointSaver`（继承 `MemorySaver`）持久化到 `config.memory.dir`（`.flow-sessions/`）；线程隔离、重启存活、恢复 interrupt/resume。
+- **sessionStore** —— `FileCheckpointSaver`（继承 `MemorySaver`）持久化到 `config.memory.dir`（默认 `~/.flowagents/<workspace 散列>/`，可显式 opt-out 回 `./.flow-sessions`）；线程隔离、重启存活、恢复 interrupt/resume。
 - **builtInTools** —— `createFlowTools(ctx)` 组合 bash/fs/search/http/json/mcp-bridge/platform_api/agent_variable + demo 工具；经 `bindTools` 绑定到模型，由 `ToolNode` 执行。
 
 运行时查询：`deepagents-flow-ts capabilities`（无需凭证）。

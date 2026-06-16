@@ -18,6 +18,7 @@
 
 import { config as loadDotenv } from "dotenv";
 import { loadFlowConfig } from "./runtime/flow-config.js";
+import { destroyRuntimeContext } from "./runtime/index.js";
 import { createFlowRuntime } from "./compose/flow-runtime.js";
 import { createDefaultExecutor } from "./app/default-flow.js";
 import { bootstrapFlowAcp } from "./surfaces/acp/server.js";
@@ -35,6 +36,10 @@ interface ParsedArgs {
   help: boolean;
   /** graph 命令:输出 Mermaid 源而非 JSON */
   mermaid: boolean;
+  /** sessions 子命令：list（默认）/ delete */
+  sessionsAction?: "list" | "delete";
+  /** sessions delete 的目标 thread id */
+  sessionsId?: string;
 }
 
 function parseArgs(argv: string[]): ParsedArgs {
@@ -67,6 +72,9 @@ function parseArgs(argv: string[]): ParsedArgs {
     args.command = "capabilities";
   } else if (first === "sessions") {
     args.command = "sessions";
+    if (positional[1] === "delete") args.sessionsAction = "delete";
+    else if (positional[1] === "list") args.sessionsAction = "list";
+    args.sessionsId = positional[2];
   } else if (first === "flow") {
     args.command = "flow";
     args.query = positional.slice(1).join(" ") || undefined;
@@ -88,6 +96,7 @@ const HELP = `deepagents-flow-ts — 通用工作流编排模板
   deepagents-flow-ts graph          导出默认图拓扑（JSON；加 --mermaid 出 Mermaid 源）
   deepagents-flow-ts capabilities   输出能力分层 + 可用工具/MCP/skills（无凭证）
   deepagents-flow-ts sessions       列出已持久化的会话（thread id）
+  deepagents-flow-ts sessions delete <id>  删除某个已持久化会话
 
 默认图是标准 LangGraph ReAct（prepare → think ↔ tools → respond）。
 工具/会话/压缩经 FlowRuntime（框架原生 + 能力分层）驱动。
@@ -120,25 +129,51 @@ async function main(): Promise<void> {
     return;
   }
   if (args.command === "sessions") {
-    await runSessions();
+    await runSessions({ action: args.sessionsAction, id: args.sessionsId });
     return;
   }
 
   // ACP 模式下凭证由 host(Zed/JetBrains) 注入；dotenv 仅作本地兜底。
   loadDotenv();
 
-  const { appConfig } = loadFlowConfig({ configPath: args.configPath });
-  const runtime = await createFlowRuntime(appConfig);
-  const executor = createDefaultExecutor(runtime);
+  // server 身份用一次轻量配置解析（loadFlowConfig 不触 MCP；MCP 在 createFlowRuntime
+  // 内按 session 加载）。
+  const baseConfig = loadFlowConfig({ configPath: args.configPath });
 
   if (args.command === "flow") {
+    // CLI one-shot：单 runtime 共用即可，无需 per-session。
+    const runtime = await createFlowRuntime(baseConfig.appConfig);
+    const executor = createDefaultExecutor(runtime);
     await runFlowCli(executor, {
       query: args.query,
       interactive: args.interactive,
     });
-  } else {
-    await bootstrapFlowAcp({ executor, appConfig: runtime.config, debug: args.debug });
+    return;
   }
+
+  // ACP（默认）模式：per-session 工厂。每个 ACP session 按 session/new 下发的
+  // cwd / mcpServers / model 装配**独立** runtime（ACP 最高优先级，见 loadConfig 第 6 层）；
+  // onSessionClosed 时经 dispose 释放该 session 的 MCP stdio 子进程。
+  await bootstrapFlowAcp({
+    appConfig: baseConfig.appConfig,
+    debug: args.debug,
+    createExecutor: async ({ sessionConfig, workspaceRoot }) => {
+      const { appConfig } = loadFlowConfig({
+        configPath: args.configPath,
+        workspaceRoot,
+        sessionConfig,
+      });
+      const runtime = await createFlowRuntime(appConfig, { sessionConfig, workspaceRoot });
+      return {
+        executor: createDefaultExecutor(runtime),
+        dispose: async () => {
+          await destroyRuntimeContext(runtime.ctx).catch(() => {
+            /* best-effort teardown of MCP stdio procs */
+          });
+        },
+      };
+    },
+  });
 }
 
 main().catch((err) => {

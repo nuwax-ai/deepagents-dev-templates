@@ -17,6 +17,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, unlinkSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { homedir } from "node:os";
+import { createHash } from "node:crypto";
 import { MemorySaver } from "@langchain/langgraph";
 import type { RunnableConfig } from "@langchain/core/runnables";
 import { logger, type AppConfig } from "../index.js";
@@ -34,13 +35,30 @@ function expandHome(p: string): string {
   return p;
 }
 
+/** 默认会话根：用户目录下 ~/.flowagents（按 workspace 散列隔离，多项目不串话）。 */
+export const DEFAULT_SESSION_HOME = "~/.flowagents";
+
+/** workspace 绝对路径 → 12 位 sha256，作为 ~/.flowagents 下的隔离子目录名。 */
+function workspaceHash(workspaceRoot: string): string {
+  return createHash("sha256").update(resolve(workspaceRoot)).digest("hex").slice(0, 12);
+}
+
 /**
- * 由 AppConfig 解析会话存储目录 —— 与 createFlowRuntime 同口径（memory.dir，缺省 ./.flow-sessions）。
- * 抽出来供 FlowRuntime 与 createStatefulFlow 共用，避免两处目录解析漂移。
+ * 由 AppConfig 解析会话存储目录 —— 与 createFlowRuntime / runSessions 同口径。
+ * 抽出来供 FlowRuntime、createStatefulFlow、CLI sessions 共用，避免目录解析漂移。
+ *
+ * - 默认 `~/.flowagents`（或显式指向它）→ 追加 `<workspace 散列>` 子目录：会话集中在用户目录、
+ *   跨终端/重启可恢复，又按 workspace 隔离避免不同项目 thread_id 互串。
+ * - 用户显式设其它目录（绝对 / 相对 / 其它 ~/ 路径，如 `./.flow-sessions`）→ 原样解析
+ *   （opt-out + 向后兼容）。
  */
 export function resolveSessionDir(appConfig: AppConfig, workspaceRoot = process.cwd()): string {
-  const memoryDir = expandHome(appConfig.memory?.dir || "./.flow-sessions");
-  return memoryDir.startsWith("/") ? memoryDir : resolve(workspaceRoot, memoryDir);
+  const configured = appConfig.memory?.dir || DEFAULT_SESSION_HOME;
+  if (configured === DEFAULT_SESSION_HOME || configured === "~/.flowagents/") {
+    return join(resolve(homedir(), ".flowagents"), workspaceHash(workspaceRoot));
+  }
+  const expanded = expandHome(configured);
+  return expanded.startsWith("/") ? expanded : resolve(workspaceRoot, expanded);
 }
 
 /**
