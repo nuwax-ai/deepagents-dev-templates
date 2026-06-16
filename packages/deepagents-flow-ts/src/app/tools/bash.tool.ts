@@ -61,7 +61,7 @@ export function createBashTool(opts: { workspaceRoot: string; policy: FlowSandbo
     {
       name: "bash",
       description:
-        "在沙箱内执行 shell 命令（cwd=workspace 根）。用于构建/运行/git/系统操作。受 sandbox profile 约束（read-only 拒；open 放）。注：path-level deniedWritePaths 不对 bash 生效（无法静态分析命令写哪），敏感写操作用 write_file/edit_file。",
+        "在沙箱内执行 shell 命令（cwd=workspace 根）。用于构建/运行/git/系统操作。受 sandbox profile 约束（read-only 拒；open 放）。Windows 上使用系统默认 shell（cmd.exe）。注：path-level deniedWritePaths 不对 bash 生效（无法静态分析命令写哪），敏感写操作用 write_file/edit_file。",
       schema: z.object({
         command: z.string().describe("要执行的 shell 命令"),
         timeoutMs: z.number().optional().describe("超时毫秒，默认 30000（0/负数视为默认）"),

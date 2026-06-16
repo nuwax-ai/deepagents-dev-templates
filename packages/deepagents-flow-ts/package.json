@@ -1,6 +1,6 @@
 {
   "name": "deepagents-flow-ts",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Flow / workflow-orchestration agent template — the agent runs an explicit LangGraph StateGraph (not a dynamic tool loop) over ACP. Reuses the deepagents-app-ts runtime. Ships 6 reference examples: RAG, travel planner, project manager, human-in-loop, dev agent, and deep research.",
   "type": "module",
   "main": "dist/index.js",

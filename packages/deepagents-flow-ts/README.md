@@ -3,8 +3,11 @@
 **通用工作流编排模板** —— Agent 按"设计好的节点连线规则(node + edge)"作为 LangGraph 工作流运行，
 而不是自由的 tool loop。
 
-> **独立模板**：解压后在本目录 `pnpm install && pnpm build` 即可使用。
-> 底层配置/模型/MCP 经 npm 依赖 `deepagents-app-ts/runtime` 提供；扩展见 [CLAUDE.md](CLAUDE.md)。
+> **两种获取方式**：
+> - **源码开发**（git / npm 源码包，含 `src/`、`examples/`、`tsconfig`）：本目录 `pnpm install && pnpm build` 即可改默认图、跑示例、扩展能力——开发指南见 [CLAUDE.md](CLAUDE.md)。
+> - **Nuwax 运行时制品**（平台分发的 `.tar.gz` / `.zip`）：自包含 `dist/bundle.mjs`，由平台直接运行，**无需 `build`**；不含 `src/`，随包的 `examples/` 仅作**只读参考源码**（其 `import "../../src"` 在制品内不解析，需完整源码仓库才能运行）。
+>
+> 底层配置/模型/MCP 经 `deepagents-app-ts/runtime` 提供。
 
 本模板是 **工作流编排 Agent**（显式 LangGraph 图），与 Coding Agent（tool loop）产品形态不同；运行时基础能力由上述 npm 包承担，「大脑」是一张可设计的节点图。
 
@@ -151,7 +154,7 @@ const { nodes, edges, mermaid } = await getFlowTopology();
 **能力分层**（基础内置 / ACP 下发 / 环境 / 文件持久化）见 [docs/capabilities.md](docs/capabilities.md) 与
 [.nuwax-agent/capability-sources.json](.nuwax-agent/capability-sources.json)——`capabilities` 命令查询当前可用工具/MCP/skills。
 
-默认模型 `anthropic / claude-sonnet-4-6`；改 OpenAI 兼容端点见 `.env.example`。
+默认模型 `openai / deepseek-chat`（见 [config/flow-agent.config.json](config/flow-agent.config.json)，已对齐国内 OpenAI 兼容端点；切回 Anthropic 把 `model.provider` 设为 `anthropic`）。各端点配置见 [`.env.example`](.env.example)。
 
 ## 测试
 

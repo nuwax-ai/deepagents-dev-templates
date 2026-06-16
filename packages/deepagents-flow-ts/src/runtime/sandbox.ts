@@ -6,8 +6,15 @@
  * （workspace-write / read-only / open / custom），但实现是 flow-ts 自管的轻量匹配。
  */
 
-import { resolve, relative, isAbsolute } from "node:path";
+import { relative } from "node:path";
 import type { AppConfig } from "deepagents-app-ts/runtime";
+import {
+  toAbsolutePath,
+  matchPosixGlob,
+  normalizeAbsolutePath,
+} from "./path-utils.js";
+
+export { toAbsolutePath } from "./path-utils.js";
 
 export interface FlowSandboxPolicy {
   profile: "custom" | "workspace-write" | "read-only" | "open";
@@ -38,21 +45,6 @@ export function getFlowSandboxPolicy(config: AppConfig): FlowSandboxPolicy {
   };
 }
 
-/** 把 workspace 相对/绝对/~/ 路径解析成绝对路径。 */
-export function toAbsolutePath(p: string, workspaceRoot: string): string {
-  if (isAbsolute(p)) return p;
-  if (p.startsWith("~/")) return resolve(process.env.HOME || "", p.slice(2));
-  return resolve(workspaceRoot, p);
-}
-
-/** 简易 glob 匹配：支持尾部 /** 与单段 *。 */
-function matchGlob(path: string, glob: string): boolean {
-  const g = glob.replace(/\/+$/, "");
-  if (g.endsWith("/**")) return path.startsWith(g.slice(0, -3));
-  if (g.endsWith("*")) return path.startsWith(g.slice(0, -1));
-  return path === g || path.startsWith(g + "/");
-}
-
 /**
  * 判定一次路径访问是否放行。
  * - read：非 read-only 即放行，但限在 workspace 内（open 除外）
@@ -64,8 +56,11 @@ export function isPathAllowed(
   policy: FlowSandboxPolicy,
   write: boolean
 ): { ok: boolean; reason?: string } {
+  const normalizedAbs = normalizeAbsolutePath(absPath);
+  const normalizedRoot = normalizeAbsolutePath(workspaceRoot);
+
   if (policy.profile !== "open") {
-    const rel = relative(workspaceRoot, absPath);
+    const rel = relative(normalizedRoot, normalizedAbs);
     if (rel.startsWith("..")) {
       return { ok: false, reason: `path outside workspace: ${absPath}` };
     }
@@ -76,7 +71,7 @@ export function isPathAllowed(
   }
   for (const denied of policy.deniedWritePaths) {
     const deniedAbs = toAbsolutePath(denied, workspaceRoot);
-    if (matchGlob(absPath, deniedAbs)) {
+    if (matchPosixGlob(normalizedAbs, deniedAbs)) {
       return { ok: false, reason: `path denied by sandbox: ${denied}` };
     }
   }

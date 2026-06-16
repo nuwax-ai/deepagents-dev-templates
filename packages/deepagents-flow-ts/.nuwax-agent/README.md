@@ -23,7 +23,7 @@
 
 - `capability-sources.json` —— 把每项能力映射到其来源层（acp-dynamic / agent-builtin / env-builtin / agent-builtin-file / package-placeholder）。这是面板与 `flow capabilities` 读取的契约。
 - `panel.config.json` —— 描述平台面板可管理哪些字段（model / prompt / mcpServers / skills / subagents / sandbox）与不可编辑的内置能力。
-- `package.config.json` —— 声明打包目标、esbuild-bundle 依赖策略、include/exclude 规则、安装时占位符替换、平台矩阵。
+- `package.config.json` —— 声明打包目标、esbuild-bundle 依赖策略、安装时占位符替换、平台矩阵，以及供平台读取的 `include`/`exclude` 元数据。**注意**：实际进入制品的文件由 [`scripts/lib/staging.mjs`](../scripts/lib/staging.mjs) 的 `STAGING_EXCLUDES` 黑名单决定（`package.mjs` 用 `copyPackageTree` 复制整树后排除）；此处 `include`/`exclude` 仅为平台侧元数据，**改它不改变实际打包内容**，二者需手动保持一致。
 - `placeholders.json` —— 列出打包时与安装时的占位符（OpenAI 兼容与 Anthropic 两套模型 env、平台 id、安装根路径）。
 
 ## 运行时各层如何被消费
