@@ -10,6 +10,7 @@
 
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { resolveModel, type AppConfig } from "../../../src/vendor/runtime/index.js";
+import { invokeWithResilience, resolveLlmResilience } from "../../shared.js";
 import type { RAGState, RAGIntent } from "./types.js";
 
 const REWRITE_SYSTEM_PROMPT = `你是一个查询分析专家。你的任务是分析用户的问题，并提供结构化的分析结果。
@@ -62,10 +63,16 @@ export async function rewriteNode(
       ? `对话历史：\n${context}\n\n当前问题：${query}`
       : `问题：${query}`;
 
-    const response = await model.invoke([
-      new SystemMessage(REWRITE_SYSTEM_PROMPT),
-      new HumanMessage(userPrompt),
-    ]);
+    const { shortTimeoutMs } = resolveLlmResilience(config!);
+    const response = await invokeWithResilience(
+      model,
+      [new SystemMessage(REWRITE_SYSTEM_PROMPT), new HumanMessage(userPrompt)],
+      {
+        timeoutMs: shortTimeoutMs,
+        label: "rag rewrite",
+        config: config!,
+      }
+    );
 
     // 解析响应
     const content =

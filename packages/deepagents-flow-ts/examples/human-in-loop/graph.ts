@@ -26,7 +26,14 @@ import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { type AppConfig } from "../../src/vendor/runtime/index.js";
 import type { StatefulFlow } from "../../src/surfaces/flow-types.js";
 import { createStatefulFlow } from "../../src/surfaces/stateful-flow.js";
-import { requireModel, extractText, isApproval, durableCheckpointer } from "../shared.js";
+import {
+  requireModel,
+  extractText,
+  isApproval,
+  durableCheckpointer,
+  invokeWithResilience,
+  resolveLlmResilience,
+} from "../shared.js";
 
 const ReviewState = Annotation.Root({
   query: Annotation<string>,
@@ -42,12 +49,17 @@ async function composeNode(
   appConfig?: AppConfig
 ): Promise<Partial<ReviewStateType>> {
   const model = requireModel(appConfig, "human-in-loop 示例");
-  const res = await model.invoke([
-    new SystemMessage(
-      "你是专业中文文案。根据用户要求写一版初稿，简洁、3–6 句，直接给正文，不要解释或寒暄。"
-    ),
-    new HumanMessage(state.query),
-  ]);
+  const { longTimeoutMs } = resolveLlmResilience(appConfig);
+  const res = await invokeWithResilience(
+    model,
+    [
+      new SystemMessage(
+        "你是专业中文文案。根据用户要求写一版初稿，简洁、3–6 句，直接给正文，不要解释或寒暄。"
+      ),
+      new HumanMessage(state.query),
+    ],
+    { timeoutMs: longTimeoutMs, label: "review compose", config: appConfig }
+  );
   return { draft: extractText(res.content).trim() };
 }
 
@@ -72,10 +84,15 @@ async function finalizeNode(
     return { output: `✅ 已通过：\n${state.draft}` };
   }
   const model = requireModel(appConfig, "human-in-loop 示例");
-  const res = await model.invoke([
-    new SystemMessage("根据用户的修改意见改写草稿，只输出改写后的成稿，不要解释。"),
-    new HumanMessage(`原稿：\n${state.draft}\n\n修改意见：${fb}`),
-  ]);
+  const { longTimeoutMs } = resolveLlmResilience(appConfig);
+  const res = await invokeWithResilience(
+    model,
+    [
+      new SystemMessage("根据用户的修改意见改写草稿，只输出改写后的成稿，不要解释。"),
+      new HumanMessage(`原稿：\n${state.draft}\n\n修改意见：${fb}`),
+    ],
+    { timeoutMs: longTimeoutMs, label: "review finalize", config: appConfig }
+  );
   return { output: `✏️ 已按意见修订：\n${extractText(res.content).trim()}` };
 }
 

@@ -40,8 +40,6 @@ export {
   discoverMemoryFiles,
   resolveSkillsPaths,
   discoverSubAgents,
-  buildPermissions,
-  buildInterruptOn,
   type DiscoveredSubAgent,
   type RuntimeContext,
 } from "./helpers.js";

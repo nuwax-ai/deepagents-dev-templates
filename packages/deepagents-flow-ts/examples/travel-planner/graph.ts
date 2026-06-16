@@ -29,7 +29,15 @@ import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { logger, type AppConfig } from "../../src/vendor/runtime/index.js";
 import type { StatefulFlow, FlowCallbacks } from "../../src/surfaces/flow-types.js";
 import { createStatefulFlow } from "../../src/surfaces/stateful-flow.js";
-import { requireModel, extractText, runTool, isApproval, durableCheckpointer } from "../shared.js";
+import {
+  requireModel,
+  extractText,
+  runTool,
+  isApproval,
+  durableCheckpointer,
+  invokeWithResilience,
+  resolveLlmResilience,
+} from "../shared.js";
 import { callMcpTool, rateLimited, type McpServerConfig } from "../mcp-client.js";
 
 const log = logger.child("travel");
@@ -134,12 +142,17 @@ async function aggregateNode(
   const material = ordered
     .map((f) => `# ${ASPECT_LABEL[f.aspect] ?? f.aspect}\n${f.suggestion}`)
     .join("\n\n");
-  const res = await model.invoke([
-    new SystemMessage(
-      `你是旅行规划师。根据各方面的网络搜索结果，为「${state.destination}」规划一个 ${state.days} 天的行程，按天列出（含交通/住宿/景点/美食），简洁实用，不要堆砌链接。`
-    ),
-    new HumanMessage(`网络搜索素材：\n${material}`),
-  ]);
+  const { longTimeoutMs } = resolveLlmResilience(appConfig);
+  const res = await invokeWithResilience(
+    model,
+    [
+      new SystemMessage(
+        `你是旅行规划师。根据各方面的网络搜索结果，为「${state.destination}」规划一个 ${state.days} 天的行程，按天列出（含交通/住宿/景点/美食），简洁实用，不要堆砌链接。`
+      ),
+      new HumanMessage(`网络搜索素材：\n${material}`),
+    ],
+    { timeoutMs: longTimeoutMs, label: "travel aggregate", retryLabel: "travel LLM", config: appConfig }
+  );
   return { itinerary: extractText(res.content).trim() };
 }
 
@@ -161,10 +174,15 @@ async function finalizeNode(
     return { output: `✅ 行程已确认：\n${state.itinerary}` };
   }
   const model = requireModel(appConfig, "travel-planner 示例");
-  const res = await model.invoke([
-    new SystemMessage("根据用户的调整意见修订行程，只输出修订后的完整行程。"),
-    new HumanMessage(`原行程：\n${state.itinerary}\n\n调整意见：${fb}`),
-  ]);
+  const { longTimeoutMs } = resolveLlmResilience(appConfig);
+  const res = await invokeWithResilience(
+    model,
+    [
+      new SystemMessage("根据用户的调整意见修订行程，只输出修订后的完整行程。"),
+      new HumanMessage(`原行程：\n${state.itinerary}\n\n调整意见：${fb}`),
+    ],
+    { timeoutMs: longTimeoutMs, label: "travel finalize", retryLabel: "travel LLM", config: appConfig }
+  );
   return { output: `✏️ 已按意见调整：\n${extractText(res.content).trim()}` };
 }
 

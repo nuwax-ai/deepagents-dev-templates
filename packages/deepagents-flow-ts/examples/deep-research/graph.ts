@@ -186,7 +186,7 @@ function invokeLLM(
   appConfig: AppConfig | undefined,
   timeoutMs?: number
 ): Promise<{ content: unknown }> {
-  const { shortTimeoutMs, longTimeoutMs } = resolveLlmResilience(appConfig);
+  const { shortTimeoutMs } = resolveLlmResilience(appConfig);
   return invokeWithResilience(m, messages, {
     timeoutMs: timeoutMs ?? shortTimeoutMs,
     label: "deep-research 调模型",

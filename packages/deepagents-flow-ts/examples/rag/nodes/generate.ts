@@ -12,6 +12,7 @@
 
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { resolveModel, type AppConfig } from "../../../src/vendor/runtime/index.js";
+import { invokeWithResilience, resolveLlmResilience } from "../../shared.js";
 import type { RAGState, RAGConfig, RAGMetadata } from "./types.js";
 
 const GENERATE_SYSTEM_PROMPT = `你是一个专业的知识助手。基于提供的上下文信息回答用户的问题。
@@ -93,7 +94,12 @@ export async function generateNode(
       };
     } else {
       // 非流式
-      const response = await model.invoke(messages);
+      const { longTimeoutMs } = resolveLlmResilience(appConfig!);
+      const response = await invokeWithResilience(model, messages, {
+        timeoutMs: longTimeoutMs,
+        label: "rag generate",
+        config: appConfig!,
+      });
       const answer =
         typeof response.content === "string"
           ? response.content

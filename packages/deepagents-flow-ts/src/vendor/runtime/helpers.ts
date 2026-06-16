@@ -21,9 +21,3 @@ export {
   discoverSubAgents,
   type DiscoveredSubAgent,
 } from "./discovery.js";
-export {
-  resolveSandboxPolicy,
-  buildPermissions,
-  buildInterruptOn,
-  type SandboxPolicy,
-} from "./permissions.js";

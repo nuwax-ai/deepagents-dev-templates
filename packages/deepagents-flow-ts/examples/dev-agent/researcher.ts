@@ -16,6 +16,7 @@ import { StateGraph, START, END, Annotation, messagesStateReducer } from "@langc
 import { AIMessage, SystemMessage, type BaseMessage } from "@langchain/core/messages";
 import type { StructuredTool } from "@langchain/core/tools";
 import { resolveModel, type AppConfig } from "../../src/vendor/runtime/index.js";
+import { invokeWithResilience, resolveLlmResilience } from "../shared.js";
 
 const ResearcherState = Annotation.Root({
   messages: Annotation<BaseMessage[]>({
@@ -38,12 +39,18 @@ export function createResearcherSubgraph(appConfig: AppConfig, allTools: Structu
       if (!bound) {
         return { messages: [new AIMessage({ content: "(researcher 无凭证，跳过)" })] };
       }
-      const ai = await bound.invoke([
+      const { longTimeoutMs } = resolveLlmResilience(appConfig);
+      const ai = await invokeWithResilience(bound, [
         new SystemMessage(
           "你是 researcher 子代理。用工具研究给定问题，返回结构化发现：关键事实 / 矛盾证据 / 未决问题 / 建议下一步。"
         ),
         ...state.messages,
-      ]);
+      ], {
+        timeoutMs: longTimeoutMs,
+        label: "dev-agent research",
+        retryLabel: "dev-agent LLM",
+        config: appConfig,
+      });
       return { messages: [ai] };
     })
     .addEdge(START, "research")

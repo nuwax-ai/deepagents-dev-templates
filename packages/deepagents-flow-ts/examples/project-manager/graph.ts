@@ -28,7 +28,14 @@ import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { logger, type AppConfig } from "../../src/vendor/runtime/index.js";
 import type { StatefulFlow } from "../../src/surfaces/flow-types.js";
 import { createStatefulFlow } from "../../src/surfaces/stateful-flow.js";
-import { requireModel, extractText, isApproval, durableCheckpointer } from "../shared.js";
+import {
+  requireModel,
+  extractText,
+  isApproval,
+  durableCheckpointer,
+  invokeWithResilience,
+  resolveLlmResilience,
+} from "../shared.js";
 
 const log = logger.child("pm");
 
@@ -75,17 +82,27 @@ async function planNode(
 ): Promise<Partial<PMStateType>> {
   const model = requireModel(appConfig, "project-manager 示例");
   const replan = (state.attempts ?? 0) > 0 && Boolean(state.critique);
-  const res = await model.invoke([
-    new SystemMessage(
-      `你是资深项目经理。把目标拆解为 ${MIN_TASKS}–6 个有序、可执行、不重叠的关键任务（里程碑粒度）。` +
-        `只输出任务名的 JSON 字符串数组，如 ["需求调研","方案设计"]，不要任何解释。`
-    ),
-    new HumanMessage(
-      replan
-        ? `目标：${state.goal}\n\n上一轮评审意见（请据此改进计划）：${state.critique}`
-        : `目标：${state.goal}`
-    ),
-  ]);
+  const { longTimeoutMs } = resolveLlmResilience(appConfig);
+  const res = await invokeWithResilience(
+    model,
+    [
+      new SystemMessage(
+        `你是资深项目经理。把目标拆解为 ${MIN_TASKS}–6 个有序、可执行、不重叠的关键任务（里程碑粒度）。` +
+          `只输出任务名的 JSON 字符串数组，如 ["需求调研","方案设计"]，不要任何解释。`
+      ),
+      new HumanMessage(
+        replan
+          ? `目标：${state.goal}\n\n上一轮评审意见（请据此改进计划）：${state.critique}`
+          : `目标：${state.goal}`
+      ),
+    ],
+    {
+      timeoutMs: longTimeoutMs,
+      label: "pm plan",
+      retryLabel: "pm LLM",
+      config: appConfig,
+    }
+  );
   const names = parseJson<unknown[]>(extractText(res.content));
   log.info("plan", { attempts: state.attempts ?? 0, taskCount: names.length });
   return { tasks: names.map((n) => ({ name: String(n) })) };
@@ -97,14 +114,24 @@ async function estimateNode(
   appConfig?: AppConfig
 ): Promise<Partial<PMStateType>> {
   const model = requireModel(appConfig, "project-manager 示例");
-  const res = await model.invoke([
-    new SystemMessage(
-      `为每个任务估算工期（人天，正整数）。只输出 JSON 数组：[{"name":"...","days":N}]，顺序与输入一致，不要解释。`
-    ),
-    new HumanMessage(
-      `任务：\n${state.tasks.map((t, i) => `${i + 1}. ${t.name}`).join("\n")}`
-    ),
-  ]);
+  const { shortTimeoutMs } = resolveLlmResilience(appConfig);
+  const res = await invokeWithResilience(
+    model,
+    [
+      new SystemMessage(
+        `为每个任务估算工期（人天，正整数）。只输出 JSON 数组：[{"name":"...","days":N}]，顺序与输入一致，不要解释。`
+      ),
+      new HumanMessage(
+        `任务：\n${state.tasks.map((t, i) => `${i + 1}. ${t.name}`).join("\n")}`
+      ),
+    ],
+    {
+      timeoutMs: shortTimeoutMs,
+      label: "pm estimate",
+      retryLabel: "pm LLM",
+      config: appConfig,
+    }
+  );
   const items = parseJson<Array<{ days?: number }>>(extractText(res.content));
   return {
     tasks: state.tasks.map((t, i) => ({
@@ -124,13 +151,26 @@ async function evaluateNode(
   const plan = state.tasks
     .map((t, i) => `${i + 1}. ${t.name}（${t.days ?? "?"} 天）`)
     .join("\n");
-  const res = await model.invoke([
-    new SystemMessage(
-      `你是项目评审。判断该计划是否完备、可执行、覆盖关键阶段（如需求、设计、实现、测试/上线）。` +
-        `只输出 JSON：{"verdict":"complete"|"incomplete","critique":"一句话说明缺什么，或为何可通过"}。`
-    ),
-    new HumanMessage(`目标：${state.goal}\n计划：\n${plan}`),
-  ]);
+  const { shortTimeoutMs } = resolveLlmResilience(appConfig);
+  // evaluate 为评审节点：内部已有 reflection 降级（不完备走 routeAfterEvaluate 回 plan），
+  // 此处 attempts:1 不重试，避免一次评审失败被重复发送、污染 attempts 计数。
+  const res = await invokeWithResilience(
+    model,
+    [
+      new SystemMessage(
+        `你是项目评审。判断该计划是否完备、可执行、覆盖关键阶段（如需求、设计、实现、测试/上线）。` +
+          `只输出 JSON：{"verdict":"complete"|"incomplete","critique":"一句话说明缺什么，或为何可通过"}。`
+      ),
+      new HumanMessage(`目标：${state.goal}\n计划：\n${plan}`),
+    ],
+    {
+      timeoutMs: shortTimeoutMs,
+      label: "pm evaluate",
+      retryLabel: "pm LLM",
+      attempts: 1,
+      config: appConfig,
+    }
+  );
   const v = parseJson<{ verdict?: string; critique?: string }>(
     extractText(res.content)
   );
@@ -179,12 +219,22 @@ async function finalizeNode(
     };
   }
   const model = requireModel(appConfig, "project-manager 示例");
-  const res = await model.invoke([
-    new SystemMessage(
-      "根据用户的调整意见修订项目计划，输出修订后的完整任务清单（含工期）与简要排期，不要解释。"
-    ),
-    new HumanMessage(`原排期：\n${gantt}\n\n调整意见：${fb}`),
-  ]);
+  const { longTimeoutMs } = resolveLlmResilience(appConfig);
+  const res = await invokeWithResilience(
+    model,
+    [
+      new SystemMessage(
+        "根据用户的调整意见修订项目计划，输出修订后的完整任务清单（含工期）与简要排期，不要解释。"
+      ),
+      new HumanMessage(`原排期：\n${gantt}\n\n调整意见：${fb}`),
+    ],
+    {
+      timeoutMs: longTimeoutMs,
+      label: "pm finalize",
+      retryLabel: "pm LLM",
+      config: appConfig,
+    }
+  );
   return {
     output: `✏️ 已按意见调整（${state.goal}）：${fb}\n${extractText(res.content).trim()}`,
   };
