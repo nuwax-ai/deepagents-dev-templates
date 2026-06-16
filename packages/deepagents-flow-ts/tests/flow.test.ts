@@ -9,7 +9,7 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { MemorySaver } from "@langchain/langgraph";
-import { AppConfigSchema } from "deepagents-app-ts/runtime";
+import { AppConfigSchema } from "../src/vendor/runtime/index.js";
 import { executeFlow } from "../src/app/graph.js";
 import { createDemoTools } from "../src/app/tools/demo.tool.js";
 

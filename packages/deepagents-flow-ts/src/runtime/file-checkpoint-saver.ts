@@ -19,7 +19,7 @@ import { resolve, join } from "node:path";
 import { homedir } from "node:os";
 import { MemorySaver } from "@langchain/langgraph";
 import type { RunnableConfig } from "@langchain/core/runnables";
-import { logger, type AppConfig } from "deepagents-app-ts/runtime";
+import { logger, type AppConfig } from "../vendor/runtime/index.js";
 
 const log = logger.child("file-checkpoint");
 

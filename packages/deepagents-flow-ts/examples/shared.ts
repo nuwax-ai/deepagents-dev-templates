@@ -1,18 +1,32 @@
 /**
  * examples 共用件 —— 把各示例重复的样板收成一处：
- *   1. 取模型：getExampleModel（无凭证→null）/ requireModel（无凭证→直接报错，无 demo fallback）
+ *   1. 取模型：getExampleModel / requireModel
  *   2. 工具调用三态透出（runTool）
  *   3. LLM content 抽文本（extractText）、人审「通过」判定（isApproval）
+ *   4. LLM 韧性（withTimeout / withRetry / createConcurrencyLimiter）→ 复用 src/runtime/llm-resilience
  *
- * 故意放在 examples/（而非 src/）：示例之间共享，但不让 src 依赖示例、也不污染模板核心。
+ * 故意放在 examples/（而非 src/）：示例专属 helper 与模板核心解耦；韧性原语已反哺到 src/runtime。
  * 各示例用相对路径 import：`import { requireModel, runTool } from "../shared.js";`
  */
 
 import { randomUUID } from "node:crypto";
 import { MemorySaver, type BaseCheckpointSaver } from "@langchain/langgraph";
-import { resolveModel, logger, type AppConfig } from "deepagents-app-ts/runtime";
+import { resolveModel, logger, type AppConfig } from "../src/vendor/runtime/index.js";
 import { createFileCheckpointer } from "../src/runtime/file-checkpoint-saver.js";
 import type { ToolCallEvent, StageEvent } from "../src/surfaces/flow-types.js";
+
+// 模板级 LLM 韧性 —— 从 deep-research 实战反哺，默认图/compaction 同源实现
+export {
+  withTimeout,
+  withRetry,
+  createConcurrencyLimiter,
+  invokeWithResilience,
+  getSharedLlmLimiter,
+  resolveLlmResilience,
+  LLM_TIMEOUT_SHORT_MS,
+  LLM_TIMEOUT_LONG_MS,
+  LLM_DEFAULT_MAX_CONCURRENT,
+} from "../src/runtime/llm-resilience.js";
 
 const log = logger.child("example-shared");
 
@@ -27,22 +41,6 @@ export function durableCheckpointer(
 ): BaseCheckpointSaver {
   if (injected) return injected;
   return appConfig ? createFileCheckpointer(appConfig) : new MemorySaver();
-}
-
-/**
- * 给长任务里的单步加超时护栏（如一次 LLM 调用挂死不至于卡住整条流水线）。
- * 超时即 reject，由调用方决定降级/重试；clearTimeout 防泄漏。
- */
-export async function withTimeout<T>(p: Promise<T>, ms: number, label = "操作"): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`${label}超时（${ms}ms）`)), ms);
-  });
-  try {
-    return await Promise.race([p, timeout]);
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
 }
 
 /**
@@ -109,33 +107,6 @@ export async function runTool(
     }
     return { result: message, ok: false };
   }
-}
-
-/**
- * 给长任务里的不稳定步骤加重试（指数退避）——限流 429 / 网络抖动 / 偶发超时不该直接掐死整条流水线。
- * 重试用尽仍失败才抛，交调用方决定降级（见 deep-research 的 grader 容错）。
- */
-export async function withRetry<T>(
-  fn: () => Promise<T>,
-  opts: { attempts?: number; baseDelayMs?: number; label?: string } = {}
-): Promise<T> {
-  const attempts = opts.attempts ?? 3;
-  const base = opts.baseDelayMs ?? 800;
-  let lastErr: unknown;
-  for (let i = 0; i < attempts; i++) {
-    try {
-      return await fn();
-    } catch (err) {
-      lastErr = err;
-      if (i < attempts - 1) {
-        log.warn(`${opts.label ?? "步骤"}失败，重试 ${i + 1}/${attempts - 1}`, {
-          error: String(err),
-        });
-        await new Promise((r) => setTimeout(r, base * 2 ** i));
-      }
-    }
-  }
-  throw lastErr;
 }
 
 /**

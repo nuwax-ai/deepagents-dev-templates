@@ -7,7 +7,7 @@
  */
 
 import { relative } from "node:path";
-import type { AppConfig } from "deepagents-app-ts/runtime";
+import type { AppConfig } from "../vendor/runtime/index.js";
 import {
   toAbsolutePath,
   matchPosixGlob,

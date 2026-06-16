@@ -4,7 +4,7 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { HumanMessage, AIMessage, RemoveMessage } from "@langchain/core/messages";
-import { AppConfigSchema, type AppConfig } from "deepagents-app-ts/runtime";
+import { AppConfigSchema, type AppConfig } from "../src/vendor/runtime/index.js";
 import { estimateTokens, compactHistory, compactionUpdate } from "../src/app/compaction.js";
 
 describe("estimateTokens", () => {

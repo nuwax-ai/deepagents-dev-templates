@@ -9,7 +9,7 @@
  */
 
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
-import { resolveModel, type AppConfig } from "deepagents-app-ts/runtime";
+import { resolveModel, type AppConfig } from "../../../src/vendor/runtime/index.js";
 import type { RAGState, RAGIntent } from "./types.js";
 
 const REWRITE_SYSTEM_PROMPT = `你是一个查询分析专家。你的任务是分析用户的问题，并提供结构化的分析结果。

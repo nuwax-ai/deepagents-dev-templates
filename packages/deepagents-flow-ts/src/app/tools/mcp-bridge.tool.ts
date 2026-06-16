@@ -1,36 +1,34 @@
 /**
- * MCP bridge 工具 —— 列出 / 调用经 MCPManager 配置的 MCP server（context7/chrome-devtools/业务插件）。
+ * MCP bridge 工具 —— 列出 / 调用已配置的 MCP server（context7/chrome-devtools/业务插件）。
  *
  * 元工具（list_servers / list_tools / call_tool）—— 用于运行时发现并调用任意已配置 MCP 工具，
- * 与把 MCP 工具直接注册为 native StructuredTool（loadMcpTools）互补：当某 MCP server 工具
- * 名单动态、或想手动发现时用本工具。
+ * 与把 MCP 工具直接加载为 native StructuredTool（runtime-context 经 mcp-adapters）互补：
+ * 当某 MCP server 工具名单动态、或想手动发现时用本工具。
+ *
+ * 接收 runtime-context 合并后的 server 配置 map（default + session + platform），
+ * 实际 MCP 调用走 flow-ts 自有的 mcp-stdio（直连），不经 MCPManager。
  */
 
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import type { MCPManager } from "deepagents-app-ts/runtime";
 import { callMcpTool, listMcpTools, type McpServerConfig } from "../../runtime/mcp-stdio.js";
+import type { McpServerEntry } from "../../vendor/runtime/runtime-context.js";
 
-function toServerConfig(cfg: {
-  command?: string;
-  args?: string[];
-  url?: string;
-  env?: Record<string, string>;
-}): McpServerConfig | null {
+function toServerConfig(cfg: McpServerEntry): McpServerConfig | null {
   if (!cfg.command) return null;
   return { command: cfg.command, args: cfg.args, env: cfg.env };
 }
 
-export function createMcpBridgeTool(mcpManager: MCPManager) {
+export function createMcpBridgeTool(serverConfigs: Record<string, McpServerEntry>) {
   return tool(
     async ({ operation, server, toolName, args }) => {
       switch (operation) {
         case "list_servers":
-          return JSON.stringify(mcpManager.listServers());
+          return JSON.stringify(Object.keys(serverConfigs));
 
         case "list_tools": {
           if (!server) return "Error: 'server' is required for list_tools";
-          const cfg = mcpManager.getServer(server);
+          const cfg = serverConfigs[server];
           if (!cfg) return `Error: MCP server "${server}" not found`;
           const sc = toServerConfig(cfg);
           if (!sc) return `Error: "${server}" is not a stdio server`;
@@ -40,7 +38,7 @@ export function createMcpBridgeTool(mcpManager: MCPManager) {
 
         case "call_tool": {
           if (!server || !toolName) return "Error: 'server' and 'toolName' are required for call_tool";
-          const cfg = mcpManager.getServer(server);
+          const cfg = serverConfigs[server];
           if (!cfg) return `Error: MCP server "${server}" not found`;
           const sc = toServerConfig(cfg);
           if (!sc) return `Error: "${server}" is not a stdio server`;

@@ -30,8 +30,12 @@ import {
   type BaseMessage,
 } from "@langchain/core/messages";
 import type { StructuredTool } from "@langchain/core/tools";
-import { resolveModel, logger, type AppConfig } from "deepagents-app-ts/runtime";
+import { resolveModel, logger, type AppConfig } from "../vendor/runtime/index.js";
 import { hasModelCredentials } from "./compaction.js";
+import {
+  invokeWithResilience,
+  resolveLlmResilience,
+} from "../runtime/llm-resilience.js";
 import { FlowStateAnnotation, type FlowState } from "./state.js";
 import type { FlowCallbacks } from "../surfaces/flow-types.js";
 
@@ -92,14 +96,19 @@ export function createFlowGraph(config: CreateFlowGraphConfig = {}) {
       };
     }
     try {
-      const ai = await boundModel.invoke(withSystemPrompt(state.messages, config.systemPrompt ?? ""));
+      const { shortTimeoutMs } = resolveLlmResilience(config.config);
+      const ai = await invokeWithResilience(
+        boundModel,
+        withSystemPrompt(state.messages, config.systemPrompt ?? ""),
+        { timeoutMs: shortTimeoutMs, label: "think 调模型", retryLabel: "think LLM", config: config.config }
+      );
       return {
         messages: [ai],
         steps: [`think: ${(ai.tool_calls ?? []).length} tool_calls`],
       };
     } catch (err) {
-      // LLM 抖动（限流/网络/401）→ 降级回显，保证图收敛而非整图抛错
-      log.warn("think invoke failed → fallback", { error: String(err) });
+      // 重试用尽仍失败（限流/网络/超时）→ 降级回显，保证图收敛而非整图抛错
+      log.warn("think invoke failed → fallback", { error: String(err), apiOk: false });
       return {
         messages: [new AIMessage({ content: `(模型调用失败，回显输入)\n${state.input}` })],
         steps: ["think#fallback: invoke error"],

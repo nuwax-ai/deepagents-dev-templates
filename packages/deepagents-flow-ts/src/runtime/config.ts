@@ -13,7 +13,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { loadConfig, type AppConfig } from "deepagents-app-ts/runtime";
+import { loadConfig, type AppConfig } from "../vendor/runtime/index.js";
 
 // dist/runtime/config.js → 包根在 ../..
 const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");

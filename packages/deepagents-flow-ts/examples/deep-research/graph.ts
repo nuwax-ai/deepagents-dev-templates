@@ -48,7 +48,7 @@ import {
   type LangGraphRunnableConfig,
 } from "@langchain/langgraph";
 import { HumanMessage, SystemMessage, type BaseMessage } from "@langchain/core/messages";
-import { logger, type AppConfig } from "deepagents-app-ts/runtime";
+import { logger, type AppConfig } from "../../src/vendor/runtime/index.js";
 import type { StatefulFlow, FlowCallbacks } from "../../src/surfaces/flow-types.js";
 import { createStatefulFlow } from "../../src/surfaces/stateful-flow.js";
 import {
@@ -57,8 +57,8 @@ import {
   runTool,
   isApproval,
   durableCheckpointer,
-  withTimeout,
-  withRetry,
+  invokeWithResilience,
+  resolveLlmResilience,
   emitStage,
 } from "../shared.js";
 import { callMcpTool, rateLimited, type McpServerConfig } from "../mcp-client.js";
@@ -73,10 +73,6 @@ export const MAX_OUTLINE_REVIEW = 2;
 export const MAX_DRAFT_REVIEW = 2;
 /** 单次 research 节点的 MCP 搜索超时。 */
 const SEARCH_TIMEOUT_MS = 20000;
-/** 短 LLM 调用超时（plan / review / 摘要：输出短，60s 足够）。 */
-const LLM_TIMEOUT_MS = 60000;
-/** 长 LLM 调用超时（write_draft / respond：800-2000 字生成，慢模型可能超 60s）。 */
-const LLM_LONG_TIMEOUT_MS = 180000;
 
 /** 网络搜索 MCP（duckduckgo-mcp-server，免 key；与 travel-planner 同源）。
  *  注：早期版本误用 context7（仅库文档检索、无通用 search 工具）→ 每次搜索 -32602 失败。 */
@@ -179,18 +175,30 @@ function parseJson<T>(text: string): T {
   return JSON.parse(cleaned.slice(start, end + 1)) as T;
 }
 
-/** 调模型 + 超时护栏 + 重试（限流/抖动/挂死都不直接掐死长流水线；重试用尽才抛）。 */
+/**
+ * 调模型 —— 模板 invokeWithResilience + 共享并发闸门（Send 扇出必备）。
+ * 超时/并发/read config 见 src/runtime/llm-resilience.ts。
+ */
 type LLMLike = { invoke: (messages: BaseMessage[]) => Promise<{ content: unknown }> };
 function invokeLLM(
   m: LLMLike,
   messages: BaseMessage[],
-  timeoutMs = LLM_TIMEOUT_MS
+  appConfig: AppConfig | undefined,
+  timeoutMs?: number
 ): Promise<{ content: unknown }> {
-  return withRetry(
-    () => withTimeout(m.invoke(messages), timeoutMs, "deep-research 调模型"),
-    { attempts: 3, baseDelayMs: 1000, label: "deep-research LLM" }
-  );
+  const { shortTimeoutMs, longTimeoutMs } = resolveLlmResilience(appConfig);
+  return invokeWithResilience(m, messages, {
+    timeoutMs: timeoutMs ?? shortTimeoutMs,
+    label: "deep-research 调模型",
+    retryLabel: "deep-research LLM",
+    useSharedLimiter: true,
+    config: appConfig,
+  });
 }
+
+/** 长调用超时别名（draft / respond），与模板 LLM_TIMEOUT_LONG_MS 同源。 */
+const llmLongTimeout = (appConfig?: AppConfig) =>
+  resolveLlmResilience(appConfig).longTimeoutMs;
 
 // ── 节点 ────────────────────────────────────────────────
 
@@ -232,7 +240,7 @@ async function planNode(
         langClause(state.languageHint)
     ),
     new HumanMessage(`研究主题：${state.refinedTopic}`),
-  ]);
+  ], appConfig);
   const sections = parseJson<OutlineSection[]>(extractText(res.content));
   log.info("plan", {
     sections: sections.length,
@@ -322,10 +330,8 @@ async function researchNode(
     ? searchResult.slice(0, 1200)
     : `（搜索失败：${searchResult}，将基于主题常识整理）`;
 
-  const model = requireModel(
-    config?.configurable?.appConfig as AppConfig,
-    "deep-research 示例"
-  );
+  const appConfig = config?.configurable?.appConfig as AppConfig | undefined;
+  const model = requireModel(appConfig, "deep-research 示例");
   let summary: string;
   try {
     const res = await invokeLLM(model, [
@@ -337,7 +343,7 @@ async function researchNode(
       new HumanMessage(
         `主题：${state.refinedTopic}\n章节：${section.title}\n检索关键词：${query}\n检索资料：\n${rawMaterial}`
       ),
-    ]);
+    ], appConfig);
     summary = extractText(res.content).trim();
   } catch (err) {
     // 整理失败也不崩并行分支：有搜索结果则截断原文，否则写明该章节获取失败（避免错误信息污染 findings）。
@@ -371,7 +377,7 @@ async function outlineReviewNode(
       new HumanMessage(
         `主题：${state.refinedTopic}\n大纲章节：${state.outline.map((s) => s.title).join("、")}\n\n调研摘要：\n${findingsSummary}`
       ),
-    ]);
+    ], appConfig);
     const v = parseJson<{ verdict?: string; critique?: string }>(extractText(res.content));
     const decision = v.verdict === "insufficient" ? "insufficient" : "sufficient";
     log.info("outline_review", { decision, findings: state.findings.length });
@@ -420,7 +426,7 @@ async function draftNode(
           langClause(state.languageHint)
       ),
       new HumanMessage(`调研资料：\n${material}`),
-    ], LLM_LONG_TIMEOUT_MS);
+    ], appConfig, llmLongTimeout(appConfig));
     draft = extractText(res.content).trim();
   } catch (err) {
     // 重试耗尽也不崩图：复用上一版草稿（若有），并触发质量评审降级放行，让用户介入。
@@ -449,14 +455,15 @@ async function qualityReviewNode(
       new HumanMessage(
         `主题：${state.refinedTopic}\n报告（前 2000 字）：\n${state.draft.slice(0, 2000)}`
       ),
-    ]);
+    ], appConfig);
     const v = parseJson<{ verdict?: string; critique?: string }>(extractText(res.content));
     const decision = v.verdict === "fail" ? "fail" : "pass";
-    log.info("quality_review", { decision, attempt: state.draftAttempts });
+    // decision=fail 是业务评审「报告质量不达标」，不是 API 调用失败（与 catch 分支区分）
+    log.info("quality_review", { decision, attempt: state.draftAttempts, apiOk: true });
     return { draftDecision: decision, draftCritique: v.critique ?? "" };
   } catch (err) {
-    // 评审失败 → 按「通过」降级放行（已有初稿，进 approve 让用户定夺），不崩长任务
-    log.warn("quality_review 失败 → 按 pass 放行", { error: String(err) });
+    // API/解析失败 → 按「通过」降级放行（已有初稿，进 converse 让用户定夺），不崩长任务
+    log.warn("quality_review API 失败 → 按 pass 放行", { error: String(err), apiOk: false });
     return { draftDecision: "pass", draftCritique: "(评审异常，已放行)" };
   }
 }
@@ -534,7 +541,7 @@ async function respondNode(
     new HumanMessage(
       `主题：${state.refinedTopic}\n\n【研究资料】\n${findingsSummary}\n\n【当前报告】\n${current}\n\n【对话】\n${convo}\n\n用户最新消息：${state.userMessage}`
     ),
-  ], LLM_LONG_TIMEOUT_MS);
+  ], appConfig, llmLongTimeout(appConfig));
   const answer = extractText(res.content).trim();
   // 看起来像完整报告（够长 + 有 Markdown 标题）→ 视为修订，更新 finalReport
   const looksLikeReport = answer.length > 800 && /(^|\n)#{1,3}\s/.test(answer);

@@ -1,7 +1,7 @@
 {
   "name": "deepagents-flow-ts",
   "version": "0.2.0",
-  "description": "Flow / workflow-orchestration agent template — the agent runs an explicit LangGraph StateGraph (not a dynamic tool loop) over ACP. Reuses the deepagents-app-ts runtime. Ships 6 reference examples: RAG, travel planner, project manager, human-in-loop, dev agent, and deep research.",
+  "description": "Flow / workflow-orchestration agent template — the agent runs an explicit LangGraph StateGraph (not a dynamic tool loop) over ACP. Self-contained runtime (vendored, no deepagents-app-ts dependency); MCP via @langchain/mcp-adapters. Ships 6 reference examples: RAG, travel planner, project manager, human-in-loop, dev agent, and deep research.",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -62,10 +62,16 @@
   "dependencies": {
     "@langchain/core": "latest",
     "@langchain/langgraph": "latest",
+    "@langchain/anthropic": "^1.4.0",
+    "@langchain/openai": "^1.3.0",
+    "@langchain/langgraph-checkpoint": "1.1.0",
+    "@langchain/mcp-adapters": "^1.1.0",
+    "deepagents": "^1.10.2",
     "deepagents-acp": "latest",
-    "deepagents-app-ts": "workspace:*",
+    "langchain": "1.4.4",
+    "yaml": "^2.9.0",
     "dotenv": "^16.4.0",
-    "zod": "^3.23.0"
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

@@ -23,7 +23,7 @@ import {
   type BaseCheckpointSaver,
 } from "@langchain/langgraph";
 import type { RunnableConfig } from "@langchain/core/runnables";
-import { logger } from "deepagents-app-ts/runtime";
+import { logger } from "../vendor/runtime/index.js";
 import type {
   StatefulFlow,
   FlowRunResult,

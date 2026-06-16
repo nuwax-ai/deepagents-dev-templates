@@ -8,7 +8,7 @@
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { loadFlowConfig } from "../../src/runtime/config.js";
-import type { AppConfig } from "deepagents-app-ts/runtime";
+import type { AppConfig } from "../../src/vendor/runtime/index.js";
 
 const EXAMPLE_ROOT = dirname(fileURLToPath(import.meta.url));
 

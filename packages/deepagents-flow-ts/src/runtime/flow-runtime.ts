@@ -1,7 +1,7 @@
 /**
  * FlowRuntime —— 把 app-ts 的散装 runtime 能力收成一处，注入图节点。
  *
- * 包装 createRuntimeContextAsync（拿 tools/mcpTools/mcpManager/platformClient + 平台 MCP
+ * 包装 createRuntimeContextAsync（拿 mcpTools/mcpServerConfigs/platformClient/variableManager + 平台 MCP
  * hydration），叠加 resolveSystemPrompt / resolveSkillsPaths / discoverSubAgents /
  * FlowSandboxPolicy / FileCheckpointSaver / createFlowTools。
  *
@@ -19,14 +19,14 @@ import {
   type ACPSessionConfig,
   type RuntimeContext,
   type DiscoveredSubAgent,
-} from "deepagents-app-ts/runtime";
+} from "../vendor/runtime/index.js";
 import { createFlowTools } from "../app/tools/index.js";
 import { getFlowSandboxPolicy, type FlowSandboxPolicy } from "./sandbox.js";
 import { FileCheckpointSaver, createFileCheckpointer } from "./file-checkpoint-saver.js";
 
 export interface FlowRuntime {
   config: AppConfig;
-  /** app-ts runtime context（含 mcpManager/platformClient/variableManager + 平台 MCP hydration）。 */
+  /** runtime context（含 mcpServerConfigs/mcpTools/platformClient/variableManager + 平台 MCP hydration）。 */
   ctx: RuntimeContext;
   /** 全部工具（app-ts 通用 + flow 自补 + native MCP）—— 供 think 节点 bindTools。 */
   allTools: StructuredTool[];

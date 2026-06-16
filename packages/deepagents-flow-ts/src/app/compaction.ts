@@ -20,7 +20,8 @@ import {
   RemoveMessage,
   type BaseMessage,
 } from "@langchain/core/messages";
-import { resolveModel, logger, type AppConfig } from "deepagents-app-ts/runtime";
+import { resolveModel, logger, type AppConfig } from "../vendor/runtime/index.js";
+import { invokeWithResilience, resolveLlmResilience } from "../runtime/llm-resilience.js";
 
 const log = logger.child("compaction");
 
@@ -106,14 +107,20 @@ export async function compactHistory(
     const raw = resolveModel(config);
     const model = raw && typeof raw !== "string" ? raw : null;
     if (!model) return recent;
-    const res = await (
-      model as unknown as {
-        invoke: (m: BaseMessage[]) => Promise<{ content: unknown }>;
+    const { longTimeoutMs } = resolveLlmResilience(config);
+    const res = await invokeWithResilience(
+      model as unknown as { invoke: (m: BaseMessage[]) => Promise<{ content: unknown }> },
+      [
+        new SystemMessage("把以下对话历史压缩成简洁摘要，保留关键事实、决定与未决问题。只输出摘要正文。"),
+        new HumanMessage(messagesToText(oldMessages)),
+      ],
+      {
+        timeoutMs: longTimeoutMs,
+        label: "compaction 摘要",
+        retryLabel: "compaction LLM",
+        config,
       }
-    ).invoke([
-      new SystemMessage("把以下对话历史压缩成简洁摘要，保留关键事实、决定与未决问题。只输出摘要正文。"),
-      new HumanMessage(messagesToText(oldMessages)),
-    ]);
+    );
     const summary = typeof res.content === "string" ? res.content : JSON.stringify(res.content);
     log.info("history summarized", { afterTokens: estimateTokens(recent) + estimateTokens([new SystemMessage(summary)]) });
     return [new SystemMessage(`[会话历史摘要]\n${summary}`), ...recent];

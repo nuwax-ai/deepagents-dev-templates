@@ -11,7 +11,7 @@
  */
 
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
-import { resolveModel, type AppConfig } from "deepagents-app-ts/runtime";
+import { resolveModel, type AppConfig } from "../../../src/vendor/runtime/index.js";
 import type { RAGState, RAGConfig, RAGMetadata } from "./types.js";
 
 const GENERATE_SYSTEM_PROMPT = `你是一个专业的知识助手。基于提供的上下文信息回答用户的问题。

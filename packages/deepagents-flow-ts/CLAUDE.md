@@ -187,4 +187,5 @@ pnpm check:tools
 
 - 各 `examples/*/README.md`
 - [docs/flow-patterns.md](docs/flow-patterns.md)
+- [docs/langgraph-native-convergence.md](docs/langgraph-native-convergence.md)（LangGraph 原生对象收敛计划）
 - [README.md](README.md)（用户向说明）

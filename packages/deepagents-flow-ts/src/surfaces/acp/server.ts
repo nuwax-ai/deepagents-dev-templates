@@ -17,7 +17,7 @@ import {
   type DeepAgentsServerHooks,
   type StopReason,
 } from "deepagents-acp";
-import { logger, resolveModel, type AppConfig } from "deepagents-app-ts/runtime";
+import { logger, resolveModel, type AppConfig } from "../../vendor/runtime/index.js";
 import type {
   FlowExecutor,
   StatefulFlow,
