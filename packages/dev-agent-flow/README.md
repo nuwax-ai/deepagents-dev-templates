@@ -23,15 +23,15 @@
 packages/dev-agent-flow/
 ├── system-prompt.md                          # 系统提示词（XML 标签分区）
 ├── skills/
-│   ├── template-init/SKILL.md                # 模板检测：分层架构、import 方向、示例对照表
+│   ├── flow-template-init/SKILL.md                # 模板检测：分层架构、import 方向、示例对照表
 │   ├── flow-orchestration/SKILL.md           # 编排核心：StateGraph/节点/边/Send/HITL/createStatefulFlow/checkpoint
 │   ├── flow-creator/SKILL.md                 # 创建新 flow：State->节点->graph->执行器->surface 挂接
 │   ├── flow-framework/SKILL.md               # 框架 API + ACP：分层架构/FlowRuntime/surface seam/bootstrapFlowAcp
-│   ├── tool-creator/SKILL.md                 # 工具开发：tool()+Zod/无状态vs工厂/注册 createFlowTools
-│   ├── config-setup/SKILL.md                 # 配置管理：MCP 服务器/合并策略/agent_variable 密钥
-│   ├── prompt-designer/SKILL.md              # 基于 flow.base.md 设计提示词
-│   ├── skill-creator/SKILL.md                # 技能创建
-│   └── verify-and-test/SKILL.md             # 验证流程：build->test(分层守卫)->ACP冒烟->graph
+│   ├── flow-tool-creator/SKILL.md                 # 工具开发：tool()+Zod/无状态vs工厂/注册 createFlowTools
+│   ├── flow-config-setup/SKILL.md                 # 配置管理：MCP 服务器/合并策略/agent_variable 密钥
+│   ├── flow-prompt-designer/SKILL.md              # 基于 flow.base.md 设计提示词
+│   ├── flow-skill-creator/SKILL.md                # 技能创建
+│   └── flow-verify-and-test/SKILL.md             # 验证流程：build->test(分层守卫)->ACP冒烟->graph
 └── README.md                                 # 本文件
 ```
 

@@ -1,5 +1,5 @@
 ---
-name: config-setup
+name: flow-config-setup
 description: "flow-ts 配置管理：MCP 服务器（stdio/http）、合并策略、变量插值 + agent_variable 密钥管理、命名规范"
 tags: [mcp, variables, secrets, configuration, platform, flow]
 version: "3.0.0"

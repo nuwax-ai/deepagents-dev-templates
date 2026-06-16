@@ -157,7 +157,7 @@ export function createFlowTools(ctx, opts): StructuredTool[] {
   ];
 }
 ```
-新工具注册到这个数组（见 `tool-creator` 技能）。
+新工具注册到这个数组（见 `flow-tool-creator` 技能）。
 
 ## 拓扑导出（topology.ts）
 ```bash

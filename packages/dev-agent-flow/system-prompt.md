@@ -20,7 +20,7 @@
 ### 编排与框架
 | 技能 | 触发场景 | 关键内容 |
 |------|----------|----------|
-| `template-init` | 开始任何开发任务前 | flow-ts 模板检测、分层目录扫描、import 方向规则、示例对照表 |
+| `flow-template-init` | 开始任何开发任务前 | flow-ts 模板检测、分层目录扫描、import 方向规则、示例对照表 |
 | `flow-orchestration` | 设计或修改工作流图 | StateGraph/Annotation、节点/边/条件路由、并行 Send、HITL interrupt/resume、createStatefulFlow、checkpoint、子图、长任务 |
 | `flow-creator` | 创建一个全新的 flow | graph.ts + nodes + index.ts -> FlowExecutor/StatefulFlow -> surface 挂接 |
 | `flow-framework` | 理解核心 API / ACP 集成 | 分层架构、FlowRuntime 接口 vs compose 工厂、nodes 工厂、surface seam、bootstrapFlowAcp 短路、ACPSessionConfig、FlowCallbacks（含 onPlan） |
@@ -28,15 +28,15 @@
 ### 工具与配置
 | 技能 | 触发场景 | 关键内容 |
 |------|----------|----------|
-| `tool-creator` | flow-ts 创建新工具 | tool() 函数、Zod schema 设计、无状态 vs 平台绑定工厂、注册到 createFlowTools |
-| `config-setup` | 配置 MCP / 管理变量 | MCP 服务器（stdio/http）、合并策略、agent_variable 密钥管理、变量插值 |
+| `flow-tool-creator` | flow-ts 创建新工具 | tool() 函数、Zod schema 设计、无状态 vs 平台绑定工厂、注册到 createFlowTools |
+| `flow-config-setup` | 配置 MCP / 管理变量 | MCP 服务器（stdio/http）、合并策略、agent_variable 密钥管理、变量插值 |
 
 ### 开发流程
 | 技能 | 触发场景 | 关键内容 |
 |------|----------|----------|
-| `prompt-designer` | 设计场景提示词 | flow.base.md 模板、save_prompt 保存 |
-| `skill-creator` | 创建新技能 SKILL.md | YAML frontmatter、目录约定、渐进加载 |
-| `verify-and-test` | 开发完成后验证 | build -> typecheck -> test（含分层守卫）-> ACP 冒烟（rcoder-cli 各示例入口）-> graph |
+| `flow-prompt-designer` | 设计场景提示词 | flow.base.md 模板、save_prompt 保存 |
+| `flow-skill-creator` | 创建新技能 SKILL.md | YAML frontmatter、目录约定、渐进加载 |
+| `flow-verify-and-test` | 开发完成后验证 | build -> typecheck -> test（含分层守卫）-> ACP 冒烟（rcoder-cli 各示例入口）-> graph |
 ### 技能使用原则
 1. **先查阅再操作** — 涉及编排 → 先读 `flow-orchestration`；创建 flow → 先读 `flow-creator`
 2. **先对照 examples** — 新 flow 优先打开最接近的范例（RAG/travel/pm/review/dev-agent/deep-research）
@@ -188,7 +188,7 @@ platform_api(operation: "query_plugins", params: { query: "<所需能力>" })
 ## 开发流程（必须遵循）
 
 ### Phase 0: 检测模板
-1. 执行 `template-init` 技能 — 确认 flow-ts 分层架构与目录结构
+1. 执行 `flow-template-init` 技能 — 确认 flow-ts 分层架构与目录结构
 2. 读取 `config/flow-agent.config.json` 了解当前配置
 3. 确认 `src/core/`、`src/runtime/`、`src/app/`（graph.ts + nodes/ + tools/）、`src/compose/`、`examples/` 结构
 
@@ -211,12 +211,12 @@ platform_api(operation: "query_plugins", params: { query: "<所需能力>" })
 4. **写连线** → `graph.ts` 的 addEdge / addConditionalEdges / Send 扇出
 5. **包成执行器** → `FlowExecutor`（函数）或 `createStatefulFlow`（有状态）
 6. **挂接 surface** → `index.ts` 调 `bootstrapFlowAcp` / `runFlowCli`
-7. **工具开发**（如需要）：查阅 `tool-creator` → 创建 → 注册到 `createFlowTools()`
-8. **提示词设计**（如需要）：查阅 `prompt-designer` → 基于 `flow.base.md`
-9. **变量创建**（如需要）：查阅 `config-setup` → 通过 `agent_variable` 创建占位
+7. **工具开发**（如需要）：查阅 `flow-tool-creator` → 创建 → 注册到 `createFlowTools()`
+8. **提示词设计**（如需要）：查阅 `flow-prompt-designer` → 基于 `flow.base.md`
+9. **变量创建**（如需要）：查阅 `flow-config-setup` → 通过 `agent_variable` 创建占位
 
 ### Phase 3: 验证
-1. 执行 `verify-and-test` 技能 — 完整验证流程
+1. 执行 `flow-verify-and-test` 技能 — 完整验证流程
 2. `pnpm build` — 编译通过
 3. `pnpm test` — 测试通过（含 `tests/layering.test.ts` 分层守卫）
 4. `pnpm typecheck` / `pnpm typecheck:examples` — 类型检查

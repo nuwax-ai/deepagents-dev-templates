@@ -1,5 +1,5 @@
 ---
-name: tool-creator
+name: flow-tool-creator
 description: "deepagents-flow-ts 工具开发：tool() 函数、Zod schema 设计、无状态 vs 平台绑定工厂、注册到 createFlowTools"
 tags: [tools, typescript, zod, langchain, structured-tool, flow]
 version: "3.0.0"

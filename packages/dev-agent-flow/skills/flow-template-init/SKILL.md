@@ -1,5 +1,5 @@
 ---
-name: template-init
+name: flow-template-init
 description: "检测 deepagents-flow-ts 分层架构、目录结构、import 方向规则、示例对照表"
 tags: [template, init, structure, zones, flow, layering]
 version: "2.0.0"

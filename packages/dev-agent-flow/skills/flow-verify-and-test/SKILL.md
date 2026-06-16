@@ -1,5 +1,5 @@
 ---
-name: verify-and-test
+name: flow-verify-and-test
 description: "flow-ts 完整验证流程：build -> typecheck -> test（含分层守卫）-> ACP 冒烟（rcoder-cli 各示例入口）-> graph"
 tags: [testing, verification, build, quality, flow]
 version: "3.0.0"

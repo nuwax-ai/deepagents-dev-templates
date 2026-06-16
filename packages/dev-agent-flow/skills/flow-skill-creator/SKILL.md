@@ -1,5 +1,5 @@
 ---
-name: skill-creator
+name: flow-skill-creator
 description: "创建新技能 SKILL.md：YAML frontmatter、目录约定、渐进加载（flow-ts 适用）"
 tags: [skills, markdown, meta, creation, flow]
 version: "1.0.0"

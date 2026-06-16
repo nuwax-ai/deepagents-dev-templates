@@ -1,5 +1,5 @@
 ---
-name: prompt-designer
+name: flow-prompt-designer
 description: "基于 flow.base.md 设计 flow-ts 场景提示词并通过 save_prompt 保存"
 tags: [prompts, design, acp, platform, flow]
 version: "1.0.0"
