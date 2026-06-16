@@ -133,10 +133,10 @@ agent-package.json              # Distribution manifest
 
 ## Roadmap Documents
 
-- [Agent core progress](docs/agent-core-progress.md) 是当前 agent core 完整度与优先级看板，按 `Supported` / `Planned` / `Blocked` / `Deferred` 追踪。
-- [Scenario agent template design](docs/scenario-agent-template-design.md) 记录“用户提示词 -> Agent Spec -> 能力编排 -> 实现 -> 验证”的模板设计，以及 `.nuwax-agent` 配置边界。
-- [Scenario agent examples](docs/scenario-agent-examples.md) 提供客服、销售、数据分析、文档问答、代码维护、运维自动化等用户提示词到 Agent Spec 的示例。
-- [Package install lifecycle](docs/package-install-lifecycle.md) 记录 npm `.tgz`、Nuwax `.tar.gz`、Nuwax `.zip`、version/platform JSON、安装、升级、回滚、卸载生命周期。
+- [Agent core progress](agent-core-progress.md) 是当前 agent core 完整度与优先级看板，按 `Supported` / `Planned` / `Blocked` / `Deferred` 追踪。
+- [Scenario agent template design](../../../packages/deepagents-app-ts/docs/architecture/scenario-agent-template-design.md) 记录“用户提示词 -> Agent Spec -> 能力编排 -> 实现 -> 验证”的模板设计，以及 `.nuwax-agent` 配置边界。
+- [Scenario agent examples](../../../packages/deepagents-app-ts/docs/architecture/scenario-agent-examples.md) 提供客服、销售、数据分析、文档问答、代码维护、运维自动化等用户提示词到 Agent Spec 的示例。
+- [Package install lifecycle](../../../packages/deepagents-app-ts/docs/guides/package-install-lifecycle.md) 记录 npm `.tgz`、Nuwax `.tar.gz`、Nuwax `.zip`、version/platform JSON、安装、升级、回滚、卸载生命周期。
 
 ## Current Status
 - ✅ Project scaffolding

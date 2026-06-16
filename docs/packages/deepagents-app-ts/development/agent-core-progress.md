@@ -4,7 +4,7 @@ This document is the canonical progress tracker for the agent core in
 `packages/deepagents-app-ts`. It records what is supported today, what is planned, and
 what remains blocked by platform or protocol dependencies.
 
-Architecture & runtime-flow diagrams: [runtime-architecture.md](../architecture/runtime-architecture.md).
+Architecture & runtime-flow diagrams: [runtime-architecture.md](../../../packages/deepagents-app-ts/docs/architecture/runtime-architecture.md).
 
 ## Status Legend
 

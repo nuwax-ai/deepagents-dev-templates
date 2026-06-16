@@ -8,7 +8,7 @@ upgrade, rollback, and uninstall flow, see
 
 For publishing packaged artifacts to a MinIO/S3 bucket and how nuwaclaw
 discovers channels / latest version from `latest.json` and
-`channels/<channel>.json`, see [Distribution via MinIO/S3](./distribution-s3.md).
+`channels/<channel>.json`, see [Distribution via MinIO/S3](../../../../docs/packages/deepagents-app-ts/development/distribution-s3.md).
 
 ## Package Contract
 

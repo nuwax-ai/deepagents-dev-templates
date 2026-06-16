@@ -187,5 +187,5 @@ pnpm check:tools
 
 - 各 `examples/*/README.md`
 - [docs/flow-patterns.md](docs/flow-patterns.md)
-- [docs/langgraph-native-convergence.md](docs/langgraph-native-convergence.md)（LangGraph 原生对象收敛计划）
+- [LangGraph 原生对象收敛计划](../../docs/packages/deepagents-flow-ts/development/langgraph-native-convergence.md)（monorepo 开发文档，不在模板分发包内）
 - [README.md](README.md)（用户向说明）

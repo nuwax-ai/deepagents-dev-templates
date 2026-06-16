@@ -26,7 +26,9 @@ scripts/       — Build, esbuild bundle, package, install/upgrade/release tooli
 
 ## Roadmap Documents
 
-- [Agent core progress](./docs/agent-core-progress.md) tracks supported, planned, blocked, and deferred agent-core capabilities.
+维护者向的开发/路线图文档见 monorepo [docs/packages/deepagents-app-ts/](../../docs/packages/deepagents-app-ts/development/)（不进 npm 分发包）。
+
+- [Agent core progress](../../docs/packages/deepagents-app-ts/development/agent-core-progress.md) tracks supported, planned, blocked, and deferred agent-core capabilities.
 - [Scenario agent template design](./docs/scenario-agent-template-design.md) describes how user prompts become Agent Specs, prompts, tools, skills, variables, and `.nuwax-agent` panel/debug configuration.
 - [Scenario agent examples](./docs/scenario-agent-examples.md) provides concrete user-prompt-to-Agent-Spec examples for support, sales, data, document QA, code maintenance, and operations Agents.
 - [Package install lifecycle](./docs/package-install-lifecycle.md) records the planned npm `.tgz`, Nuwax `.tar.gz`, Nuwax `.zip`, version/platform JSON, install, upgrade, rollback, and uninstall flow.

@@ -52,3 +52,7 @@ uv run ruff check .                    # Lint code
 ## License
 
 MIT
+
+## Development Docs
+
+各包模板内的 `README` / `QUICKSTART` / `docs/guides` 面向模板使用者。Monorepo 维护用的开发计划、进度看板、研究报告等见 [docs/packages/](docs/packages/README.md)。

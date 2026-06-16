@@ -374,7 +374,7 @@ LLM_PROVIDER=openai npx tsx tests/acp-verify.ts
 
 发现新功能或回归时：
 1. 查 `agent-core-progress.md` 的 "Status Legend" — 它用 `Supported` / `Planned` / `Blocked` / `Deferred` 四态追踪每项能力
-2. 写一条复现步骤进 `docs/agent-core-progress.md` 的 "Next Step" 列
+2. 写一条复现步骤进 [agent-core-progress.md](../../../../docs/packages/deepagents-app-ts/development/agent-core-progress.md) 的 "Next Step" 列
 3. 如果是 bug，在 v0.2.0 之后的 plan 里加 fix
 
 ---
@@ -382,8 +382,8 @@ LLM_PROVIDER=openai npx tsx tests/acp-verify.ts
 ## 关联文档
 
 - `zed-acp-setup.md` — Zed ACP server 配置
-- `acp-test-plan.md` — 完整的 18 个测试用例设计（自动化）
-- `agent-core-progress.md` — 能力完成度看板
+- [acp-test-plan.md](../../../../docs/packages/deepagents-app-ts/development/acp-test-plan.md) — 完整的 18 个测试用例设计（自动化）
+- [agent-core-progress.md](../../../../docs/packages/deepagents-app-ts/development/agent-core-progress.md) — 能力完成度看板
 - `scenario-agent-examples.md` — Scenario Agent 的 4 个示例 prompt
 - `scenario-agent-template-design.md` — Scenario Agent 的设计原理
 - `package-install-lifecycle.md` — 打包安装生命周期（与本验证流程互补）

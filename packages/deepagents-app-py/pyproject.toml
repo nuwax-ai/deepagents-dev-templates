@@ -99,7 +99,6 @@ include = [
     "config",
     "prompts",
     "skills",
-    "docs",
     "scripts",
     "tests",
     ".nuwax-agent",

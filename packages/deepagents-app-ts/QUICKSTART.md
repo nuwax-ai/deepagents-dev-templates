@@ -175,7 +175,7 @@ A: 使用 `npx tsx src/index.ts`（默认）启动 ACP server，然后用 Zed/Je
 ## 下一步
 
 - 阅读 [README.md](./README.md) 了解完整架构
-- 阅读 [PLAN.md](./PLAN.md) 了解设计决策
+- 阅读 [V1 设计计划](../../docs/packages/deepagents-app-ts/development/PLAN.md) 了解设计决策（monorepo 维护文档）
 - 浏览 `prompts/` 目录修改或编写新提示词
 - 浏览 `skills/` 目录添加自定义技能
 - 浏览 `src/app/tools/` 添加自定义工具

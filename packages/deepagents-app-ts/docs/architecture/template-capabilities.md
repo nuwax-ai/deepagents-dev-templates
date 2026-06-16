@@ -2,7 +2,7 @@
 
 This template is for a development Agent that helps users and AI Agents build scenario-specific application Agents. The generated application Agent runs through ACP and is packaged for nuwaclaw as an agent engine.
 
-For current completeness status, see [Agent Core Progress](./agent-core-progress.md).
+For current completeness status, see [Agent Core Progress](../../../../docs/packages/deepagents-app-ts/development/agent-core-progress.md).
 For user-prompt-driven scenario Agent generation and `.nuwax-agent` configuration boundaries, see [Scenario Agent Template Design](./scenario-agent-template-design.md).
 For concrete prompt-to-Agent examples, see [Scenario Agent Examples](./scenario-agent-examples.md).
 

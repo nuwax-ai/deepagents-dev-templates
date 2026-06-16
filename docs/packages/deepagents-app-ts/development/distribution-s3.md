@@ -2,7 +2,7 @@
 
 本文档记录把 `deepagents-dev-templates` 的所有产物（压缩包、版本/平台元数据、安装/升级/卸载脚本、manifest）发布到 MinIO / S3 桶的约定，让 nuwaclaw 引擎可以按需拉取。
 
-本地安装/升级/卸载/回滚流程见 [Package Install Lifecycle](./package-install-lifecycle.md)；nuwaclaw 引擎契约见 [nuwaclaw Engine Integration](./nuwaclaw-engine-integration.md)。
+本地安装/升级/卸载/回滚流程见 [Package Install Lifecycle](../../../packages/deepagents-app-ts/docs/guides/package-install-lifecycle.md)；nuwaclaw 引擎契约见 [nuwaclaw Engine Integration](../../../packages/deepagents-app-ts/docs/architecture/nuwaclaw-engine-integration.md)。
 
 ## 为什么用 MinIO / S3
 

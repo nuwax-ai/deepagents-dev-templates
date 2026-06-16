@@ -251,7 +251,7 @@ bash <(curl -fsSL https://s3.nuwax.com:9443/nuwax-packages/agent-engines/deepage
   --install-root /opt/nuwax/deepagents-template
 ```
 
-凭证 `NUWAX_S3_*` 需提前 export（`install-from-s3.sh` 引导器会校验）。详细桶布局 / 凭证模型见 [Distribution via MinIO/S3](./distribution-s3.md)。
+凭证 `NUWAX_S3_*` 需提前 export（`install-from-s3.sh` 引导器会校验）。详细桶布局 / 凭证模型见 [Distribution via MinIO/S3](../../../../docs/packages/deepagents-app-ts/development/distribution-s3.md)。
 
 ## Upgrade
 
