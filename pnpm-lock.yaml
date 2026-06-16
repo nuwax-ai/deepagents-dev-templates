@@ -89,6 +89,9 @@ importers:
 
   packages/deepagents-flow-ts:
     dependencies:
+      '@agentclientprotocol/sdk':
+        specifier: ^0.24.0
+        version: 0.24.0(zod@3.25.76)
       '@langchain/anthropic':
         specifier: ^1.4.0
         version: 1.4.0(@langchain/core@1.1.49(openai@6.42.0(zod@3.25.76)))
@@ -110,9 +113,6 @@ importers:
       deepagents:
         specifier: ^1.10.2
         version: 1.10.2(langsmith@0.7.6(openai@6.42.0(zod@3.25.76)))(openai@6.42.0(zod@3.25.76))(zod-to-json-schema@3.25.2(zod@3.25.76))
-      deepagents-acp:
-        specifier: ^0.1.12
-        version: 0.1.12(@langchain/core@1.1.49(openai@6.42.0(zod@3.25.76)))(@langchain/langgraph@1.4.2(@langchain/core@1.1.49(openai@6.42.0(zod@3.25.76)))(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76))(langsmith@0.7.6(openai@6.42.0(zod@3.25.76)))(openai@6.42.0(zod@3.25.76))(zod-to-json-schema@3.25.2(zod@3.25.76))(zod@3.25.76)
       dotenv:
         specifier: ^16.4.0
         version: 16.6.1
