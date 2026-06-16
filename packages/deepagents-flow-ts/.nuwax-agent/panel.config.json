@@ -9,11 +9,11 @@
   },
   "model": {
     "source": "acp-dynamic",
-    "provider": "anthropic",
+    "provider": "openai",
     "fields": [
-      { "name": "ANTHROPIC_MODEL", "label": "Model", "type": "string", "default": "${ANTHROPIC_MODEL}", "required": true },
-      { "name": "ANTHROPIC_BASE_URL", "label": "Base URL", "type": "url", "default": "${ANTHROPIC_BASE_URL}", "required": false },
-      { "name": "ANTHROPIC_API_KEY", "label": "API Key", "type": "secret", "default": "${SECRET_ANTHROPIC_API_KEY}", "required": true }
+      { "name": "OPENAI_MODEL", "label": "Model", "type": "string", "default": "${OPENAI_MODEL}", "required": true },
+      { "name": "OPENAI_BASE_URL", "label": "Base URL (OpenAI 兼容；第三方端点填这里)", "type": "url", "default": "${OPENAI_BASE_URL}", "required": true },
+      { "name": "OPENAI_API_KEY", "label": "API Key", "type": "secret", "default": "${SECRET_OPENAI_API_KEY}", "required": true }
     ]
   },
   "prompt": {

@@ -134,9 +134,9 @@ async function main() {
   }
 
   const pkgName = readJson("package.json").name;
-  const agentName = readJson("agent-package.json").name;
+  const agentName = readJson(".nuwax-agent/agent-package.json").name;
   const version = opts.version || readJson("package.json").version;
-  const agentVersion = readJson("agent-package.json").version;
+  const agentVersion = readJson(".nuwax-agent/agent-package.json").version;
   const outDir = path.resolve(PKG_DIR, opts.outDir);
   const npmCache = process.env.NPM_CONFIG_CACHE || path.join(tmpdir(), "deepagents-flow-ts-npm-cache");
 
@@ -228,7 +228,7 @@ async function main() {
       version,
       artifacts: artifactRecords,
     };
-    const baseManifest = readJson("agent-package.json");
+    const baseManifest = readJson(".nuwax-agent/agent-package.json");
     const primary = artifactRecords[0];
     const release = {
       ...baseManifest,

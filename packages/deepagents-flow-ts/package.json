@@ -1,7 +1,7 @@
 {
   "name": "deepagents-flow-ts",
   "version": "0.1.0",
-  "description": "Flow / workflow-orchestration agent template — the agent runs an explicit, designed LangGraph node graph (not a dynamic tool loop) over ACP. Reuses the deepagents-app-ts runtime. Ships a RAG flow (rewrite → retrieve → grade → prepare → generate) as the bundled example.",
+  "description": "Flow / workflow-orchestration agent template — the agent runs an explicit LangGraph StateGraph (not a dynamic tool loop) over ACP. Reuses the deepagents-app-ts runtime. Ships 6 reference examples: RAG, travel planner, project manager, human-in-loop, dev agent, and deep research.",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -50,12 +50,12 @@
     "smoke:pm": "node scripts/smoke-acp.mjs --entry examples/project-manager/index.ts",
     "smoke:review": "node scripts/smoke-acp.mjs --entry examples/human-in-loop/index.ts",
     "smoke:research": "node scripts/smoke-acp.mjs --entry examples/deep-research/index.ts",
+    "smoke:dev-agent": "node scripts/smoke-acp.mjs --entry examples/dev-agent/index.ts",
     "bundle": "node scripts/lib/bundle.mjs",
     "setup:tools": "node scripts/setup-win-tools.mjs",
     "check:tools": "node scripts/check-tools.mjs",
     "package": "node scripts/package.mjs",
     "package:all": "node scripts/package.mjs --format all",
-    "package:nuwax": "node scripts/package.mjs --format all",
     "package:platforms": "node scripts/package-platforms.mjs",
     "validate:package": "node scripts/validate-package.mjs"
   },
@@ -81,7 +81,7 @@
     "dist",
     "config",
     "scripts",
-    "agent-package.json"
+    ".nuwax-agent/agent-package.json"
   ],
   "keywords": [
     "deepagents",

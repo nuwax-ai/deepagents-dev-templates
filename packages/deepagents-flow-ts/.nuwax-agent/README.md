@@ -1,37 +1,39 @@
-# .nuwax-agent Development Configuration
+# .nuwax-agent 开发配置
 
-This directory stores Nuwax-specific development, capability-layer, packaging, and lifecycle metadata for the **deepagents-flow-ts** workflow-orchestration template agent.
+本目录存放 **deepagents-flow-ts** 工作流编排模板的 Nuwax 平台面元数据：开发配置、能力分层、打包契约。
 
-It is intentionally separate from `config/`:
+它与 `config/` 有意分开：
 
-- `config/` is runtime application configuration consumed by `loadFlowConfig` → `loadConfig` (app-ts).
-- `.nuwax-agent/` is platform-facing metadata used by the Nuwax configuration panel, packaging, install/upgrade flows, and the `flow capabilities` CLI.
+- `config/` 是运行时应用配置，由 `loadFlowConfig` → `loadConfig`（app-ts）加载。
+- `.nuwax-agent/` 是平台面元数据，供 Nuwax 配置面板、打包流程、`flow capabilities` CLI 使用。
 
-No real secrets live here — use placeholders like `${SECRET_ANTHROPIC_API_KEY}` and let ACP / env / installer provide the final value.
+这里不放真实密钥 —— 用占位符如 `${SECRET_OPENAI_API_KEY}`，最终值由 ACP / 环境变量注入。
 
-## Capability Source Layers
+## 能力来源分层
 
-| Layer | Examples | Ownership |
+| 层 | 示例 | 归属 |
 | --- | --- | --- |
-| ACP dynamic | System prompt, MCP servers, skills, model, subagents | Nuwax platform & workspace config |
-| Agent builtin | Runtime tools (bash/fs/search/http/mcp-bridge), compaction, demo tools | Template package |
-| Environment builtin | API keys, base URLs, log paths | Cloud computer / local machine / installer |
-| Agent builtin file | Session store (file JSON checkpointer) | Template package (`.flow-sessions/`) |
-| Package placeholder | `${INSTALL_ROOT}`, `${AGENT_ID}`, `${PACKAGE_VERSION}` | Build & install pipeline |
+| ACP 动态 | 系统提示词、MCP 服务、skills、模型、subagent | Nuwax 平台与工作区配置 |
+| Agent 内置 | 运行时工具（bash/fs/search/http/mcp-bridge）、压缩、demo 工具 | 模板包 |
+| 环境内置 | API key、base URL、日志路径 | 云计算机 / 本机 / 安装器 |
+| Agent 内置文件 | 会话存储（文件 JSON checkpointer） | 模板包（`.flow-sessions/`） |
+| 包占位符 | `${INSTALL_ROOT}`、`${AGENT_ID}`、`${PACKAGE_VERSION}` | 构建与安装流水线 |
 
-## Files
+## 文件
 
-- `capability-sources.json` — maps every capability to its source layer (acp-dynamic / agent-builtin / env-builtin / agent-builtin-file / package-placeholder). This is the contract the panel and `flow capabilities` read.
-- `panel.config.json` — describes which fields the platform panel can manage (model / prompt / mcpServers / skills / subagents / sandbox) vs. the non-editable builtin capabilities.
+- `capability-sources.json` —— 把每项能力映射到其来源层（acp-dynamic / agent-builtin / env-builtin / agent-builtin-file / package-placeholder）。这是面板与 `flow capabilities` 读取的契约。
+- `panel.config.json` —— 描述平台面板可管理哪些字段（model / prompt / mcpServers / skills / subagents / sandbox）与不可编辑的内置能力。
+- `package.config.json` —— 声明打包目标、esbuild-bundle 依赖策略、include/exclude 规则、安装时占位符替换、平台矩阵。
+- `placeholders.json` —— 列出打包时与安装时的占位符（OpenAI 兼容与 Anthropic 两套模型 env、平台 id、安装根路径）。
 
-## How the running agent consumes each layer
+## 运行时各层如何被消费
 
-- **systemPrompt** — `resolveSystemPrompt(appConfig, sessionConfig, root)` priority: ACP session > `config.agent.systemPrompt` > `prompts/flow.base.md` > inline fallback.
-- **mcpServers** — `MCPManager` merges `config/mcp.default.json` < platform-bound MCP < ACP/session MCP (`mergeStrategy: session-wins`); native tools loaded via `loadMcpTools`.
-- **model** — `resolveModel(appConfig)` from `config.model` (ACP session / env / config / defaults).
-- **skills** — `resolveSkillsPaths(appConfig)` discovers `skills/builtin/`, `skills/platform/`, and `.agents/*/skills/`.
-- **subagents** — `discoverSubAgents(appConfig)` parses `.agents/agents/<name>/AGENT.md`.
-- **sessionStore** — `FileCheckpointSaver` (extends `MemorySaver`) persists to `config.memory.dir` (`.flow-sessions/`); thread-isolated, survives restart, restores interrupt/resume.
-- **builtInTools** — `createFlowTools(ctx)` composes bash/fs/search/http/json/mcp-bridge/platform_api/agent_variable + demo tools; bound to the model via `bindTools` and executed by `ToolNode`.
+- **systemPrompt** —— `resolveSystemPrompt(appConfig, sessionConfig, root)` 优先级：ACP session > `config.agent.systemPrompt` > `prompts/flow.base.md` > 内联 fallback。
+- **mcpServers** —— `MCPManager` 合并 `config/mcp.default.json` < 平台绑定 MCP < ACP/session MCP（`mergeStrategy: session-wins`）；原生工具经 `loadMcpTools` 加载。
+- **model** —— `resolveModel(appConfig)` 取自 `config.model`（ACP session / env / config / defaults）。
+- **skills** —— `resolveSkillsPaths(appConfig)` 发现 `skills/builtin/`、`skills/platform/`、`.agents/*/skills/`。
+- **subagents** —— `discoverSubAgents(appConfig)` 解析 `.agents/agents/<name>/AGENT.md`。
+- **sessionStore** —— `FileCheckpointSaver`（继承 `MemorySaver`）持久化到 `config.memory.dir`（`.flow-sessions/`）；线程隔离、重启存活、恢复 interrupt/resume。
+- **builtInTools** —— `createFlowTools(ctx)` 组合 bash/fs/search/http/json/mcp-bridge/platform_api/agent_variable + demo 工具；经 `bindTools` 绑定到模型，由 `ToolNode` 执行。
 
-Query it at runtime: `deepagents-flow-ts capabilities` (no credentials needed).
+运行时查询：`deepagents-flow-ts capabilities`（无需凭证）。

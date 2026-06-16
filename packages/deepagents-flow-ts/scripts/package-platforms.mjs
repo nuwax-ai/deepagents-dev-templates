@@ -137,7 +137,7 @@ async function main() {
 
   const log = verbose ? (...a) => console.error(...a) : () => {};
 
-  let agentName = positional[0] ?? readJson("agent-package.json").name;
+  let agentName = positional[0] ?? readJson(".nuwax-agent/agent-package.json").name;
   let version = positional[1] ?? readJson("package.json").version;
   let outDir = positional[2] ?? "dist-packages";
   const packageName = readJson("package.json").name;

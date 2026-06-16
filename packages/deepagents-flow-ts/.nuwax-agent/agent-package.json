@@ -1,7 +1,7 @@
 {
   "name": "deepagents-flow-ts",
   "version": "0.1.0",
-  "description": "Workflow-orchestration agent template — the agent runs an explicit LangGraph StateGraph (default ReAct flow: prepare -> think -> act -> observe -> reflect -> respond) over ACP, instead of a dynamic tool loop. Ships a RAG flow as a bundled example.",
+  "description": "Workflow-orchestration agent template — the agent runs an explicit LangGraph StateGraph (default ReAct: prepare → think ↔ tools → respond) over ACP instead of a dynamic tool loop. Ships 6 reference examples: RAG, travel planner, project manager, human-in-loop, dev agent, and deep research.",
   "engine": "deepagents-flow-ts",
   "source": {
     "type": "s3",
