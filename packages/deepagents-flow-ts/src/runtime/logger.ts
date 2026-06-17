@@ -46,9 +46,9 @@ function safeFilename(s: string): string {
   return s.replace(/[^a-zA-Z0-9_\-.]/g, "_");
 }
 
-/** 今日日期 YYYY.MM.DD（首次写时定文件名日期段）。 */
+/** 今日日期 YYYY_MM_DD（首次写时定文件名日期段）。 */
 function todayDate(): string {
-  return new Date().toISOString().slice(0, 10).replace(/-/g, ".");
+  return new Date().toISOString().slice(0, 10).replace(/-/g, "_");
 }
 
 /** 敏感字段名（凭证 / 端点 / 模型名）；非 debug 级脱敏其值。 */
@@ -82,7 +82,7 @@ function logDir(): string {
   return resolve(process.env.LOG_DIR || join(homedir(), FLOWAGENTS_DIRNAME, LOGS_SUBDIR));
 }
 
-/** 建 per-session writer：<logDir>/<agentName>-<sessionId>-<YYYY.MM.DD>.log（调用方先 mkdir）。 */
+/** 建 per-session writer：<logDir>/<agentName>-<sessionId>-<YYYY_MM_DD>.log（调用方先 mkdir）。 */
 function buildWriter(sessionId: string): LogWriter {
   const fname = `${safeFilename(logAgentName)}-${safeFilename(sessionId)}-${todayDate()}.log`;
   const filePath = join(logDir(), fname);
@@ -105,7 +105,7 @@ export function setLogAgent(name: string): void {
 
 /**
  * surfaces 在 session 开始时调：建/取 per-session writer 并设为当前。幂等（同 sessionId 复用）。
- * 文件：~/.flowagents/logs/<agentName>-<sessionId>-<YYYY.MM.DD>.log。
+ * 文件：~/.flowagents/logs/<agentName>-<sessionId>-<YYYY_MM_DD>.log。
  *
  * 并发：全局 currentWriter 适合 ACP「一个 connection 串行 prompt」。真并发多 session 时
  * 换 AsyncLocalStorage 按 ctx 路由（本实现未做）。
@@ -136,7 +136,8 @@ function getLogFile(): LogWriter | null {
     try {
       const dir = logDir();
       if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-      bootstrapWriter = buildWriter(`process-${process.pid}`);
+      // 进程级 fallback：sessionId 直接用 pid，避免文件名里出现固定的 "process" 段。
+      bootstrapWriter = buildWriter(String(process.pid));
     } catch (err) {
       process.stderr.write(
         `[logger] Failed to init bootstrap log: ${err instanceof Error ? err.message : String(err)}\n`
