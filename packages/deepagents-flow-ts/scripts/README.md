@@ -2,6 +2,18 @@
 
 `deepagents-flow-ts` 的构建、打包与冒烟测试脚本。全部为 **纯 Node `.mjs`**，可在 Windows PowerShell、macOS 与 Linux 下运行。
 
+## Version sync
+
+以 `package.json` 顶层 `version` 为权威源，同步到发布相关的派生元数据（`.nuwax-agent/agent-package.json`、`config/flow-agent.config.json`），避免手动改一处忘一处导致制品版本错位。**不触碰**依赖版本、引擎要求、框架版本。
+
+| Script | npm 命令 | 说明 |
+|--------|----------|------|
+| `sync-version.mjs` | `pnpm run version:sync` | 执行同步（写盘） |
+| | `pnpm run version:preview` | `--dry-run`，只预览不写 |
+| | `pnpm run version:check` | `--check`，不一致则退出 1（CI 守卫） |
+
+`package` / `package:all` / `package:platforms` 均已在前置串联 `version:check` —— 版本不一致时直接中断，不会产出错版本制品。
+
 ## Build & Bundle
 
 | Script | npm 命令 | 说明 |

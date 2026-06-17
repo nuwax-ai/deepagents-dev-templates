@@ -58,9 +58,12 @@
     "bundle": "node scripts/lib/bundle.mjs",
     "setup:tools": "node scripts/setup-win-tools.mjs",
     "check:tools": "node scripts/check-tools.mjs",
-    "package": "node scripts/package.mjs",
-    "package:all": "node scripts/package.mjs --format all",
-    "package:platforms": "node scripts/package-platforms.mjs",
+    "version:check": "node scripts/sync-version.mjs --check",
+    "version:sync": "node scripts/sync-version.mjs",
+    "version:preview": "node scripts/sync-version.mjs --dry-run",
+    "package": "node scripts/sync-version.mjs --check && node scripts/package.mjs",
+    "package:all": "node scripts/sync-version.mjs --check && node scripts/package.mjs --format all",
+    "package:platforms": "node scripts/sync-version.mjs --check && node scripts/package-platforms.mjs",
     "validate:package": "node scripts/validate-package.mjs"
   },
   "dependencies": {
