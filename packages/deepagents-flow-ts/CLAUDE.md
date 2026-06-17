@@ -8,8 +8,8 @@
 用户用本模板搭建 **LangGraph 工作流 Agent**（显式节点图 + 条件边 / `interrupt` / `Send`），**不是**自由 tool loop。
 
 你的职责：
-1. 在 **`src/app/`** 改默认图（`graph.ts` 连线 + `nodes/` 节点实现 + `tools/` 工具），或在 **`examples/`** 照范例新增 flow
-2. 对照 **`examples/`** 找拓扑与挂接方式，再写 `graph.ts` / `nodes/`
+1. 在 **`src/app/`** 改默认图（`graph.ts` 连线 + `nodes/` 节点实现 + `tools/` 工具）
+2. 新建 flow 时，**先读 `examples/` 中最接近的范例**学拓扑与挂接方式，然后在 **`src/app/`** 实现（改 `graph.ts` 连线、`nodes/` 节点、`tools/` 工具）
 3. **不要改** `src/core/`、`src/runtime/`、`src/surfaces/`、`src/compose/`（契约 / 底层运行时 / 适配器 / 组合根；除非用户明确要求）
 4. 需要新底层能力时，在 **`src/runtime/`** 内扩展或拷贝实现，并改 import 指向本项目文件
 
@@ -70,18 +70,20 @@ import { loadConfig, resolveModel, logger, createRuntimeContextAsync /* … */ }
 
 ---
 
-## examples/ — 参考库（优先阅读）
+## examples/ — 参考库（纯只读）
 
-新 flow、改拓扑、加 HITL / 并行 / 重试时，**先来这里**，不要从零猜 LangGraph 或改 `src/surfaces/`。
+> ⚠️ **`examples/` 是给 AI Agent 做开发时参考用的示例代码，纯只读。**
+> 你**不应该**在 `examples/` 下创建新目录、修改已有范例、或把它当作开发工作区。
+> 正确用法：**阅读**范例学拓扑与挂接方式 → 在 **`src/app/`** 中实现。
+>
+> 新 flow、改拓扑、加 HITL / 并行 / 重试时，**先来这里**读，不要从零猜 LangGraph 或改 `src/surfaces/`。
 
 ### AI Agent 工作流
 
 1. **判需求** → 从下表选最接近示例
 2. **读** `README.md` + `graph.ts`
-3. **复制目录骨架** → `examples/<name>/`
-4. **写业务** → `graph.ts`、`nodes/`、`index.ts`（`FlowExecutor` 或 `createStatefulFlow`）
-5. **挂接** → `bootstrapFlowAcp` / `runFlowCli`（照范例 `index.ts`）
-6. **补测试** → `examples/<name>/tests/`
+3. **在 `src/app/` 实现** → 改 `graph.ts` 连线、`nodes/` 节点逻辑、`tools/` 工具
+4. **补测试** → `tests/`
 
 ### 示例对照表
 
@@ -96,26 +98,22 @@ import { loadConfig, resolveModel, logger, createRuntimeContextAsync /* … */ }
 
 有状态示例统一用 **`createStatefulFlow`**（[src/surfaces/stateful-flow.ts](src/surfaces/stateful-flow.ts)）。
 
-### 新 flow 目录模板
+### 开发位置
 
-```
-examples/<your-flow>/
-  README.md
-  index.ts        # → bootstrapFlowAcp / runFlowCli
-  graph.ts
-  nodes/
-  state.ts        # 可选
-  config/         # 可选
-  tests/
-```
+所有 flow 开发都在 **`src/app/`**：
+- `graph.ts` — 连线与条件路由（图是契约）
+- `nodes/` — 节点实现（prepare / think / tools / respond）
+- `tools/` — 内置工具（在此加新工具）
+
+`examples/` 下的代码**仅供参考**，不要在其中创建或修改任何内容。
 
 ### 默认 flow vs 示例
 
 | | `src/app/` | `examples/*` |
 |--|------------|--------------|
-| 用途 | 开箱 ReAct | 可复制的业务拓扑 |
+| 用途 | 开箱 ReAct + **开发工作区** | 只读参考拓扑 |
 | 无凭证 | 有 fallback，可跑 | 真调 LLM，须 `.env` |
-| 何时改 | 小改默认图 | 新拓扑 / 新范例 |
+| 何时改 | 所有 flow 开发都在这里 | 不改——仅供阅读学习 |
 
 ---
 
@@ -128,7 +126,8 @@ examples/<your-flow>/
 | 契约 | `src/core/` | 纯类型;改契约需同步 app + surfaces |
 | 底层运行时 / 适配器 / 组合根 | `src/runtime/`、`src/surfaces/`、`src/compose/` | 默认不改 |
 | 默认图 | `src/app/`（`graph.ts` 连线 + `nodes/` 节点 + `tools/` 工具） | 可改 |
-| 参考与复制 | `examples/` | 新 flow 优先对照 |
+| 参考（只读） | `examples/` | 阅读学拓扑，不修改不新建 |
+| 开发工作区 | `src/app/` | graph.ts + nodes/ + tools/ |
 | 配置 | `config/`、`prompts/`、`skills/`、`.agents/` | 按需扩展 |
 
 ### 设计原则
@@ -215,5 +214,4 @@ pnpm check:tools
 
 - 各 `examples/*/README.md`
 - [docs/flow-patterns.md](docs/flow-patterns.md)
-- [LangGraph 原生对象收敛计划](../../docs/packages/deepagents-flow-ts/development/langgraph-native-convergence.md)（monorepo 开发文档，不在模板分发包内）
 - [README.md](README.md)（用户向说明）
