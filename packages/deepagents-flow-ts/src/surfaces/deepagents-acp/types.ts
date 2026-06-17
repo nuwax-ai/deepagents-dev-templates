@@ -162,6 +162,13 @@ export interface DeepAgentsServerHooks {
     params: Record<string, unknown>;
     /** The ACP connection for this turn; cast to your client type to stream updates. */
     conn: unknown;
+    /**
+     * Abort signal for this turn. Aborted when the client sends `session/cancel`
+     * (`DeepAgentsServer.handleCancel` aborts `currentPromptAbortController`).
+     * Hosts running long work should thread this into their underlying runnable so the
+     * turn stops promptly on cancellation.
+     */
+    signal?: AbortSignal;
   }): void | { stopReason: StopReason } | Promise<void | { stopReason: StopReason }>;
 
   /** Called after a prompt turn completes (including cancellation). */

@@ -651,6 +651,7 @@ export class DeepAgentsServer {
         promptText: this.getPromptText(prompt),
         params,
         conn,
+        signal: this.currentPromptAbortController?.signal,
       });
       if (hookResult) {
         return hookResult;

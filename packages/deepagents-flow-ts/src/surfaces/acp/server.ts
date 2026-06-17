@@ -212,16 +212,19 @@ export function sessionConfigFromParams(params: Record<string, unknown>): {
   return { sessionConfig, workspaceRoot: cwd };
 }
 
-/** 启动 Flow ACP 服务（stdio）。任意 FlowExecutor / per-session 工厂都能插进来。 */
-export async function bootstrapFlowAcp(options: FlowAcpOptions): Promise<void> {
-  if (options.debug) {
-    process.env.LOG_LEVEL = "debug";
-  }
-  const { appConfig } = options;
-
+/**
+ * 构造 flow surface 的三个 ACP hook（configureSession / onPrompt / onSessionClosed）。
+ *
+ * 从 bootstrapFlowAcp 抽出，便于在测试中直接调用 hook、注入假 executor / 假 conn，
+ * 无需启动真实 stdio server。bootstrapFlowAcp 调它再把 hooks 交给 DeepAgentsServer——行为不变。
+ *
+ * onPrompt 把 ACP cancel controller 的 signal 经 callbacks.signal 透传进 flow，
+ * flow 再交给 `graph.stream({signal})`：client 取消时图运行快速 reject，onPrompt 的 catch 收尾。
+ */
+export function createFlowHooks(options: FlowAcpOptions): DeepAgentsServerHooks {
   // per-session executor 缓存（createExecutor 模式）；单 executor 模式下恒空。
   const sessions = new Map<string, SessionExecutor>();
-  // configureSession 下发的 workspace/cwd 也缓存下来；若 hook 未能立即建好 executor，
+  // configureSession 下发的 workspace/cwd 也缓存下来；若 hook 未能立即建好 executor,
   // 后续懒建也必须沿用同一 session 配置，不能退回进程 cwd。
   const sessionConfigs = new Map<
     string,
@@ -231,20 +234,6 @@ export async function bootstrapFlowAcp(options: FlowAcpOptions): Promise<void> {
   // 一个会话 = 一个主题：老式 flow（未实现 hasStarted）的「等回复」内存兜底，按 sessionId 跟踪。
   // 实现了 hasStarted 的 flow 优先从 checkpointer 推断续跑（跨进程/IDE 重启仍准）。
   const fallbackResume = new Set<string>();
-
-  log.info("Flow ACP bootstrapping", {
-    agent: appConfig.agent.name,
-    model: `${appConfig.model.provider}:${appConfig.model.name}`,
-    mode: options.createExecutor ? "per-session" : "single-executor",
-  });
-
-  // 极简 throwaway agent —— onPrompt 会短路，它永不进入请求路径。
-  const agentConfig = {
-    name: appConfig.agent.name,
-    description: appConfig.agent.description,
-    model: resolveModel(appConfig),
-    tools: [],
-  } as unknown as DeepAgentConfig;
 
   /** 取该 session 的 executor：优先 per-session 缓存，回退单 executor；createExecutor 模式下缺失则懒建。 */
   async function resolveExecutor(
@@ -269,7 +258,7 @@ export async function bootstrapFlowAcp(options: FlowAcpOptions): Promise<void> {
     return options.executor;
   }
 
-  const hooks: DeepAgentsServerHooks = {
+  return {
     // session/new | session/load：按 ACP cwd/mcpServers/model 装配 per-session runtime。
     async configureSession(ctx) {
       if (!options.createExecutor) return undefined;
@@ -328,6 +317,8 @@ export async function bootstrapFlowAcp(options: FlowAcpOptions): Promise<void> {
         // 阶段进度作为 thought chunk，与主回答区分。
         onStage: (e) => streamText(conn, sessionId, formatStage(e), "thought"),
         onPlan: (e) => emitPlan(conn, sessionId, e),
+        // ACP cancel signal → graph.stream({signal})，取消时图运行快速 reject。
+        ...(ctx.signal ? { signal: ctx.signal } : {}),
       };
 
       try {
@@ -392,6 +383,30 @@ export async function bootstrapFlowAcp(options: FlowAcpOptions): Promise<void> {
       log.info("session closed", { sessionId: ctx.sessionId });
     },
   };
+}
+
+/** 启动 Flow ACP 服务（stdio）。任意 FlowExecutor / per-session 工厂都能插进来。 */
+export async function bootstrapFlowAcp(options: FlowAcpOptions): Promise<void> {
+  if (options.debug) {
+    process.env.LOG_LEVEL = "debug";
+  }
+  const { appConfig } = options;
+
+  log.info("Flow ACP bootstrapping", {
+    agent: appConfig.agent.name,
+    model: `${appConfig.model.provider}:${appConfig.model.name}`,
+    mode: options.createExecutor ? "per-session" : "single-executor",
+  });
+
+  // 极简 throwaway agent —— onPrompt 会短路，它永不进入请求路径。
+  const agentConfig = {
+    name: appConfig.agent.name,
+    description: appConfig.agent.description,
+    model: resolveModel(appConfig),
+    tools: [],
+  } as unknown as DeepAgentConfig;
+
+  const hooks = createFlowHooks(options);
 
   const server = new DeepAgentsServer({
     agents: agentConfig,
