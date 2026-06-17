@@ -30,6 +30,7 @@
 |------|----------|----------|
 | `flow-tool-creator` | flow-ts 创建新工具 | tool() 函数、Zod schema 设计、无状态 vs 平台绑定工厂、注册到 createFlowTools |
 | `flow-config-setup` | 配置 MCP / 管理变量 | MCP 服务器（stdio/http）、合并策略、agent_variable 密钥管理、变量插值 |
+| `agent-dev-config` | 接入平台工具到 LangGraph / 保存系统提示词到平台 | 搜索可用工具（Plugin/Workflow/Knowledge）、添加/删除工具到 dev Agent 配置、按平台 schema 在 LangGraph 实现 @tool + bind_tools、更新系统提示词/开场白 |
 
 ### 开发流程
 | 技能 | 触发场景 | 关键内容 |

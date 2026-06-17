@@ -78,14 +78,25 @@ const graph = createFlowGraph({
 | `runFlowCli(flow, { query, interactive })` | `src/surfaces/cli/run.ts` | CLI 跑一次 |
 | `createStatefulFlow(options)` | `src/surfaces/stateful-flow.ts` | 有状态 flow 基座 |
 
-## ACP 集成：bootstrapFlowAcp（onPrompt 短路）
+## ACP 集成：bootstrapFlowAcp（onPrompt 短路 + per-session hooks）
 
-deepagents-acp 的 `onPrompt` 钩子在 agent 运行前触发，返回 `{ stopReason }` 即短路。
-surface 在这里跑传入的 executor，把回答经 `conn` 流式推给客户端，**deep agent 永不进入请求路径**。
-所以不需要 force-tool / 巨型提示词那套把 loop 逼成 workflow 的 hack。
+flow-ts vendor 了 `deepagents-acp` 0.1.3 源码到 `src/surfaces/deepagents-acp/`（自带 ACP 生命周期 hooks）。
+三个 hook 让 flow 完全接管 ACP 请求路径：
+
+| Hook | 作用 |
+|------|------|
+| `configureSession` | session/new 时按 ACP cwd/mcpServers/model 装配 per-session runtime（createExecutor 模式） |
+| `onPrompt` | agent 运行前触发，跑 FlowExecutor/StatefulFlow → 流式推 `conn` → 返回 `{ stopReason }` 短路（deep agent 永不进入请求路径） |
+| `onSessionClosed` | session 关闭时释放 per-session 资源（MCP stdio 子进程等） |
+
+`onPrompt` 支持 ACP cancel 信号：`ctx.signal` 经 `callbacks.signal` 透传进 `graph.stream({signal})`，取消时 inflight tool_call 发 failed update + 返回 `StopReason::Cancelled`。
+不需要 force-tool / 巨型提示词那套把 loop 逼成 workflow 的 hack。
 
 ```typescript
 await bootstrapFlowAcp({ executor, appConfig, debug });
+// 或 per-session 工厂模式（ACP session/new 的 cwd/mcpServers/model 各自独立 runtime）
+await bootstrapFlowAcp({ createExecutor, appConfig, debug });
+// createExecutor({ sessionConfig, workspaceRoot }) => { executor, dispose }
 // executor: FlowExecutor（函数）或 StatefulFlow（对象）
 ```
 
@@ -115,7 +126,7 @@ interface FlowCallbacks {
 |------|-------------------|------|
 | onToken | `agent_message_chunk` | 模型文本增量（主回答区） |
 | onStage | `agent_thought_chunk` | 阶段进度（thought 区，不污染主回答） |
-| onPlan | `plan` | 结构化任务清单（PlanEntry[]，与 deepagents-acp 对齐） |
+| onPlan | `plan` | 结构化任务清单（PlanEntry[]，与 vendor deepagents-acp 对齐） |
 | onToolCall | `tool_call` / `tool_call_update` | 工具 in_progress / completed / failed |
 > types 从 `core/flow-types.js` import（或兼容路径 `surfaces/flow-types.js`）。
 
