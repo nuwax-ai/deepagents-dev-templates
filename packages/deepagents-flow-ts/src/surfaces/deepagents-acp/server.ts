@@ -493,30 +493,18 @@ export class DeepAgentsServer {
 
     this.log("Created session:", sessionId, "for agent:", agentName);
 
-    const response = {
+    const response: NewSessionResponse = {
       sessionId,
       modes: {
         availableModes: AVAILABLE_MODES,
-        currentModeId: (params.mode as string) ?? "agent",
+        currentModeId: paramsExt.mode ?? "agent",
       },
     };
 
     this.log("New session response:", JSON.stringify(response));
 
-    const agentConfig = this.agentConfigs.get(agentName);
-    const customCommands = agentConfig?.commands ?? [];
-    const allCommands = [...DEFAULT_COMMANDS, ...customCommands];
-    conn
-      .sessionUpdate({
-        sessionId,
-        update: {
-          sessionUpdate: "available_commands_update",
-          availableCommands: allCommands,
-        },
-      } as SessionNotification)
-      .catch((err) => {
-        this.log("Failed to send commands update:", err);
-      });
+    // Initialize session: apply host hook, create agent, send commands
+    await this.initializeSession(session, conn, "new", params);
 
     return response;
   }
@@ -543,14 +531,42 @@ export class DeepAgentsServer {
     });
     session.lastActivityAt = new Date();
 
-    // Host hook: configure the (re)loaded session before it is used.
+    // Initialize session: apply host hook, create agent, send commands
+    await this.initializeSession(session, conn, "load", params);
+
+    await this.replaySessionHistory(session, conn);
+
+    const response: LoadSessionResponse = {
+      modes: {
+        availableModes: AVAILABLE_MODES,
+        currentModeId: session.mode ?? "agent",
+      },
+    };
+
+    this.log("Load session response:", JSON.stringify(response));
+    return response;
+  }
+
+  /**
+   * Common session initialization logic shared by handleNewSession and handleLoadSession.
+   * Applies host hook, creates agent if needed, sets ACP backend session ID, and sends commands.
+   */
+  private async initializeSession(
+    session: SessionState,
+    conn: AgentSideConnection,
+    phase: "new" | "load",
+    params: Record<string, unknown>,
+  ): Promise<void> {
+    const { id: sessionId, agentName } = session;
+
+    // Host hook: configure the session before the agent is built.
     await this.applySessionPatch(
-      session.agentName,
+      agentName,
       await this.hooks?.configureSession?.({
         sessionId,
-        agentName: session.agentName,
+        agentName,
         mode: session.mode,
-        phase: "load",
+        phase,
         params,
       }),
     );
@@ -558,19 +574,18 @@ export class DeepAgentsServer {
     // A configureSession patch may have replaced the agent config, which
     // invalidates the cached agent + backend (applySessionPatch deletes them).
     // Rebuild before use — otherwise the agent is missing and the next prompt
-    // throws "Agent not found". Mirrors handleNewSession.
-    if (!this.agents.has(session.agentName)) {
-      this.createAgent(session.agentName);
+    // throws "Agent not found".
+    if (!this.agents.has(agentName)) {
+      this.createAgent(agentName);
     }
 
-    const acpBackend = this.acpBackends.get(session.agentName);
+    const acpBackend = this.acpBackends.get(agentName);
     if (acpBackend) {
       acpBackend.setSessionId(sessionId);
     }
 
-    await this.replaySessionHistory(session, conn);
-
-    const agentConfig = this.agentConfigs.get(session.agentName);
+    // Send available commands to the client
+    const agentConfig = this.agentConfigs.get(agentName);
     const customCommands = agentConfig?.commands ?? [];
     const allCommands = [...DEFAULT_COMMANDS, ...customCommands];
     conn
@@ -584,16 +599,6 @@ export class DeepAgentsServer {
       .catch((err) => {
         this.log("Failed to send commands update:", err);
       });
-
-    const response = {
-      modes: {
-        availableModes: AVAILABLE_MODES,
-        currentModeId: session.mode ?? "agent",
-      },
-    };
-
-    this.log("Load session response:", JSON.stringify(response));
-    return response;
   }
 
   /**
@@ -734,8 +739,8 @@ export class DeepAgentsServer {
       throw new Error(`Session not found: ${sessionId}`);
     }
 
-    // Accept both ACP spec 'modeId' and legacy 'mode' parameter
-    const mode = (params.modeId as string) ?? (params.mode as string);
+    // SDK 0.24.0: SetSessionModeRequest has modeId (required)
+    const mode = params.modeId;
     session.mode = mode;
     this.log("Set mode for session:", sessionId, "to:", mode);
 
@@ -1432,7 +1437,7 @@ export class DeepAgentsServer {
       // though ACP does not drive humanInTheLoop interrupts.
       permissions: config.permissions,
       store: config.store,
-      backend,
+      backend: backend as Parameters<typeof createDeepAgent>[0]["backend"],
       skills: config.skills,
       memory: config.memory,
       checkpointer: this.checkpointer,
@@ -1448,7 +1453,7 @@ export class DeepAgentsServer {
   ): BackendProtocolV2 | BackendFactory {
     if (config.backend) {
       this.log("Using custom backend for agent:", config.name);
-      return config.backend;
+      return config.backend as BackendProtocolV2 | BackendFactory;
     }
 
     if (
@@ -1505,7 +1510,7 @@ export class DeepAgentsServer {
 
     this.log("Writing file via client:", { path, length: content.length });
     try {
-      await this.connection.writeTextFile({ path, content });
+      await this.connection.writeTextFile({ sessionId: "", path, content } as WriteTextFileRequest);
       this.log("File write successful:", path);
       return true;
     } catch (err) {
