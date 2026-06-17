@@ -256,9 +256,10 @@ describe("B. 取消任务（cancel）", () => {
 
     // 关键：onPrompt 在 abort 后快速返回（远小于完整跑完的 500ms）
     expect(elapsed).toBeLessThan(FULL_RUN_MS);
-    expect(r).toEqual({ stopReason: "end_turn" }); // 现有 catch 收尾 → 道歉
-    // 收到了道歉消息
-    expect(updates.some((u) => u.text === "抱歉，处理您的问题时出现错误。")).toBe(true);
+    // 协议要求（acp.d.ts:1051）：cancel 时以 StopReason::Cancelled 响应，不是 end_turn。
+    expect(r).toEqual({ stopReason: "cancelled" });
+    // 取消时不发「道歉」消息（那是普通错误的收尾行为，cancel 是用户主动中止）
+    expect(updates.some((u) => u.text === "抱歉，处理您的问题时出现错误。")).toBe(false);
   });
 
   it("未带 signal 时不受影响：正常跑到 interrupt（对照）", async () => {

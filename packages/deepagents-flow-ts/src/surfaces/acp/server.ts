@@ -359,6 +359,13 @@ export function createFlowHooks(options: FlowAcpOptions): DeepAgentsServerHooks 
         if (result.footer) await streamText(conn, sessionId, result.footer);
         return { stopReason: "end_turn" as StopReason };
       } catch (err) {
+        // 客户端 session/cancel：协议要求以 StopReason::Cancelled 响应原 prompt
+        // （acp.d.ts:1051）。signal 被 abort 时底层图运行以 AbortError reject——
+        // 这里捕获后返回 cancelled，而非把取消当成普通错误返回 end_turn。
+        if ((err as Error)?.name === "AbortError" || ctx.signal?.aborted) {
+          log.info("onPrompt cancelled by client", { sessionId });
+          return { stopReason: "cancelled" as StopReason };
+        }
         log.error("onPrompt flow failed", { error: String(err) });
         if (!durableResume) fallbackResume.delete(sessionId); // 出错清兜底状态，避免卡在 resume
         await streamText(conn, sessionId, "抱歉，处理您的问题时出现错误。");
