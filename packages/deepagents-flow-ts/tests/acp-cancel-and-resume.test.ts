@@ -73,21 +73,45 @@ afterAll(() => {
 
 /** 收集推给客户端的 sessionUpdate，供断言流式输出序列。 */
 function makeFakeConn() {
-  const updates: Array<{ kind: string; text?: string; status?: string }> = [];
+  const updates: Array<{
+    kind: string;
+    text?: string;
+    status?: string;
+    toolCallId?: string;
+  }> = [];
   const conn = {
     async sessionUpdate(params: {
       sessionId: string;
-      update: { sessionUpdate: string; content?: { text?: string }; status?: string };
+      update: {
+        sessionUpdate: string;
+        content?: unknown;
+        status?: string;
+        toolCallId?: string;
+      };
     }) {
       const u = params.update;
       updates.push({
         kind: u.sessionUpdate,
-        text: u.content?.text,
+        text: extractText(u.content),
         status: u.status,
+        toolCallId: u.toolCallId,
       });
     },
   };
   return { conn, updates };
+}
+
+/** 兼容两种 content 形态：{ text } 或 [{ content: { text } }]。 */
+function extractText(content: unknown): string | undefined {
+  if (!content) return undefined;
+  if (typeof content === "object" && !Array.isArray(content)) {
+    return (content as { text?: string }).text;
+  }
+  if (Array.isArray(content)) {
+    const first = content[0] as { content?: { text?: string } } | undefined;
+    return first?.content?.text;
+  }
+  return undefined;
 }
 
 /** per-session createExecutor 工厂：按传入 flow 实例返回 SessionExecutor。 */
@@ -273,6 +297,75 @@ describe("B. 取消任务（cancel）", () => {
       conn,
     });
     expect(r).toEqual({ stopReason: "end_turn" });
+  });
+
+  it("cancel 时给 in-flight tool_call 发 failed update（避免客户端 UI 悬挂）", async () => {
+    // 假图：先发一个 on_tool_start（tool 进入 in_progress），再进入可被 abort 的长 delay。
+    const FULL_RUN_MS = 500;
+    let lastSignal: AbortSignal | undefined;
+    const toolCallId = "tc-cancel-1";
+    const fakeGraphWithTool = {
+      async stream(_input: unknown, config?: { signal?: AbortSignal }) {
+        lastSignal = config?.signal;
+        async function* gen() {
+          // 1) tool 开始（in_progress）—— onPrompt 的 onToolCall 会把它加入 inflightTools
+          yield [
+            "tools",
+            { event: "on_tool_start", toolCallId, name: "search", input: '{"q":"x"}' },
+          ];
+          // 2) 长任务循环：被 abort 时以 AbortError reject（tool 永远收不到 on_tool_end）
+          for (let i = 0; i < 50; i++) {
+            if (lastSignal?.aborted) {
+              const err = new Error("Aborted");
+              err.name = "AbortError";
+              throw err;
+            }
+            await delay(FULL_RUN_MS / 50);
+          }
+        }
+        return gen();
+      },
+      async getState() {
+        return { values: { output: "done" }, config: { configurable: { checkpoint_id: "cp" } } };
+      },
+    };
+    const flow = createStatefulFlow<{ output: string }>({
+      buildGraph: () => fakeGraphWithTool,
+      toInput: (query) => ({ query }),
+      toResult: (v) => ({ answer: v.output }),
+      checkpointer: new MemorySaver(),
+    });
+
+    const hooks = createFlowHooks({ executor: flow, appConfig: fakeAppConfig });
+    const { conn, updates } = makeFakeConn();
+    const sessionId = "sess-cancel-tool-1";
+    const controller = new AbortController();
+
+    const onPromptPromise = hooks.onPrompt!({
+      sessionId,
+      promptText: "用工具搜一下",
+      params: {},
+      conn,
+      signal: controller.signal,
+    });
+
+    await delay(30); // 让 tool_start 被处理（进入 inflightTools）
+    // 确认 tool_call 已发（in_progress）
+    expect(updates.some((u) => u.kind === "tool_call" && u.toolCallId === toolCallId)).toBe(true);
+
+    controller.abort(); // 取消
+
+    const r = await onPromptPromise;
+    expect(r).toEqual({ stopReason: "cancelled" });
+
+    // 关键：in-flight tool 收到 tool_call_update {status:"failed"} + 取消说明
+    const failedUpdate = updates.find(
+      (u) => u.kind === "tool_call_update" && u.toolCallId === toolCallId
+    );
+    expect(failedUpdate).toBeDefined();
+    expect(failedUpdate!.status).toBe("failed");
+    // ToolCallStatus 枚举无 cancelled（客户端本地标记）；agent 侧用 failed + 说明
+    expect(failedUpdate!.text).toContain("已取消");
   });
 });
 

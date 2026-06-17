@@ -308,12 +308,23 @@ export function createFlowHooks(options: FlowAcpOptions): DeepAgentsServerHooks 
 
       // 跟踪是否流式：流式则只补 footer/question，非流式则整段发。
       let streamed = false;
+      // 跟踪本轮已 start、未 end 的 tool_call：cancel 时遍历发终止 update，
+      // 避免客户端 UI 上工具调用永远挂着「进行中」（abort 时收不到 on_tool_end）。
+      const inflightTools = new Map<string, ToolCallEvent>();
       const callbacks: FlowCallbacks = {
         onToken: (token) => {
           streamed = true;
           return streamText(conn, sessionId, token, "agent");
         },
-        onToolCall: (e) => emitToolCall(conn, sessionId, e),
+        onToolCall: async (e) => {
+          await emitToolCall(conn, sessionId, e);
+          if (e.status === "in_progress") {
+            inflightTools.set(e.toolCallId, e);
+          } else {
+            // completed | failed：已结束，移出 in-flight 集合
+            inflightTools.delete(e.toolCallId);
+          }
+        },
         // 阶段进度作为 thought chunk，与主回答区分。
         onStage: (e) => streamText(conn, sessionId, formatStage(e), "thought"),
         onPlan: (e) => emitPlan(conn, sessionId, e),
@@ -363,7 +374,23 @@ export function createFlowHooks(options: FlowAcpOptions): DeepAgentsServerHooks 
         // （acp.d.ts:1051）。signal 被 abort 时底层图运行以 AbortError reject——
         // 这里捕获后返回 cancelled，而非把取消当成普通错误返回 end_turn。
         if ((err as Error)?.name === "AbortError" || ctx.signal?.aborted) {
-          log.info("onPrompt cancelled by client", { sessionId });
+          log.info("onPrompt cancelled by client", { sessionId, inflight: inflightTools.size });
+          // 给 in-flight tool_call 发合法终止状态（failed + 取消说明），避免客户端 UI 悬挂「进行中」。
+          // 注意：ToolCallStatus 枚举只有 pending|in_progress|completed|failed，无 cancelled
+          // （客户端会本地标记 cancelled，但 agent 侧用 failed 表达「非正常终止」才是合法值）。
+          for (const e of inflightTools.values()) {
+            await conn.sessionUpdate({
+              sessionId,
+              update: {
+                sessionUpdate: "tool_call_update",
+                toolCallId: e.toolCallId,
+                status: "failed",
+                content: [
+                  { type: "content", content: { type: "text", text: "已取消（客户端 session/cancel）" } },
+                ],
+              },
+            });
+          }
           return { stopReason: "cancelled" as StopReason };
         }
         log.error("onPrompt flow failed", { error: String(err) });
