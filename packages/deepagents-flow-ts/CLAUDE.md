@@ -36,7 +36,6 @@ examples/        # ★ 新 flow 优先对照的参考实现
 config/          # flow-agent.config.json、mcp.*.json
 prompts/         # flow.base.md
 skills/          # SKILL.md
-.agents/         # Subagent（AGENT.md）
 scripts/         # 打包、smoke（.mjs）
 docs/            # flow-patterns、capabilities、zed-debug
 tests/           # 默认图单测 + 分层守卫（layering.test.ts）
