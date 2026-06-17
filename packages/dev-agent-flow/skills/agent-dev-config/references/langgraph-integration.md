@@ -1,6 +1,6 @@
 # Flow 工具开发对接指南（TypeScript / deepagents-flow-ts）
 
-平台提供的工具**必须先搜索并添加到 Agent 配置**（见 `SKILL.md` 与 `api-docs.md`），之后才能在 deepagents-flow-ts 中使用。本文说明第 3 步——**按平台返回的 `schema` 在 `src/app/tools/` 中实现 TypeScript 工具，注册到 `createFlowTools()`**。
+平台提供的工具**必须先搜索并添加到 Agent 配置**（见 `SKILL.md` 与 `api-docs.md`），之后才能在 flow-ts 中使用。本文说明第 3 步——**按平台返回的 `schema` 在 `src/libs/tools/` 中实现 TypeScript 工具，注册到 `src/app/flow-tools.ts` 的 `createFlowTools()`**。
 
 > **写进代码的，只有"实际要用到的工具"本身。** 这里的 `tool()` 函数实现的是**该工具自己的业务逻辑**（你写的、运行时被智能体调用的代码），与 dev 配置接口（config/search/add/del/update）无关——dev 接口只在开发期手动跑，绝不 import 到工具代码里。
 
@@ -12,7 +12,8 @@
 开发期（不进代码）：搜索 → 拿到 schema → tool/add 加进配置
                               │
                               ▼  schema 作为依据
-运行时（写进代码）：src/app/tools/xxx.tool.ts → tool() + Zod schema
+运行时（写进代码）：src/libs/tools/xxx.tool.ts → tool() + Zod schema
+                              │  注册到 src/app/flow-tools.ts 的 createFlowTools()
                               │  bindTools（think 节点自动）
                               ▼
                     LLM（按 schema 生成 tool call）──► tool() 执行业务逻辑
@@ -43,10 +44,10 @@ echo '<搜索结果里的 schema 字符串>' | node -e "process.stdin.resume();l
 
 ## 第二步：用 tool() + Zod schema 对齐平台 schema
 
-flow-ts 的工具全部在 `src/app/tools/` 下，用 `@langchain/core/tools` 的 `tool()` 函数 + `zod` 定义入参。**字段名、类型、必填必须与平台 schema 一致**：
+flow-ts 的通用工具放 `src/libs/tools/`，用 `@langchain/core/tools` 的 `tool()` 函数 + `zod` 定义入参。**字段名、类型、必填必须与平台 schema 一致**：
 
 ```typescript
-// src/app/tools/platform-search.tool.ts
+// src/libs/tools/platform-search.tool.ts
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 
@@ -82,11 +83,14 @@ export const platformSearchTool = tool(
 
 ## 第三步：注册到 createFlowTools()
 
-在 `src/app/tools/index.ts` 的 `createFlowTools()` 中注册新工具：
+在 `src/app/flow-tools.ts` 的 `createFlowTools()` 中注册新工具。先在 `src/libs/tools/index.ts` re-export，再在 flow-tools.ts 引入：
 
 ```typescript
-// src/app/tools/index.ts
-import { platformSearchTool } from "./platform-search.tool.js";
+// src/libs/tools/index.ts — 加一行 re-export
+export { platformSearchTool } from "./platform-search.tool.js";
+
+// src/app/flow-tools.ts — 在 buildTools 的返回数组中加入
+import { platformSearchTool } from "../libs/tools/index.js";
 
 export function createFlowTools(ctx, opts) {
   // ...
@@ -102,7 +106,7 @@ export function createFlowTools(ctx, opts) {
 
 注册后，`think` 节点会自动 `bindTools(allTools)` 到 LLM，无需手动绑定。
 
-> **工厂模式**：如果工具需要运行时依赖（如 platformClient、variableManager），用工厂函数 `createXxxTool(deps)` 而非直接导出常量。照 `platform-api.tool.ts` / `agent-variable.tool.ts` 模式。
+> **工厂模式**：如果工具需要运行时依赖（如 platformClient、variableManager），用工厂函数 `createXxxTool(deps)` 而非直接导出常量。照 `platform-api.tool.ts` / `agent-variable.tool.ts` 模式，在 `reused[]` 数组中用工厂调用注册。
 
 ## 系统提示词与开场白
 
@@ -114,11 +118,11 @@ flow-ts 默认图已内置一套工具（`createFlowTools()` 自动组装），*
 
 | 类别 | 来源 | 注册位置 |
 |------|------|----------|
-| 通用工具 | `http_request`、`json_utils` | `reused[]`（无状态） |
-| 平台工具 | `platform_api`、`agent_variable` | `reused[]`（工厂注入 platformClient） |
-| 沙箱工具 | `bash`、`fs`、`search`、`demo` | `buildTools(wsRoot)`（按工作目录构建） |
+| 通用工具 | `http_request`、`json_utils` | `src/libs/tools/`（无状态，`reused[]`） |
+| 平台工具 | `platform_api`、`agent_variable` | `src/libs/tools/`（工厂注入 platformClient，`reused[]`） |
+| 沙箱工具 | `bash`、`fs`、`search`、`demo` | `src/libs/tools/`（按工作目录构建，`buildTools(wsRoot)`） |
 | MCP 工具 | `@langchain/mcp-adapters` 加载 | `ctx.mcpTools`（runtime-context 自动合并） |
-| **新增平台工具** | 本文档描述的 `tool()` + Zod | `buildTools(wsRoot)` 中注册 |
+| **新增平台工具** | 本文档描述的 `tool()` + Zod | `src/libs/tools/` → `buildTools(wsRoot)` 中注册 |
 
 > **新增工具不是替代内置工具**，而是补充。如果平台已有等价的内置工具（如 `http_request`），优先用内置的。
 
@@ -148,6 +152,7 @@ flow-ts 默认图已内置一套工具（`createFlowTools()` 自动组装），*
 
 - `tool()`：`@langchain/core/tools`
 - `z`：`zod`（Zod schema）
-- `createFlowTools()`：`src/app/tools/index.ts`
+- `createFlowTools()`：`src/app/flow-tools.ts`
+- 通用工具 barrel：`src/libs/tools/index.ts`
 - `StructuredTool`：`@langchain/core/tools`
-- 参照实现：`platform-api.tool.ts`（工厂模式）、`http-request.tool.ts`（无状态常量）
+- 参照实现：`src/libs/tools/platform-api.tool.ts`（工厂模式）、`src/libs/tools/http-request.tool.ts`（无状态常量）

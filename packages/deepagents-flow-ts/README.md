@@ -11,6 +11,33 @@
 
 本模板是 **工作流编排 Agent**（显式 LangGraph 图），与 Coding Agent（tool loop）产品形态不同；运行时基础能力由模板**自包含的底层运行时**（`src/runtime/`）承担，「大脑」是一张可设计的节点图。
 
+## 快速开始
+
+```bash
+pnpm install && pnpm build
+pnpm flow "你好"          # 跑默认 ReAct flow(CLI;无凭证走 fallback 也能跑)
+pnpm start:acp           # 或启动 ACP 服务(供 Zed/JetBrains)
+```
+
+**拼你自己的 flow** = 组合 `src/libs/nodes/` 的节点 factory + 在 `src/app/graph.ts` 连线:
+
+```ts
+import { createLlmNode, createHumanApprovalNode } from "./libs/nodes/index.js";
+
+const gen = createLlmNode<S>({ model: () => model, prompt: (s) => [/* msgs */], write: (r) => ({ draft: r.content }) });
+const review = createHumanApprovalNode<S>({ question: (s) => `草稿:${s.draft},ok?`, write: (fb) => ({ feedback: fb }) });
+
+const graph = new StateGraph(S)
+  .addNode("gen", gen).addNode("review", review)
+  .addEdge(START, "gen").addEdge("gen", "review").addEdge("review", END)
+  .compile({ checkpointer });
+```
+
+- **7 个 factory**(createLlmNode / createLlmStreamNode / createToolExecNode / createHumanApprovalNode / createPrepareNode / createFanout / createSubgraphNode)的「何时用 + 用法」见 **[docs/node-kit.md](docs/node-kit.md)**
+- 进阶模式(Send / interrupt / subgraph / 长任务硬化)见 [docs/flow-patterns.md](docs/flow-patterns.md)
+- 6 个完整可跑范例见 [examples/](examples/)
+- **AI Agent 开发指南**见 [CLAUDE.md](CLAUDE.md)
+
 ## 默认图（标准 LangGraph ReAct）
 
 开箱即用的默认图是标准 ReAct，工具/持久化全用框架原生能力：

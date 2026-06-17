@@ -4,6 +4,10 @@
 
 这一页收**少用但框架支持**的模式——平时不一定用,但需要时知道有、能照着抄。API 对齐已安装的 `@langchain/langgraph@1.x`(均已导出:`Send`、`interrupt`、`Command`、`MemorySaver`)。
 
+> **优先用 factory**:下面的 Send / interrupt / subgraph 等模式,框架已收成 `src/libs/nodes/` 的 factory
+> (`createFanout` / `createHumanApprovalNode` / `createSubgraphNode`),见 [node-kit.md](node-kit.md)。
+> 能用 factory 就别手写原生模式;只有 bespoke 节点(自定义 MCP 检索、反射 Command-goto 等)才回这里看原生 API。
+
 > 真实业务里把这些加到 `src/app/graph.ts` 的 `addNode`/`addEdge`/`addConditionalEdges` 即可。
 
 ## 1. Send:并行 fan-out(map-reduce)
