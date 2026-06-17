@@ -90,20 +90,20 @@ export async function qualityReviewNode(
     log.warn("quality_review API 失败 → 按 pass 放行", { error: String(err), apiOk: false });
     update = { draftDecision: "pass", draftCritique: "(评审异常，已放行)" };
   }
-  const route = routeAfterQualityReview({ ...state, ...update });
-  const goto = route === "write_draft" ? "write_draft" : "converse";
+  const goto = routeAfterQualityReview({ ...state, ...update });
   return new Command({ goto, update });
 }
 
 /**
- * 条件边（纯函数）：质量评审不达标 & 未达上限 → 回 draft；否则 → approve。
+ * 条件边（纯函数）：质量评审不达标 & 未达上限 → 回 draft；否则 → converse（进入持续会话）。
+ * 返回值与图节点 ends（["write_draft","converse"]）对齐。
  */
-export function routeAfterQualityReview(state: ResearchStateShape): "write_draft" | "approve" {
+export function routeAfterQualityReview(state: ResearchStateShape): "write_draft" | "converse" {
   if (
     state.draftDecision === "fail" &&
     state.draftAttempts < MAX_DRAFT_REVIEW
   ) {
     return "write_draft";
   }
-  return "approve";
+  return "converse";
 }

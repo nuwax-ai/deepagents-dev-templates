@@ -106,20 +106,20 @@ describe("routeAfterQualityReview (条件边, 纯函数, 无凭证)", () => {
     expect(routeAfterQualityReview(state)).toBe("write_draft");
   });
 
-  it("fail 但已达 MAX_DRAFT_REVIEW → 强制进 approve（防死循环）", () => {
+  it("fail 但已达 MAX_DRAFT_REVIEW → 强制进 converse（防死循环）", () => {
     const state = makeState({
       draftDecision: "fail",
       draftAttempts: MAX_DRAFT_REVIEW,
     });
-    expect(routeAfterQualityReview(state)).toBe("approve");
+    expect(routeAfterQualityReview(state)).toBe("converse");
   });
 
-  it("pass → 直接进 approve", () => {
+  it("pass → 直接进 converse", () => {
     const state = makeState({
       draftDecision: "pass",
       draftAttempts: 1,
     });
-    expect(routeAfterQualityReview(state)).toBe("approve");
+    expect(routeAfterQualityReview(state)).toBe("converse");
   });
 });
 
