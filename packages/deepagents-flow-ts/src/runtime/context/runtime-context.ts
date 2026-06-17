@@ -101,7 +101,9 @@ function resolveDefaultMcpServers(config: AppConfig): Record<string, McpServerEn
   return servers;
 }
 
-/** 把 server 配置转成 mcp-adapters connection；跳过无 url 且无 command 的无效项。 */
+/** 把 server 配置转成 mcp-adapters connection；跳过无 url 且无 command 的无效项。
+ *  env 规范化：session/平台下发的 env 可能是 array（非法），清洗为 Record<string,string>，
+ *  否则单个非法 server 会让 mcp-adapters 整体 Zod 校验失败、连累其余合法 server。 */
 function toConnections(
   servers: Record<string, McpServerEntry>
 ): Record<string, McpConnection> {
@@ -110,11 +112,22 @@ function toConnections(
     if (s.url) {
       out[name] = { transport: "http", url: s.url };
     } else if (s.command) {
+      // env 仅保留 plain object 且值为 string；其余形态（array / 非 string 值）一律丢弃。
+      const rawEnv = s.env as unknown;
+      const cleanEnv: Record<string, string> | undefined =
+        rawEnv && typeof rawEnv === "object" && !Array.isArray(rawEnv)
+          ? Object.fromEntries(
+              Object.entries(rawEnv as Record<string, unknown>)
+                .filter(([, v]) => typeof v === "string")
+                .map(([k, v]) => [k, v as string])
+            ) || undefined
+          : undefined;
+      const hasEnv = cleanEnv && Object.keys(cleanEnv).length > 0;
       out[name] = {
         transport: "stdio",
         command: s.command,
         args: s.args ?? [],
-        ...(s.env ? { env: s.env } : {}),
+        ...(hasEnv ? { env: cleanEnv } : {}),
       };
     }
     // else: 既无 url 又无 command —— 跳过，避免 mcp-adapters Zod 'command: Required'。
@@ -213,23 +226,44 @@ export async function hydrateRuntimeContext(
     context.sessionMcpServers
   );
 
-  // Load native MCP tools via mcp-adapters; onConnectionError=warn so a single
+  // Load native MCP tools via mcp-adapters; onConnectionError=ignore so a single
   // unreachable server does not zero out all MCP tools.
-  try {
-    const names = Object.keys(context.mcpServerConfigs);
-    if (names.length > 0) {
+  // 注意：mcp-adapters 的 onConnectionError 仅接受 "throw"|"ignore"（不接受 "warn"）。
+  const connections = toConnections(context.mcpServerConfigs);
+  const connNames = Object.keys(connections);
+  if (connNames.length > 0) {
+    try {
       const client = new MultiServerMCPClient({
-        mcpServers: toConnections(context.mcpServerConfigs),
-        onConnectionError: "warn",
+        mcpServers: connections,
+        onConnectionError: "ignore",
       } as never);
       context.mcpClient = client;
       context.mcpTools = await client.getTools();
       log.info("Loaded MCP tools", { count: context.mcpTools.length });
+    } catch (err) {
+      // 整体加载失败时，逐个 server 重试，避免单个坏 server 连累其余（onConnectionError=ignore 兜底连接级错误，
+      // 但 Zod 校验级错误会整体抛出，故此处再按 server 隔离重试一次）。
+      log.warn("MCP bulk load failed; retrying per-server", {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      const tools: typeof context.mcpTools = [];
+      for (const name of connNames) {
+        try {
+          const single = new MultiServerMCPClient({
+            mcpServers: { [name]: connections[name] },
+            onConnectionError: "ignore",
+          } as never);
+          tools.push(...(await single.getTools()));
+        } catch (e) {
+          log.warn("MCP server skipped", {
+            server: name,
+            error: e instanceof Error ? e.message : String(e),
+          });
+        }
+      }
+      context.mcpTools = tools;
+      log.info("Loaded MCP tools (per-server fallback)", { count: tools.length });
     }
-  } catch (err) {
-    log.warn("Failed to load MCP tools; continuing with builtin tools only", {
-      error: err instanceof Error ? err.message : String(err),
-    });
   }
 
   return context;

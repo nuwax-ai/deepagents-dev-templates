@@ -209,6 +209,25 @@ export function sessionConfigFromParams(params: Record<string, unknown>): {
     ...(mcpServers ? { mcpServers } : {}),
     ...(model ? { model } : {}),
   };
+  // 诊断告警：cwd 不是 flow-ts 项目根（缺 config/mcp.default.json 与 package.json）时提示。
+  // 不改写客户端意图（cwd 由 ACP 客户端控制），仅记录便于排查 "MCP config file not found" 类问题。
+  void (async () => {
+    try {
+      const fs = await import("node:fs");
+      const path = await import("node:path");
+      const hasProject =
+        fs.existsSync(path.join(cwd, "package.json")) &&
+        fs.existsSync(path.join(cwd, "config", "mcp.default.json"));
+      if (!hasProject) {
+        log.warn(
+          "ACP session cwd 不是 flow-ts 项目根（缺 package.json / config/mcp.default.json），MCP 默认配置与项目代码将读不到",
+          { cwd }
+        );
+      }
+    } catch {
+      // 诊断失败不影响主流程
+    }
+  })();
   return { sessionConfig, workspaceRoot: cwd };
 }
 

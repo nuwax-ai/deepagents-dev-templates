@@ -66,6 +66,10 @@ export function resolveModel(config: AppConfig): CreateDeepAgentParams["model"] 
       anthropicApiUrl: config.model.baseUrl,
       temperature: config.model.settings.temperature,
       maxTokens: config.model.settings.maxTokens,
+      // Anthropic SDK 对非流式请求有 10 分钟硬上限（长任务/慢模型如经 anthropic 协议代理的 glm 会触发
+      // "Streaming is required for operations that may take longer than 10 minutes"）。
+      // 开启 streaming 后 invoke 仍返回聚合 AIMessage（LangChain 内部聚合 stream），但底层以流式发出，绕过该限制。
+      streaming: true,
     });
   }
 
