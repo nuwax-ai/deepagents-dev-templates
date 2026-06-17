@@ -267,7 +267,15 @@ export function createFlowHooks(options: FlowAcpOptions): DeepAgentsServerHooks 
       try {
         const built = await options.createExecutor({ sessionConfig, workspaceRoot });
         // session/load 重配时先 dispose 旧资源，避免泄漏。
-        await sessions.get(ctx.sessionId)?.dispose?.();
+        // best-effort：旧实例 dispose 抛错不应阻断新实例就位（与 onSessionClosed 一致）。
+        try {
+          await sessions.get(ctx.sessionId)?.dispose?.();
+        } catch (dispErr) {
+          log.warn("configureSession: 旧 executor dispose 失败", {
+            sessionId: ctx.sessionId,
+            error: String(dispErr),
+          });
+        }
         sessions.set(ctx.sessionId, built);
         sessionFailures.delete(ctx.sessionId);
         log.info("configureSession → per-session runtime", {
@@ -378,18 +386,28 @@ export function createFlowHooks(options: FlowAcpOptions): DeepAgentsServerHooks 
           // 给 in-flight tool_call 发合法终止状态（failed + 取消说明），避免客户端 UI 悬挂「进行中」。
           // 注意：ToolCallStatus 枚举只有 pending|in_progress|completed|failed，无 cancelled
           // （客户端会本地标记 cancelled，但 agent 侧用 failed 表达「非正常终止」才是合法值）。
+          // best-effort：conn 可能已半关，单个 update 失败不应阻断其余 tool 收尾、也不应把
+          // cancel 当成普通错误吞掉（否则会落入下面的「道歉」分支，返回 end_turn 而非 cancelled）。
           for (const e of inflightTools.values()) {
-            await conn.sessionUpdate({
-              sessionId,
-              update: {
-                sessionUpdate: "tool_call_update",
+            try {
+              await conn.sessionUpdate({
+                sessionId,
+                update: {
+                  sessionUpdate: "tool_call_update",
+                  toolCallId: e.toolCallId,
+                  status: "failed",
+                  content: [
+                    { type: "content", content: { type: "text", text: "已取消（客户端 session/cancel）" } },
+                  ],
+                },
+              });
+            } catch (tuErr) {
+              log.warn("cancel: tool_call_update 发送失败", {
+                sessionId,
                 toolCallId: e.toolCallId,
-                status: "failed",
-                content: [
-                  { type: "content", content: { type: "text", text: "已取消（客户端 session/cancel）" } },
-                ],
-              },
-            });
+                error: String(tuErr),
+              });
+            }
           }
           return { stopReason: "cancelled" as StopReason };
         }

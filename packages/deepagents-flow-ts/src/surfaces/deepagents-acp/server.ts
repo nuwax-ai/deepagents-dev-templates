@@ -146,7 +146,13 @@ export class DeepAgentsServer {
   private checkpointer: MemorySaver;
   private clientCapabilities: ACPCapabilities = {};
   private isRunning = false;
-  private currentPromptAbortController: AbortController | null = null;
+  /**
+   * Per-session abort controllers for in-flight prompts, keyed by sessionId.
+   * `session/cancel` targets only the cancelling session, so concurrent prompts
+   * on different sessions no longer clobber each other's controller. ACP
+   * guarantees one prompt at a time per session, so a single entry per id suffices.
+   */
+  private readonly promptAbortControllers = new Map<string, AbortController>();
   private acpBackends: Map<string, ACPFilesystemBackend> = new Map();
 
   private readonly serverName: string;
@@ -469,35 +475,13 @@ export class DeepAgentsServer {
 
     this.sessions.set(sessionId, session);
 
-    // Host hook: configure the session (per-session workspace/cwd, replaced
-    // agent config, session-scoped MCP) before the agent is built.
-    await this.applySessionPatch(
-      agentName,
-      await this.hooks?.configureSession?.({
-        sessionId,
-        agentName,
-        mode: session.mode,
-        phase: "new",
-        params,
-      }),
-    );
-
-    if (!this.agents.has(agentName)) {
-      this.createAgent(agentName);
-    }
-
-    const acpBackend = this.acpBackends.get(agentName);
-    if (acpBackend) {
-      acpBackend.setSessionId(sessionId);
-    }
-
     this.log("Created session:", sessionId, "for agent:", agentName);
 
     const response: NewSessionResponse = {
       sessionId,
       modes: {
         availableModes: AVAILABLE_MODES,
-        currentModeId: paramsExt.mode ?? "agent",
+        currentModeId: session.mode ?? "agent",
       },
     };
 
@@ -627,8 +611,9 @@ export class DeepAgentsServer {
 
     session.lastActivityAt = new Date();
 
-    // Create abort controller for cancellation
-    this.currentPromptAbortController = new AbortController();
+    // Create a per-session abort controller for this turn (replacing any stale
+    // entry left by a turn that never reached `finally`).
+    this.promptAbortControllers.set(sessionId, new AbortController());
 
     // Extract prompt text for logging
     const prompt = params.prompt as ContentBlock[];
@@ -656,7 +641,7 @@ export class DeepAgentsServer {
         promptText: this.getPromptText(prompt),
         params,
         conn,
-        signal: this.currentPromptAbortController?.signal,
+        signal: this.promptAbortControllers.get(sessionId)?.signal,
       });
       if (hookResult) {
         return hookResult;
@@ -688,7 +673,7 @@ export class DeepAgentsServer {
       await this.hooks?.onPromptError?.({ sessionId, error });
       throw error;
     } finally {
-      this.currentPromptAbortController = null;
+      this.promptAbortControllers.delete(sessionId);
     }
   }
 
@@ -721,9 +706,9 @@ export class DeepAgentsServer {
   private async handleCancel(params: CancelNotification): Promise<void> {
     this.log("Cancelling session:", params.sessionId);
 
-    if (this.currentPromptAbortController) {
-      this.currentPromptAbortController.abort();
-    }
+    // Abort only the cancelling session's in-flight prompt — not whatever
+    // happens to be globally current. No-op if that session has no prompt running.
+    this.promptAbortControllers.get(params.sessionId)?.abort();
   }
 
   /**
@@ -758,7 +743,7 @@ export class DeepAgentsServer {
   ): Promise<StopReason> {
     const config = {
       configurable: { thread_id: session.threadId },
-      signal: this.currentPromptAbortController?.signal,
+      signal: this.promptAbortControllers.get(session.id)?.signal,
     };
 
     // Track active tool calls
@@ -781,7 +766,7 @@ export class DeepAgentsServer {
       const eventKeys = Object.keys(event);
 
       // Check for cancellation
-      if (this.currentPromptAbortController?.signal.aborted) {
+      if (this.promptAbortControllers.get(session.id)?.signal.aborted) {
         this.log(
           "Stream cancelled, cleaning up tool calls:",
           activeToolCalls.size,
