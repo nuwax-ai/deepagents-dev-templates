@@ -17,17 +17,14 @@ version: "2.0.0"
 | `FlowExecutor` | 问答 / 检索 / 批处理（单输入单输出） | 函数 `(query, cb) => Promise<FlowResult>` | `examples/rag` |
 | `StatefulFlow` | 审批 / 确认 / 长任务（HITL / 跨重启） | `createStatefulFlow(...)` | travel / pm / review / deep-research |
 
-## Step 2: 复制范例骨架
+## Step 2: 读范例，在 src/app/ 实现
 
-```
-examples/<your-flow>/
-  README.md
-  index.ts        # -> bootstrapFlowAcp / runFlowCli（参数解析 + surface 挂接）
-  graph.ts        # State 定义 + 节点 + 连线 + 编译
-  nodes/          # 节点逻辑（可选，复杂时拆分）
-  config/         # 自定义配置段（可选）
-  tests/          # 决策函数单测
-```
+> ⚠️ **`examples/` 纯只读**。阅读范例学拓扑，然后在 **`src/app/`** 中实现（改 graph.ts、nodes/、tools/）。
+
+开发位置 `src/app/`：
+- `graph.ts` — 连线与条件路由（图是契约）
+- `nodes/` — 节点实现（prepare / think / tools / respond）
+- `tools/` — 内置工具（在此加新工具）
 
 ## Step 3: 写 State 定义
 

@@ -55,7 +55,11 @@ export interface StageEvent {
   detail?: string;
 }
 
-/** 回调集合（流式 token + 工具调用 + 阶段 + Plan）——one-shot 与 stateful flow 共用。 */
+/**
+ * 回调集合（流式 token + 工具调用 + 阶段 + Plan）——one-shot 与 stateful flow 共用。
+ * signal（可选）：任务取消信号。surface 从 ACP cancel controller 取，透传到
+ * `graph.stream({signal})`；中止时 LangGraph 以 AbortError reject，surface 据此快速收尾。
+ */
 export interface FlowCallbacks {
   onToken?: (token: string) => void | Promise<void>;
   onToolCall?: (e: ToolCallEvent) => void | Promise<void>;
@@ -63,6 +67,8 @@ export interface FlowCallbacks {
   onStage?: (e: StageEvent) => void | Promise<void>;
   /** 结构化 Plan 更新（ACP sessionUpdate: plan）。 */
   onPlan?: (e: PlanEvent) => void | Promise<void>;
+  /** 任务取消信号（可选）。被中止时底层图运行 reject，不再继续产出 token。 */
+  signal?: AbortSignal;
 }
 
 /**

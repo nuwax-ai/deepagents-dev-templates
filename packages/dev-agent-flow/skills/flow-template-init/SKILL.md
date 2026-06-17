@@ -17,7 +17,7 @@ version: "2.0.0"
 检查项目根目录的 `package.json`：
 - `name` 包含 `deepagents-flow-ts`
 - `type` 为 `"module"`（ESM）
-- `dependencies` 包含 `@langchain/langgraph`、`deepagents-acp`、`@langchain/mcp-adapters`
+- `dependencies` 包含 `@langchain/langgraph`、`@agentclientprotocol/sdk`、`@langchain/mcp-adapters`（ACP 经 `src/surfaces/deepagents-acp/` vendor 自维护）
 - **自包含**：不依赖 deepagents-app-ts（底层运行时全部在 `src/runtime/` 内）
 
 这是 **TypeScript 工作流编排模板**（仅 TS，无 Python 版）。
@@ -55,11 +55,10 @@ src/
   surfaces/      # ACP / CLI 适配器（L4，保护）
   compose/       # 组合根（L4，保护）：createFlowRuntime 装配 runtime + tools
   index.ts       # 入口 / 装配
-examples/        # 参考库（新 flow 优先对照）
+examples/        # 参考库（只读，新 flow 在此新建目录，不修改已有范例）
 config/          # flow-agent.config.json、mcp.*.json
 prompts/         # flow.base.md
 skills/          # SKILL.md（builtin/）
-.agents/         # 声明式 subagent（agents/<name>/AGENT.md）
 tests/           # 默认图单测 + 分层守卫（layering.test.ts）
 ```
 
@@ -81,7 +80,8 @@ core -> runtime -> app -> { surfaces | compose } -> index.ts
 | 契约 | `src/core/` | 纯类型；改契约需同步 app + surfaces |
 | 底层运行时/适配器/组合根 | `src/runtime/`、`src/surfaces/`、`src/compose/` | 禁止修改（除非用户明确要求） |
 | 默认图 | `src/app/`（graph.ts 连线 + nodes/ 节点 + tools/ 工具） | 可改 |
-| 参考与复制 | `examples/` | 新 flow 优先对照 |
+| 参考（只读） | `examples/` | 阅读学拓扑，不修改不新建 |
+| 开发工作区 | `src/app/` | graph.ts + nodes/ + tools/ |
 | 配置 | `config/`、`prompts/`、`skills/`、`.agents/` | 按需扩展 |
 
 ### Step 6: 安装依赖与验证

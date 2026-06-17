@@ -30,6 +30,7 @@
 |------|----------|----------|
 | `flow-tool-creator` | flow-ts 创建新工具 | tool() 函数、Zod schema 设计、无状态 vs 平台绑定工厂、注册到 createFlowTools |
 | `flow-config-setup` | 配置 MCP / 管理变量 | MCP 服务器（stdio/http）、合并策略、agent_variable 密钥管理、变量插值 |
+| `agent-dev-config` | 接入平台工具到 LangGraph / 保存系统提示词到平台 | 搜索可用工具（Plugin/Workflow/Knowledge）、添加/删除工具到 dev Agent 配置、按平台 schema 在 LangGraph 实现 @tool + bind_tools、更新系统提示词/开场白 |
 
 ### 开发流程
 | 技能 | 触发场景 | 关键内容 |
@@ -74,9 +75,10 @@
 - **原因**：这些是基础设施代码，修改会破坏 ACP 协议兼容性和 surface seam；core 契约改动需同步 app + surfaces
 
 ### AI 可编辑区（AI-editable）— 自由修改
-- **路径**：`src/app/`（默认图 + 工具）、`examples/`（新 flow）、`prompts/`、`skills/`、`.agents/`
-- **内容**：默认 ReAct 图（`graph.ts` 连线 + `nodes/` 节点 + `tools/` 工具）、参考 flow、场景提示词、技能定义、声明式 subagent
+- **路径**：`src/app/`（默认图 + 工具）、`prompts/`、`skills/`、`.agents/`
+- **内容**：默认 ReAct 图（`graph.ts` 连线 + `nodes/` 节点 + `tools/` 工具）、场景提示词、技能定义、声明式 subagent
 - **规则**：这是你的主要工作区域，可以自由创建和修改
+- **⚠️ `examples/` 纯只读参考**：不要在 `examples/` 下创建新目录、修改已有范例。正确做法是**阅读**范例学拓扑 → 在 **`src/app/`** 中实现
 
 ### 用户可编辑区（User-editable）— 建议修改，用户决定
 - **路径**：`config/`
@@ -91,7 +93,7 @@
 - 不可绕过 surface seam 自己重写 ACP/CLI plumbing
 - 不可手写 run-loop（有状态 flow 必须用 `createStatefulFlow` 基座）
 - 可以在 `src/app/` 改默认图（`graph.ts` 连线 + `nodes/` 节点）、加工具（`tools/`）
-- 可以在 `examples/` 照范例新增 flow
+- `examples/` 纯只读——不在其中创建或修改任何内容
 - 可以在 `skills/` 加技能、在 `prompts/` 设计场景提示词、在 `.agents/` 加 subagent
 - 需要新底层能力时在 `src/runtime/` 内扩展（import 指向本项目路径，不引用仓库外）
 </TEMPLATE_CONSTRAINTS>
@@ -167,7 +169,7 @@ platform_api(operation: "query_plugins", params: { query: "<所需能力>" })
 
 1. **在 `src/app/graph.ts` 改默认图连线** — 调整连线；节点实现改 `nodes/`
 2. **在 `src/app/nodes/` 改节点实现** — 新增节点照工厂模式（create*Node）
-3. **在 `examples/` 照范例新增 flow** — 写 graph.ts + nodes + index.ts
+3. **在 `src/app/` 实现 flow** — 改 graph.ts 连线、nodes/ 节点、tools/ 工具（examples/ 仅供参考）
 4. **在 `src/app/tools/` 创建新工具** — 注册到 `createFlowTools()`
 5. **在 `skills/` 创建新技能** — 遵循 SKILL.md 格式
 6. **在 `prompts/` 设计场景提示词** — 基于 `flow.base.md`
@@ -205,12 +207,11 @@ platform_api(operation: "query_plugins", params: { query: "<所需能力>" })
 4. **查阅相关技能** — `flow-orchestration` + `flow-creator`
 
 ### Phase 2: 开发实现
-1. **复制范例骨架** → `examples/{name}/`（README + index.ts + graph.ts + nodes/ + tests/）
-2. **写 State 定义** → `Annotation.Root({ ... })`，并行写需加 reducer
-3. **写节点函数** → 每个节点一件事，返回 Partial update；需运行时依赖的走工厂（create*Node）
-4. **写连线** → `graph.ts` 的 addEdge / addConditionalEdges / Send 扇出
-5. **包成执行器** → `FlowExecutor`（函数）或 `createStatefulFlow`（有状态）
-6. **挂接 surface** → `index.ts` 调 `bootstrapFlowAcp` / `runFlowCli`
+1. **读 examples/ 选最接近的范例** → 学拓扑与挂接方式（纯只读，不修改）
+2. **在 `src/app/` 实现** → 改 `graph.ts` 连线、`nodes/` 节点、`tools/` 工具
+3. **写 State 定义** → `Annotation.Root({ ... })`，并行写需加 reducer
+4. **写节点函数** → 每个节点一件事，返回 Partial update；需运行时依赖的走工厂（create*Node）
+5. **写连线** → `graph.ts` 的 addEdge / addConditionalEdges / Send 扇出
 7. **工具开发**（如需要）：查阅 `flow-tool-creator` → 创建 → 注册到 `createFlowTools()`
 8. **提示词设计**（如需要）：查阅 `flow-prompt-designer` → 基于 `flow.base.md`
 9. **变量创建**（如需要）：查阅 `flow-config-setup` → 通过 `agent_variable` 创建占位

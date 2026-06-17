@@ -20,6 +20,11 @@ const log = logger.child("flow-think");
 
 type BoundModel = { invoke: (m: BaseMessage[]) => Promise<AIMessage> };
 
+/** Model-like interface that has bindTools (BaseChatModel, ConfigurableModel, etc.) */
+interface ModelWithTools {
+  bindTools(tools: StructuredTool[]): BoundModel;
+}
+
 /** 仅在有 systemPrompt 且 messages 首条非 system 时，前置注入 SystemMessage。 */
 function withSystemPrompt(messages: BaseMessage[], systemPrompt: string): BaseMessage[] {
   if (!systemPrompt) return messages;
@@ -46,9 +51,9 @@ export function createThinkNode(deps: ThinkNodeDeps) {
     try {
       const raw = resolveModel(config);
       if (raw && typeof raw !== "string") {
-        boundModel = (
-          raw as unknown as { bindTools: (t: StructuredTool[]) => BoundModel }
-        ).bindTools(allTools);
+        // raw is a model instance (BaseChatModel, ConfigurableModel, etc.) that has bindTools
+        const model = raw as unknown as ModelWithTools;
+        boundModel = model.bindTools(allTools);
       }
     } catch (err) {
       log.warn("resolveModel/bindTools failed", { error: String(err) });

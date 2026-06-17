@@ -181,6 +181,7 @@ export function createStatefulFlow<S = Record<string, unknown>>(
       const streamConfig: StreamRunnableConfig = {
         ...config,
         streamMode: [...STREAM_MODES],
+        ...(callbacks?.signal ? { signal: callbacks.signal } : {}),
       };
       const stream = await graph.stream(streamInput, streamConfig);
 

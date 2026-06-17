@@ -212,16 +212,19 @@ export function sessionConfigFromParams(params: Record<string, unknown>): {
   return { sessionConfig, workspaceRoot: cwd };
 }
 
-/** 启动 Flow ACP 服务（stdio）。任意 FlowExecutor / per-session 工厂都能插进来。 */
-export async function bootstrapFlowAcp(options: FlowAcpOptions): Promise<void> {
-  if (options.debug) {
-    process.env.LOG_LEVEL = "debug";
-  }
-  const { appConfig } = options;
-
+/**
+ * 构造 flow surface 的三个 ACP hook（configureSession / onPrompt / onSessionClosed）。
+ *
+ * 从 bootstrapFlowAcp 抽出，便于在测试中直接调用 hook、注入假 executor / 假 conn，
+ * 无需启动真实 stdio server。bootstrapFlowAcp 调它再把 hooks 交给 DeepAgentsServer——行为不变。
+ *
+ * onPrompt 把 ACP cancel controller 的 signal 经 callbacks.signal 透传进 flow，
+ * flow 再交给 `graph.stream({signal})`：client 取消时图运行快速 reject，onPrompt 的 catch 收尾。
+ */
+export function createFlowHooks(options: FlowAcpOptions): DeepAgentsServerHooks {
   // per-session executor 缓存（createExecutor 模式）；单 executor 模式下恒空。
   const sessions = new Map<string, SessionExecutor>();
-  // configureSession 下发的 workspace/cwd 也缓存下来；若 hook 未能立即建好 executor，
+  // configureSession 下发的 workspace/cwd 也缓存下来；若 hook 未能立即建好 executor,
   // 后续懒建也必须沿用同一 session 配置，不能退回进程 cwd。
   const sessionConfigs = new Map<
     string,
@@ -231,20 +234,6 @@ export async function bootstrapFlowAcp(options: FlowAcpOptions): Promise<void> {
   // 一个会话 = 一个主题：老式 flow（未实现 hasStarted）的「等回复」内存兜底，按 sessionId 跟踪。
   // 实现了 hasStarted 的 flow 优先从 checkpointer 推断续跑（跨进程/IDE 重启仍准）。
   const fallbackResume = new Set<string>();
-
-  log.info("Flow ACP bootstrapping", {
-    agent: appConfig.agent.name,
-    model: `${appConfig.model.provider}:${appConfig.model.name}`,
-    mode: options.createExecutor ? "per-session" : "single-executor",
-  });
-
-  // 极简 throwaway agent —— onPrompt 会短路，它永不进入请求路径。
-  const agentConfig = {
-    name: appConfig.agent.name,
-    description: appConfig.agent.description,
-    model: resolveModel(appConfig),
-    tools: [],
-  } as unknown as DeepAgentConfig;
 
   /** 取该 session 的 executor：优先 per-session 缓存，回退单 executor；createExecutor 模式下缺失则懒建。 */
   async function resolveExecutor(
@@ -269,7 +258,7 @@ export async function bootstrapFlowAcp(options: FlowAcpOptions): Promise<void> {
     return options.executor;
   }
 
-  const hooks: DeepAgentsServerHooks = {
+  return {
     // session/new | session/load：按 ACP cwd/mcpServers/model 装配 per-session runtime。
     async configureSession(ctx) {
       if (!options.createExecutor) return undefined;
@@ -278,7 +267,15 @@ export async function bootstrapFlowAcp(options: FlowAcpOptions): Promise<void> {
       try {
         const built = await options.createExecutor({ sessionConfig, workspaceRoot });
         // session/load 重配时先 dispose 旧资源，避免泄漏。
-        await sessions.get(ctx.sessionId)?.dispose?.();
+        // best-effort：旧实例 dispose 抛错不应阻断新实例就位（与 onSessionClosed 一致）。
+        try {
+          await sessions.get(ctx.sessionId)?.dispose?.();
+        } catch (dispErr) {
+          log.warn("configureSession: 旧 executor dispose 失败", {
+            sessionId: ctx.sessionId,
+            error: String(dispErr),
+          });
+        }
         sessions.set(ctx.sessionId, built);
         sessionFailures.delete(ctx.sessionId);
         log.info("configureSession → per-session runtime", {
@@ -319,15 +316,28 @@ export async function bootstrapFlowAcp(options: FlowAcpOptions): Promise<void> {
 
       // 跟踪是否流式：流式则只补 footer/question，非流式则整段发。
       let streamed = false;
+      // 跟踪本轮已 start、未 end 的 tool_call：cancel 时遍历发终止 update，
+      // 避免客户端 UI 上工具调用永远挂着「进行中」（abort 时收不到 on_tool_end）。
+      const inflightTools = new Map<string, ToolCallEvent>();
       const callbacks: FlowCallbacks = {
         onToken: (token) => {
           streamed = true;
           return streamText(conn, sessionId, token, "agent");
         },
-        onToolCall: (e) => emitToolCall(conn, sessionId, e),
+        onToolCall: async (e) => {
+          await emitToolCall(conn, sessionId, e);
+          if (e.status === "in_progress") {
+            inflightTools.set(e.toolCallId, e);
+          } else {
+            // completed | failed：已结束，移出 in-flight 集合
+            inflightTools.delete(e.toolCallId);
+          }
+        },
         // 阶段进度作为 thought chunk，与主回答区分。
         onStage: (e) => streamText(conn, sessionId, formatStage(e), "thought"),
         onPlan: (e) => emitPlan(conn, sessionId, e),
+        // ACP cancel signal → graph.stream({signal})，取消时图运行快速 reject。
+        ...(ctx.signal ? { signal: ctx.signal } : {}),
       };
 
       try {
@@ -368,6 +378,39 @@ export async function bootstrapFlowAcp(options: FlowAcpOptions): Promise<void> {
         if (result.footer) await streamText(conn, sessionId, result.footer);
         return { stopReason: "end_turn" as StopReason };
       } catch (err) {
+        // 客户端 session/cancel：协议要求以 StopReason::Cancelled 响应原 prompt
+        // （acp.d.ts:1051）。signal 被 abort 时底层图运行以 AbortError reject——
+        // 这里捕获后返回 cancelled，而非把取消当成普通错误返回 end_turn。
+        if ((err as Error)?.name === "AbortError" || ctx.signal?.aborted) {
+          log.info("onPrompt cancelled by client", { sessionId, inflight: inflightTools.size });
+          // 给 in-flight tool_call 发合法终止状态（failed + 取消说明），避免客户端 UI 悬挂「进行中」。
+          // 注意：ToolCallStatus 枚举只有 pending|in_progress|completed|failed，无 cancelled
+          // （客户端会本地标记 cancelled，但 agent 侧用 failed 表达「非正常终止」才是合法值）。
+          // best-effort：conn 可能已半关，单个 update 失败不应阻断其余 tool 收尾、也不应把
+          // cancel 当成普通错误吞掉（否则会落入下面的「道歉」分支，返回 end_turn 而非 cancelled）。
+          for (const e of inflightTools.values()) {
+            try {
+              await conn.sessionUpdate({
+                sessionId,
+                update: {
+                  sessionUpdate: "tool_call_update",
+                  toolCallId: e.toolCallId,
+                  status: "failed",
+                  content: [
+                    { type: "content", content: { type: "text", text: "已取消（客户端 session/cancel）" } },
+                  ],
+                },
+              });
+            } catch (tuErr) {
+              log.warn("cancel: tool_call_update 发送失败", {
+                sessionId,
+                toolCallId: e.toolCallId,
+                error: String(tuErr),
+              });
+            }
+          }
+          return { stopReason: "cancelled" as StopReason };
+        }
         log.error("onPrompt flow failed", { error: String(err) });
         if (!durableResume) fallbackResume.delete(sessionId); // 出错清兜底状态，避免卡在 resume
         await streamText(conn, sessionId, "抱歉，处理您的问题时出现错误。");
@@ -392,6 +435,30 @@ export async function bootstrapFlowAcp(options: FlowAcpOptions): Promise<void> {
       log.info("session closed", { sessionId: ctx.sessionId });
     },
   };
+}
+
+/** 启动 Flow ACP 服务（stdio）。任意 FlowExecutor / per-session 工厂都能插进来。 */
+export async function bootstrapFlowAcp(options: FlowAcpOptions): Promise<void> {
+  if (options.debug) {
+    process.env.LOG_LEVEL = "debug";
+  }
+  const { appConfig } = options;
+
+  log.info("Flow ACP bootstrapping", {
+    agent: appConfig.agent.name,
+    model: `${appConfig.model.provider}:${appConfig.model.name}`,
+    mode: options.createExecutor ? "per-session" : "single-executor",
+  });
+
+  // 极简 throwaway agent —— onPrompt 会短路，它永不进入请求路径。
+  const agentConfig = {
+    name: appConfig.agent.name,
+    description: appConfig.agent.description,
+    model: resolveModel(appConfig),
+    tools: [],
+  } as unknown as DeepAgentConfig;
+
+  const hooks = createFlowHooks(options);
 
   const server = new DeepAgentsServer({
     agents: agentConfig,

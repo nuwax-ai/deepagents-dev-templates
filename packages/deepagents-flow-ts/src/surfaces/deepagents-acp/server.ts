@@ -146,7 +146,13 @@ export class DeepAgentsServer {
   private checkpointer: MemorySaver;
   private clientCapabilities: ACPCapabilities = {};
   private isRunning = false;
-  private currentPromptAbortController: AbortController | null = null;
+  /**
+   * Per-session abort controllers for in-flight prompts, keyed by sessionId.
+   * `session/cancel` targets only the cancelling session, so concurrent prompts
+   * on different sessions no longer clobber each other's controller. ACP
+   * guarantees one prompt at a time per session, so a single entry per id suffices.
+   */
+  private readonly promptAbortControllers = new Map<string, AbortController>();
   private acpBackends: Map<string, ACPFilesystemBackend> = new Map();
 
   private readonly serverName: string;
@@ -469,54 +475,20 @@ export class DeepAgentsServer {
 
     this.sessions.set(sessionId, session);
 
-    // Host hook: configure the session (per-session workspace/cwd, replaced
-    // agent config, session-scoped MCP) before the agent is built.
-    await this.applySessionPatch(
-      agentName,
-      await this.hooks?.configureSession?.({
-        sessionId,
-        agentName,
-        mode: session.mode,
-        phase: "new",
-        params,
-      }),
-    );
-
-    if (!this.agents.has(agentName)) {
-      this.createAgent(agentName);
-    }
-
-    const acpBackend = this.acpBackends.get(agentName);
-    if (acpBackend) {
-      acpBackend.setSessionId(sessionId);
-    }
-
     this.log("Created session:", sessionId, "for agent:", agentName);
 
-    const response = {
+    const response: NewSessionResponse = {
       sessionId,
       modes: {
         availableModes: AVAILABLE_MODES,
-        currentModeId: (params.mode as string) ?? "agent",
+        currentModeId: session.mode ?? "agent",
       },
     };
 
     this.log("New session response:", JSON.stringify(response));
 
-    const agentConfig = this.agentConfigs.get(agentName);
-    const customCommands = agentConfig?.commands ?? [];
-    const allCommands = [...DEFAULT_COMMANDS, ...customCommands];
-    conn
-      .sessionUpdate({
-        sessionId,
-        update: {
-          sessionUpdate: "available_commands_update",
-          availableCommands: allCommands,
-        },
-      } as SessionNotification)
-      .catch((err) => {
-        this.log("Failed to send commands update:", err);
-      });
+    // Initialize session: apply host hook, create agent, send commands
+    await this.initializeSession(session, conn, "new", params);
 
     return response;
   }
@@ -543,14 +515,42 @@ export class DeepAgentsServer {
     });
     session.lastActivityAt = new Date();
 
-    // Host hook: configure the (re)loaded session before it is used.
+    // Initialize session: apply host hook, create agent, send commands
+    await this.initializeSession(session, conn, "load", params);
+
+    await this.replaySessionHistory(session, conn);
+
+    const response: LoadSessionResponse = {
+      modes: {
+        availableModes: AVAILABLE_MODES,
+        currentModeId: session.mode ?? "agent",
+      },
+    };
+
+    this.log("Load session response:", JSON.stringify(response));
+    return response;
+  }
+
+  /**
+   * Common session initialization logic shared by handleNewSession and handleLoadSession.
+   * Applies host hook, creates agent if needed, sets ACP backend session ID, and sends commands.
+   */
+  private async initializeSession(
+    session: SessionState,
+    conn: AgentSideConnection,
+    phase: "new" | "load",
+    params: Record<string, unknown>,
+  ): Promise<void> {
+    const { id: sessionId, agentName } = session;
+
+    // Host hook: configure the session before the agent is built.
     await this.applySessionPatch(
-      session.agentName,
+      agentName,
       await this.hooks?.configureSession?.({
         sessionId,
-        agentName: session.agentName,
+        agentName,
         mode: session.mode,
-        phase: "load",
+        phase,
         params,
       }),
     );
@@ -558,19 +558,18 @@ export class DeepAgentsServer {
     // A configureSession patch may have replaced the agent config, which
     // invalidates the cached agent + backend (applySessionPatch deletes them).
     // Rebuild before use — otherwise the agent is missing and the next prompt
-    // throws "Agent not found". Mirrors handleNewSession.
-    if (!this.agents.has(session.agentName)) {
-      this.createAgent(session.agentName);
+    // throws "Agent not found".
+    if (!this.agents.has(agentName)) {
+      this.createAgent(agentName);
     }
 
-    const acpBackend = this.acpBackends.get(session.agentName);
+    const acpBackend = this.acpBackends.get(agentName);
     if (acpBackend) {
       acpBackend.setSessionId(sessionId);
     }
 
-    await this.replaySessionHistory(session, conn);
-
-    const agentConfig = this.agentConfigs.get(session.agentName);
+    // Send available commands to the client
+    const agentConfig = this.agentConfigs.get(agentName);
     const customCommands = agentConfig?.commands ?? [];
     const allCommands = [...DEFAULT_COMMANDS, ...customCommands];
     conn
@@ -584,16 +583,6 @@ export class DeepAgentsServer {
       .catch((err) => {
         this.log("Failed to send commands update:", err);
       });
-
-    const response = {
-      modes: {
-        availableModes: AVAILABLE_MODES,
-        currentModeId: session.mode ?? "agent",
-      },
-    };
-
-    this.log("Load session response:", JSON.stringify(response));
-    return response;
   }
 
   /**
@@ -622,8 +611,9 @@ export class DeepAgentsServer {
 
     session.lastActivityAt = new Date();
 
-    // Create abort controller for cancellation
-    this.currentPromptAbortController = new AbortController();
+    // Create a per-session abort controller for this turn (replacing any stale
+    // entry left by a turn that never reached `finally`).
+    this.promptAbortControllers.set(sessionId, new AbortController());
 
     // Extract prompt text for logging
     const prompt = params.prompt as ContentBlock[];
@@ -651,6 +641,7 @@ export class DeepAgentsServer {
         promptText: this.getPromptText(prompt),
         params,
         conn,
+        signal: this.promptAbortControllers.get(sessionId)?.signal,
       });
       if (hookResult) {
         return hookResult;
@@ -682,7 +673,7 @@ export class DeepAgentsServer {
       await this.hooks?.onPromptError?.({ sessionId, error });
       throw error;
     } finally {
-      this.currentPromptAbortController = null;
+      this.promptAbortControllers.delete(sessionId);
     }
   }
 
@@ -715,9 +706,9 @@ export class DeepAgentsServer {
   private async handleCancel(params: CancelNotification): Promise<void> {
     this.log("Cancelling session:", params.sessionId);
 
-    if (this.currentPromptAbortController) {
-      this.currentPromptAbortController.abort();
-    }
+    // Abort only the cancelling session's in-flight prompt — not whatever
+    // happens to be globally current. No-op if that session has no prompt running.
+    this.promptAbortControllers.get(params.sessionId)?.abort();
   }
 
   /**
@@ -733,8 +724,8 @@ export class DeepAgentsServer {
       throw new Error(`Session not found: ${sessionId}`);
     }
 
-    // Accept both ACP spec 'modeId' and legacy 'mode' parameter
-    const mode = (params.modeId as string) ?? (params.mode as string);
+    // SDK 0.24.0: SetSessionModeRequest has modeId (required)
+    const mode = params.modeId;
     session.mode = mode;
     this.log("Set mode for session:", sessionId, "to:", mode);
 
@@ -752,7 +743,7 @@ export class DeepAgentsServer {
   ): Promise<StopReason> {
     const config = {
       configurable: { thread_id: session.threadId },
-      signal: this.currentPromptAbortController?.signal,
+      signal: this.promptAbortControllers.get(session.id)?.signal,
     };
 
     // Track active tool calls
@@ -775,7 +766,7 @@ export class DeepAgentsServer {
       const eventKeys = Object.keys(event);
 
       // Check for cancellation
-      if (this.currentPromptAbortController?.signal.aborted) {
+      if (this.promptAbortControllers.get(session.id)?.signal.aborted) {
         this.log(
           "Stream cancelled, cleaning up tool calls:",
           activeToolCalls.size,
@@ -1431,7 +1422,7 @@ export class DeepAgentsServer {
       // though ACP does not drive humanInTheLoop interrupts.
       permissions: config.permissions,
       store: config.store,
-      backend,
+      backend: backend as Parameters<typeof createDeepAgent>[0]["backend"],
       skills: config.skills,
       memory: config.memory,
       checkpointer: this.checkpointer,
@@ -1447,7 +1438,7 @@ export class DeepAgentsServer {
   ): BackendProtocolV2 | BackendFactory {
     if (config.backend) {
       this.log("Using custom backend for agent:", config.name);
-      return config.backend;
+      return config.backend as BackendProtocolV2 | BackendFactory;
     }
 
     if (
@@ -1504,7 +1495,7 @@ export class DeepAgentsServer {
 
     this.log("Writing file via client:", { path, length: content.length });
     try {
-      await this.connection.writeTextFile({ path, content });
+      await this.connection.writeTextFile({ sessionId: "", path, content } as WriteTextFileRequest);
       this.log("File write successful:", path);
       return true;
     } catch (err) {
