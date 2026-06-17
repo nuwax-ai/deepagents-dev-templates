@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { safeCalc, createDemoTools } from "../src/app/tools/demo.tool.js";
+import { safeCalc, createDemoTools } from "../src/libs/tools/demo.tool.js";
 import { getFlowSandboxPolicy, isPathAllowed } from "../src/runtime/fs/sandbox.js";
 import type { AppConfig } from "../src/runtime/index.js";
 

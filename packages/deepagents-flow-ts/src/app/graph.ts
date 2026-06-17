@@ -27,12 +27,8 @@ import type { StructuredTool } from "@langchain/core/tools";
 import { logger, type AppConfig } from "../runtime/index.js";
 import { FlowStateAnnotation, type FlowState } from "./state.js";
 import type { FlowCallbacks } from "../core/flow-types.js";
-import {
-  prepareNode,
-  createThinkNode,
-  createToolsNode,
-  createRespondNode,
-} from "./nodes/index.js";
+import { createThinkNode, createRespondNode } from "./nodes/index.js";
+import { createPrepareNode, createToolExecNode } from "../libs/nodes/index.js";
 
 const log = logger.child("flow-graph");
 
@@ -53,12 +49,22 @@ export function createFlowGraph(config: CreateFlowGraphConfig = {}) {
 
   // 建节点：prepare 纯函数；think/tools/respond 由工厂承接各自运行时依赖（见 ./nodes/*）。
   const graph = new StateGraph(FlowStateAnnotation)
-    .addNode("prepare", prepareNode)
+    .addNode("prepare", createPrepareNode<FlowState>())
     .addNode(
       "think",
       createThinkNode({ config: config.config, allTools, systemPrompt: config.systemPrompt })
     )
-    .addNode("tools", createToolsNode({ allTools, callbacks }))
+    .addNode(
+      "tools",
+      createToolExecNode<FlowState>({
+        tools: allTools,
+        callbacks,
+        write: (msgs) => ({
+          messages: msgs,
+          steps: msgs.map((t) => `tool:${t.name ?? "?"}`),
+        }),
+      })
+    )
     .addNode("respond", createRespondNode({ callbacks }))
     // 连边：图的契约（与可视化拓扑一致，见 topology.ts）。
     .addEdge(START, "prepare")

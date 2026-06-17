@@ -17,13 +17,8 @@ import {
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { logger, type AppConfig } from "../../../../src/runtime/index.js";
 import type { FlowCallbacks } from "../../../../src/surfaces/flow-types.js";
-import {
-  emitPlan,
-  emitStage,
-  extractText,
-  requireModel,
-  runTool,
-} from "../../../shared.js";
+import { requireModel } from "../../../shared.js";
+import { emitPlan, emitStage, extractText, runTool } from "../../../../src/libs/nodes/index.js";
 import type { OutlineSection, ResearchFinding } from "../types.js";
 import { invokeLLM, langClause } from "../helpers.js";
 import { outlineToPlanEntries } from "../planning.js";

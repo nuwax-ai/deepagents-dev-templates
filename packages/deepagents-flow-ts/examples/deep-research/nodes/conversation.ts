@@ -3,9 +3,10 @@
 import { Command, interrupt, type LangGraphRunnableConfig } from "@langchain/langgraph";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { logger, type AppConfig } from "../../../src/runtime/index.js";
-import { isApproval, requireModel } from "../../shared.js";
+import { requireModel } from "../../shared.js";
+import { isApproval, streamLLMText } from "../../../src/libs/nodes/index.js";
 import type { ResearchStateShape } from "./types.js";
-import { langClause, llmLongTimeout, streamLLMText } from "./helpers.js";
+import { langClause, llmLongTimeout } from "./helpers.js";
 
 const log = logger.child("deep-research");
 

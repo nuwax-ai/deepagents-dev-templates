@@ -8,8 +8,11 @@
  *   START → compose → review(interrupt 暂停) → finalize → END
  *                         ▲ 把草稿抛给用户、等回复            └ 按回复定稿
  *
- * 真实接入：compose / finalize **真调大模型**生成（无 demo fallback——未配凭证直接报错）。
- * review 用 interrupt 暂停，复用模板的 StatefulFlow seam（surface 接好 resume）。
+ * 节点消费框架 factory（src/libs/nodes）：
+ *  - compose → createLlmNode；review → createHumanApprovalNode（interrupt + isApproval）。
+ *  - finalize 保留 bespoke：含 isApproval 短路（通过则不调 LLM 直接定稿），非纯 LLM 节点。
+ *
+ * 真实接入：compose / finalize 的 LLM 分支 **真调大模型**（无 demo fallback——未配凭证直接报错）。
  * ⚠️ 节点名不能与 state channel 同名：channel 有 draft，所以"写草稿"的节点叫 compose。
  */
 
@@ -19,21 +22,21 @@ import {
   END,
   Annotation,
   MemorySaver,
-  interrupt,
   type BaseCheckpointSaver,
 } from "@langchain/langgraph";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { type AppConfig } from "../../src/runtime/index.js";
 import type { StatefulFlow } from "../../src/surfaces/flow-types.js";
 import { createStatefulFlow } from "../../src/surfaces/stateful-flow.js";
+import { requireModel } from "../shared.js";
 import {
-  requireModel,
-  extractText,
+  createLlmNode,
+  createHumanApprovalNode,
   isApproval,
-  durableCheckpointer,
-  invokeWithResilience,
-  resolveLlmResilience,
-} from "../shared.js";
+  extractText,
+} from "../../src/libs/nodes/index.js";
+import { durableCheckpointer } from "../../src/runtime/services/file-checkpoint-saver.js";
+import { invokeWithResilience, resolveLlmResilience } from "../../src/runtime/services/llm-resilience.js";
 
 const ReviewState = Annotation.Root({
   query: Annotation<string>,
@@ -43,38 +46,10 @@ const ReviewState = Annotation.Root({
 });
 type ReviewStateType = typeof ReviewState.State;
 
-/** compose：大模型写初稿。 */
-async function composeNode(
-  state: ReviewStateType,
-  appConfig?: AppConfig
-): Promise<Partial<ReviewStateType>> {
-  const model = requireModel(appConfig, "human-in-loop 示例");
-  const { longTimeoutMs } = resolveLlmResilience(appConfig);
-  const res = await invokeWithResilience(
-    model,
-    [
-      new SystemMessage(
-        "你是专业中文文案。根据用户要求写一版初稿，简洁、3–6 句，直接给正文，不要解释或寒暄。"
-      ),
-      new HumanMessage(state.query),
-    ],
-    { timeoutMs: longTimeoutMs, label: "review compose", config: appConfig }
-  );
-  return { draft: extractText(res.content).trim() };
-}
-
 /**
- * review：interrupt 暂停，把草稿抛给用户审阅。
- * resume 时本节点从头重跑，interrupt 直接返回用户回复（LangGraph 语义）。
+ * finalize：通过则定稿；否则大模型按意见改写。
+ * 保留 bespoke——isApproval 短路（通过则不调 LLM），非纯 LLM 节点，不适配 createLlmNode。
  */
-function reviewNode(state: ReviewStateType): Partial<ReviewStateType> {
-  const feedback = interrupt({
-    question: `📝 草稿如下：\n${state.draft}\n\n请审阅：直接说修改意见，或回复「ok」通过。`,
-  });
-  return { feedback: String(feedback ?? "").trim() };
-}
-
-/** finalize：通过则定稿；否则大模型按意见改写。 */
 async function finalizeNode(
   state: ReviewStateType,
   appConfig?: AppConfig
@@ -100,9 +75,31 @@ export function createReviewGraph(
   appConfig?: AppConfig,
   checkpointer: BaseCheckpointSaver = new MemorySaver()
 ) {
+  // compose：框架 createLlmNode（真调大模型写初稿）。
+  const compose = createLlmNode<ReviewStateType>({
+    model: () => requireModel(appConfig, "human-in-loop 示例"),
+    prompt: (s) => [
+      new SystemMessage(
+        "你是专业中文文案。根据用户要求写一版初稿，简洁、3–6 句，直接给正文，不要解释或寒暄。"
+      ),
+      new HumanMessage(s.query),
+    ],
+    write: (r) => ({ draft: r.content.trim() }),
+    config: appConfig,
+    label: "review compose",
+    timeoutMs: resolveLlmResilience(appConfig).longTimeoutMs,
+  });
+
+  // review：框架 createHumanApprovalNode（interrupt 暂停把草稿抛给用户 → 写 feedback）。
+  const review = createHumanApprovalNode<ReviewStateType>({
+    question: (s) =>
+      `📝 草稿如下：\n${s.draft}\n\n请审阅：直接说修改意见，或回复「ok」通过。`,
+    write: (feedback) => ({ feedback }),
+  });
+
   return new StateGraph(ReviewState)
-    .addNode("compose", (s: ReviewStateType) => composeNode(s, appConfig))
-    .addNode("review", reviewNode)
+    .addNode("compose", compose)
+    .addNode("review", review)
     .addNode("finalize", (s: ReviewStateType) => finalizeNode(s, appConfig))
     .addEdge(START, "compose")
     .addEdge("compose", "review")

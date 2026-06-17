@@ -49,12 +49,13 @@ import {
 import type { AppConfig } from "../../src/runtime/index.js";
 import type { StatefulFlow } from "../../src/surfaces/flow-types.js";
 import { createStatefulFlow } from "../../src/surfaces/stateful-flow.js";
-import { durableCheckpointer, emitPlan, emitStage } from "../shared.js";
+import { emitPlan, emitStage } from "../../src/libs/nodes/index.js";
+import { durableCheckpointer } from "../../src/runtime/services/file-checkpoint-saver.js";
 import {
   clarifyNode,
   converseNode,
   deliveryNode,
-  draftNode,
+  createDraftNode,
   fanoutToResearch,
   formatDeliveryAnswer,
   isDdgErrorText,
@@ -172,6 +173,7 @@ export function createResearchGraph(
   appConfig?: AppConfig,
   checkpointer: BaseCheckpointSaver = new MemorySaver()
 ) {
+  const draftNode = createDraftNode(appConfig);
   return new StateGraph(ResearchState)
     .addNode("clarify", clarifyNode)
     .addNode("plan", async (s: ResearchStateType, c?: LangGraphRunnableConfig) => {
@@ -199,7 +201,7 @@ export function createResearchGraph(
         stage: "撰写初稿",
         detail: s.draftAttempts > 0 ? "据质量评审重写" : undefined,
       });
-      return draftNode(s, appConfig, c);
+      return draftNode(s, c);
     })
     .addNode(
       "quality_review",

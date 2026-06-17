@@ -6,11 +6,15 @@
  *   START → gather → ⟨Send 并行⟩ research × 4（交通/住宿/景点/美食，各发一次真实 DuckDuckGo 搜索）
  *         → aggregate（LLM 把搜索结果整理成 N 天行程）→ confirm(interrupt) → finalize → END
  *
+ * 节点消费框架 factory（src/libs/nodes）：
+ *  - fanoutToResearch → createFanout（Send map-reduce 扇出）；
+ *  - aggregate → createLlmNode；confirm → createHumanApprovalNode。
+ *  - 保留 bespoke：gather（纯解析）、research（真实 DDG MCP 检索 + rateLimited）、
+ *    finalize（isApproval 短路，通过则不调 LLM）。
+ *
  * 真实接入（无 demo fallback——未配凭证 / 无网直接报错）：
- *  - research 调**真实 MCP**（duckduckgo-mcp-server，免 key）做网络搜索；
- *    DDG 限 1 请求/秒，用 rateLimited 把并行调用串行化（图仍并行，外部请求错峰）。
- *  - aggregate / finalize **真调大模型**整理与改写。
- *  - onToolCall 透出每次搜索；HITL 用 interrupt 暂停确认。
+ *  - research 调**真实 MCP**（duckduckgo-mcp-server，免 key）；DDG 限 1 请求/秒，rateLimited 错峰。
+ *  - aggregate / finalize 的 LLM 分支 **真调大模型**；onToolCall 透出每次搜索；HITL 用 interrupt。
  * ⚠️ 节点名不能与 state channel 同名。
  */
 
@@ -19,9 +23,7 @@ import {
   START,
   END,
   Annotation,
-  Send,
   MemorySaver,
-  interrupt,
   type BaseCheckpointSaver,
   type LangGraphRunnableConfig,
 } from "@langchain/langgraph";
@@ -29,15 +31,17 @@ import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { logger, type AppConfig } from "../../src/runtime/index.js";
 import type { StatefulFlow, FlowCallbacks } from "../../src/surfaces/flow-types.js";
 import { createStatefulFlow } from "../../src/surfaces/stateful-flow.js";
+import { requireModel } from "../shared.js";
 import {
-  requireModel,
-  extractText,
+  createLlmNode,
+  createHumanApprovalNode,
+  createFanout,
   runTool,
   isApproval,
-  durableCheckpointer,
-  invokeWithResilience,
-  resolveLlmResilience,
-} from "../shared.js";
+  extractText,
+} from "../../src/libs/nodes/index.js";
+import { durableCheckpointer } from "../../src/runtime/services/file-checkpoint-saver.js";
+import { invokeWithResilience, resolveLlmResilience } from "../../src/runtime/services/llm-resilience.js";
 import { callResolvedMcpTool, rateLimited, type McpServerConfig } from "../mcp-client.js";
 
 const log = logger.child("travel");
@@ -95,19 +99,19 @@ export function gatherNode(state: TravelStateType): Partial<TravelStateType> {
   return { destination, days, findings: [] };
 }
 
-/** 条件边：对每个 aspect 派一个 research 实例（map 扇出，导出供单测）。 */
-export function fanoutToResearch(state: TravelStateType): Send[] {
-  return ASPECTS.map(
-    (aspect) =>
-      new Send("research", {
-        currentAspect: aspect,
-        destination: state.destination,
-        days: state.days,
-      })
-  );
-}
+/** 条件边：对每个 aspect 派一个 research 实例（map 扇出，导出供单测）。框架 createFanout。 */
+export const fanoutToResearch = createFanout<(typeof ASPECTS)[number], TravelStateType>({
+  items: () => [...ASPECTS],
+  target: "research",
+  input: (aspect, s) => ({
+    currentAspect: aspect,
+    destination: s.destination,
+    days: s.days,
+  }),
+});
 
-/** research：对单个 aspect 发一次真实 DuckDuckGo 搜索（并行实例之一；rateLimited 节流到 ≤1/秒）。 */
+/** research：对单个 aspect 发一次真实 DuckDuckGo 搜索（并行实例之一；rateLimited 节流到 ≤1/秒）。
+ *  保留 bespoke——自定义 MCP 检索 + rateLimited，非 ToolNode 模式。 */
 async function researchNode(
   state: TravelStateType,
   config?: LangGraphRunnableConfig
@@ -138,41 +142,8 @@ async function researchNode(
   return { findings: [{ aspect, suggestion }] };
 }
 
-/** aggregate：等所有并行 research 完成后，LLM 把 4 路搜索结果整理成按天行程。 */
-async function aggregateNode(
-  state: TravelStateType,
-  appConfig?: AppConfig
-): Promise<Partial<TravelStateType>> {
-  const model = requireModel(appConfig, "travel-planner 示例");
-  const ordered = ASPECTS.map((a) =>
-    state.findings.find((f) => f.aspect === a)
-  ).filter((f): f is Finding => Boolean(f));
-  const material = ordered
-    .map((f) => `# ${ASPECT_LABEL[f.aspect] ?? f.aspect}\n${f.suggestion}`)
-    .join("\n\n");
-  const { longTimeoutMs } = resolveLlmResilience(appConfig);
-  const res = await invokeWithResilience(
-    model,
-    [
-      new SystemMessage(
-        `你是旅行规划师。根据各方面的网络搜索结果，为「${state.destination}」规划一个 ${state.days} 天的行程，按天列出（含交通/住宿/景点/美食），简洁实用，不要堆砌链接。`
-      ),
-      new HumanMessage(`网络搜索素材：\n${material}`),
-    ],
-    { timeoutMs: longTimeoutMs, label: "travel aggregate", retryLabel: "travel LLM", config: appConfig }
-  );
-  return { itinerary: extractText(res.content).trim() };
-}
-
-/** confirm：interrupt 暂停，把行程草案抛给用户确认/调整。 */
-function confirmNode(state: TravelStateType): Partial<TravelStateType> {
-  const feedback = interrupt({
-    question: `${state.itinerary}\n\n以上行程 OK 吗？要调整（预算 / 天数 / 偏好）就说一下，或回复「ok」确认。`,
-  });
-  return { feedback: String(feedback ?? "").trim() };
-}
-
-/** finalize：通过则定稿；否则 LLM 按意见改写行程。 */
+/** finalize：通过则定稿；否则 LLM 按意见改写行程。
+ *  保留 bespoke——isApproval 短路（通过则不调 LLM）。 */
 async function finalizeNode(
   state: TravelStateType,
   appConfig?: AppConfig
@@ -198,11 +169,42 @@ export function createTravelGraph(
   appConfig?: AppConfig,
   checkpointer: BaseCheckpointSaver = new MemorySaver()
 ) {
+  // aggregate：框架 createLlmNode（把 4 路搜索结果整理成按天行程）。
+  const aggregate = createLlmNode<TravelStateType>({
+    model: () => requireModel(appConfig, "travel-planner 示例"),
+    prompt: (s) => {
+      const ordered = ASPECTS.map((a) => s.findings.find((f) => f.aspect === a)).filter(
+        (f): f is Finding => Boolean(f)
+      );
+      const material = ordered
+        .map((f) => `# ${ASPECT_LABEL[f.aspect] ?? f.aspect}\n${f.suggestion}`)
+        .join("\n\n");
+      return [
+        new SystemMessage(
+          `你是旅行规划师。根据各方面的网络搜索结果，为「${s.destination}」规划一个 ${s.days} 天的行程，按天列出（含交通/住宿/景点/美食），简洁实用，不要堆砌链接。`
+        ),
+        new HumanMessage(`网络搜索素材：\n${material}`),
+      ];
+    },
+    write: (r) => ({ itinerary: r.content.trim() }),
+    config: appConfig,
+    label: "travel aggregate",
+    retryLabel: "travel LLM",
+    timeoutMs: resolveLlmResilience(appConfig).longTimeoutMs,
+  });
+
+  // confirm：框架 createHumanApprovalNode（interrupt 把行程抛给用户确认 → 写 feedback）。
+  const confirm = createHumanApprovalNode<TravelStateType>({
+    question: (s) =>
+      `${s.itinerary}\n\n以上行程 OK 吗？要调整（预算 / 天数 / 偏好）就说一下，或回复「ok」确认。`,
+    write: (feedback) => ({ feedback }),
+  });
+
   return new StateGraph(TravelState)
     .addNode("gather", gatherNode)
     .addNode("research", researchNode)
-    .addNode("aggregate", (s: TravelStateType) => aggregateNode(s, appConfig))
-    .addNode("confirm", confirmNode)
+    .addNode("aggregate", aggregate)
+    .addNode("confirm", confirm)
     .addNode("finalize", (s: TravelStateType) => finalizeNode(s, appConfig))
     .addEdge(START, "gather")
     .addConditionalEdges("gather", fanoutToResearch, ["research"])

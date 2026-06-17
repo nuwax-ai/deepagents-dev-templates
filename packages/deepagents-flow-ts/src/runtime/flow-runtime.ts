@@ -2,9 +2,8 @@
  * FlowRuntime —— 图节点启动时拿到的「装配好的运行时」契约。
  *
  * 本文件**只定义接口**（纯类型，仅引用 runtime 层类型 → app→runtime 合法下行）。
- * 装配逻辑 `createFlowRuntime`（要 import app 层的 createFlowTools）在 `compose/flow-runtime.ts`，
- * 以免 runtime→app 依赖倒挂；此处仅 **re-export** 它，保持历史 import 路径
- * （`src/runtime/flow-runtime.js`）对 examples / 对外消费者可用。
+ * 装配逻辑 `createFlowRuntime`（要 import app 层的 createFlowTools）在 `src/index.ts`（组合根/入口），
+ * 以免 runtime→app 依赖倒挂;compose 层已并入 index,本文件不再 re-export 它。
  *
  * 图节点经 FlowRuntime 拿到 allTools（bindTools）/ systemPrompt / checkpointer，
  * 不再各自裸调 resolveModel / appConfig。
@@ -40,7 +39,3 @@ export interface FlowRuntime {
   /** 文件后端 checkpointer（跨重启恢复 + interrupt/resume 持久化）。 */
   checkpointer: FileCheckpointSaver;
 }
-
-// 装配工厂在 compose 层（组合根）；此处 re-export 仅为兼容历史 import 路径。
-// 分层守卫（tests/layering.test.ts）对本行的 runtime→compose 上行 import 做了显式 allowlist。
-export { createFlowRuntime } from "../compose/flow-runtime.js";

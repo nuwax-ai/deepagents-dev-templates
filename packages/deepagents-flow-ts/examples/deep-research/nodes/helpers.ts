@@ -1,5 +1,12 @@
 /**
- * deep-research 节点共享 helper。
+ * deep-research 节点共享 helper（示例专属）。
+ *
+ * 仅保留 deep-research 本地、非通用件：
+ *  - 语言偏好提取（extractLanguageHint / langClause）
+ *  - 调模型薄配置糖（invokeLLM / llmLongTimeout）—— 经模板韧性原语 invokeWithResilience
+ *
+ * 通用件已下沉框架：extractText/parseJson/streamLLMText/emit* → src/libs/nodes；
+ * 韧性原语 → src/runtime/services/llm-resilience。
  *
  * LLM 调用约定（框架优先对照）：
  *  - 外部搜索 → Context7 + DuckDuckGo 并行（merge 取优）；DDG 走 rateLimited 串行
@@ -7,24 +14,12 @@
  */
 
 import type { BaseMessage } from "@langchain/core/messages";
-import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import type { AppConfig } from "../../../src/runtime/index.js";
 import {
-  extractText,
-  getSharedLlmLimiter,
   invokeWithResilience,
   resolveLlmResilience,
-  withRetry,
-  withTimeout,
-  emitTextToken,
-} from "../../shared.js";
-
-export type LLMLike = {
-  invoke: (messages: BaseMessage[]) => Promise<{ content: unknown }>;
-  stream?: (messages: BaseMessage[]) =>
-    | Promise<AsyncIterable<{ content?: unknown }>>
-    | AsyncIterable<{ content?: unknown }>;
-};
+} from "../../../src/runtime/services/llm-resilience.js";
+import type { LLMLike } from "../../../src/libs/nodes/index.js";
 
 /**
  * 从用户自由文本中提取语言偏好指令（"用中文" → "请以中文输出"）。无明确偏好返回 ""。
@@ -40,19 +35,6 @@ export function extractLanguageHint(text: string): string {
 /** 生成追加在 SystemMessage 末尾的语言要求子句（空字符串表示无偏好）。 */
 export function langClause(hint: string): string {
   return hint ? `\n\n**语言要求：${hint}**` : "";
-}
-
-/**
- * 从 LLM 文本里抽出第一段 JSON（容忍 ```json 围栏与前后说明文字）。
- */
-export function parseJson<T>(text: string): T {
-  const cleaned = text.replace(/```(?:json)?/gi, "").trim();
-  const start = cleaned.search(/[[{]/);
-  if (start === -1) throw new Error(`LLM 未返回 JSON：${text.slice(0, 200)}`);
-  const close = cleaned[start] === "[" ? "]" : "}";
-  const end = cleaned.lastIndexOf(close);
-  if (end <= start) throw new Error(`LLM JSON 不完整：${text.slice(0, 200)}`);
-  return JSON.parse(cleaned.slice(start, end + 1)) as T;
 }
 
 /**
@@ -77,43 +59,3 @@ export function invokeLLM(
 /** 长调用超时别名（draft / respond），与模板 LLM_TIMEOUT_LONG_MS 同源。 */
 export const llmLongTimeout = (appConfig?: AppConfig) =>
   resolveLlmResilience(appConfig).longTimeoutMs;
-
-/**
- * 流式调模型：只用于用户可见的大段输出（draft/respond）。
- */
-export async function streamLLMText(
-  m: LLMLike,
-  messages: BaseMessage[],
-  appConfig: AppConfig | undefined,
-  config: LangGraphRunnableConfig | undefined,
-  timeoutMs: number
-): Promise<{ text: string; streamed: boolean }> {
-  const hasVisibleTokenSink = Boolean(
-    (config?.configurable as { onToken?: unknown } | undefined)?.onToken
-  );
-
-  if (!m.stream || !hasVisibleTokenSink) {
-    const res = await invokeLLM(m, messages, appConfig, timeoutMs);
-    return { text: extractText(res.content), streamed: false };
-  }
-
-  const run = async () => {
-    let full = "";
-    const stream = await Promise.resolve(m.stream!(messages));
-    for await (const chunk of stream) {
-      const text = extractText(chunk.content);
-      if (!text) continue;
-      full += text;
-      emitTextToken(config, text);
-    }
-    return full;
-  };
-
-  const text = await getSharedLlmLimiter(appConfig)(() =>
-    withRetry(
-      () => withTimeout(run(), timeoutMs, "deep-research 流式调模型"),
-      { label: "deep-research streaming LLM" }
-    )
-  );
-  return { text, streamed: true };
-}

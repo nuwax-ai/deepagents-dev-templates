@@ -3,9 +3,10 @@
 import { Command } from "@langchain/langgraph";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { logger, type AppConfig } from "../../../src/runtime/index.js";
-import { extractText, requireModel } from "../../shared.js";
+import { requireModel } from "../../shared.js";
+import { extractText, parseJson } from "../../../src/libs/nodes/index.js";
 import type { ResearchStateShape } from "./types.js";
-import { invokeLLM, parseJson } from "./helpers.js";
+import { invokeLLM } from "./helpers.js";
 
 const log = logger.child("deep-research");
 

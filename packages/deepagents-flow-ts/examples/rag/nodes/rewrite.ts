@@ -6,11 +6,14 @@
  * 2. 重写查询使其更适合检索
  * 3. 提取关键词
  * 4. 推荐检索源（mcp_hint）
+ *
+ * 实现：框架 createLlmNode（parse JSON + fallback 降级）。
  */
 
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { resolveModel, type AppConfig } from "../../../src/runtime/index.js";
-import { invokeWithResilience, resolveLlmResilience } from "../../shared.js";
+import { resolveLlmResilience } from "../../../src/runtime/services/llm-resilience.js";
+import { createLlmNode, parseJson } from "../../../src/libs/nodes/index.js";
 import type { RAGState, RAGIntent } from "./types.js";
 
 const REWRITE_SYSTEM_PROMPT = `你是一个查询分析专家。你的任务是分析用户的问题，并提供结构化的分析结果。
@@ -37,69 +40,6 @@ mcp_hint 规则：
 - keywords 提取 3-5 个核心关键词
 - intent 根据问题性质判断`;
 
-export async function rewriteNode(
-  state: RAGState,
-  config?: AppConfig
-): Promise<Partial<RAGState>> {
-  const { query, history } = state;
-
-  try {
-    // 使用配置中的模型；resolveModel 类型上含 string/undefined，RAG 节点需要实例
-    const model = resolveModel(config!);
-    if (!model || typeof model === "string") {
-      throw new Error("RAG rewrite node requires an instantiated chat model");
-    }
-
-    // 构建上下文
-    let context = "";
-    if (history && history.length > 0) {
-      const recentHistory = history.slice(-6); // 最近 3 轮对话
-      context = recentHistory
-        .map((msg: any) => `${msg._getType()}: ${msg.content}`)
-        .join("\n");
-    }
-
-    const userPrompt = context
-      ? `对话历史：\n${context}\n\n当前问题：${query}`
-      : `问题：${query}`;
-
-    const { shortTimeoutMs } = resolveLlmResilience(config!);
-    const response = await invokeWithResilience(
-      model,
-      [new SystemMessage(REWRITE_SYSTEM_PROMPT), new HumanMessage(userPrompt)],
-      {
-        timeoutMs: shortTimeoutMs,
-        label: "rag rewrite",
-        config: config!,
-      }
-    );
-
-    // 解析响应
-    const content =
-      typeof response.content === "string"
-        ? response.content
-        : JSON.stringify(response.content);
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-
-    if (jsonMatch) {
-      const result = JSON.parse(jsonMatch[0]);
-      return {
-        rewritten_query: result.rewritten_query || query,
-        intent: validateIntent(result.intent),
-        keywords: result.keywords || [],
-        mcp_hint: result.mcp_hint || undefined,
-      };
-    }
-
-    // 解析失败，降级处理
-    return fallbackRewrite(query);
-  } catch (error) {
-    console.error("[Rewrite] Error:", error);
-    // 失败降级：用原始 query
-    return fallbackRewrite(query);
-  }
-}
-
 function validateIntent(intent: string): RAGIntent {
   const validIntents: RAGIntent[] = [
     "factual",
@@ -123,4 +63,47 @@ function fallbackRewrite(query: string): Partial<RAGState> {
       .slice(0, 5),
     mcp_hint: undefined,
   };
+}
+
+/** rewrite 节点：框架 createLlmNode（parse JSON 结构化输出 + 无模型/异常 fallback 降级）。 */
+export function createRewriteNode(appConfig?: AppConfig) {
+  return createLlmNode<RAGState>({
+    // 模型缺失返回 null（触发 fallback），与原 try/catch 降级同义。
+    model: () => {
+      const m = resolveModel(appConfig!);
+      return m && typeof m !== "string" ? m : null;
+    },
+    prompt: (s) => {
+      let context = "";
+      if (s.history && s.history.length > 0) {
+        const recentHistory = s.history.slice(-6); // 最近 3 轮对话
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        context = recentHistory.map((msg: any) => `${msg._getType()}: ${msg.content}`).join("\n");
+      }
+      const userPrompt = context
+        ? `对话历史：\n${context}\n\n当前问题：${s.query}`
+        : `问题：${s.query}`;
+      return [new SystemMessage(REWRITE_SYSTEM_PROMPT), new HumanMessage(userPrompt)];
+    },
+    parse: (text) =>
+      parseJson<{ rewritten_query?: string; intent?: string; keywords?: string[]; mcp_hint?: string }>(text),
+    write: (r, s) => {
+      const result = (r.parsed ?? {}) as {
+        rewritten_query?: string;
+        intent?: string;
+        keywords?: string[];
+        mcp_hint?: string;
+      };
+      return {
+        rewritten_query: result.rewritten_query || s.query,
+        intent: validateIntent(result.intent ?? "factual"),
+        keywords: result.keywords || [],
+        mcp_hint: result.mcp_hint || undefined,
+      };
+    },
+    fallback: (s) => fallbackRewrite(s.query),
+    config: appConfig,
+    label: "rag rewrite",
+    timeoutMs: resolveLlmResilience(appConfig).shortTimeoutMs,
+  });
 }

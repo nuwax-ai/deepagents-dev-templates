@@ -29,7 +29,7 @@ export {
   routeAfterQualityReview,
 } from "./review.js";
 
-export { draftNode } from "./draft.js";
+export { createDraftNode } from "./draft.js";
 
 export {
   converseNode,

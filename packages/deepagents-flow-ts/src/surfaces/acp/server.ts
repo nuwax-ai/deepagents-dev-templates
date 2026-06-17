@@ -20,7 +20,7 @@ import {
   type DeepAgentConfig,
   type DeepAgentsServerHooks,
   type StopReason,
-} from "../deepagents-acp/index.js";
+} from "../../libs/deepagents-acp/index.js";
 import {
   logger,
   resolveModel,

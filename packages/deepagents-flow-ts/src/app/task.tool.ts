@@ -15,9 +15,9 @@ import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import type { StructuredTool } from "@langchain/core/tools";
-import type { AppConfig, DiscoveredSubAgent } from "../../runtime/index.js";
-import { createFlowGraph } from "../graph.js";
-import type { FlowState } from "../state.js";
+import type { AppConfig, DiscoveredSubAgent } from "../runtime/index.js";
+import { createFlowGraph } from "./graph.js";
+import type { FlowState } from "./state.js";
 
 export interface TaskToolDeps {
   subAgents: DiscoveredSubAgent[];

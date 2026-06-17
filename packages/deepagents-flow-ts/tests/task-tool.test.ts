@@ -4,7 +4,7 @@ import { AppConfigSchema } from "../src/runtime/index.js";
 import {
   createTaskTool,
   parseSubagentModelOverride,
-} from "../src/app/tools/task.tool.js";
+} from "../src/app/task.tool.js";
 
 const baseConfig = AppConfigSchema.parse({
   model: { provider: "openai", name: "deepseek-chat" },

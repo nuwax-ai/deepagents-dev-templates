@@ -12,7 +12,7 @@
 
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { resolveModel, type AppConfig } from "../../../src/runtime/index.js";
-import { invokeWithResilience, resolveLlmResilience } from "../../shared.js";
+import { invokeWithResilience, resolveLlmResilience } from "../../../src/runtime/services/llm-resilience.js";
 import type { RAGState, RAGConfig, RAGMetadata } from "./types.js";
 
 const GENERATE_SYSTEM_PROMPT = `你是一个专业的知识助手。基于提供的上下文信息回答用户的问题。

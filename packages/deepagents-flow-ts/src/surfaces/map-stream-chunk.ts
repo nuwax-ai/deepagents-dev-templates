@@ -17,21 +17,7 @@
 
 import { INTERRUPT } from "@langchain/langgraph";
 import type { SurfaceStreamEvent } from "./stream-events.js";
-
-/** 从 LLM content（string 或 content block 数组）抽纯文本。 */
-function extractText(content: unknown): string {
-  if (typeof content === "string") return content;
-  if (Array.isArray(content)) {
-    return content
-      .map((b) =>
-        b && typeof b === "object" && "text" in b
-          ? String((b as { text: unknown }).text)
-          : ""
-      )
-      .join("");
-  }
-  return "";
-}
+import { extractText } from "../libs/nodes/index.js";
 
 export function mapStreamChunk(mode: string, chunk: unknown): SurfaceStreamEvent[] {
   const events: SurfaceStreamEvent[] = [];

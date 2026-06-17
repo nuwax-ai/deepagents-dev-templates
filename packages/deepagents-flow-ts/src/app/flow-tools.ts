@@ -1,10 +1,10 @@
 /**
- * Flow 工具集组装 —— 通用工具 + flow 自补工具 + skills/subagent + native MCP 工具。
+ * Flow 工具集装配（app 层）。
  *
- * 模板自包含:通用工具（http_request/json_utils/platform_api/agent_variable）与 flow 自管的
- * bash/fs/search/demo/mcp-bridge 都在本目录（app/tools/），再合并 runtime-context 经
- * @langchain/mcp-adapters 加载的 native MCP 工具（ctx.mcpTools）。
- * 另接：load_skill（渐进式读 SKILL.md）+ task（委派声明式 subagent）。新增工具放本目录、在此注册。
+ * 通用工具来自框架 toolkit/；task 委派工具是 app 专属（依赖默认图 createFlowGraph）。
+ * createFlowTools 与 task.tool 共享 buildTools（按工作目录重建工具集,不含 task 防递归）。
+ * 放 app 层（而非 toolkit）:它要同时 import toolkit（通用工具,下行）+ app/task.tool
+ * （默认图专属,同层）+ app/graph（task 委派的目标图,同层）。
  */
 
 import type { StructuredTool } from "@langchain/core/tools";
@@ -12,19 +12,21 @@ import type {
   RuntimeContext,
   DiscoveredSkill,
   DiscoveredSubAgent,
-} from "../../runtime/index.js";
-import { httpRequestTool } from "./http-request.tool.js";
-import { jsonUtilsTool } from "./json-utils.tool.js";
-import { createPlatformApiTool } from "./platform-api.tool.js";
-import { createAgentVariableTool } from "./agent-variable.tool.js";
-import { createBashTool } from "./bash.tool.js";
-import { createFsTools } from "./fs.tool.js";
-import { createSearchTools } from "./search.tool.js";
-import { createDemoTools } from "./demo.tool.js";
-import { createMcpBridgeTool } from "./mcp-bridge.tool.js";
-import { createSkillTool } from "./skill.tool.js";
+} from "../runtime/index.js";
+import type { FlowSandboxPolicy } from "../runtime/fs/sandbox.js";
+import {
+  httpRequestTool,
+  jsonUtilsTool,
+  createPlatformApiTool,
+  createAgentVariableTool,
+  createBashTool,
+  createFsTools,
+  createSearchTools,
+  createDemoTools,
+  createMcpBridgeTool,
+  createSkillTool,
+} from "../libs/tools/index.js";
 import { createTaskTool } from "./task.tool.js";
-import type { FlowSandboxPolicy } from "../../runtime/fs/sandbox.js";
 
 export function createFlowTools(
   ctx: RuntimeContext,

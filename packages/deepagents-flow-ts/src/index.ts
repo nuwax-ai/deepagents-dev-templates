@@ -19,13 +19,80 @@
 import { config as loadDotenv } from "dotenv";
 import { loadFlowConfig } from "./runtime/flow-config.js";
 import { destroyRuntimeContext, setLogAgent } from "./runtime/index.js";
-import { createFlowRuntime } from "./compose/flow-runtime.js";
+import {
+  createRuntimeContextAsync,
+  resolveSystemPrompt,
+  resolveSkillsPaths,
+  discoverSkills,
+  discoverSubAgents,
+  renderSkillsSection,
+  renderSubagentsSection,
+  type AppConfig,
+  type ACPSessionConfig,
+} from "./runtime/index.js";
+import { createFlowTools } from "./app/flow-tools.js";
+import { getFlowSandboxPolicy } from "./runtime/fs/sandbox.js";
+import { createFileCheckpointer } from "./runtime/services/file-checkpoint-saver.js";
+import type { FlowRuntime } from "./runtime/flow-runtime.js";
 import { createDefaultExecutor } from "./app/default-flow.js";
 import { bootstrapFlowAcp } from "./surfaces/acp/server.js";
 import { runFlowCli } from "./surfaces/cli/run.js";
 import { runCapabilities } from "./surfaces/cli/capabilities.js";
 import { runSessions } from "./surfaces/cli/sessions.js";
 import { getFlowTopology } from "./app/topology.js";
+
+/**
+ * createFlowRuntime —— 组合根(原 `compose/flow-runtime.ts` 折入入口)。
+ * 装配 runtime 基础设施 + app 工具(createFlowTools)→ FlowRuntime,注入图节点。
+ * 唯一跨层向下装配点(取 app/flow-tools);故在 root(index)而非 runtime,免 runtime→app 倒挂。
+ */
+export async function createFlowRuntime(
+  appConfig: AppConfig,
+  options: { sessionConfig?: ACPSessionConfig; workspaceRoot?: string } = {}
+): Promise<FlowRuntime> {
+  const workspaceRoot = options.workspaceRoot ?? process.cwd();
+  const ctx = await createRuntimeContextAsync(appConfig, options.sessionConfig, workspaceRoot);
+  const sandbox = getFlowSandboxPolicy(appConfig);
+
+  const skillsPaths = resolveSkillsPaths(appConfig);
+  const skills = discoverSkills(appConfig, workspaceRoot);
+  const subAgents = discoverSubAgents(appConfig, workspaceRoot);
+  const progressiveSkills = appConfig.skills.progressiveLoading;
+
+  // skills → load_skill 工具;subAgents → task 委派工具(沙箱按 workspaceRoot / 各自 workdir)。
+  const allTools = createFlowTools(ctx, {
+    workspaceRoot,
+    policy: sandbox,
+    skills: progressiveSkills ? skills : [],
+    subAgents,
+  });
+
+  // 系统提示词追加「Available Skills」「Subagents」清单。
+  const baseSystemPrompt = resolveSystemPrompt(appConfig, options.sessionConfig, workspaceRoot);
+  const sections = [
+    renderSkillsSection(skills, progressiveSkills),
+    renderSubagentsSection(subAgents),
+  ].filter(Boolean);
+  const systemPrompt = sections.length
+    ? `${baseSystemPrompt}\n\n${sections.join("\n\n")}`
+    : baseSystemPrompt;
+
+  // 文件后端 checkpointer(跨重启恢复 + interrupt/resume 持久化)。
+  const checkpointer = createFileCheckpointer(appConfig, workspaceRoot);
+
+  return {
+    config: appConfig,
+    ctx,
+    allTools,
+    systemPrompt,
+    skillsPaths,
+    skills,
+    subAgents,
+    sandbox,
+    workspaceRoot,
+    checkpointer,
+  };
+}
 
 interface ParsedArgs {
   command: "acp" | "flow" | "graph" | "capabilities" | "sessions";

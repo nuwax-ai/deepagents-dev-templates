@@ -16,7 +16,7 @@
 import { StateGraph, END, START, Annotation } from "@langchain/langgraph";
 import { BaseMessage } from "@langchain/core/messages";
 import { logger, type AppConfig } from "../../src/runtime/index.js";
-import { rewriteNode } from "./nodes/rewrite.js";
+import { createRewriteNode } from "./nodes/rewrite.js";
 import { retrieveNode, type RetrieveNodeConfig } from "./nodes/retrieve.js";
 import { gradeNode, routeAfterGrade } from "./nodes/grade.js";
 import { prepareNode } from "./nodes/prepare.js";
@@ -97,6 +97,9 @@ export function createRAGGraph(config: CreateRAGGraphConfig) {
     onToolCall: config.callbacks?.onToolCall,
   };
 
+  // rewrite：框架 createLlmNode 实例（createRewriteNode）。
+  const rewriteNode = createRewriteNode(config.appConfig);
+
   log.info("Creating StateGraph", {
     nodes: ["rewrite", "retrieve", "grade", "prepare", "generate"],
   });
@@ -104,7 +107,7 @@ export function createRAGGraph(config: CreateRAGGraphConfig) {
   const graph = new StateGraph(RAGStateAnnotation)
     // ── 节点 ────────────────────────────────────────────
     .addNode("rewrite", async (state: RAGStateType) => {
-      const result = await rewriteNode(state, config.appConfig);
+      const result = await rewriteNode(state);
       log.info("node rewrite done", { intent: result.intent });
       return result;
     })

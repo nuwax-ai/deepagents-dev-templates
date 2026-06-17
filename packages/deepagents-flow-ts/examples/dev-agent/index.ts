@@ -18,7 +18,8 @@
  */
 
 import { loadFlowConfig } from "../../src/runtime/flow-config.js";
-import { createFlowRuntime, type FlowRuntime } from "../../src/runtime/flow-runtime.js";
+import { createFlowRuntime } from "../../src/index.js";
+import type { FlowRuntime } from "../../src/runtime/flow-runtime.js";
 import { createFlowGraph } from "../../src/app/graph.js";
 import { applyCompaction } from "../../src/app/compaction.js";
 import { runFlowCli } from "../../src/surfaces/cli/run.js";

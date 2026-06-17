@@ -9,14 +9,15 @@
  *   parentGraph.addConditionalEdges("think", (s) => needsResearch(s) ? "research" : "respond");
  *
  * 子图有独立 state（messages），运行时父子经共享 channel（messages）映射。
- * 这就是 flow-ts 里 Subagent 的框架原生实现——不新建委托工具，直接用 LangGraph subgraph。
+ * 构建用框架 createSubgraphNode（子图作节点 idiom 收口）；内部 research 节点保留 bespoke（LLM+tools）。
  */
 
-import { StateGraph, START, END, Annotation, messagesStateReducer } from "@langchain/langgraph";
+import { START, END, Annotation, messagesStateReducer } from "@langchain/langgraph";
 import { AIMessage, SystemMessage, type BaseMessage } from "@langchain/core/messages";
 import type { StructuredTool } from "@langchain/core/tools";
 import { resolveModel, type AppConfig } from "../../src/runtime/index.js";
-import { invokeWithResilience, resolveLlmResilience } from "../shared.js";
+import { invokeWithResilience, resolveLlmResilience } from "../../src/runtime/services/llm-resilience.js";
+import { createSubgraphNode } from "../../src/libs/nodes/index.js";
 
 const ResearcherState = Annotation.Root({
   messages: Annotation<BaseMessage[]>({
@@ -24,6 +25,7 @@ const ResearcherState = Annotation.Root({
     default: () => [],
   }),
 });
+type ResearcherStateType = typeof ResearcherState.State;
 
 type BoundModel = { invoke: (m: BaseMessage[]) => Promise<AIMessage> };
 
@@ -34,26 +36,36 @@ export function createResearcherSubgraph(appConfig: AppConfig, allTools: Structu
       ? (raw as unknown as { bindTools: (t: StructuredTool[]) => BoundModel }).bindTools(allTools)
       : null;
 
-  return new StateGraph(ResearcherState)
-    .addNode("research", async (state) => {
-      if (!bound) {
-        return { messages: [new AIMessage({ content: "(researcher 无凭证，跳过)" })] };
-      }
-      const { longTimeoutMs } = resolveLlmResilience(appConfig);
-      const ai = await invokeWithResilience(bound, [
-        new SystemMessage(
-          "你是 researcher 子代理。用工具研究给定问题，返回结构化发现：关键事实 / 矛盾证据 / 未决问题 / 建议下一步。"
-        ),
-        ...state.messages,
-      ], {
-        timeoutMs: longTimeoutMs,
-        label: "dev-agent research",
-        retryLabel: "dev-agent LLM",
-        config: appConfig,
-      });
-      return { messages: [ai] };
-    })
-    .addEdge(START, "research")
-    .addEdge("research", END)
-    .compile();
+  return createSubgraphNode<ResearcherStateType>({
+    state: ResearcherState,
+    nodes: {
+      // research 节点保留 bespoke：bindTools 模型调工具 + 无凭证 fallback。
+      research: async (state) => {
+        if (!bound) {
+          return { messages: [new AIMessage({ content: "(researcher 无凭证，跳过)" })] };
+        }
+        const { longTimeoutMs } = resolveLlmResilience(appConfig);
+        const ai = await invokeWithResilience(
+          bound,
+          [
+            new SystemMessage(
+              "你是 researcher 子代理。用工具研究给定问题，返回结构化发现：关键事实 / 矛盾证据 / 未决问题 / 建议下一步。"
+            ),
+            ...state.messages,
+          ],
+          {
+            timeoutMs: longTimeoutMs,
+            label: "dev-agent research",
+            retryLabel: "dev-agent LLM",
+            config: appConfig,
+          }
+        );
+        return { messages: [ai] };
+      },
+    },
+    edges: [
+      [START, "research"],
+      ["research", END],
+    ],
+  });
 }

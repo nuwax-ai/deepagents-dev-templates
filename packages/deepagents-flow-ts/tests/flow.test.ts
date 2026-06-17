@@ -11,7 +11,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { MemorySaver } from "@langchain/langgraph";
 import { AppConfigSchema } from "../src/runtime/index.js";
 import { executeFlow } from "../src/app/graph.js";
-import { createDemoTools } from "../src/app/tools/demo.tool.js";
+import { createDemoTools } from "../src/libs/tools/demo.tool.js";
 
 describe("executeFlow 默认图（无凭证 fallback）", () => {
   const credVars = ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "OPENAI_API_KEY"];

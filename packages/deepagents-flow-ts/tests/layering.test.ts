@@ -2,16 +2,17 @@
  * 分层守卫 —— 把「只能 import 左侧层」的架构规则变成可执行测试（+ 可读文档）。
  *
  * 分层（每层只能 import 它**左侧**的层）：
- *   core → runtime → app → { surfaces | compose } → index.ts
- *   (纯契约) (底层运行时) (默认图)  (适配器 | 组合根)     (入口/装配)
+ *   core → runtime → libs → app → surfaces → index.ts
+ *   (纯契约) (底层运行时) (可复用/vendored 库) (默认图) (适配器) (入口/组合根)
  *
  * - core 纯类型契约,零依赖,是所有层的共享词汇。
  * - runtime 是底层运行时（config / model / logger / platform / mcp / context + checkpoint /
  *   sandbox / ripgrep / llm-resilience）—— flow-ts 自有,自包含。
- * - surfaces 与 compose 是**兄弟层**：互不 import。
- * - index.ts（入口/装配根）可 import 任意层 —— 唯一把 surfaces + compose 接到一起的地方。
- * - 唯一受控例外：runtime/flow-runtime.ts re-export compose 的 createFlowRuntime（兼容历史路径），
- *   在 ALLOWLIST 显式放行。
+ * - libs 是可复用 / vendored 库:nodes/(节点 factory + 构建原语)+ tools/(内置通用工具)
+ *   + deepagents-acp/(vendored ACP SDK,自包含、只引外部包)。三者互不引用;只依赖 runtime+core 或纯外部包。
+ * - app 是默认 flow（graph/state/nodes/compaction/topology + flow-tools/task 工具装配）。
+ * - surfaces 是 ACP/CLI 适配器,只向上 import。
+ * - index.ts（入口）= 组合根:createFlowRuntime 折入此处（原 compose 层已并入）,装配 runtime+app→FlowRuntime。
  *
  * 扫描 src/ 全部 .ts 的相对 import / re-export，发现上行依赖即失败并列出违规。
  */
@@ -23,34 +24,32 @@ import { fileURLToPath } from "node:url";
 
 const SRC = resolve(dirname(fileURLToPath(import.meta.url)), "../src");
 
-type Layer = "core" | "runtime" | "app" | "surfaces" | "compose" | "root";
+type Layer = "core" | "runtime" | "libs" | "app" | "surfaces" | "root";
 
-/** 每层允许 import 的层集合（自身 + 所有左侧层）。surfaces 与 compose 互不包含。 */
+/** 每层允许 import 的层集合（自身 + 所有左侧层）。 */
 const ALLOWED: Record<Layer, ReadonlySet<Layer>> = {
   core: new Set(["core"]),
   runtime: new Set(["runtime", "core"]),
-  app: new Set(["app", "runtime", "core"]),
-  surfaces: new Set(["surfaces", "app", "runtime", "core"]),
-  compose: new Set(["compose", "app", "runtime", "core"]),
-  root: new Set(["root", "compose", "surfaces", "app", "runtime", "core"]),
+  libs: new Set(["libs", "runtime", "core"]),
+  app: new Set(["app", "libs", "runtime", "core"]),
+  surfaces: new Set(["surfaces", "app", "libs", "runtime", "core"]),
+  root: new Set(["root", "surfaces", "app", "libs", "runtime", "core"]),
 };
 
 /**
  * 受控例外：{ 文件 src-相对路径 → 允许的额外目标层 }。
- * runtime/flow-runtime.ts 仅为兼容历史 import 路径 re-export compose 的工厂（见该文件注释）。
+ * （compose 层已并入 index.ts;原 runtime/flow-runtime→compose 例外已移除。当前无例外。）
  */
-const ALLOWLIST: Record<string, ReadonlySet<Layer>> = {
-  "runtime/flow-runtime.ts": new Set(["compose"]),
-};
+const ALLOWLIST: Record<string, ReadonlySet<Layer>> = {};
 
 /** 由 src-相对路径判定所属层。 */
 function layerOf(srcRelPath: string): Layer {
   const top = srcRelPath.split(sep)[0]!;
   if (top === "core") return "core";
   if (top === "runtime") return "runtime";
+  if (top === "libs") return "libs";
   if (top === "app") return "app";
   if (top === "surfaces") return "surfaces";
-  if (top === "compose") return "compose";
   return "root"; // src 顶层文件（index.ts 等）
 }
 
@@ -85,7 +84,7 @@ describe("分层架构守卫（import 方向）", () => {
     expect(files.length).toBeGreaterThan(20);
   });
 
-  it("每个文件只 import 其允许的层（core→runtime→app→{surfaces|compose}→root）", () => {
+  it("每个文件只 import 其允许的层（core→runtime→kit→app→surfaces→index）", () => {
     const violations: string[] = [];
 
     for (const file of files) {

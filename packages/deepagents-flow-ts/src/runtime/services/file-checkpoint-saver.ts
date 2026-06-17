@@ -18,7 +18,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, unlink
 import { resolve, join } from "node:path";
 import { homedir } from "node:os";
 import { createHash } from "node:crypto";
-import { MemorySaver } from "@langchain/langgraph";
+import { MemorySaver, type BaseCheckpointSaver } from "@langchain/langgraph";
 import type { RunnableConfig } from "@langchain/core/runnables";
 import { logger, type AppConfig } from "../index.js";
 
@@ -76,6 +76,19 @@ export function createFileCheckpointer(
   workspaceRoot = process.cwd()
 ): FileCheckpointSaver {
   return new FileCheckpointSaver({ dir: resolveCheckpointDir(appConfig, workspaceRoot) });
+}
+
+/**
+ * 长任务默认持久化：有 appConfig → FileCheckpointSaver（跨重启续跑）；
+ * 无 appConfig（极少数纯单测）→ MemorySaver。单测可注入自己的 checkpointer 覆盖。
+ * 各有状态示例的 createXxxFlow 统一经此决定 checkpointer，避免「示例忘了持久化」回归。
+ */
+export function durableCheckpointer(
+  appConfig?: AppConfig,
+  injected?: BaseCheckpointSaver
+): BaseCheckpointSaver {
+  if (injected) return injected;
+  return appConfig ? createFileCheckpointer(appConfig) : new MemorySaver();
 }
 
 interface ThreadFileData {

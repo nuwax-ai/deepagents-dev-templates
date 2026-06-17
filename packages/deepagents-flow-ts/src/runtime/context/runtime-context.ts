@@ -6,7 +6,7 @@
  *   （session-wins：default < platform < session），用 @langchain/mcp-adapters 的
  *   MultiServerMCPClient.getTools() 加载 native MCP 工具。
  * - onConnectionError="warn"：单个 server 连不上只告警，不炸掉其余 server 的工具。
- * - tools 不由本 context 创建（由 app/tools 的 createFlowTools 组装）。
+ * - tools 不由本 context 创建（由 toolkit 的 createFlowTools 组装）。
  */
 
 import type { StructuredTool } from "@langchain/core/tools";
