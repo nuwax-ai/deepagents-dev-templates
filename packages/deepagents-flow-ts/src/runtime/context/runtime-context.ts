@@ -120,7 +120,7 @@ function toConnections(
               Object.entries(rawEnv as Record<string, unknown>)
                 .filter(([, v]) => typeof v === "string")
                 .map(([k, v]) => [k, v as string])
-            ) || undefined
+            )
           : undefined;
       const hasEnv = cleanEnv && Object.keys(cleanEnv).length > 0;
       out[name] = {
