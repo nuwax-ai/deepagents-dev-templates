@@ -14,6 +14,7 @@
 
 import type { BaseMessage } from "@langchain/core/messages";
 import { logger, type AppConfig } from "../index.js";
+import { acpPromptLogFields } from "../session-trace.js";
 
 const log = logger.child("llm-resilience");
 
@@ -197,12 +198,12 @@ export function invokeWithResilience<M extends InvokeModel>(
   const timeoutMs = options.timeoutMs ?? resilience.shortTimeoutMs;
   const label = options.label ?? "LLM 调模型";
   const startedAt = Date.now();
-  log.debug("LLM invoke start", {
+  log.debug("LLM invoke start", acpPromptLogFields({
     label,
     messageCount: messages.length,
     timeoutMs,
     useSharedLimiter: Boolean(options.useSharedLimiter),
-  });
+  }));
   const run = () =>
     withRetry(
       () => withTimeout(model.invoke(messages), timeoutMs, label),
@@ -213,15 +214,15 @@ export function invokeWithResilience<M extends InvokeModel>(
       }
     )
       .then((result) => {
-        log.debug("LLM invoke done", { label, durationMs: Date.now() - startedAt });
+        log.debug("LLM invoke done", acpPromptLogFields({ label, durationMs: Date.now() - startedAt }));
         return result;
       })
       .catch((err) => {
-        log.warn("LLM invoke failed", {
+        log.warn("LLM invoke failed", acpPromptLogFields({
           label,
           durationMs: Date.now() - startedAt,
           error: String(err),
-        });
+        }));
         throw err;
       }) as Promise<Awaited<ReturnType<M["invoke"]>>>;
 

@@ -25,7 +25,7 @@ import {
 } from "@langchain/langgraph";
 import type { RunnableConfig } from "@langchain/core/runnables";
 import { type AppConfig } from "../runtime/index.js";
-import { traceFlowCallbacks, traceFlowRun } from "../runtime/session-trace.js";
+import { traceFlowCallbacks, traceFlowRun, isInAcpPromptCycle } from "../runtime/session-trace.js";
 import type {
   StatefulFlow,
   FlowRunResult,
@@ -166,44 +166,43 @@ export function createStatefulFlow<S = Record<string, unknown>>(
     async run(input, threadId, callbacks): Promise<FlowRunResult> {
       const inputText = input.resume ?? input.query ?? "";
       const mode = input.resume !== undefined ? "resume" : "query";
-      const traced = traceFlowCallbacks(callbacks, { threadId });
+      const inAcp = isInAcpPromptCycle();
+      const traced = inAcp
+        ? (callbacks ?? {})
+        : traceFlowCallbacks(callbacks, { threadId, sessionId: threadId });
 
-      return traceFlowRun(
-        "stateful-flow",
-        { threadId, mode, input: inputText },
-        async () => {
-          const config = baseConfig(threadId, traced);
+      const runBody = async (): Promise<FlowRunResult> => {
+        const config = baseConfig(threadId, traced);
 
-          if (options.appConfig && input.resume === undefined) {
-            await applyCompaction(graph, config, options.appConfig);
-          }
-
-          const streamInput =
-            input.resume !== undefined
-              ? new Command({ resume: input.resume })
-              : options.toInput(input.query ?? "");
-
-          const streamConfig: StreamRunnableConfig = {
-            ...config,
-            streamMode: [...STREAM_MODES],
-            ...(traced.signal ? { signal: traced.signal } : {}),
-          };
-          const stream = await graph.stream(streamInput, streamConfig);
-
-          const interruptQuestion = await consumeStream(stream, traced);
-
-          if (interruptQuestion !== undefined) {
-            return {
-              status: "interrupted" as const,
-              question: interruptQuestion,
-            };
-          }
-
-          const snapshot = await graph.getState(config);
-          const { answer, footer } = options.toResult(snapshot.values as S);
-          return { status: "done" as const, answer, footer };
+        if (options.appConfig && input.resume === undefined) {
+          await applyCompaction(graph, config, options.appConfig);
         }
-      );
+
+        const streamInput =
+          input.resume !== undefined
+            ? new Command({ resume: input.resume })
+            : options.toInput(input.query ?? "");
+
+        const streamConfig: StreamRunnableConfig = {
+          ...config,
+          streamMode: [...STREAM_MODES],
+          ...(traced.signal ? { signal: traced.signal } : {}),
+        };
+        const stream = await graph.stream(streamInput, streamConfig);
+
+        const interruptQuestion = await consumeStream(stream, traced);
+
+        if (interruptQuestion !== undefined) {
+          return { status: "interrupted", question: interruptQuestion };
+        }
+
+        const snapshot = await graph.getState(config);
+        const { answer, footer } = options.toResult(snapshot.values as S);
+        return { status: "done", answer, footer };
+      };
+
+      if (inAcp) return runBody();
+      return traceFlowRun("stateful-flow", { threadId, mode, input: inputText }, runBody);
     },
 
     /**

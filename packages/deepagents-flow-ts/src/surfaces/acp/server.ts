@@ -24,16 +24,19 @@ import {
 import {
   logger,
   setLogSession,
-  truncateForLog,
-  getEffectiveLogLevel,
   resolveModel,
   type AppConfig,
   type ACPSessionConfig,
 } from "../../runtime/index.js";
+import {
+  runInAcpPromptCycle,
+  traceFlowCallbacks,
+  logAcpPromptStart,
+  logAcpPromptEnd,
+} from "../../runtime/session-trace.js";
 import type {
   FlowExecutor,
   StatefulFlow,
-  FlowCallbacks,
   ToolCallEvent,
   StageEvent,
   PlanEvent,
@@ -330,145 +333,147 @@ export function createFlowHooks(options: FlowAcpOptions): DeepAgentsServerHooks 
       // configureSession 未触发时（部分 host）仍保证 per-session log writer 就位。
       setLogSession(sessionId);
       const promptStartedAt = Date.now();
-      const logQuery =
-        getEffectiveLogLevel() === "debug" ? text : truncateForLog(text, 200);
 
       const executor = await resolveExecutor(sessionId);
       if (!executor) {
         log.warn("onPrompt: no executor available for session", { sessionId });
         return undefined;
       }
-      // executor 是 function ⇒ one-shot FlowExecutor；是对象（有 run）⇒ 支持 HITL 的 StatefulFlow。
       const isStateful = typeof executor !== "function";
       const durableResume =
         isStateful && typeof (executor as StatefulFlow).hasStarted === "function";
 
-      // 跟踪是否流式：流式则只补 footer/question，非流式则整段发。
-      let streamed = false;
-      // 跟踪本轮已 start、未 end 的 tool_call：cancel 时遍历发终止 update，
-      // 避免客户端 UI 上工具调用永远挂着「进行中」（abort 时收不到 on_tool_end）。
-      const inflightTools = new Map<string, ToolCallEvent>();
-      const callbacks: FlowCallbacks = {
-        onToken: (token) => {
-          streamed = true;
-          return streamText(conn, sessionId, token, "agent");
-        },
-        onToolCall: async (e) => {
-          await emitToolCall(conn, sessionId, e);
-          if (e.status === "in_progress") {
-            inflightTools.set(e.toolCallId, e);
-          } else {
-            inflightTools.delete(e.toolCallId);
-          }
-        },
-        onStage: (e) => streamText(conn, sessionId, formatStage(e), "thought"),
-        onPlan: (e) => emitPlan(conn, sessionId, e),
-        ...(ctx.signal ? { signal: ctx.signal } : {}),
-      };
-
-      try {
-        if (isStateful) {
-          const flow = executor as StatefulFlow;
-          // 该 session 是否已开题：持久化 flow 读 checkpointer（已有 checkpoint ⇒ 续跑），否则查内存兜底。
-          const resuming = durableResume
-            ? await flow.hasStarted!(sessionId)
-            : fallbackResume.has(sessionId);
-          log.info(resuming ? "onPrompt → resume" : "onPrompt → flow(stateful)", {
-            sessionId,
-            durable: durableResume,
-            query: logQuery,
-            queryChars: text.length,
-          });
-          const res = await flow.run(
-            resuming ? { resume: text } : { query: text },
-            sessionId,
-            callbacks
+      return runInAcpPromptCycle(
+        { sessionId, startedAt: promptStartedAt, query: text },
+        async () => {
+          let streamed = false;
+          const inflightTools = new Map<string, ToolCallEvent>();
+          const callbacks = traceFlowCallbacks(
+            {
+              onToken: (token) => {
+                streamed = true;
+                return streamText(conn, sessionId, token, "agent");
+              },
+              onToolCall: async (e) => {
+                await emitToolCall(conn, sessionId, e);
+                if (e.status === "in_progress") {
+                  inflightTools.set(e.toolCallId, e);
+                } else {
+                  inflightTools.delete(e.toolCallId);
+                }
+              },
+              onStage: (e) => streamText(conn, sessionId, formatStage(e), "thought"),
+              onPlan: (e) => emitPlan(conn, sessionId, e),
+              ...(ctx.signal ? { signal: ctx.signal } : {}),
+            },
+            { sessionId, threadId: sessionId }
           );
-          if (res.status === "interrupted") {
-            if (!durableResume) fallbackResume.add(sessionId); // 老式 flow：内存记「等回复」
-            log.info("onPrompt done (interrupted)", {
-              sessionId,
-              durationMs: Date.now() - promptStartedAt,
-              questionChars: res.question?.length ?? 0,
-            });
-            // interrupt 问题是下一轮交互提示；即使前面已流式输出报告正文，也要发出。
-            if (res.question) {
-              await streamText(conn, sessionId, res.question);
+
+          try {
+            if (isStateful) {
+              const flow = executor as StatefulFlow;
+              const resuming = durableResume
+                ? await flow.hasStarted!(sessionId)
+                : fallbackResume.has(sessionId);
+              const mode = resuming ? "resume" : "query";
+              logAcpPromptStart({
+                sessionId,
+                mode,
+                query: text,
+                resuming,
+                isStateful: true,
+              });
+              const res = await flow.run(
+                resuming ? { resume: text } : { query: text },
+                sessionId,
+                callbacks
+              );
+              if (res.status === "interrupted") {
+                if (!durableResume) fallbackResume.add(sessionId);
+                logAcpPromptEnd({
+                  sessionId,
+                  startedAt: promptStartedAt,
+                  status: "interrupted",
+                  questionChars: res.question?.length ?? 0,
+                });
+                if (res.question) {
+                  await streamText(conn, sessionId, res.question);
+                }
+                return { stopReason: "end_turn" as StopReason };
+              }
+              if (!durableResume) fallbackResume.delete(sessionId);
+              if (!streamed && res.answer) await streamText(conn, sessionId, res.answer);
+              if (res.footer) await streamText(conn, sessionId, res.footer);
+              logAcpPromptEnd({
+                sessionId,
+                startedAt: promptStartedAt,
+                status: res.status,
+                answerChars: res.answer?.length ?? 0,
+                streamed,
+              });
+              return { stopReason: "end_turn" as StopReason };
             }
+
+            logAcpPromptStart({
+              sessionId,
+              mode: "query",
+              query: text,
+              isStateful: false,
+            });
+            const result = await (executor as FlowExecutor)(text, callbacks);
+            if (!streamed && result.answer) await streamText(conn, sessionId, result.answer);
+            if (result.footer) await streamText(conn, sessionId, result.footer);
+            logAcpPromptEnd({
+              sessionId,
+              startedAt: promptStartedAt,
+              answerChars: result.answer?.length ?? 0,
+              streamed,
+            });
+            return { stopReason: "end_turn" as StopReason };
+          } catch (err) {
+            if ((err as Error)?.name === "AbortError" || ctx.signal?.aborted) {
+              logAcpPromptEnd({
+                sessionId,
+                startedAt: promptStartedAt,
+                cancelled: true,
+              });
+              for (const e of inflightTools.values()) {
+                try {
+                  await conn.sessionUpdate({
+                    sessionId,
+                    update: {
+                      sessionUpdate: "tool_call_update",
+                      toolCallId: e.toolCallId,
+                      status: "failed",
+                      content: [
+                        {
+                          type: "content",
+                          content: { type: "text", text: "已取消（客户端 session/cancel）" },
+                        },
+                      ],
+                    },
+                  });
+                } catch (tuErr) {
+                  log.warn("cancel: tool_call_update 发送失败", {
+                    sessionId,
+                    toolCallId: e.toolCallId,
+                    error: String(tuErr),
+                  });
+                }
+              }
+              return { stopReason: "cancelled" as StopReason };
+            }
+            logAcpPromptEnd({
+              sessionId,
+              startedAt: promptStartedAt,
+              error: String(err),
+            });
+            if (!durableResume) fallbackResume.delete(sessionId);
+            await streamText(conn, sessionId, "抱歉，处理您的问题时出现错误。");
             return { stopReason: "end_turn" as StopReason };
           }
-          if (!durableResume) fallbackResume.delete(sessionId); // 跑到底，清兜底状态
-          if (!streamed && res.answer) await streamText(conn, sessionId, res.answer);
-          if (res.footer) await streamText(conn, sessionId, res.footer);
-          log.info("onPrompt done", {
-            sessionId,
-            durationMs: Date.now() - promptStartedAt,
-            status: res.status,
-            answerChars: res.answer?.length ?? 0,
-            streamed,
-          });
-          return { stopReason: "end_turn" as StopReason };
         }
-
-        // one-shot FlowExecutor
-        log.info("onPrompt → flow", { sessionId, query: logQuery, queryChars: text.length });
-        const result = await (executor as FlowExecutor)(text, callbacks);
-        if (!streamed && result.answer) await streamText(conn, sessionId, result.answer);
-        if (result.footer) await streamText(conn, sessionId, result.footer);
-        log.info("onPrompt done", {
-          sessionId,
-          durationMs: Date.now() - promptStartedAt,
-          answerChars: result.answer?.length ?? 0,
-          streamed,
-        });
-        return { stopReason: "end_turn" as StopReason };
-      } catch (err) {
-        // 客户端 session/cancel：协议要求以 StopReason::Cancelled 响应原 prompt
-        // （acp.d.ts:1051）。signal 被 abort 时底层图运行以 AbortError reject——
-        // 这里捕获后返回 cancelled，而非把取消当成普通错误返回 end_turn。
-        if ((err as Error)?.name === "AbortError" || ctx.signal?.aborted) {
-          log.info("onPrompt cancelled by client", {
-            sessionId,
-            durationMs: Date.now() - promptStartedAt,
-            inflight: inflightTools.size,
-          });
-          // 给 in-flight tool_call 发合法终止状态（failed + 取消说明），避免客户端 UI 悬挂「进行中」。
-          // 注意：ToolCallStatus 枚举只有 pending|in_progress|completed|failed，无 cancelled
-          // （客户端会本地标记 cancelled，但 agent 侧用 failed 表达「非正常终止」才是合法值）。
-          // best-effort：conn 可能已半关，单个 update 失败不应阻断其余 tool 收尾、也不应把
-          // cancel 当成普通错误吞掉（否则会落入下面的「道歉」分支，返回 end_turn 而非 cancelled）。
-          for (const e of inflightTools.values()) {
-            try {
-              await conn.sessionUpdate({
-                sessionId,
-                update: {
-                  sessionUpdate: "tool_call_update",
-                  toolCallId: e.toolCallId,
-                  status: "failed",
-                  content: [
-                    { type: "content", content: { type: "text", text: "已取消（客户端 session/cancel）" } },
-                  ],
-                },
-              });
-            } catch (tuErr) {
-              log.warn("cancel: tool_call_update 发送失败", {
-                sessionId,
-                toolCallId: e.toolCallId,
-                error: String(tuErr),
-              });
-            }
-          }
-          return { stopReason: "cancelled" as StopReason };
-        }
-        log.error("onPrompt flow failed", {
-          sessionId,
-          durationMs: Date.now() - promptStartedAt,
-          error: String(err),
-        });
-        if (!durableResume) fallbackResume.delete(sessionId); // 出错清兜底状态，避免卡在 resume
-        await streamText(conn, sessionId, "抱歉，处理您的问题时出现错误。");
-        return { stopReason: "end_turn" as StopReason };
-      }
+      );
     },
 
     // session 关闭：释放 per-session 资源（MCP stdio 子进程等）+ 清兜底状态。

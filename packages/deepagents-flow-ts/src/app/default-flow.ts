@@ -8,27 +8,26 @@
 
 import type { FlowRuntime } from "../runtime/flow-runtime.js";
 import type { FlowExecutor } from "../core/flow-types.js";
-import { traceFlowCallbacks, traceFlowRun } from "../runtime/session-trace.js";
+import { traceFlowCallbacks, traceFlowRun, isInAcpPromptCycle } from "../runtime/session-trace.js";
 import { executeFlow } from "./graph.js";
 
 export function createDefaultExecutor(runtime: FlowRuntime): FlowExecutor {
   return async (query, opts) => {
-    const traced = traceFlowCallbacks(opts);
-    const { output } = await traceFlowRun(
-      "executeFlow",
-      { input: query },
-      () =>
-        executeFlow(
-          query,
-          {
-            allTools: runtime.allTools,
-            checkpointer: runtime.checkpointer,
-            config: runtime.config,
-            systemPrompt: runtime.systemPrompt,
-          },
-          traced
-        )
-    );
-    return { answer: output };
+    const traced = isInAcpPromptCycle() ? (opts ?? {}) : traceFlowCallbacks(opts);
+    const run = async () => {
+      const { output } = await executeFlow(
+        query,
+        {
+          allTools: runtime.allTools,
+          checkpointer: runtime.checkpointer,
+          config: runtime.config,
+          systemPrompt: runtime.systemPrompt,
+        },
+        traced
+      );
+      return { answer: output };
+    };
+    if (isInAcpPromptCycle()) return run();
+    return traceFlowRun("executeFlow", { input: query }, run);
   };
 }

@@ -200,4 +200,28 @@ describe("session-trace", () => {
     expect(joined).toContain("tool bash result");
     stderr.mockRestore();
   });
+
+  it("ACP 周期内 tool/stage 日志带 sessionId 与 promptMs", async () => {
+    const { runInAcpPromptCycle, traceFlowCallbacks } = await import(
+      "../src/runtime/session-trace.js"
+    );
+    process.env.LOG_LEVEL = "debug";
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    await runInAcpPromptCycle(
+      { sessionId: "sess_acp_1", startedAt: Date.now(), query: "hi" },
+      async () => {
+        const traced = traceFlowCallbacks({}, { sessionId: "sess_acp_1" });
+        await traced.onToolCall?.({
+          toolCallId: "tc2",
+          toolName: "search",
+          args: { q: "x" },
+          status: "in_progress",
+        });
+      }
+    );
+    const joined = stderr.mock.calls.map((c) => String(c[0])).join("");
+    expect(joined).toContain("sessionId=sess_acp_1");
+    expect(joined).toContain("promptMs=");
+    stderr.mockRestore();
+  });
 });

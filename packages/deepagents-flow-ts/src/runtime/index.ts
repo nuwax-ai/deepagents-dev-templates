@@ -62,4 +62,13 @@ export {
   type LogLevel,
 } from "./logger.js";
 export { traceFlowCallbacks, traceFlowRun, type SessionTraceContext, type TraceFlowRunMeta } from "./session-trace.js";
+export {
+  isInAcpPromptCycle,
+  getAcpPromptCycle,
+  acpPromptLogFields,
+  runInAcpPromptCycle,
+  logAcpPromptStart,
+  logAcpPromptEnd,
+  type AcpPromptCycle,
+} from "./session-trace.js";
 export { getPackageVersion } from "./version.js";
