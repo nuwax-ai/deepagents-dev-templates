@@ -69,6 +69,7 @@ export {
   runInAcpPromptCycle,
   logAcpPromptStart,
   logAcpPromptEnd,
+  logPromptComplete,
   type AcpPromptCycle,
 } from "./session-trace.js";
 export { getPackageVersion } from "./version.js";

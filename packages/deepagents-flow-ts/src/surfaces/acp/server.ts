@@ -31,8 +31,10 @@ import {
 import {
   runInAcpPromptCycle,
   traceFlowCallbacks,
+  traceFlowRun,
   logAcpPromptStart,
   logAcpPromptEnd,
+  logPromptComplete,
 } from "../../runtime/session-trace.js";
 import type {
   FlowExecutor,
@@ -118,6 +120,83 @@ async function emitToolCall(
     update.content = [{ type: "content", content: { type: "text", text: e.error } }];
   }
   await conn.sessionUpdate({ sessionId, update });
+}
+
+/** ACP 流式回传统计（写入 prompt_end）。 */
+interface AcpStreamStats {
+  streamed: boolean;
+  streamChars: number;
+  tokenChunks: number;
+}
+
+function createAcpStreamStats(): AcpStreamStats {
+  return { streamed: false, streamChars: 0, tokenChunks: 0 };
+}
+
+/**
+ * 组装 ACP onPrompt 的 callbacks：流式推送 + tool trace。
+ * 所有调试日志在此层注入，flow 图本身无感知。
+ */
+function buildAcpCallbacks(
+  conn: AcpConnection,
+  sessionId: string,
+  stats: AcpStreamStats,
+  inflightTools: Map<string, ToolCallEvent>,
+  signal?: AbortSignal
+): ReturnType<typeof traceFlowCallbacks> {
+  return traceFlowCallbacks(
+    {
+      onToken: (token) => {
+        stats.streamed = true;
+        stats.streamChars += token.length;
+        stats.tokenChunks += 1;
+        return streamText(conn, sessionId, token, "agent");
+      },
+      onToolCall: async (e) => {
+        await emitToolCall(conn, sessionId, e);
+        if (e.status === "in_progress") {
+          inflightTools.set(e.toolCallId, e);
+        } else {
+          inflightTools.delete(e.toolCallId);
+        }
+      },
+      onStage: (e) => streamText(conn, sessionId, formatStage(e), "thought"),
+      onPlan: (e) => emitPlan(conn, sessionId, e),
+      ...(signal ? { signal } : {}),
+    },
+    { sessionId, threadId: sessionId }
+  );
+}
+
+async function failInflightToolsOnCancel(
+  conn: AcpConnection,
+  sessionId: string,
+  inflightTools: Map<string, ToolCallEvent>
+): Promise<void> {
+  for (const e of inflightTools.values()) {
+    try {
+      await conn.sessionUpdate({
+        sessionId,
+        update: {
+          sessionUpdate: "tool_call_update",
+          toolCallId: e.toolCallId,
+          status: "failed",
+          content: [
+            {
+              type: "content",
+              content: { type: "text", text: "已取消（客户端 session/cancel）" },
+            },
+          ],
+        },
+      });
+    } catch (tuErr) {
+      log.warn("cancel: tool_call_update 发送失败", {
+        sessionId,
+        toolCallId: e.toolCallId,
+        error: String(tuErr),
+      });
+    }
+  }
 }
 
 async function streamText(
@@ -259,6 +338,8 @@ export function createFlowHooks(options: FlowAcpOptions): DeepAgentsServerHooks 
   // 一个会话 = 一个主题：老式 flow（未实现 hasStarted）的「等回复」内存兜底，按 sessionId 跟踪。
   // 实现了 hasStarted 的 flow 优先从 checkpointer 推断续跑（跨进程/IDE 重启仍准）。
   const fallbackResume = new Set<string>();
+  /** 记录每轮 onPrompt 起始时间，供 onPromptComplete 写 prompt_complete。 */
+  const promptTurnStartedAt = new Map<string, number>();
 
   /** 取该 session 的 executor：优先 per-session 缓存，回退单 executor；createExecutor 模式下缺失则懒建。 */
   async function resolveExecutor(
@@ -333,10 +414,14 @@ export function createFlowHooks(options: FlowAcpOptions): DeepAgentsServerHooks 
       // configureSession 未触发时（部分 host）仍保证 per-session log writer 就位。
       setLogSession(sessionId);
       const promptStartedAt = Date.now();
+      promptTurnStartedAt.set(sessionId, promptStartedAt);
+      // ① 协议层：收到 session/prompt
+      logAcpPromptStart({ sessionId, query: text });
 
       const executor = await resolveExecutor(sessionId);
       if (!executor) {
         log.warn("onPrompt: no executor available for session", { sessionId });
+        promptTurnStartedAt.delete(sessionId);
         return undefined;
       }
       const isStateful = typeof executor !== "function";
@@ -346,28 +431,26 @@ export function createFlowHooks(options: FlowAcpOptions): DeepAgentsServerHooks 
       return runInAcpPromptCycle(
         { sessionId, startedAt: promptStartedAt, query: text },
         async () => {
-          let streamed = false;
+          const stats = createAcpStreamStats();
           const inflightTools = new Map<string, ToolCallEvent>();
-          const callbacks = traceFlowCallbacks(
-            {
-              onToken: (token) => {
-                streamed = true;
-                return streamText(conn, sessionId, token, "agent");
-              },
-              onToolCall: async (e) => {
-                await emitToolCall(conn, sessionId, e);
-                if (e.status === "in_progress") {
-                  inflightTools.set(e.toolCallId, e);
-                } else {
-                  inflightTools.delete(e.toolCallId);
-                }
-              },
-              onStage: (e) => streamText(conn, sessionId, formatStage(e), "thought"),
-              onPlan: (e) => emitPlan(conn, sessionId, e),
-              ...(ctx.signal ? { signal: ctx.signal } : {}),
-            },
-            { sessionId, threadId: sessionId }
+          const callbacks = buildAcpCallbacks(
+            conn,
+            sessionId,
+            stats,
+            inflightTools,
+            ctx.signal
           );
+
+          const endTurn = (meta: Omit<Parameters<typeof logAcpPromptEnd>[0], "sessionId" | "startedAt">) => {
+            logAcpPromptEnd({
+              sessionId,
+              startedAt: promptStartedAt,
+              streamed: stats.streamed,
+              streamChars: stats.streamChars,
+              tokenChunks: stats.tokenChunks,
+              ...meta,
+            });
+          };
 
           try {
             if (isStateful) {
@@ -376,24 +459,29 @@ export function createFlowHooks(options: FlowAcpOptions): DeepAgentsServerHooks 
                 ? await flow.hasStarted!(sessionId)
                 : fallbackResume.has(sessionId);
               const mode = resuming ? "resume" : "query";
-              logAcpPromptStart({
-                sessionId,
-                mode,
-                query: text,
-                resuming,
-                isStateful: true,
-              });
-              const res = await flow.run(
-                resuming ? { resume: text } : { query: text },
-                sessionId,
-                callbacks
+              // ② flow 执行（tool/stage/LLM trace 经 callbacks 注入）
+              const res = await traceFlowRun(
+                "flow.run",
+                {
+                  sessionId,
+                  threadId: sessionId,
+                  mode,
+                  input: text,
+                  resuming,
+                  isStateful: true,
+                },
+                () =>
+                  flow.run(
+                    resuming ? { resume: text } : { query: text },
+                    sessionId,
+                    callbacks
+                  )
               );
               if (res.status === "interrupted") {
                 if (!durableResume) fallbackResume.add(sessionId);
-                logAcpPromptEnd({
-                  sessionId,
-                  startedAt: promptStartedAt,
-                  status: "interrupted",
+                endTurn({
+                  stopReason: "end_turn",
+                  flowStatus: "interrupted",
                   questionChars: res.question?.length ?? 0,
                 });
                 if (res.question) {
@@ -402,78 +490,58 @@ export function createFlowHooks(options: FlowAcpOptions): DeepAgentsServerHooks 
                 return { stopReason: "end_turn" as StopReason };
               }
               if (!durableResume) fallbackResume.delete(sessionId);
-              if (!streamed && res.answer) await streamText(conn, sessionId, res.answer);
+              if (!stats.streamed && res.answer) await streamText(conn, sessionId, res.answer);
               if (res.footer) await streamText(conn, sessionId, res.footer);
-              logAcpPromptEnd({
-                sessionId,
-                startedAt: promptStartedAt,
-                status: res.status,
+              endTurn({
+                stopReason: "end_turn",
+                flowStatus: res.status,
                 answerChars: res.answer?.length ?? 0,
-                streamed,
               });
               return { stopReason: "end_turn" as StopReason };
             }
 
-            logAcpPromptStart({
-              sessionId,
-              mode: "query",
-              query: text,
-              isStateful: false,
-            });
-            const result = await (executor as FlowExecutor)(text, callbacks);
-            if (!streamed && result.answer) await streamText(conn, sessionId, result.answer);
+            const result = await traceFlowRun(
+              "flow.run",
+              {
+                sessionId,
+                mode: "query",
+                input: text,
+                isStateful: false,
+              },
+              () => (executor as FlowExecutor)(text, callbacks)
+            );
+            if (!stats.streamed && result.answer) await streamText(conn, sessionId, result.answer);
             if (result.footer) await streamText(conn, sessionId, result.footer);
-            logAcpPromptEnd({
-              sessionId,
-              startedAt: promptStartedAt,
+            endTurn({
+              stopReason: "end_turn",
+              flowStatus: "done",
               answerChars: result.answer?.length ?? 0,
-              streamed,
             });
             return { stopReason: "end_turn" as StopReason };
           } catch (err) {
             if ((err as Error)?.name === "AbortError" || ctx.signal?.aborted) {
-              logAcpPromptEnd({
-                sessionId,
-                startedAt: promptStartedAt,
-                cancelled: true,
-              });
-              for (const e of inflightTools.values()) {
-                try {
-                  await conn.sessionUpdate({
-                    sessionId,
-                    update: {
-                      sessionUpdate: "tool_call_update",
-                      toolCallId: e.toolCallId,
-                      status: "failed",
-                      content: [
-                        {
-                          type: "content",
-                          content: { type: "text", text: "已取消（客户端 session/cancel）" },
-                        },
-                      ],
-                    },
-                  });
-                } catch (tuErr) {
-                  log.warn("cancel: tool_call_update 发送失败", {
-                    sessionId,
-                    toolCallId: e.toolCallId,
-                    error: String(tuErr),
-                  });
-                }
-              }
+              endTurn({ stopReason: "cancelled" });
+              await failInflightToolsOnCancel(conn, sessionId, inflightTools);
               return { stopReason: "cancelled" as StopReason };
             }
-            logAcpPromptEnd({
-              sessionId,
-              startedAt: promptStartedAt,
-              error: String(err),
-            });
+            endTurn({ stopReason: "end_turn", error: String(err) });
             if (!durableResume) fallbackResume.delete(sessionId);
             await streamText(conn, sessionId, "抱歉，处理您的问题时出现错误。");
             return { stopReason: "end_turn" as StopReason };
           }
         }
       );
+    },
+
+    /** ③ 协议层：deepagents-acp 确认 turn 已结束（含 onPrompt 短路路径）。 */
+    async onPromptComplete(ctx) {
+      const startedAt = promptTurnStartedAt.get(ctx.sessionId);
+      logPromptComplete({
+        sessionId: ctx.sessionId,
+        stopReason: ctx.stopReason,
+        promptMs: startedAt != null ? Date.now() - startedAt : 0,
+      });
+      promptTurnStartedAt.delete(ctx.sessionId);
     },
 
     // session 关闭：释放 per-session 资源（MCP stdio 子进程等）+ 清兜底状态。

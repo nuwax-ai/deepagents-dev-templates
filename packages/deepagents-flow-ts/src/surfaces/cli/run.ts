@@ -15,6 +15,7 @@ import { createInterface } from "node:readline";
 import { randomUUID } from "node:crypto";
 import type { FlowExecutor, StatefulFlow, FlowCallbacks } from "../../core/flow-types.js";
 import { setLogSession } from "../../runtime/index.js";
+import { traceFlowCallbacks, traceFlowRun } from "../../runtime/session-trace.js";
 
 export interface FlowCliOptions {
   query?: string;
@@ -60,8 +61,12 @@ export async function runFlowCli(
 
   const ask = async (q: string): Promise<void> => {
     process.stdout.write(`\n❓ ${q}\n⏳ 处理中...\n\n`);
-    // CLI 非流式：不传 onToken，由 executor 返回完整结果
-    const result = await flow(q, toolCallbacks);
+    const traced = traceFlowCallbacks(toolCallbacks, { sessionId });
+    const result = await traceFlowRun(
+      "flow.run",
+      { sessionId, mode: "query", input: q, isStateful: false },
+      () => flow(q, traced)
+    );
     process.stdout.write("📝 回答：\n");
     process.stdout.write(result.answer + (result.footer ?? "") + "\n");
   };
@@ -112,7 +117,14 @@ async function runStatefulCli(
       ? { resume: firstText }
       : { query: firstText };
     while (true) {
-      const res = await flow.run(input, threadId, toolCallbacks);
+      const inputText = input.resume ?? input.query ?? "";
+      const mode = input.resume !== undefined ? "resume" : "query";
+      const traced = traceFlowCallbacks(toolCallbacks, { threadId, sessionId: threadId });
+      const res = await traceFlowRun(
+        "flow.run",
+        { sessionId: threadId, threadId, mode, input: inputText, isStateful: true },
+        () => flow.run(input, threadId, traced)
+      );
       if (res.status === "done") {
         process.stdout.write("📝 回答：\n");
         process.stdout.write(res.answer + (res.footer ?? "") + "\n");

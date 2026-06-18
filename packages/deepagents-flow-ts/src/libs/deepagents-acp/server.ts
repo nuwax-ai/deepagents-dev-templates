@@ -644,6 +644,10 @@ export class DeepAgentsServer {
         signal: this.promptAbortControllers.get(sessionId)?.signal,
       });
       if (hookResult) {
+        await this.hooks?.onPromptComplete?.({
+          sessionId,
+          stopReason: hookResult.stopReason,
+        });
         return hookResult;
       }
 

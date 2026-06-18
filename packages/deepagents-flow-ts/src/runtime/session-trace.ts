@@ -3,7 +3,8 @@
  *
  * ACP 路径：`runInAcpPromptCycle` 在 onPrompt 周期内设置 AsyncLocalStorage，
  * 周期内 tool/stage/LLM 日志自动带 sessionId + promptMs。
- * CLI 路径：stateful-flow / default-flow 自行 `traceFlowRun`（无 ACP 周期时）。
+ * CLI 路径：surfaces/cli/run.ts 在调用 flow 前包 `traceFlowRun` / `traceFlowCallbacks`。
+ * 业务图（stateful-flow / default-flow）不感知 trace。
  */
 
 import { AsyncLocalStorage } from "node:async_hooks";
@@ -147,8 +148,7 @@ function compactMeta(meta: TraceFlowRunMeta): Record<string, unknown> {
 }
 
 /**
- * 包裹一次 flow 执行（CLI / 非 ACP 路径）。
- * 已在 ACP onPrompt 周期内时仅执行 fn，避免与 acp-prompt 周期日志重复。
+ * 包裹一次 flow 执行（由 surface 层调用：ACP server / CLI）。
  */
 export async function traceFlowRun<T extends {
   output?: string;
@@ -163,96 +163,115 @@ export async function traceFlowRun<T extends {
   meta: TraceFlowRunMeta,
   fn: () => Promise<T>
 ): Promise<T> {
-  const inAcp = isInAcpPromptCycle();
   const startedAt = Date.now();
   const inputText = meta.input ?? "";
-  if (!inAcp) {
-    log.info(`${label} start`, {
-      ...compactMeta(meta),
-      input: inputText ? truncateForLog(inputText, 200) : undefined,
-      inputChars: inputText.length,
-    });
-  }
+  const cycleFields = acpPromptLogFields();
+  log.info(`${label} start`, {
+    ...compactMeta(meta),
+    ...cycleFields,
+    input: inputText ? truncateForLog(inputText, 200) : undefined,
+    inputChars: inputText.length,
+  });
   try {
     const result = await fn();
-    if (!inAcp) {
-      const answer = result.output ?? result.answer ?? "";
-      const doneMeta: Record<string, unknown> = {
-        ...compactMeta(meta),
-        durationMs: Date.now() - startedAt,
-        status: result.status,
+    const answer = result.output ?? result.answer ?? "";
+    const doneMeta: Record<string, unknown> = {
+      ...compactMeta(meta),
+      ...cycleFields,
+      promptMs: cycleFields.promptMs ?? Date.now() - startedAt,
+      durationMs: Date.now() - startedAt,
+      flowStatus: result.status,
+      outputChars: answer.length,
+      footerChars: result.footer?.length ?? 0,
+    };
+    if (result.steps?.length) doneMeta.steps = result.steps;
+    if (result.status === "interrupted" && result.question) {
+      doneMeta.questionChars = result.question.length;
+    }
+    log.info(`${label} done`, doneMeta);
+    if (result.messages?.length) {
+      log.block("debug", `${label} messages`, formatMessagesForLog(result.messages));
+    } else if (answer) {
+      log.debug(`${label} output preview`, {
         outputChars: answer.length,
-        footerChars: result.footer?.length ?? 0,
-      };
-      if (result.steps?.length) doneMeta.steps = result.steps;
-      if (result.status === "interrupted" && result.question) {
-        doneMeta.questionChars = result.question.length;
-      }
-      log.info(`${label} done`, doneMeta);
-      if (result.messages?.length) {
-        log.block("debug", `${label} messages`, formatMessagesForLog(result.messages));
-      } else if (answer) {
-        log.debug(`${label} output preview`, {
-          outputChars: answer.length,
-          preview: truncateForLog(answer, 200),
-        });
-      }
+        preview: truncateForLog(answer, 200),
+      });
     }
     return result;
   } catch (err) {
-    if (!inAcp) {
-      log.error(`${label} failed`, {
-        ...compactMeta(meta),
-        durationMs: Date.now() - startedAt,
-        error: String(err),
-      });
-    }
+    log.error(`${label} failed`, {
+      ...compactMeta(meta),
+      ...cycleFields,
+      durationMs: Date.now() - startedAt,
+      error: String(err),
+    });
     throw err;
   }
 }
 
-/** ACP onPrompt 周期起止日志（与 flow-acp 互补，带 promptMs 锚点）。 */
+/** ACP session/prompt 周期起止（仅 surfaces/acp/server.ts 调用）。 */
+
+/** 协议收到 session/prompt，onPrompt 入口。 */
 export function logAcpPromptStart(meta: {
   sessionId: string;
-  mode: string;
   query: string;
+  mode?: string;
   resuming?: boolean;
   isStateful?: boolean;
 }): void {
   const logQuery =
     getEffectiveLogLevel() === "debug" ? meta.query : truncateForLog(meta.query, 200);
-  log.info("acp-prompt ▶", {
+  log.info("prompt_start", {
     sessionId: meta.sessionId,
-    mode: meta.mode,
-    resuming: meta.resuming,
-    isStateful: meta.isStateful,
+    ...(meta.mode ? { mode: meta.mode } : {}),
+    ...(meta.resuming != null ? { resuming: meta.resuming } : {}),
+    ...(meta.isStateful != null ? { isStateful: meta.isStateful } : {}),
     query: logQuery,
     queryChars: meta.query.length,
     promptMs: 0,
   });
 }
 
+/** onPrompt 即将 return { stopReason } 给 deepagents-acp。 */
 export function logAcpPromptEnd(meta: {
   sessionId: string;
   startedAt: number;
-  status?: string;
+  /** ACP 协议返回给客户端的 stopReason（end_turn / cancelled / …）。 */
+  stopReason: string;
+  /** flow 内部状态（interrupted / done），与 stopReason 不同：HITL interrupt 仍返回 end_turn。 */
+  flowStatus?: string;
   answerChars?: number;
   questionChars?: number;
   streamed?: boolean;
-  cancelled?: boolean;
+  streamChars?: number;
+  tokenChunks?: number;
   error?: string;
 }): void {
   const fields: Record<string, unknown> = {
     sessionId: meta.sessionId,
     promptMs: Date.now() - meta.startedAt,
+    stopReason: meta.stopReason,
   };
-  if (meta.status) fields.status = meta.status;
+  if (meta.flowStatus) fields.flowStatus = meta.flowStatus;
   if (meta.answerChars != null) fields.answerChars = meta.answerChars;
   if (meta.questionChars != null) fields.questionChars = meta.questionChars;
   if (meta.streamed != null) fields.streamed = meta.streamed;
-  if (meta.cancelled) fields.cancelled = true;
+  if (meta.streamChars != null) fields.streamChars = meta.streamChars;
+  if (meta.tokenChunks != null) fields.tokenChunks = meta.tokenChunks;
   if (meta.error) fields.error = meta.error;
   const level = meta.error ? "error" : "info";
-  const tag = meta.error ? "acp-prompt ✗" : meta.cancelled ? "acp-prompt ⊘" : "acp-prompt ◀";
-  log[level](tag, fields);
+  log[level](`prompt_end ${meta.stopReason}`, fields);
+}
+
+/** deepagents-acp 在 turn 收尾后回调（协议层确认）。 */
+export function logPromptComplete(meta: {
+  sessionId: string;
+  stopReason: string;
+  promptMs: number;
+}): void {
+  log.info(`prompt_complete ${meta.stopReason}`, {
+    sessionId: meta.sessionId,
+    stopReason: meta.stopReason,
+    promptMs: meta.promptMs,
+  });
 }
