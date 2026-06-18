@@ -11,12 +11,12 @@
  */
 
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { dirname, resolve } from "node:path";
+import { resolve } from "node:path";
 import { loadConfig, type AppConfig, type ACPSessionConfig } from "./index.js";
+import { resolvePackageRoot } from "./package-root.js";
 
-// dist/runtime/flow-config.js → 包根在 ../..
-const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+/** Agent 模板包根；dev 与 esbuild bundle 下均由 resolvePackageRoot 统一解析。 */
+const PACKAGE_ROOT = resolvePackageRoot(import.meta.url);
 
 export interface LoadedFlowConfig {
   appConfig: AppConfig;

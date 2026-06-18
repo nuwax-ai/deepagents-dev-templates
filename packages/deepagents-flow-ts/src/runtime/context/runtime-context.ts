@@ -12,8 +12,9 @@
 import type { StructuredTool } from "@langchain/core/tools";
 import { MultiServerMCPClient } from "@langchain/mcp-adapters";
 import { readFileSync, existsSync } from "node:fs";
-import { resolve } from "node:path";
 import { type AppConfig, type ACPSessionConfig } from "../config/config-loader.js";
+import { resolvePath } from "../config/config-paths.js";
+import { resolvePackageRoot } from "../package-root.js";
 import { PlatformClient } from "../platform/platform-client.js";
 import { VariableManager } from "../platform/variable-manager.js";
 import { logger } from "../logger.js";
@@ -67,18 +68,22 @@ function mergeServers(
  * 从 config.mcp.servers + configPath/configPaths 指向的文件加载 default MCP servers。
  * 注意:不读 configPath 会丢失 mcp.default.json
  * 里的默认 server（如 context7）。
+ *
+ * MCP 默认配置属于 Agent 安装包，相对包根解析；ACP session cwd（用户工作区）不参与。
  */
 function resolveDefaultMcpServers(config: AppConfig): Record<string, McpServerEntry> {
   const log = logger.child("mcp-default");
   const servers: Record<string, McpServerEntry> = {
     ...((config.mcp.servers as Record<string, McpServerEntry> | undefined) ?? {}),
   };
+  // 包根：loadConfig 已将内置配置的相对路径规范为绝对路径；此处用包根兜底未规范化的相对路径。
+  const packageRoot = resolvePackageRoot(import.meta.url);
   const paths = [
     config.mcp.configPath,
     ...((config.mcp.configPaths as string[] | undefined) ?? []),
   ].filter((p): p is string => Boolean(p));
   for (const p of paths) {
-    const resolved = resolve(process.cwd(), p);
+    const resolved = resolvePath(p, packageRoot);
     if (!existsSync(resolved)) {
       log.warn(`MCP config file not found: ${resolved}`);
       continue;

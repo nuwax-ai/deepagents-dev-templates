@@ -11,15 +11,20 @@ import { z } from "zod";
 import { getPackageVersion } from "../version.js";
 
 export const BUILTIN_TEMPLATE_CONFIGS = {
+  flowAgent: {
+    path: "config/flow-agent.config.json",
+    resourceBase: ".",
+  },
+  /** @deprecated 别名；与 flowAgent 同路径，兼容 DEEPAGENTS_BUILTIN_CONFIG=appAgent */
   appAgent: {
-    path: "config/app-agent.config.json",
+    path: "config/flow-agent.config.json",
     resourceBase: ".",
   },
 } as const;
 
 export type BuiltinTemplateConfigName = keyof typeof BUILTIN_TEMPLATE_CONFIGS;
 
-export const DEFAULT_BUILTIN_TEMPLATE_CONFIG: BuiltinTemplateConfigName = "appAgent";
+export const DEFAULT_BUILTIN_TEMPLATE_CONFIG: BuiltinTemplateConfigName = "flowAgent";
 
 // ─── Config Schema ──────────────────────────────────────
 

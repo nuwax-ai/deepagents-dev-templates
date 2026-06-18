@@ -6,19 +6,17 @@
  * or merging. Extracted from config-loader.ts.
  */
 import { homedir } from "node:os";
-import { dirname, isAbsolute, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { isAbsolute, join, resolve } from "node:path";
 import { logger } from "../logger.js";
+import { resolvePackageRoot } from "../package-root.js";
 import {
   BUILTIN_TEMPLATE_CONFIGS,
   DEFAULT_BUILTIN_TEMPLATE_CONFIG,
   type BuiltinTemplateConfigName,
 } from "./config-schema.js";
 
-// NOTE: this file must stay in src/runtime/config/ — TEMPLATE_PACKAGE_ROOT is
-// derived from import.meta.url relative to this location.
-const RUNTIME_DIR = dirname(fileURLToPath(import.meta.url));
-export const TEMPLATE_PACKAGE_ROOT = resolve(RUNTIME_DIR, "..", "..", "..");
+/** Agent 模板包根（含 config/、prompts/）；与 ACP 用户 workspace cwd 无关。 */
+export const TEMPLATE_PACKAGE_ROOT = resolvePackageRoot(import.meta.url);
 
 export function readBuiltinTemplateConfigNameFromEnv(): BuiltinTemplateConfigName | undefined {
   const name = process.env.DEEPAGENTS_BUILTIN_CONFIG;
