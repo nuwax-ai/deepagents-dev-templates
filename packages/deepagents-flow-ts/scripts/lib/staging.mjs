@@ -4,7 +4,7 @@
  */
 import { spawn, spawnSync } from "node:child_process";
 import { cp, lstat, mkdir, readdir, rm, stat } from "node:fs/promises";
-import { createWriteStream } from "node:fs";
+import { createWriteStream, existsSync } from "node:fs";
 import path from "node:path";
 import { createGzip } from "node:zlib";
 import { fileURLToPath } from "node:url";
@@ -155,6 +155,20 @@ function tarCommand() {
   return "tar";
 }
 
+/** Windows: use bsdtar (System32) for zip — Git tar misparses `C:` in zip output paths. */
+function zipTarCommand() {
+  if (process.platform === "win32") {
+    const winTar = path.join(process.env.SystemRoot ?? "C:\\Windows", "System32", "tar.exe");
+    if (existsSync(winTar)) return winTar;
+  }
+  return tarCommand();
+}
+
+function zipTarAvailable() {
+  const cmd = zipTarCommand();
+  return path.isAbsolute(cmd) ? existsSync(cmd) : commandExists(cmd);
+}
+
 export async function createTarGz(artifact, parentDir, folderName) {
   if (process.platform === "darwin") {
     process.env.COPYFILE_DISABLE = "1";
@@ -206,6 +220,20 @@ export async function createTarGz(artifact, parentDir, folderName) {
   });
 }
 
+async function createZipTar(artifact, parentDir, folderName) {
+  const absArtifact = path.resolve(artifact);
+  const parent = path.resolve(parentDir);
+  await new Promise((resolve, reject) => {
+    const child = spawn(
+      zipTarCommand(),
+      ["-a", "-cf", tarPathArg(absArtifact), "-C", tarPathArg(parent), folderName],
+      { stdio: "inherit", shell: false },
+    );
+    child.on("error", reject);
+    child.on("close", (code) => (code === 0 ? resolve() : reject(new Error(`tar zip exited ${code}`))));
+  });
+}
+
 async function createZipPowerShell(artifact, parentDir, folderName) {
   const absArtifact = path.resolve(artifact);
   const absFolder = path.join(path.resolve(parentDir), folderName);
@@ -243,23 +271,19 @@ export async function createZipArchive(artifact, parentDir, folderName) {
     return;
   }
 
+  if (zipTarAvailable()) {
+    try {
+      await createZipTar(absArtifact, parentDir, folderName);
+      return;
+    } catch (err) {
+      if (process.platform !== "win32") throw err;
+    }
+  }
+
   if (process.platform === "win32") {
     await createZipPowerShell(absArtifact, parentDir, folderName);
     return;
   }
 
-  if (commandExists(tarCommand())) {
-    await new Promise((resolve, reject) => {
-      const child = spawn(
-        tarCommand(),
-        ["-a", "-cf", tarPathArg(absArtifact), "-C", tarPathArg(path.resolve(parentDir)), folderName],
-        { stdio: "inherit", shell: false },
-      );
-      child.on("error", reject);
-      child.on("close", (code) => (code === 0 ? resolve() : reject(new Error(`tar zip exited ${code}`))));
-    });
-    return;
-  }
-
-  throw new Error("No zip tool available (install zip, or use PowerShell / tar with zip support)");
+  throw new Error("No zip tool available (install zip, or use tar with zip support)");
 }

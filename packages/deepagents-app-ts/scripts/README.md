@@ -44,7 +44,8 @@ This installs via Chocolatey:
 | Tool | Chocolatey package | Used for |
 |------|-------------------|----------|
 | `rsync` | `rsync` | Staging copy (falls back to Node `fs.cp`) |
-| `zip` | `zip` | Windows `.zip` archives (falls back to PowerShell `Compress-Archive`) |
+| `zip` | `zip` | Windows `.zip` archives（最快；否则 `System32\tar -a` → PowerShell `Compress-Archive`） |
+| `tar` | （Windows 10+ 内置） | Windows `.zip` when `zip` CLI is missing（bsdtar + forward-slash `-C`） |
 
 macOS / Linux usually ship these tools; run `pnpm run check:tools` to confirm.
 

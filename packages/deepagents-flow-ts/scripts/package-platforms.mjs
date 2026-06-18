@@ -5,7 +5,7 @@
  */
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
-import { mkdtemp, mkdir, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, rm, copyFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -128,6 +128,48 @@ function writePlatformsJson(outPath, { agentName, version, pairs }) {
   writeFileSync(outPath, `${JSON.stringify(doc, null, 2)}\n`);
 }
 
+/**
+ * 各平台制品内容相同，仅扩展名/平台名不同：tar.gz 只压缩一次再复制，zip 与 tar.gz 并行生成。
+ */
+async function createPlatformArchives({ outDir, agentName, version, stagingDir, stageFolder, log }) {
+  const artifactPath = (key, ext) => path.join(outDir, `${agentName}-${key}-${version}.${ext}`);
+  const tarPlatforms = PLATFORMS.filter((p) => p.ext === "tar.gz");
+  const zipPlatforms = PLATFORMS.filter((p) => p.ext === "zip");
+  const pairByKey = new Map();
+
+  const [{ key: primaryTarKey, ext: primaryTarExt }] = tarPlatforms;
+  const primaryTarPath = artifactPath(primaryTarKey, primaryTarExt);
+
+  await Promise.all([
+    (async () => {
+      await rm(primaryTarPath, { force: true });
+      log(`Creating ${path.basename(primaryTarPath)}`);
+      await createTarGz(primaryTarPath, stagingDir, stageFolder);
+      pairByKey.set(primaryTarKey, { key: primaryTarKey, file: primaryTarPath });
+    })(),
+    ...zipPlatforms.map(async ({ key, ext }) => {
+      const artifact = artifactPath(key, ext);
+      await rm(artifact, { force: true });
+      log(`Creating ${path.basename(artifact)}`);
+      await createZipArchive(artifact, stagingDir, stageFolder);
+      pairByKey.set(key, { key, file: artifact });
+    }),
+  ]);
+
+  await Promise.all(
+    tarPlatforms.slice(1).map(async ({ key, ext }) => {
+      const artifact = artifactPath(key, ext);
+      await rm(artifact, { force: true });
+      log(`Creating ${path.basename(artifact)}`);
+      await copyFile(primaryTarPath, artifact);
+      pairByKey.set(key, { key, file: artifact });
+    }),
+  );
+
+  const pairs = PLATFORMS.map(({ key }) => pairByKey.get(key));
+  return { artifacts: pairs.map((p) => p.file), pairs };
+}
+
 async function main() {
   const { help, verbose, printArtifacts, positional } = parseArgs(process.argv.slice(2));
   if (help) {
@@ -178,22 +220,14 @@ async function main() {
     log("Writing in-package .version.json / .platform.json");
     writePackageMetadata(stageRoot, { version, packageName, agentName });
 
-    const artifacts = [];
-    const pairs = [];
-    for (const { key, ext } of PLATFORMS) {
-      const artifact = path.join(outDir, `${agentName}-${key}-${version}.${ext}`);
-      await rm(artifact, { force: true });
-      log(`Creating ${path.basename(artifact)}`);
-      if (ext === "tar.gz") {
-        await createTarGz(artifact, stagingDir, `${agentName}-${version}`);
-      } else if (ext === "zip") {
-        await createZipArchive(artifact, stagingDir, `${agentName}-${version}`);
-      } else {
-        throw new Error(`unsupported archive ext: ${ext}`);
-      }
-      artifacts.push(artifact);
-      pairs.push({ key, file: artifact });
-    }
+    const { artifacts, pairs } = await createPlatformArchives({
+      outDir,
+      agentName,
+      version,
+      stagingDir,
+      stageFolder: `${agentName}-${version}`,
+      log,
+    });
 
     const platformsJson = path.join(outDir, `${agentName}-${version}.platforms.json`);
     log(`Writing ${path.basename(platformsJson)}`);

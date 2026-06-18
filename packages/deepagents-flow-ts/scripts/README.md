@@ -42,8 +42,8 @@ pnpm run check:tools   # 检测工具是否就绪
 | 工具 | 用途 | 缺失时 fallback |
 |------|------|-----------------|
 | `rsync` | staging 复制 | Node `fs.cp` |
-| `zip` | Windows `.zip` | PowerShell `Compress-Archive` |
-| `gzip` / `tar` | `.tar.gz` | Node `zlib` + `tar` |
+| `zip` | Windows `.zip`（最快） | `System32\tar -a`（正斜杠 `-C`）→ PowerShell `Compress-Archive` |
+| `gzip` / `tar` | `.tar.gz` / Windows `.zip`（无 `zip` CLI 时） | Node `zlib` + `tar` / PowerShell |
 
 ## 共享库
 
