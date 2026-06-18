@@ -1,12 +1,12 @@
 # Flow 工具开发对接指南（TypeScript / deepagents-flow-ts）
 
-平台提供的工具**必须先搜索并添加到 Agent 配置**（见 `SKILL.md` 与 `api-docs.md`），之后才能在 flow-ts 中使用。本文说明第 3 步——**按平台返回的 `schema` 在 `src/libs/tools/` 中实现 TypeScript 工具，注册到 `src/app/flow-tools.ts` 的 `createFlowTools()`**。
+平台提供的工具**必须先搜索并添加到 Agent 配置**（见 `SKILL.md` 与 `api-docs.md`），之后才能在 `deepagents-flow-ts` 目标模板项目中使用。本文说明第 3 步——**按平台返回的 `schema` 在 `src/libs/tools/` 中实现 TypeScript 工具，注册到 `src/app/flow-tools.ts` 的 `createFlowTools()`**。
 
 > **写进代码的，只有"实际要用到的工具"本身。** 这里的 `tool()` 函数实现的是**该工具自己的业务逻辑**（你写的、运行时被智能体调用的代码），与 dev 配置接口（config/search/add/del/update）无关——dev 接口只在开发期手动跑，绝不 import 到工具代码里。
 
-## 对接模型（flow-ts 版）
+## 对接模型（deepagents-flow-ts 版）
 
-平台工具的 `schema` 字段是**字符串化的 JSON Schema**，描述了该工具的入参（字段名、类型、是否必填）。flow-ts 侧的核心任务：**用 `tool()` + Zod schema 定义工具入参与平台 schema 对齐**，注册到 `createFlowTools()`，由 think 节点自动 `bindTools`。
+平台工具的 `schema` 字段是**字符串化的 JSON Schema**，描述了该工具的入参（字段名、类型、是否必填）。`deepagents-flow-ts` 目标模板项目侧的核心任务：**用 `tool()` + Zod schema 定义工具入参与平台 schema 对齐**，注册到 `createFlowTools()`，由 think 节点自动 `bindTools`。
 
 ```
 开发期（不进代码）：搜索 → 拿到 schema → tool/add 加进配置
@@ -19,7 +19,7 @@
                     LLM（按 schema 生成 tool call）──► tool() 执行业务逻辑
 ```
 
-> flow-ts 里定义的工具必须与配置中添加的工具指向同一 `targetType`+`targetId`，这样模型生成的 tool call 才能被正确路由/对应。
+> `deepagents-flow-ts` 目标模板项目里定义的工具必须与配置中添加的工具指向同一 `targetType`+`targetId`，这样模型生成的 tool call 才能被正确路由/对应。
 
 ## 第一步：解析平台 schema
 
@@ -44,7 +44,7 @@ echo '<搜索结果里的 schema 字符串>' | node -e "process.stdin.resume();l
 
 ## 第二步：用 tool() + Zod schema 对齐平台 schema
 
-flow-ts 的通用工具放 `src/libs/tools/`，用 `@langchain/core/tools` 的 `tool()` 函数 + `zod` 定义入参。**字段名、类型、必填必须与平台 schema 一致**：
+`deepagents-flow-ts` 目标模板项目的通用工具放 `src/libs/tools/`，用 `@langchain/core/tools` 的 `tool()` 函数 + `zod` 定义入参。**字段名、类型、必填必须与平台 schema 一致**：
 
 ```typescript
 // src/libs/tools/platform-search.tool.ts
@@ -110,11 +110,11 @@ export function createFlowTools(ctx, opts) {
 
 ## 系统提示词与开场白
 
-系统提示词**保存到平台配置**（见 `SKILL.md` 第 5 步 / `api-docs.md` 第 2 节），flow-ts 运行时通过 `runtime-context` 中的 prompt 解析链统一读取（ACP session > config > `prompts/flow.base.md` > fallback），**不要在代码里硬编码重复一份**，避免与平台配置不一致。
+系统提示词**保存到平台配置**（见 `SKILL.md` 第 5 步 / `api-docs.md` 第 2 节），`deepagents-flow-ts` 目标模板项目运行时通过 `runtime-context` 中的 prompt 解析链统一读取（ACP session > config > `prompts/flow.base.md` > fallback），**不要在代码里硬编码重复一份**，避免与平台配置不一致。
 
-## 与 flow-ts 内置工具的关系
+## 与 deepagents-flow-ts 内置工具的关系
 
-flow-ts 默认图已内置一套工具（`createFlowTools()` 自动组装），**平台工具与内置工具共存**：
+`deepagents-flow-ts` 默认图已内置一套工具（`createFlowTools()` 自动组装），**平台工具与内置工具共存**：
 
 | 类别 | 来源 | 注册位置 |
 |------|------|----------|
@@ -133,7 +133,7 @@ flow-ts 默认图已内置一套工具（`createFlowTools()` 自动组装），*
 | LLM 生成了 tool call 但平台报参数错误 | 工具字段名/类型与平台 schema 不一致 | 解析 schema，逐字段对齐 Zod 定义 |
 | 模型从不调用该工具 | 工具未添加到配置 / description 不清晰 | 先 `tool/add` 进配置；完善 `tool()` 的 description |
 | 必填字段缺失导致失败 | Zod schema 把必填字段也设了 `.optional()` | `schema.required` 中的字段不加 `.optional()` |
-| 添加与实现的工具不匹配 | 加 A 调 B | 配置中 `targetId` 与 flow-ts 实现的工具指向同一项 |
+| 添加与实现的工具不匹配 | 加 A 调 B | 配置中 `targetId` 与 `deepagents-flow-ts` 目标模板项目实现的工具指向同一项 |
 | 工具没生效 | 忘了在 `createFlowTools()` 注册 | 在 `buildTools()` 数组中加入新工具 |
 | 类型不兼容 | `tool()` 返回值不是 string | `tool()` 必须返回 string，复杂对象用 `JSON.stringify()` |
 
@@ -141,7 +141,7 @@ flow-ts 默认图已内置一套工具（`createFlowTools()` 自动组装），*
 
 - ❌ **在 `tool()` 函数体里调用 dev 配置接口**（config/search/add/del/update）——dev 接口是开发期手动跑的配置工具，不写进业务代码；`tool()` 里只写该工具自己的业务逻辑。
 - ❌ 按 LLM 的"常识"给工具起字段名，不对照平台 schema。
-- ❌ 把系统提示词同时硬编码在 flow-ts 代码里又存一份到平台——以平台配置为单一数据源。
+- ❌ 把系统提示词同时硬编码在 `deepagents-flow-ts` 目标模板项目代码里又存一份到平台——以平台配置为单一数据源。
 - ❌ 没把工具 `tool/add` 进配置就直接用——平台不会路由。
 - ❌ 忘了在 `createFlowTools()` 的 `buildTools()` 中注册新工具。
 - ✅ 平台 schema → Zod schema → `tool()` → `createFlowTools()` 注册，一路对齐。

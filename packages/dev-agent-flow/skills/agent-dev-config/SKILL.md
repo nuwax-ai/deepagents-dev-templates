@@ -1,45 +1,51 @@
 ---
 name: agent-dev-config
-description: "flow-ts 开发期平台配置技能：封装 4sandbox/agent/dev/* 接口——搜索/添加/删除平台工具（Plugin/Workflow/Knowledge）、保存系统提示词与开场白。这些接口仅在开发期手动运行，不进 flow-ts 业务代码。核心流程：搜到可用工具 → 添加到 dev Agent 配置 → 按返回的 schema 在 src/libs/tools/ 用 tool() + Zod 实现 → 注册到 createFlowTools()。"
-tags: [flow-ts, agent-development, tool-config, system-prompt, dev-space, sandbox, plugin, workflow, knowledge]
+description: "deepagents-flow-ts 目标模板项目的开发期平台配置技能：封装 4sandbox/agent/dev/* 接口——搜索/添加/删除平台工具（Plugin/Workflow/Knowledge）、保存系统提示词与开场白。这些接口仅在开发期手动运行，不进 deepagents-flow-ts 运行时代码。核心流程：搜到可用工具 → 添加到 dev Agent 配置 → 按返回的 schema 在 src/libs/tools/ 用 tool() + Zod 实现 → 注册到 createFlowTools()。"
+tags: [deepagents-flow-ts, agent-development, tool-config, system-prompt, dev-space, sandbox, plugin, workflow, knowledge]
 version: "3.0.0"
 license: MIT
 ---
 
-# 平台工具配置与接入（flow-ts）
+# 平台工具配置与接入（deepagents-flow-ts）
 
-用 **deepagents-flow-ts** 开发智能体时，本技能解决两件事：① 把**系统提示词 / 开场白**保存到开发平台配置；② 把**平台提供的工具**接入 flow-ts。平台工具虽多，但**必须先配置（搜索 → 添加）才能被框架使用**，随后按工具返回的 `schema` 在 `src/libs/tools/` 用 `tool()` + Zod 实现，注册到 `createFlowTools()`。所有配置操作面向 `4sandbox/agent/dev/*` 接口。
+## 模板身份边界
+
+本 Skill 只服务于 `deepagents-flow-ts` 目标模板项目。本 Skill 是开发期配置说明，不是运行时业务项目。
+
+当本文说“目标模板项目”“目标项目”“Agent 项目”时，默认都指用户基于 `deepagents-flow-ts` 创建、解压或分发出来的项目。不要把本 Skill 配置本身当作要开发或运行的业务模板。
+
+用 **deepagents-flow-ts** 开发智能体时，本技能解决两件事：① 把**系统提示词 / 开场白**保存到开发平台配置；② 把**平台提供的工具**接入目标模板项目。平台工具虽多，但**必须先配置（搜索 → 添加）才能被框架使用**，随后按工具返回的 `schema` 在 `src/libs/tools/` 用 `tool()` + Zod 实现，注册到 `createFlowTools()`。所有配置操作面向 `4sandbox/agent/dev/*` 接口。
 
 ## 职责边界（务必区分）
 
-本技能的 dev 接口与 flow-ts 业务代码是**两个层面**，不要混淆：
+本技能的 dev 接口与 `deepagents-flow-ts` 目标模板项目运行时代码是**两个层面**，不要混淆：
 
 | 层面 | 是什么 | 何时运行 | 是否写进代码 |
 |------|--------|----------|--------------|
-| **配置层（dev 接口）** | config / search / add / del / update | **开发阶段**，由人/AI 手动跑，用来取关键数据、更新平台配置 | ❌ **不进 flow-ts 业务代码** |
-| **工具层（实际工具）** | 按平台 `schema` 在 `src/libs/tools/` 用 `tool()` + Zod 实现的工具 | **运行时**，由智能体实际调用 | ✅ 只有这一层写进代码 |
+| **配置层（dev 接口）** | config / search / add / del / update | **开发阶段**，由人/AI 手动跑，用来取关键数据、更新平台配置 | ❌ **不进 `deepagents-flow-ts` 运行时代码** |
+| **工具层（实际工具）** | 按平台 `schema` 在 `src/libs/tools/` 用 `tool()` + Zod 实现的工具 | **运行时**，由目标模板项目的智能体实际调用 | ✅ 只有这一层写进代码 |
 
-> 一句话：**dev 接口是开发期的"配置工具"，不是运行时被调用的工具。** 写进 flow-ts 代码的，只有「实际要用到的工具」本身——按它的 schema 实现，而不是去 import 这些配置管理 API。
+> 一句话：**dev 接口是开发期的"配置工具"，不是运行时被调用的工具。** 写进 `deepagents-flow-ts` 目标模板项目代码的，只有「实际要用到的工具」本身——按它的 schema 实现，而不是去 import 这些配置管理 API。
 
 ## When to Use
 
-**首要场景**：用 flow-ts 开发智能体时，需要让智能体调用平台工具或设置其系统提示词，就加载本技能，严格按 **搜索 → 添加到配置 → 按 schema 在 src/libs/tools/ 实现** 的顺序操作。
+**首要场景**：用 `deepagents-flow-ts` 目标模板项目开发智能体时，需要让智能体调用平台工具或设置其系统提示词，就加载本技能，严格按 **搜索 → 添加到配置 → 按 schema 在 src/libs/tools/ 实现** 的顺序操作。
 
-- 用 flow-ts 开发智能体、需要接入平台工具 → **必须先搜索** dev 空间，不要凭记忆/臆测直接添加。
-- 需要把**系统提示词 / 开场白**保存到平台配置（flow-ts 运行时读取）。
+- 用 `deepagents-flow-ts` 目标模板项目开发智能体、需要接入平台工具 → **必须先搜索** dev 空间，不要凭记忆/臆测直接添加。
+- 需要把**系统提示词 / 开场白**保存到平台配置（目标模板项目运行时读取）。
 - 用户要**查看 / 查询**当前开发中的 Agent 配置（工具列表、systemPrompt、开场白）。
-- 用户要给 Agent **添加**或**删除**工具（决定 flow-ts 智能体可用哪些工具）。
+- 用户要给 Agent **添加**或**删除**工具（决定目标模板项目智能体可用哪些工具）。
 
 > 完整接口字段表、请求/响应示例、错误码见 `references/api-docs.md`。
-> flow-ts 工具对接示例（`tool()` + Zod + `createFlowTools()`）见 `references/langgraph-integration.md`。
+> `deepagents-flow-ts` 工具对接示例（`tool()` + Zod + `createFlowTools()`）见 `references/langgraph-integration.md`。
 > 端点调用可使用 `scripts/agent_tool.sh`（bash）或 `scripts/agent_tool.py`（Python）。
 
-## 核心流程：平台工具接入 flow-ts
+## 核心流程：平台工具接入 deepagents-flow-ts
 
-平台提供大量工具供 flow-ts 框架使用，但**未配置则不可用**。选定一个工具后，三步缺一不可：
+平台提供大量工具供 `deepagents-flow-ts` 目标模板项目使用，但**未配置则不可用**。选定一个工具后，三步缺一不可：
 
 1. **搜索** —— 在 dev 空间搜出可用工具，取得 `targetType` / `targetId` / `schema`。
-2. **添加到配置** —— 用 `tool/add` 把工具加入当前开发 Agent 的配置；**只有配置后 flow-ts 智能体才能调用它**，只引用 `targetId` 不添加则运行时不可用。
+2. **添加到配置** —— 用 `tool/add` 把工具加入当前开发 Agent 的配置；**只有配置后目标模板项目智能体才能调用它**，只引用 `targetId` 不添加则运行时不可用。
 3. **按 schema 在 src/libs/tools/ 实现** —— 以工具返回的 `schema`（字符串化 JSON Schema）为准，在 `src/libs/tools/` 中用 `tool()` + Zod 实现该工具，注册到 `src/app/flow-tools.ts` 的 `createFlowTools()`。think 节点自动 `bindTools`，无需手动绑定。不要按臆测字段名开发。
 
 > 口诀：**搜得到 → 加进配置 → 按它的 schema 在 src/libs/tools/ 用 tool() + Zod 实现 → 注册到 createFlowTools()**。三步必须一致指向同一个 `targetType` + `targetId`。
@@ -115,10 +121,10 @@ echo '<搜索结果里的 schema 字符串>' | node -e "process.stdin.resume();l
 - **字段名、类型以 schema 为准**——Zod schema 的字段定义必须与平台 schema 对齐，不要臆造参数名。
 - **类型映射**：`string`→`z.string()`、`integer`/`number`→`z.number()`、`boolean`→`z.boolean()`、`array`→`z.array()`、`object`→`z.record()`。
 - `required` 列出的字段**必填**（不加 `.optional()`），其余加 `.optional()`。
-- 添加的工具（`targetType`/`targetId`）与 flow-ts 中实现/绑定的工具**必须是同一个**，不要"加 A 调 B"。
+- 添加的工具（`targetType`/`targetId`）与 `deepagents-flow-ts` 目标模板项目中实现/绑定的工具**必须是同一个**，不要"加 A 调 B"。
 - **返回值必须为 string**：复杂对象用 `JSON.stringify()` 序列化。
 - 注册路径：`src/libs/tools/xxx.tool.ts` → 在 `src/libs/tools/index.ts` re-export → 在 `src/app/flow-tools.ts` 的 `buildTools()` 数组中加入。
-- flow-ts 对接示例（`tool()` + Zod + `createFlowTools()`）见 `references/langgraph-integration.md`。
+- `deepagents-flow-ts` 对接示例（`tool()` + Zod + `createFlowTools()`）见 `references/langgraph-integration.md`。
 
 ### 4. 删除工具
 
@@ -176,18 +182,18 @@ curl -s -X POST "${PLATFORM_BASE_URL}/api/v1/4sandbox/agent/dev/config/update" \
 
 ## Anti-patterns
 
-- ❌ **把 dev 接口写进 flow-ts 业务代码**（`src/libs/tools/`）——config/search/add/del/update 是开发期配置操作，运行时不应出现；代码里只该有"实际要用的工具"本身。
+- ❌ **把 dev 接口写进 `deepagents-flow-ts` 运行时代码**（`src/libs/tools/`）——config/search/add/del/update 是开发期配置操作，运行时不应出现；代码里只该有"实际要用的工具"本身。
 - ❌ **未搜索就直接添加工具**，凭记忆猜 `targetId`——接入平台工具时，搜索是必须优先执行的第一步。
-- ❌ **搜到了却没添加到配置**，就在 flow-ts 里写工具——未 `tool/add` 进配置，平台侧不会路由调用。
+- ❌ **搜到了却没添加到配置**，就在 `deepagents-flow-ts` 目标模板项目里写工具——未 `tool/add` 进配置，平台侧不会路由调用。
 - ❌ **不按 schema 开发工具**，按臆测的字段名/类型定义 `tool()`——入参 Zod schema 必须与搜索结果返回的 `schema` 对齐。
-- ❌ **加 A 调 B**：配置中添加的工具与 flow-ts 中实现的工具 `targetId` 不一致。
+- ❌ **加 A 调 B**：配置中添加的工具与 `deepagents-flow-ts` 目标模板项目中实现的工具 `targetId` 不一致。
 - ❌ 忘了在 `createFlowTools()` 的 `buildTools()` 中注册新工具。
 - ❌ 写系统提示词到配置时**把不相关字段填成空字符串**，导致原值被覆盖——省略即可。
 - ❌ 把 `${PLATFORM_BASE_URL}` / `${SANDBOX_ACCESS_KEY}` 当字面量写死在交付里——应来自环境变量。
 - ❌ 写操作后**不做验证**就声称"已完成"——必须重新查询配置确认。
 - ✅ **代码里只写"实际用到的工具"**（`src/libs/tools/`），配置变更走 dev 接口（开发期手动跑），两者分离。
 - ✅ 接入工具三步一致：**搜 → 加 → 按 schema 用 `tool()` + Zod 在 `src/libs/tools/` 实现 → 注册到 `createFlowTools()`**，指向同一 `targetType`+`targetId`。
-- ✅ 系统提示词保存到平台配置，flow-ts 运行时统一读取，避免在代码里硬编码。
+- ✅ 系统提示词保存到平台配置，`deepagents-flow-ts` 目标模板项目运行时统一读取，避免在代码里硬编码。
 - ✅ 每次写操作后调用 `config` 核对结果。
 - ✅ 参照 `platform-api.tool.ts` / `http-request.tool.ts` 的 `tool()` + Zod 写法。
 

@@ -1,16 +1,16 @@
 ---
 name: flow-builder
-description: "flow-ts 工作流设计与编排：State 定义 -> 节点(工厂模式) -> graph.ts 连线 -> 执行器包装(FlowExecutor/createStatefulFlow) -> surface 挂接。编排模式：ReAct/条件路由/Send 并行/HITL interrupt-resume/子图/长任务。LangGraph API 细节用 Context7 查"
-tags: [flow, orchestration, stategraph, hitl, send, creation, graph, nodes, flow-ts]
+description: "deepagents-flow-ts 目标模板项目的工作流设计与编排：State 定义 -> 优先组合 src/libs/nodes/ factory -> src/app/graph.ts 连线 -> 执行器包装(FlowExecutor/createStatefulFlow) -> surface 挂接。编排模式：ReAct/条件路由/Send 并行/HITL interrupt-resume/子图/长任务。LangGraph API 细节用 Context7 查"
+tags: [flow, orchestration, stategraph, hitl, send, creation, graph, nodes, deepagents-flow-ts]
 version: "1.0.0"
 ---
 
-# Flow 设计与编排（flow-ts）
+# Flow 设计与编排（deepagents-flow-ts）
 
 ## When to Use
 需要设计或创建一个工作流图时：状态定义、节点、边、条件路由、并行 Send、interrupt/resume HITL、子图、长任务流水线。
 
-> LangGraph/LangChain API 细节（`Annotation.Root`、`Send`、`interrupt`、`Command`、`StateGraph` 等）用 Context7 查最新文档：`resolve-library-id("langgraph")` → `query-docs`。本技能聚焦 flow-ts 的结构约定与编排模式。
+> LangGraph/LangChain API 细节（`Annotation.Root`、`Send`、`interrupt`、`Command`、`StateGraph` 等）用 Context7 查最新文档：`resolve-library-id("langgraph")` → `query-docs`。本技能聚焦 `deepagents-flow-ts` 目标模板项目的结构约定与编排模式。
 
 ## Step 1: 选型与对照
 
@@ -19,9 +19,9 @@ version: "1.0.0"
 | `FlowExecutor` | 问答 / 检索 / 批处理 | 函数 `(query, cb) => Promise<FlowResult>` | `examples/rag` |
 | `StatefulFlow` | 审批 / 确认 / HITL / 跨重启 | `createStatefulFlow(...)` | travel / pm / review / deep-research |
 
-> **examples/ 纯只读**。读范例学拓扑，在 **`src/app/`** 实现（改 graph.ts 连线、nodes/ 节点、tools/ 工具）。
+> **examples/ 纯只读**。读范例学拓扑，在 **`src/app/`** 实现默认图（改 graph.ts 连线、nodes/ 节点、flow-tools.ts 工具装配）。通用工具放 `src/libs/tools/`，可复用节点优先用 `src/libs/nodes/` factory。
 
-开发位置：`src/app/` 的 `graph.ts`（连线）+ `nodes/`（节点）+ `tools/`（工具）
+开发位置：`src/app/graph.ts`（连线）+ `src/app/nodes/`（默认图节点）+ `src/app/flow-tools.ts`（工具装配）；可复用节点来自 `src/libs/nodes/`。
 
 ## Step 2: 写 State 定义
 
@@ -50,7 +50,7 @@ type MyStateType = typeof MyState.State;
 
 ## Step 3: 写节点函数
 
-> **节点工厂模式**：需运行时依赖的节点走工厂（`createXxxNode(deps)` 返回闭包）；纯节点直接导出函数。照 `src/app/nodes/` 模式。
+> **节点 factory 优先**：先查 `docs/node-kit.md` 和 `src/libs/nodes/` 的 createLlmNode/createToolExecNode/createHumanApprovalNode/createFanout 等 factory；只有 bespoke 场景才在 `src/app/nodes/` 手写节点，并说明为什么不用 factory。
 
 ```typescript
 async function composeNode(state: MyStateType): Promise<Partial<MyStateType>> {

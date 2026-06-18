@@ -1,11 +1,11 @@
 ---
 name: flow-tools-config
-description: "flow-ts 工具开发与配置管理：tool() + Zod schema 创建工具、注册到 createFlowTools()、MCP 服务器配置（stdio/http）、合并策略、agent_variable 密钥管理。工具优先级：平台→内置→MCP→自写"
-tags: [tools, mcp, variables, secrets, configuration, zod, flow-ts]
+description: "deepagents-flow-ts 目标模板项目的工具开发与配置管理：在 src/libs/tools/ 用 tool() + Zod schema 创建工具，并在 src/app/flow-tools.ts 注册到 createFlowTools()；MCP 服务器配置（stdio/http）、合并策略、agent_variable 密钥管理。工具优先级：平台→内置→MCP→自写"
+tags: [tools, mcp, variables, secrets, configuration, zod, deepagents-flow-ts]
 version: "1.0.0"
 ---
 
-# 工具开发与配置（flow-ts）
+# 工具开发与配置（deepagents-flow-ts）
 
 ## When to Use
 需要添加自定义工具、配置 MCP 服务器、管理 API key / 变量时。
@@ -14,13 +14,13 @@ version: "1.0.0"
 
 ### 前置检查（强制优先级）
 ```
-1. platform_api(operation: "query_plugins")  ← 查平台插件
+1. 平台 Plugin / Workflow / Knowledge  ← 先加载 agent-dev-config 搜索并添加配置
 2. 内置工具：bash/fs/search/demo/http_request/json_utils/platform_api/agent_variable/mcp_tool_bridge
 3. native MCP 工具：ctx.mcpTools（@langchain/mcp-adapters 自动加载）
-4. 以上都没有 → 创建自定义工具
+4. 以上都没有 → 在 src/libs/tools/ 创建自定义工具，并在 src/app/flow-tools.ts 注册
 ```
 
-### 创建工具文件 `src/app/tools/{name}.tool.ts`
+### 创建工具文件 `src/libs/tools/{name}.tool.ts`
 
 **无状态工具（不需要平台依赖）：**
 ```typescript
@@ -73,11 +73,12 @@ export function createMyTool(ctx: RuntimeContext) {
 
 ### 注册到 createFlowTools()
 ```typescript
-// src/app/tools/index.ts
+// src/libs/tools/index.ts
 import { weatherTool } from "./weather.tool.js";
 import { createMyTool } from "./my-service.tool.js";
 
-// 在 buildTools 返回的数组中加入：
+// src/app/flow-tools.ts
+// 在 reused 或 buildTools 返回数组中加入：
 weatherTool,        // 无状态：直接引用
 createMyTool(ctx),  // 平台绑定：工厂调用
 ```
