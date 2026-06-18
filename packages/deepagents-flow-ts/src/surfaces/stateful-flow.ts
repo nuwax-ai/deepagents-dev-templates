@@ -24,7 +24,8 @@ import {
   type BaseCheckpointSaver,
 } from "@langchain/langgraph";
 import type { RunnableConfig } from "@langchain/core/runnables";
-import { logger, type AppConfig } from "../runtime/index.js";
+import { type AppConfig } from "../runtime/index.js";
+import { traceFlowCallbacks, traceFlowRun } from "../runtime/session-trace.js";
 import type {
   StatefulFlow,
   FlowRunResult,
@@ -33,8 +34,6 @@ import type {
 import { applyCompaction } from "../app/compaction.js";
 import { mapStreamChunk } from "./map-stream-chunk.js";
 import { dispatchSurfaceEvent } from "./dispatch-surface-event.js";
-
-const log = logger.child("stateful-flow");
 
 /** LangGraph 多模式 stream 的 streamMode 列表。 */
 const STREAM_MODES = ["messages", "tools", "custom", "updates"] as const;
@@ -165,36 +164,46 @@ export function createStatefulFlow<S = Record<string, unknown>>(
 
   return {
     async run(input, threadId, callbacks): Promise<FlowRunResult> {
-      const config = baseConfig(threadId, callbacks);
+      const inputText = input.resume ?? input.query ?? "";
+      const mode = input.resume !== undefined ? "resume" : "query";
+      const traced = traceFlowCallbacks(callbacks, { threadId });
 
-      // 自动压缩：仅「新 query（非 resume）」入口——checkpoint 累积历史超阈值则摘要+替换后再跑。
-      // resume（HITL 续跑）分支不动历史，避免干扰挂起的 interrupt。
-      if (options.appConfig && input.resume === undefined) {
-        await applyCompaction(graph, config, options.appConfig);
-      }
+      return traceFlowRun(
+        "stateful-flow",
+        { threadId, mode, input: inputText },
+        async () => {
+          const config = baseConfig(threadId, traced);
 
-      const streamInput =
-        input.resume !== undefined
-          ? new Command({ resume: input.resume })
-          : options.toInput(input.query ?? "");
+          if (options.appConfig && input.resume === undefined) {
+            await applyCompaction(graph, config, options.appConfig);
+          }
 
-      const streamConfig: StreamRunnableConfig = {
-        ...config,
-        streamMode: [...STREAM_MODES],
-        ...(callbacks?.signal ? { signal: callbacks.signal } : {}),
-      };
-      const stream = await graph.stream(streamInput, streamConfig);
+          const streamInput =
+            input.resume !== undefined
+              ? new Command({ resume: input.resume })
+              : options.toInput(input.query ?? "");
 
-      const interruptQuestion = await consumeStream(stream, callbacks);
+          const streamConfig: StreamRunnableConfig = {
+            ...config,
+            streamMode: [...STREAM_MODES],
+            ...(traced.signal ? { signal: traced.signal } : {}),
+          };
+          const stream = await graph.stream(streamInput, streamConfig);
 
-      if (interruptQuestion !== undefined) {
-        log.info("interrupted → 等待用户 resume", { threadId });
-        return { status: "interrupted", question: interruptQuestion };
-      }
+          const interruptQuestion = await consumeStream(stream, traced);
 
-      const snapshot = await graph.getState(config);
-      const { answer, footer } = options.toResult(snapshot.values as S);
-      return { status: "done", answer, footer };
+          if (interruptQuestion !== undefined) {
+            return {
+              status: "interrupted" as const,
+              question: interruptQuestion,
+            };
+          }
+
+          const snapshot = await graph.getState(config);
+          const { answer, footer } = options.toResult(snapshot.values as S);
+          return { status: "done" as const, answer, footer };
+        }
+      );
     },
 
     /**

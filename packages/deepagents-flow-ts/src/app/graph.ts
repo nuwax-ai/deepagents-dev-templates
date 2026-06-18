@@ -93,12 +93,16 @@ export async function executeFlow(
     systemPrompt: string;
   },
   callbacks: FlowCallbacks = {}
-): Promise<{ output: string; steps: string[] }> {
+): Promise<{ output: string; steps: string[]; messages: FlowState["messages"] }> {
   const graph = createFlowGraph({ ...deps, callbacks });
   const threadId = randomUUID();
   const result = (await graph.invoke(
     { input, messages: [] } as unknown as FlowState,
     { configurable: { thread_id: threadId } }
   )) as FlowState;
-  return { output: result.output ?? "", steps: result.steps ?? [] };
+  return {
+    output: result.output ?? "",
+    steps: result.steps ?? [],
+    messages: result.messages ?? [],
+  };
 }

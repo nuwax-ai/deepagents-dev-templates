@@ -48,5 +48,18 @@ export {
   type DiscoveredSkill,
   type RuntimeContext,
 } from "./context/helpers.js";
-export { Logger, logger, setLogAgent, setLogSession, type LogLevel } from "./logger.js";
+export {
+  Logger,
+  logger,
+  setLogAgent,
+  setLogSession,
+  getSessionLogPath,
+  getEffectiveLogLevel,
+  truncateForLog,
+  formatMessagesForLog,
+  formatPayloadForLog,
+  resolveTraceMaxChars,
+  type LogLevel,
+} from "./logger.js";
+export { traceFlowCallbacks, traceFlowRun, type SessionTraceContext, type TraceFlowRunMeta } from "./session-trace.js";
 export { getPackageVersion } from "./version.js";

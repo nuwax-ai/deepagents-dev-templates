@@ -23,6 +23,9 @@ import {
 } from "../../libs/deepagents-acp/index.js";
 import {
   logger,
+  setLogSession,
+  truncateForLog,
+  getEffectiveLogLevel,
   resolveModel,
   type AppConfig,
   type ACPSessionConfig,
@@ -280,6 +283,8 @@ export function createFlowHooks(options: FlowAcpOptions): DeepAgentsServerHooks 
   return {
     // session/new | session/load：按 ACP cwd/mcpServers/model 装配 per-session runtime。
     async configureSession(ctx) {
+      // 无论单/多 executor，都先绑定 per-session 日志（幂等）。
+      setLogSession(ctx.sessionId);
       if (!options.createExecutor) return undefined;
       const { sessionConfig, workspaceRoot } = sessionConfigFromParams(ctx.params);
       sessionConfigs.set(ctx.sessionId, { sessionConfig, workspaceRoot });
@@ -322,6 +327,11 @@ export function createFlowHooks(options: FlowAcpOptions): DeepAgentsServerHooks 
       }
       const conn = ctx.conn as AcpConnection;
       const sessionId = ctx.sessionId;
+      // configureSession 未触发时（部分 host）仍保证 per-session log writer 就位。
+      setLogSession(sessionId);
+      const promptStartedAt = Date.now();
+      const logQuery =
+        getEffectiveLogLevel() === "debug" ? text : truncateForLog(text, 200);
 
       const executor = await resolveExecutor(sessionId);
       if (!executor) {
@@ -348,14 +358,11 @@ export function createFlowHooks(options: FlowAcpOptions): DeepAgentsServerHooks 
           if (e.status === "in_progress") {
             inflightTools.set(e.toolCallId, e);
           } else {
-            // completed | failed：已结束，移出 in-flight 集合
             inflightTools.delete(e.toolCallId);
           }
         },
-        // 阶段进度作为 thought chunk，与主回答区分。
         onStage: (e) => streamText(conn, sessionId, formatStage(e), "thought"),
         onPlan: (e) => emitPlan(conn, sessionId, e),
-        // ACP cancel signal → graph.stream({signal})，取消时图运行快速 reject。
         ...(ctx.signal ? { signal: ctx.signal } : {}),
       };
 
@@ -369,7 +376,8 @@ export function createFlowHooks(options: FlowAcpOptions): DeepAgentsServerHooks 
           log.info(resuming ? "onPrompt → resume" : "onPrompt → flow(stateful)", {
             sessionId,
             durable: durableResume,
-            text: text.slice(0, 100),
+            query: logQuery,
+            queryChars: text.length,
           });
           const res = await flow.run(
             resuming ? { resume: text } : { query: text },
@@ -378,6 +386,11 @@ export function createFlowHooks(options: FlowAcpOptions): DeepAgentsServerHooks 
           );
           if (res.status === "interrupted") {
             if (!durableResume) fallbackResume.add(sessionId); // 老式 flow：内存记「等回复」
+            log.info("onPrompt done (interrupted)", {
+              sessionId,
+              durationMs: Date.now() - promptStartedAt,
+              questionChars: res.question?.length ?? 0,
+            });
             // interrupt 问题是下一轮交互提示；即使前面已流式输出报告正文，也要发出。
             if (res.question) {
               await streamText(conn, sessionId, res.question);
@@ -387,21 +400,38 @@ export function createFlowHooks(options: FlowAcpOptions): DeepAgentsServerHooks 
           if (!durableResume) fallbackResume.delete(sessionId); // 跑到底，清兜底状态
           if (!streamed && res.answer) await streamText(conn, sessionId, res.answer);
           if (res.footer) await streamText(conn, sessionId, res.footer);
+          log.info("onPrompt done", {
+            sessionId,
+            durationMs: Date.now() - promptStartedAt,
+            status: res.status,
+            answerChars: res.answer?.length ?? 0,
+            streamed,
+          });
           return { stopReason: "end_turn" as StopReason };
         }
 
         // one-shot FlowExecutor
-        log.info("onPrompt → flow", { sessionId, query: text.slice(0, 100) });
+        log.info("onPrompt → flow", { sessionId, query: logQuery, queryChars: text.length });
         const result = await (executor as FlowExecutor)(text, callbacks);
         if (!streamed && result.answer) await streamText(conn, sessionId, result.answer);
         if (result.footer) await streamText(conn, sessionId, result.footer);
+        log.info("onPrompt done", {
+          sessionId,
+          durationMs: Date.now() - promptStartedAt,
+          answerChars: result.answer?.length ?? 0,
+          streamed,
+        });
         return { stopReason: "end_turn" as StopReason };
       } catch (err) {
         // 客户端 session/cancel：协议要求以 StopReason::Cancelled 响应原 prompt
         // （acp.d.ts:1051）。signal 被 abort 时底层图运行以 AbortError reject——
         // 这里捕获后返回 cancelled，而非把取消当成普通错误返回 end_turn。
         if ((err as Error)?.name === "AbortError" || ctx.signal?.aborted) {
-          log.info("onPrompt cancelled by client", { sessionId, inflight: inflightTools.size });
+          log.info("onPrompt cancelled by client", {
+            sessionId,
+            durationMs: Date.now() - promptStartedAt,
+            inflight: inflightTools.size,
+          });
           // 给 in-flight tool_call 发合法终止状态（failed + 取消说明），避免客户端 UI 悬挂「进行中」。
           // 注意：ToolCallStatus 枚举只有 pending|in_progress|completed|failed，无 cancelled
           // （客户端会本地标记 cancelled，但 agent 侧用 failed 表达「非正常终止」才是合法值）。
@@ -430,7 +460,11 @@ export function createFlowHooks(options: FlowAcpOptions): DeepAgentsServerHooks 
           }
           return { stopReason: "cancelled" as StopReason };
         }
-        log.error("onPrompt flow failed", { error: String(err) });
+        log.error("onPrompt flow failed", {
+          sessionId,
+          durationMs: Date.now() - promptStartedAt,
+          error: String(err),
+        });
         if (!durableResume) fallbackResume.delete(sessionId); // 出错清兜底状态，避免卡在 resume
         await streamText(conn, sessionId, "抱歉，处理您的问题时出现错误。");
         return { stopReason: "end_turn" as StopReason };

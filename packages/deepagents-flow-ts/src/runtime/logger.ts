@@ -8,6 +8,7 @@
  *   LOG_LEVEL — debug | info | warn | error (default: info)
  *   LOG_DIR   — directory for log files. Defaults to ~/.flowagents/logs.
  *               All log output is tee'd to a timestamped .jsonl file in that directory.
+ *   LOG_TRACE_FULL — 1/true 时 trace 内容不截断（默认 debug 截 8000 字符、info 截 500）
  */
 
 import { appendFileSync, mkdirSync, existsSync } from "node:fs";
@@ -129,6 +130,81 @@ export function setLogSession(sessionId: string): void {
   currentWriter = w;
 }
 
+/** 诊断/测试：返回已绑定的 per-session 日志文件路径（未绑定则 undefined）。 */
+export function getSessionLogPath(sessionId: string): string | undefined {
+  return logWriters.get(sessionId)?.path;
+}
+
+/** 读取全局有效日志级别（env 或默认 info）。 */
+export function getEffectiveLogLevel(): LogLevel {
+  const envLevel = process.env.LOG_LEVEL as LogLevel;
+  return envLevel && envLevel in LOG_LEVELS ? envLevel : "info";
+}
+
+/**
+ * trace 内容截断上限。LOG_TRACE_FULL=1 时不截断；
+ * debug 默认 8000 字符，info 默认 500（摘要级）。
+ */
+export function resolveTraceMaxChars(override?: number): number {
+  if (
+    process.env.LOG_TRACE_FULL === "1" ||
+    process.env.LOG_TRACE_FULL?.toLowerCase() === "true"
+  ) {
+    return Number.POSITIVE_INFINITY;
+  }
+  if (override != null) return override;
+  return getEffectiveLogLevel() === "debug" ? 8000 : 500;
+}
+
+/** 截断长文本用于日志行；保留尾部省略提示。 */
+export function truncateForLog(text: string, maxChars?: number): string {
+  const limit = resolveTraceMaxChars(maxChars);
+  if (!Number.isFinite(limit) || text.length <= limit) return text;
+  return `${text.slice(0, limit)}…[+${text.length - limit} chars]`;
+}
+
+/** 把 LangChain 风格 message（duck-type _getType）格式化为可读多行文本。 */
+export function formatMessagesForLog(
+  messages: Array<{
+    _getType?: () => string;
+    content?: unknown;
+    tool_calls?: unknown;
+  }>,
+  opts?: { full?: boolean }
+): string {
+  const full = opts?.full ?? getEffectiveLogLevel() === "debug";
+  return messages
+    .map((m, i) => {
+      const role = m._getType?.() ?? "unknown";
+      const content =
+        typeof m.content === "string"
+          ? m.content
+          : m.content != null
+            ? JSON.stringify(m.content, null, 2)
+            : "";
+      const body = full ? content : truncateForLog(content, 200);
+      const tools =
+        m.tool_calls && Array.isArray(m.tool_calls) && m.tool_calls.length
+          ? `\n  tool_calls: ${JSON.stringify(m.tool_calls, null, 2)}`
+          : "";
+      return `[${i}] ${role}: ${body}${tools}`;
+    })
+    .join("\n");
+}
+
+/** 把任意 payload 序列化为日志块文本。 */
+export function formatPayloadForLog(payload: unknown, full?: boolean): string {
+  const text =
+    typeof payload === "string" ? payload : JSON.stringify(payload, null, 2);
+  return full || getEffectiveLogLevel() === "debug" ? text : truncateForLog(text);
+}
+
+function writeRawLine(line: string): void {
+  process.stderr.write(`${line}\n`);
+  const logFile = getLogFile();
+  if (logFile) logFile.write(line);
+}
+
 function getLogFile(): LogWriter | null {
   if (currentWriter) return currentWriter;
   // 无 session（server 启动期 / configureSession 前）：fallback 进程级文件，不丢日志。
@@ -161,8 +237,7 @@ export class Logger {
 
   private getEffectiveLevel(): LogLevel {
     if (this.level === "dynamic") {
-      const envLevel = process.env.LOG_LEVEL as LogLevel;
-      return envLevel && envLevel in LOG_LEVELS ? envLevel : "info";
+      return getEffectiveLogLevel();
     }
     return this.level;
   }
@@ -215,6 +290,19 @@ export class Logger {
     this.emit("error", message, context);
   }
 
+  /**
+   * 多行块日志：先打一行标题（含 prefix/level），再打缩进正文。
+   * 用于 LLM 消息、工具 args/result 等调试场景的全文 dump。
+   */
+  block(level: LogLevel, tag: string, body: string): void {
+    if (!this.shouldLog(level)) return;
+    writeRawLine(this.formatMessage(level, `${tag} ▼`));
+    for (const line of body.split("\n")) {
+      writeRawLine(`  ${line}`);
+    }
+    writeRawLine(this.formatMessage(level, `${tag} ▲`));
+  }
+
   /** Create a child logger with additional prefix */
   child(subPrefix: string): Logger {
     const newPrefix = this.prefix ? `${this.prefix}:${subPrefix}` : subPrefix;
@@ -226,9 +314,8 @@ export class Logger {
   }
 }
 
-/** Default logger instance */
+/** Default logger instance —— dynamic level，跟随运行时 LOG_LEVEL（含 bootstrapFlowAcp --debug）。 */
 export const logger = new Logger({
-  level: (process.env.LOG_LEVEL as LogLevel) || "info",
   structured: true,
   prefix: "runtime",
 });

@@ -8,19 +8,26 @@
 
 import type { FlowRuntime } from "../runtime/flow-runtime.js";
 import type { FlowExecutor } from "../core/flow-types.js";
+import { traceFlowCallbacks, traceFlowRun } from "../runtime/session-trace.js";
 import { executeFlow } from "./graph.js";
 
 export function createDefaultExecutor(runtime: FlowRuntime): FlowExecutor {
   return async (query, opts) => {
-    const { output } = await executeFlow(
-      query,
-      {
-        allTools: runtime.allTools,
-        checkpointer: runtime.checkpointer,
-        config: runtime.config,
-        systemPrompt: runtime.systemPrompt,
-      },
-      { onToken: opts?.onToken, onToolCall: opts?.onToolCall }
+    const traced = traceFlowCallbacks(opts);
+    const { output } = await traceFlowRun(
+      "executeFlow",
+      { input: query },
+      () =>
+        executeFlow(
+          query,
+          {
+            allTools: runtime.allTools,
+            checkpointer: runtime.checkpointer,
+            config: runtime.config,
+            systemPrompt: runtime.systemPrompt,
+          },
+          traced
+        )
     );
     return { answer: output };
   };

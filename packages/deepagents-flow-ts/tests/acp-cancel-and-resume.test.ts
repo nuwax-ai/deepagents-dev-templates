@@ -194,7 +194,7 @@ describe("A. load_session / 上下文恢复", () => {
     expect(updates.slice(updatesBefore).some((u) => u.text === "done:ok")).toBe(true);
   });
 
-  it("单 executor 模式：configureSession 返回 undefined（不建 per-session runtime）", async () => {
+  it("单 executor 模式：configureSession 返回 undefined（不建 per-session runtime），但仍绑定 session 日志", async () => {
     const dir = freshDir();
     const flow = makeFlow(new MemorySaver());
     const hooks = createFlowHooks({
@@ -204,7 +204,6 @@ describe("A. load_session / 上下文恢复", () => {
     const { conn } = makeFakeConn();
     const sessionId = "sess-single-1";
 
-    // configureSession 在单 executor 模式下是 no-op
     const cfg = await hooks.configureSession!({
       sessionId,
       agentName: "test-flow",
@@ -212,6 +211,10 @@ describe("A. load_session / 上下文恢复", () => {
       params: { cwd: dir },
     });
     expect(cfg).toBeUndefined();
+
+    const { getSessionLogPath, setLogAgent } = await import("../src/runtime/logger.js");
+    setLogAgent("test-flow");
+    expect(getSessionLogPath(sessionId)).toContain(sessionId);
 
     // onPrompt 仍能直接用单 executor 跑
     const r = await hooks.onPrompt!({ sessionId, promptText: "hi", params: {}, conn });

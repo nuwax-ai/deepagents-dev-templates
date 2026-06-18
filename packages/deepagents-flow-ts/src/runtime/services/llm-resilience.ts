@@ -196,6 +196,13 @@ export function invokeWithResilience<M extends InvokeModel>(
   const resilience = resolveLlmResilience(options.config);
   const timeoutMs = options.timeoutMs ?? resilience.shortTimeoutMs;
   const label = options.label ?? "LLM 调模型";
+  const startedAt = Date.now();
+  log.debug("LLM invoke start", {
+    label,
+    messageCount: messages.length,
+    timeoutMs,
+    useSharedLimiter: Boolean(options.useSharedLimiter),
+  });
   const run = () =>
     withRetry(
       () => withTimeout(model.invoke(messages), timeoutMs, label),
@@ -204,7 +211,19 @@ export function invokeWithResilience<M extends InvokeModel>(
         baseDelayMs: options.baseDelayMs,
         label: options.retryLabel ?? label,
       }
-    ) as Promise<Awaited<ReturnType<M["invoke"]>>>;
+    )
+      .then((result) => {
+        log.debug("LLM invoke done", { label, durationMs: Date.now() - startedAt });
+        return result;
+      })
+      .catch((err) => {
+        log.warn("LLM invoke failed", {
+          label,
+          durationMs: Date.now() - startedAt,
+          error: String(err),
+        });
+        throw err;
+      }) as Promise<Awaited<ReturnType<M["invoke"]>>>;
 
   if (options.useSharedLimiter) {
     return getSharedLlmLimiter(options.config)(run);
