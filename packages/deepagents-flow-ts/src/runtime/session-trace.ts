@@ -177,8 +177,7 @@ export async function traceFlowRun<T extends {
     const answer = result.output ?? result.answer ?? "";
     const doneMeta: Record<string, unknown> = {
       ...compactMeta(meta),
-      ...cycleFields,
-      promptMs: cycleFields.promptMs ?? Date.now() - startedAt,
+      ...acpPromptLogFields(),
       durationMs: Date.now() - startedAt,
       flowStatus: result.status,
       outputChars: answer.length,
@@ -201,7 +200,7 @@ export async function traceFlowRun<T extends {
   } catch (err) {
     log.error(`${label} failed`, {
       ...compactMeta(meta),
-      ...cycleFields,
+      ...acpPromptLogFields(),
       durationMs: Date.now() - startedAt,
       error: String(err),
     });
