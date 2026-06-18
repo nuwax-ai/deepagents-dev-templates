@@ -103,16 +103,6 @@
       "requiredAt": "install"
     },
     {
-      "name": "AGENT_ID",
-      "description": "Panel-facing agent identifier stamped into panel.config.json.",
-      "requiredAt": "install"
-    },
-    {
-      "name": "SPACE_ID",
-      "description": "Panel-facing workspace identifier stamped into scenario specs.",
-      "requiredAt": "install"
-    },
-    {
       "name": "PACKAGE_VERSION",
       "description": "Version stamped into generated install metadata.",
       "requiredAt": "package"

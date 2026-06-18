@@ -99,8 +99,6 @@ function writePackageMetadata(stageRoot, { version, packageName, agentName, bund
           installCommand: esbuildBundle ? null : "npm install --omit=dev",
         },
         config: {
-          panel: ".nuwax-agent/panel.config.json",
-          lifecycle: ".nuwax-agent/lifecycle.json",
           placeholders: ".nuwax-agent/placeholders.json",
           package: ".nuwax-agent/package.config.json",
         },

@@ -95,8 +95,6 @@ function writePackageMetadata(stageRoot, { version, packageName, agentName }) {
       installCommand: null,
     },
     config: {
-      panel: ".nuwax-agent/panel.config.json",
-      lifecycle: ".nuwax-agent/lifecycle.json",
       placeholders: ".nuwax-agent/placeholders.json",
       package: ".nuwax-agent/package.config.json",
     },

@@ -6,6 +6,7 @@
 
 import type { FlowState } from "../state.js";
 import type { FlowCallbacks } from "../../core/flow-types.js";
+import { extractText } from "../../libs/nodes/index.js";
 
 export interface RespondNodeDeps {
   /** surface 回调（流式 token）。 */
@@ -18,7 +19,9 @@ export function createRespondNode(deps: RespondNodeDeps) {
 
   return async (state: FlowState): Promise<Partial<FlowState>> => {
     const last = state.messages[state.messages.length - 1];
-    const text = last && typeof last.content === "string" ? (last.content as string) : "";
+    // content 可能是 string 或 content block 数组（Anthropic 协议 / 部分 provider），
+    // 统一经 extractText 抽纯文本，避免 array content 被当成空串导致无输出。
+    const text = last ? extractText(last.content) : "";
     if (text && callbacks?.onToken) await callbacks.onToken(text);
     return { output: text, steps: ["respond"] };
   };

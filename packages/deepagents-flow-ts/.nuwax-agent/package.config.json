@@ -52,8 +52,6 @@
     "ANTHROPIC_BASE_URL",
     "MAX_TOKENS",
     "LOG_LEVEL",
-    "AGENT_ID",
-    "SPACE_ID",
     "PLATFORM_AGENT_ID",
     "PLATFORM_SPACE_ID"
   ],

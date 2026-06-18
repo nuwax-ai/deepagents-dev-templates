@@ -20,7 +20,7 @@
     },
     "package-placeholder": {
       "description": "Values replaced when building or installing tar/zip/npm artifacts.",
-      "examples": ["INSTALL_ROOT", "AGENT_ID", "PACKAGE_VERSION"]
+      "examples": ["INSTALL_ROOT", "PACKAGE_VERSION"]
     }
   },
   "capabilities": {

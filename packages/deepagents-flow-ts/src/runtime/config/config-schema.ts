@@ -211,7 +211,8 @@ export const AppConfigSchema = z.object({
   agent: z.object({
     name: z.string().default("deepagents-flow-ts"),
     description: z.string().default("AI application agent"),
-    version: z.string().default(getPackageVersion() ?? "0.0.0"),
+    // 惰性默认值：仅当 config 未提供 version 时才读 package.json，避免每次启动都做一次文件读取。
+    version: z.string().default(() => getPackageVersion() ?? "0.0.0"),
     outputStyle: z.string().default("concise"),
     systemPrompt: z.string().optional(),
     systemPromptPath: z.string().default("prompts/flow.base.md"),
