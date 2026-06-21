@@ -11,7 +11,7 @@
  *   LOG_TRACE_FULL — 1/true 时 trace 内容不截断（默认 debug 截 8000 字符、info 截 500）
  */
 
-import { appendFileSync, mkdirSync, existsSync } from "node:fs";
+import { appendFileSync, mkdirSync, existsSync, readFileSync, renameSync, unlinkSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { homedir } from "node:os";
 import { FLOWAGENTS_NAME, FLOWAGENTS_DIRNAME, LOGS_SUBDIR } from "./paths.js";
@@ -105,6 +105,36 @@ export function setLogAgent(name: string): void {
 }
 
 /**
+ * 把 bootstrap（PID）启动期日志并入刚建立的 session 日志文件，保证「一次会话 = 一份日志」。
+ * 仅在首次为某 sessionId 建 writer 时调一次；之后 bootstrapWriter 置空，后续不再产生 PID 文件。
+ *   - session 文件不存在 → rename（PID 文件直接成为 session 文件的开头）
+ *   - session 文件已存在（同日 resume 同 sessionId）→ append PID 内容后删除 PID 文件
+ * 任何 I/O 失败都吞掉（日志不应拖垮 agent）。
+ */
+function foldBootstrapInto(sessionFilePath: string): void {
+  if (!bootstrapWriter) return;
+  const src = bootstrapWriter.path;
+  try {
+    if (!existsSync(src)) return;
+    if (existsSync(sessionFilePath)) {
+      const prev = readFileSync(src, "utf-8");
+      if (prev) appendFileSync(sessionFilePath, prev);
+      try {
+        unlinkSync(src);
+      } catch {
+        /* 删除失败忽略 */
+      }
+    } else {
+      renameSync(src, sessionFilePath);
+    }
+  } catch {
+    /* 合并失败不阻断 session 日志 */
+  } finally {
+    bootstrapWriter = null;
+  }
+}
+
+/**
  * surfaces 在 session 开始时调：建/取 per-session writer 并设为当前。幂等（同 sessionId 复用）。
  * 文件：~/.flowagents/logs/<agentName>-<sessionId>-<YYYY_MM_DD>.log。
  *
@@ -118,6 +148,7 @@ export function setLogSession(sessionId: string): void {
       const dir = logDir();
       if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
       w = buildWriter(sessionId);
+      foldBootstrapInto(w.path); // 合并启动期 PID 日志 → session 文件（一次会话一份）
       logWriters.set(sessionId, w);
       w.write(`${localTimestamp()} [info] [logger] log session ${logAgentName}:${sessionId}  path=${w.path}`);
     } catch (err) {
