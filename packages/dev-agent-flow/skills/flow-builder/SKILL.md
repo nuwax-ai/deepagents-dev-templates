@@ -155,8 +155,9 @@ await bootstrapFlowAcp({ executor, appConfig, debug });
 ```
 surface 自动分流：function -> one-shot；对象（有 run）-> stateful HITL。
 
-## Step 7: 验证与调试日志（`.logs/`）
+## Step 7: 验证与调试日志（`.logs/`）·【强制 · 非可选】
 
+> **完成闸门**：本 Step 的验证命令是系统提示词 `<COMPLETION_GATE>` 的执行依据。报告「完成」前必须跑通 `pnpm build && pnpm typecheck && pnpm test && pnpm graph` 并贴真实输出；失败进入「读错误→修复→重跑」循环，**未跑通禁止声称完成**。
 > **`<DEBUG_LOGS>` 详细指引**：系统提示词只规定「必须先读日志」；本 Step 为完整操作路径（约定、命令、六步排查法）。
 
 编排完成后，除编译/测试外，**运行时问题必须读项目根真实调试日志**。
@@ -213,7 +214,7 @@ pnpm graph                   # 导出拓扑
 | 长任务 | 多阶段流水线 | 双层 reflection + `onStage` + checkpoint | `examples/deep-research` |
 
 ## Anti-patterns
-- ❌ 手写 run-loop（必须用 createStatefulFlow）
+- ❌ 手写 run-loop（必须用 createStatefulFlow；例外：经 scaffold 复用的预置 stateful-custom 拓扑如 dev-agent，run-loop 已封装在 `src/app/topologies/`，勿自己手写）
 - ❌ 节点名与 channel 同名（LangGraph 会报错）
 - ❌ 并行 Send 写 state 不加 reducer（数据会被覆盖）
 - ❌ 在条件边函数里做 I/O（必须纯路由逻辑）
