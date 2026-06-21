@@ -1,19 +1,2 @@
-/**
- * RAG 工作流节点导出
- */
-
-export { createRewriteNode } from "./rewrite.js";
-export { retrieveNode } from "./retrieve.js";
-export { gradeNode, routeAfterGrade, MAX_RETRIEVE_ATTEMPTS } from "./grade.js";
-export { prepareNode } from "./prepare.js";
-export { generateNode } from "./generate.js";
-export type {
-  RAGState,
-  RAGIntent,
-  RAGConfig,
-  RAGResponse,
-  RAGMetadata,
-  Source,
-  RetrievalResult,
-} from "./types.js";
-export { DEFAULT_RAG_CONFIG } from "./types.js";
+/** rag 节点聚合 re-export shim（实现已提升至 src/libs/topologies/rag/nodes/）。 */
+export * from "../../../src/libs/topologies/rag/nodes/index.js";

@@ -15,26 +15,14 @@
 
 import { createFlowGraph, type CreateFlowGraphConfig } from "./graph.js";
 
-export interface FlowTopologyNode {
-  id: string;
-  label: string;
-}
-
-export interface FlowTopologyEdge {
-  source: string;
-  target: string;
-  /** 条件边(addConditionalEdges)为 true,普通边为 false。 */
-  conditional: boolean;
-  /** 条件分支标签(如路由目标名);普通边无标签。 */
-  label?: string;
-}
-
-export interface FlowTopology {
-  nodes: FlowTopologyNode[];
-  edges: FlowTopologyEdge[];
-  /** 同一拓扑的 Mermaid 源,可直接渲染 / 贴进文档。 */
-  mermaid: string;
-}
+// 拓扑类型契约下沉 core/flow-types.ts（app + libs/topologies 共享；libs 不能 import app）。
+// 本模块 import 供下方 getFlowTopology 使用，并 re-export 维持公开 `deepagents-flow-ts/topology` 子路径。
+import type {
+  FlowTopology,
+  FlowTopologyNode,
+  FlowTopologyEdge,
+} from "../core/flow-types.js";
+export type { FlowTopology, FlowTopologyNode, FlowTopologyEdge } from "../core/flow-types.js";
 
 /**
  * 提取默认 flow 图的拓扑(静态:只构建图结构,不执行节点,无需凭证)。

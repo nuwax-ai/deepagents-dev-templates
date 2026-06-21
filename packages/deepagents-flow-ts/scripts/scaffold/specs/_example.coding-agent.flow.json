@@ -1,0 +1,9 @@
+{
+  "name": "coding-agent",
+  "description": "综合编码助手：ReAct 工具调用 + 多轮续接 + 上下文压缩（stateful-custom）",
+  "flowType": "stateful",
+  "topology": "dev-agent",
+  "systemPrompt": "你是资深全栈工程师，擅长用工具查文档、读写文件、跑命令来解决工程问题。",
+  "tools": [],
+  "params": {}
+}

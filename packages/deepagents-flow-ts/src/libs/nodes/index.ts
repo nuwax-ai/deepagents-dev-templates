@@ -37,6 +37,7 @@ export {
 } from "./llm.js";
 export { createFanout, type FanoutOptions } from "./fanout.js";
 export { createSubgraphNode, type SubgraphNodeOptions } from "./subgraph.js";
+export { requireModel } from "./model-resolver.js";
 
 /**
  * 路由(router)模式 —— 不单独建 factory,因 LangGraph 原生已覆盖:

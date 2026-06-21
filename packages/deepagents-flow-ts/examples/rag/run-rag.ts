@@ -6,7 +6,6 @@
  */
 
 import type { CreateRAGGraphConfig } from "./graph.js";
-import type { RAGResponse } from "./nodes/types.js";
 import { DEFAULT_RAG_CONFIG } from "./nodes/types.js";
 import type { LoadedRagConfig } from "./config.js";
 
@@ -34,14 +33,5 @@ export function buildGraphConfig(
   };
 }
 
-/** 来源脚注（流式回答之后追加）。无来源时返回空串。 */
-export function formatSourcesFooter(response: RAGResponse): string {
-  if (!response.sources || response.sources.length === 0) {
-    return "";
-  }
-  let out = "\n\n---\n**来源:**\n";
-  response.sources.forEach((s, i) => {
-    out += `${i + 1}. ${s.title}${s.url ? ` (${s.url})` : ""}\n`;
-  });
-  return out;
-}
+// formatSourcesFooter 已提升至拓扑（src/libs/topologies/rag/executor.ts）；此处 re-export。
+export { formatSourcesFooter } from "../../src/libs/topologies/rag/index.js";

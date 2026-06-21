@@ -39,7 +39,8 @@ vi.mock("../../../src/runtime/index.js", async (importOriginal) => {
   return { ...actual, resolveModel: () => h.fakeModel };
 });
 
-vi.mock("../nodes/retrieve.js", () => ({
+// retrieve 已提升至 src/libs/topologies/rag/nodes/retrieve.ts；mock 指向新位置。
+vi.mock("../../../src/libs/topologies/rag/nodes/retrieve.js", () => ({
   retrieveNode: async (state: { attempts?: number }) => ({
     raw_results: h.retrieve.results,
     attempts: (state.attempts ?? 0) + 1,

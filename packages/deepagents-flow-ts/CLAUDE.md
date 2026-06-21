@@ -19,17 +19,19 @@ src/
   core/          纯类型契约(各层共享)
   runtime/       底层运行时(config/model/logger/mcp/checkpoint/llm-resilience + flow-config/flow-runtime)
   libs/          ★ 可复用构建件(保护、消费不改)
-    nodes/         节点 factory + 原语(建 flow 用,见 node-kit.md)
+    nodes/         节点 factory + 原语(建 flow 用,见 node-kit.md)+ model-resolver(凭证策略)
     tools/         内置通用工具(bash/fs/search/demo/mcp-bridge/http/json/platform-api/agent-variable/skill)
+    topologies/    7 拓扑积木(图逻辑单一权威:graph/topology/recipe;scaffold 生成薄封装复用;单向依赖 nodes/+mcp/)
+    mcp/           stdio MCP 客户端(callResolvedMcpTool/rateLimited;零 src import,自包含)
     deepagents-acp/  vendored ACP SDK(自包含)
-  app/           默认 ReAct 图(★ 可改、开发工作区):graph.ts + nodes/(think/respond) + flow-tools/task + state/topology/default-flow/compaction
+  app/           默认 ReAct 图(★ 可改、开发工作区):graph.ts + nodes/(think/respond) + flow-tools/task + state/topology/default-flow/compaction + flows/(注册表+scaffold 生成薄封装) + topologies/(app 层拓扑,如 dev-agent stateful-custom)
   surfaces/      ACP/CLI 适配器(保护):acp/ cli/ + stateful-flow/map-stream-chunk/...
-  index.ts       入口 + 组合根(createFlowRuntime)
-examples/        参考实现(只读)
+  index.ts       入口 + 组合根(createFlowRuntime + materializeFlow 桥接 stateful-recipe)
+examples/        参考实现(只读;dedup 后 graph/nodes 多为 re-export shim 指向 libs/topologies)
 config/ prompts/ skills/ scripts/ docs/ tests/
 ```
 
-分层(只能 import 左侧):**`core → runtime → libs → app → surfaces → index.ts`**(`libs` 内 nodes/tools/deepagents-acp 互不引用)。`tests/layering.test.ts` 强制,**零例外**。
+分层(只能 import 左侧):**`core → runtime → libs → app → surfaces → index.ts`**(`libs` 内 nodes/tools/deepagents-acp/mcp 互不引用;`topologies/` 单向依赖 nodes/+mcp/,其余子目录不反向引 topologies/)。`tests/layering.test.ts` 强制(layerOf 粒度到 libs top-level),**零例外**。
 
 ## 建 flow(★ 开箱即用)
 
