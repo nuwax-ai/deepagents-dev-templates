@@ -2,7 +2,7 @@
 name: agent-dev-config
 description: "deepagents-flow-ts 目标模板项目的开发期平台配置技能：封装 4sandbox/agent/dev/* 接口——搜索/添加/删除平台工具（Plugin/Workflow/Knowledge）、保存系统提示词与开场白。这些接口仅在开发期手动运行，不进 deepagents-flow-ts 运行时代码。核心流程：搜到可用工具 → 添加到 dev Agent 配置 → 按返回的 schema 在 src/libs/tools/ 用 tool() + Zod 实现 → 注册到 createFlowTools()。"
 tags: [deepagents-flow-ts, agent-development, tool-config, system-prompt, dev-space, sandbox, plugin, workflow, knowledge]
-version: "3.0.0"
+version: "3.1.0"
 license: MIT
 ---
 
