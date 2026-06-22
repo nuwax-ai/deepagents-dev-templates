@@ -2,10 +2,10 @@
  * 通用 stdio MCP 客户端（提炼自 examples/rag/nodes/retrieve.ts）。
  *
  * spawn 一个 MCP server 子进程，走 JSON-RPC over stdio：initialize 握手 → tools/call → 收结果 → 关进程。
- * 供示例节点接真实 MCP 工具（如 DuckDuckGo 网络搜索）。
+ * 供示例节点接真实 MCP 工具（如 context7 文档检索）。
  *
  * 还提供 rateLimited：把并发调用串行化 + 保证最小间隔——接有 rate limit 的免费 API
- * （如 DuckDuckGo 限 1 请求/秒）必备，即使图是并行的，外部请求也会错峰。
+ * 必备，即使图是并行的，外部请求也会错峰。
  */
 
 import { spawn } from "node:child_process";
@@ -151,7 +151,7 @@ export async function listMcpTools(
 }
 
 /**
- * 解析真实工具名 —— 不同 DuckDuckGo MCP 包版本可能不叫 duckduckgo_search。
+ * 解析真实工具名 —— 不同 MCP 包版本工具名可能不同。
  * 优先精确匹配 preferred，再试 aliases，再模糊匹配，最后若仅一个工具则用之。
  */
 export async function resolveMcpToolName(
@@ -179,7 +179,7 @@ export function chooseMcpToolName(
     (n) =>
       n.toLowerCase().includes(prefLower) ||
       prefLower.includes(n.toLowerCase()) ||
-      /search|duck/i.test(n)
+      /search/i.test(n)
   );
   if (fuzzy) return fuzzy;
   if (available.length === 1) return available[0]!;
@@ -198,7 +198,7 @@ export async function callResolvedMcpTool(
   const toolName = await resolveMcpToolName(
     config,
     preferred,
-    options.aliases ?? ["search", "duckduckgo", "web_search", "duckduckgo-search"],
+    options.aliases ?? ["search", "web_search", "query"],
     options.timeoutMs ?? 15000
   );
   return callMcpTool(config, toolName, args, options.timeoutMs ?? 15000);
