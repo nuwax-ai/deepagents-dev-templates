@@ -1,3 +1,3 @@
 优先用 `agent-dev-config` 增删改系统提示词、用户提示词、技能、插件、工作流、MCP 并同步到平台。
 
-**必须先装依赖**：开发、build、验证前，若无 `node_modules` 或改了 `package.json`/`pnpm-lock.yaml`，必须在项目根目录执行 `pnpm install` 并成功后再继续；禁止跳过。（Python 模板未来支持：`uv sync --group dev`）
+**必须先装依赖**：开发、build、验证前必须装好依赖，禁止跳过。有 `package.json` 且无 `node_modules`（或改了 `package.json`/`pnpm-lock.yaml`）→ `pnpm install`；有 `pyproject.toml` 且无 `.venv`（或改了 `pyproject.toml`/`uv.lock`）→ `uv sync --group dev`。安装成功后再继续。
