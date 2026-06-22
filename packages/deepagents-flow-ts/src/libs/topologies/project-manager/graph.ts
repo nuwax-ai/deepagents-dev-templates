@@ -24,15 +24,11 @@ import { logger, type AppConfig } from "../../../runtime/index.js";
 import {
   createLlmNode,
   createHumanApprovalNode,
+  createApprovalFinalizeNode,
   parseJson,
-  extractText,
-  isApproval,
   requireModel,
 } from "../../nodes/index.js";
-import {
-  invokeWithResilience,
-  resolveLlmResilience,
-} from "../../../runtime/services/llm-resilience.js";
+import { resolveLlmResilience } from "../../../runtime/services/llm-resilience.js";
 
 const log = logger.child("pm");
 
@@ -66,15 +62,10 @@ export function routeAfterEvaluate(state: PMStateType): "plan" | "approve" {
   return "approve";
 }
 
-/** finalize：批准则出确定性甘特排期；否则 LLM 按意见修订。
- *  保留 bespoke——isApproval 短路 + 确定性甘特，非纯 LLM 节点。 */
-async function finalizeNode(
-  state: PMStateType,
-  appConfig?: AppConfig
-): Promise<Partial<PMStateType>> {
-  const fb = (state.feedback ?? "").trim();
+/** 确定性甘特排期：按 tasks 工期顺序排（缺工期默认 3 天）。finalize 的 approved/rejected 两分支共用。 */
+function buildGantt(tasks: Task[]): { gantt: string; totalDays: number } {
   let cursor = 0;
-  const gantt = state.tasks
+  const gantt = tasks
     .map((t) => {
       const start = cursor;
       const dur = t.days ?? 3;
@@ -82,31 +73,7 @@ async function finalizeNode(
       return `  ${t.name}：D${start + 1}–D${cursor}（${dur} 天）`;
     })
     .join("\n");
-  if (isApproval(fb)) {
-    return {
-      output: `✅ 计划已批准（${state.goal}）\n排期（共 ${cursor} 天）：\n${gantt}`,
-    };
-  }
-  const model = requireModel(appConfig, "project-manager 拓扑");
-  const { longTimeoutMs } = resolveLlmResilience(appConfig);
-  const res = await invokeWithResilience(
-    model,
-    [
-      new SystemMessage(
-        "根据用户的调整意见修订项目计划，输出修订后的完整任务清单（含工期）与简要排期，不要解释。"
-      ),
-      new HumanMessage(`原排期：\n${gantt}\n\n调整意见：${fb}`),
-    ],
-    {
-      timeoutMs: longTimeoutMs,
-      label: "pm finalize",
-      retryLabel: "pm LLM",
-      config: appConfig,
-    }
-  );
-  return {
-    output: `✏️ 已按意见调整（${state.goal}）：${fb}\n${extractText(res.content).trim()}`,
-  };
+  return { gantt, totalDays: cursor };
 }
 
 /**
@@ -215,12 +182,39 @@ export function createPMGraph(
     write: (feedback) => ({ feedback }),
   });
 
+  // finalize：框架 createApprovalFinalizeNode（isApproval 短路 → 确定性甘特定稿 / 否则 LLM 修订）。
+  const finalize = createApprovalFinalizeNode<PMStateType>({
+    approvedOutput: (s) => {
+      const { gantt, totalDays } = buildGantt(s.tasks);
+      return { output: `✅ 计划已批准（${s.goal}）\n排期（共 ${totalDays} 天）：\n${gantt}` };
+    },
+    rejectedLlm: {
+      model: () => requireModel(appConfig, "project-manager 拓扑"),
+      prompt: (s) => {
+        const { gantt } = buildGantt(s.tasks);
+        return [
+          new SystemMessage(
+            "根据用户的调整意见修订项目计划，输出修订后的完整任务清单（含工期）与简要排期，不要解释。"
+          ),
+          new HumanMessage(`原排期：\n${gantt}\n\n调整意见：${s.feedback}`),
+        ];
+      },
+      write: (r, s) => ({
+        output: `✏️ 已按意见调整（${s.goal}）：${s.feedback}\n${r.content.trim()}`,
+      }),
+      config: appConfig,
+      label: "pm finalize",
+      retryLabel: "pm LLM",
+      timeoutMs: resolveLlmResilience(appConfig).longTimeoutMs,
+    },
+  });
+
   return new StateGraph(PMState)
     .addNode("plan", plan)
     .addNode("estimate", estimate)
     .addNode("evaluate", evaluate)
     .addNode("approve", approve)
-    .addNode("finalize", (s: PMStateType) => finalizeNode(s, appConfig))
+    .addNode("finalize", finalize)
     .addEdge(START, "plan")
     .addEdge("plan", "estimate")
     .addEdge("estimate", "evaluate")

@@ -18,37 +18,32 @@ import {
   Annotation,
   MemorySaver,
   type BaseCheckpointSaver,
-  type LangGraphRunnableConfig,
 } from "@langchain/langgraph";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { logger, type AppConfig } from "../../../runtime/index.js";
-import type { FlowCallbacks } from "../../../core/flow-types.js";
 import {
   createLlmNode,
   createHumanApprovalNode,
+  createApprovalFinalizeNode,
+  createMcpRetrievalNode,
   createFanout,
-  runTool,
-  isApproval,
-  extractText,
   requireModel,
 } from "../../nodes/index.js";
-import {
-  invokeWithResilience,
-  resolveLlmResilience,
-} from "../../../runtime/services/llm-resilience.js";
-import {
-  callResolvedMcpTool,
-  rateLimited,
-  type McpServerConfig,
-} from "../../mcp/stdio-client.js";
+import { resolveLlmResilience } from "../../../runtime/services/llm-resilience.js";
+import type { McpServerConfig } from "../../mcp/stdio-client.js";
 
 const log = logger.child("travel");
 
-/** 免 key 的网络搜索 MCP（npx 启动）。换别的搜索 MCP 改这里即可。 */
-const SEARCH_MCP: McpServerConfig = {
-  command: "npx",
-  args: ["-y", "duckduckgo-mcp-server"],
-};
+/**
+ * 搜索 MCP 源（createTravelGraph 的 searchMcp 参数传入）。
+ * ⚠️ duckduckgo-mcp-server 实测不稳定，已不再作为默认。传入可用的搜索 MCP（如自建 stdio 搜索 server），
+ *    或改用 http_request 工具调搜索 API；未传则 research 节点优雅降级（写「未配置搜索源」）。
+ */
+export interface TravelSearchMcp {
+  config: McpServerConfig;
+  /** MCP 工具名（如 "search"）。 */
+  tool: string;
+}
 
 const ASPECTS = ["transport", "stay", "sights", "food"] as const;
 const ASPECT_LABEL: Record<string, string> = {
@@ -108,71 +103,40 @@ export const fanoutToResearch = createFanout<(typeof ASPECTS)[number], TravelSta
   }),
 });
 
-/** research：对单个 aspect 发一次真实 DuckDuckGo 搜索（并行实例之一；rateLimited 节流到 ≤1/秒）。
- *  保留 bespoke——自定义 MCP 检索 + rateLimited，非 ToolNode 模式。 */
-async function researchNode(
-  state: TravelStateType,
-  config?: LangGraphRunnableConfig
-): Promise<Partial<TravelStateType>> {
-  const onToolCall = config?.configurable?.onToolCall as
-    | FlowCallbacks["onToolCall"]
-    | undefined;
-  const aspect = state.currentAspect;
-  const query = `${state.destination} ${ASPECT_QUERY[aspect] ?? aspect}`;
-  const { result, ok } = await runTool(
-    "duckduckgo_search",
-    { query },
-    () =>
-      rateLimited(() =>
-        callResolvedMcpTool(
-          SEARCH_MCP,
-          "duckduckgo_search",
-          { query, count: 5 },
-          { timeoutMs: 20000 }
-        )
-      ),
-    onToolCall
-  );
-  // 截断原始搜索结果，交给 aggregate 的 LLM 整理。
-  const suggestion = ok
-    ? result.slice(0, 800)
-    : `（${ASPECT_LABEL[aspect] ?? aspect}搜索失败：${result}）`;
-  return { findings: [{ aspect, suggestion }] };
-}
-
-/** finalize：通过则定稿；否则 LLM 按意见改写行程。
- *  保留 bespoke——isApproval 短路（通过则不调 LLM）。 */
-async function finalizeNode(
-  state: TravelStateType,
-  appConfig?: AppConfig
-): Promise<Partial<TravelStateType>> {
-  const fb = (state.feedback ?? "").trim();
-  if (isApproval(fb)) {
-    return { output: `✅ 行程已确认：\n${state.itinerary}` };
-  }
-  const model = requireModel(appConfig, "travel-planner 拓扑");
-  const { longTimeoutMs } = resolveLlmResilience(appConfig);
-  const res = await invokeWithResilience(
-    model,
-    [
-      new SystemMessage("根据用户的调整意见修订行程，只输出修订后的完整行程。"),
-      new HumanMessage(`原行程：\n${state.itinerary}\n\n调整意见：${fb}`),
-    ],
-    { timeoutMs: longTimeoutMs, label: "travel finalize", retryLabel: "travel LLM", config: appConfig }
-  );
-  return { output: `✏️ 已按意见调整：\n${extractText(res.content).trim()}` };
-}
-
 /**
  * 创建 travel 图（编译后的 LangGraph）。
  * @param systemPrompt aggregate 节点角色开场（scaffold 注入；缺省「旅行规划师」）
+ * @param searchMcp 搜索 MCP 源（{config, tool}）；缺省则 research 优雅降级（不调外部搜索）
  */
 export function createTravelGraph(
   appConfig?: AppConfig,
   checkpointer: BaseCheckpointSaver = new MemorySaver(),
-  systemPrompt?: string
+  systemPrompt?: string,
+  searchMcp?: TravelSearchMcp
 ) {
   const role = systemPrompt?.trim() || "你是旅行规划师";
+
+  // research：框架 createMcpRetrievalNode（对单个 aspect 发一次搜索；rateLimited 节流 + runTool 三态透出）。
+  // searchMcp 未传 → retrieve 返回 null → 优雅降级（写「未配置搜索源」，不崩）。
+  const research = createMcpRetrievalNode<TravelStateType>({
+    mcpServers: searchMcp ? { search: searchMcp.config } : {},
+    retrieve: (s) => {
+      if (!searchMcp) return null;
+      const query = `${s.destination} ${ASPECT_QUERY[s.currentAspect] ?? s.currentAspect}`;
+      return { server: "search", tool: searchMcp.tool, args: { query, count: 5 } };
+    },
+    write: (r, s) => ({
+      findings: [
+        {
+          aspect: s.currentAspect,
+          // 截断原始搜索结果，交给 aggregate 的 LLM 整理。
+          suggestion: r.ok
+            ? r.text.slice(0, 800)
+            : `（${ASPECT_LABEL[s.currentAspect] ?? s.currentAspect}搜索失败/未配置：${r.text}）`,
+        },
+      ],
+    }),
+  });
 
   // aggregate：框架 createLlmNode（把 4 路搜索结果整理成按天行程）。
   const aggregate = createLlmNode<TravelStateType>({
@@ -205,12 +169,29 @@ export function createTravelGraph(
     write: (feedback) => ({ feedback }),
   });
 
+  // finalize：框架 createApprovalFinalizeNode（isApproval 短路定稿 / 否则 LLM 按意见修订）。
+  const finalize = createApprovalFinalizeNode<TravelStateType>({
+    approvedOutput: (s) => ({ output: `✅ 行程已确认：\n${s.itinerary}` }),
+    rejectedLlm: {
+      model: () => requireModel(appConfig, "travel-planner 拓扑"),
+      prompt: (s) => [
+        new SystemMessage("根据用户的调整意见修订行程，只输出修订后的完整行程。"),
+        new HumanMessage(`原行程：\n${s.itinerary}\n\n调整意见：${s.feedback}`),
+      ],
+      write: (r) => ({ output: `✏️ 已按意见调整：\n${r.content.trim()}` }),
+      config: appConfig,
+      label: "travel finalize",
+      retryLabel: "travel LLM",
+      timeoutMs: resolveLlmResilience(appConfig).longTimeoutMs,
+    },
+  });
+
   return new StateGraph(TravelState)
     .addNode("gather", gatherNode)
-    .addNode("research", researchNode)
+    .addNode("research", research)
     .addNode("aggregate", aggregate)
     .addNode("confirm", confirm)
-    .addNode("finalize", (s: TravelStateType) => finalizeNode(s, appConfig))
+    .addNode("finalize", finalize)
     .addEdge(START, "gather")
     .addConditionalEdges("gather", fanoutToResearch, ["research"])
     .addEdge("research", "aggregate")

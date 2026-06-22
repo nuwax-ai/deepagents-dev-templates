@@ -14,7 +14,6 @@ export { fanoutToResearch } from "./fanout.js";
 
 export {
   createResearchSectionSubgraph,
-  createDuckDuckGoSearchTool,
   isDdgErrorText,
   mergeResearchSources,
   scoreResearchSource,

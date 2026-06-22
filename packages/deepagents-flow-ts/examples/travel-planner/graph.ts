@@ -12,6 +12,7 @@ import {
   createTravelGraph,
   getTravelTopology,
   type TravelStateType,
+  type TravelSearchMcp,
   gatherNode,
   fanoutToResearch,
 } from "../../src/libs/topologies/travel-planner/index.js";
@@ -19,18 +20,25 @@ import type { StatefulFlow } from "../../src/core/flow-types.js";
 import type { AppConfig } from "../../src/runtime/index.js";
 import type { BaseCheckpointSaver } from "@langchain/langgraph";
 
-export { getTravelTopology, gatherNode, fanoutToResearch, type TravelStateType };
+export {
+  getTravelTopology,
+  gatherNode,
+  fanoutToResearch,
+  type TravelStateType,
+  type TravelSearchMcp,
+};
 
 /**
  * 包装成模板 StatefulFlow：run({query})→并行搜索+整理后在 confirm interrupt；run({resume})→finalize。
  * 经 createStatefulFlow 统一 run-loop + 持久化 resume；checkpointer 默认 FileCheckpointSaver。
+ * @param opts.searchMcp 搜索 MCP 源（{config, tool}）；缺省则 research 优雅降级（不搜索）
  */
 export function createTravelFlow(
   appConfig?: AppConfig,
-  opts: { checkpointer?: BaseCheckpointSaver } = {}
+  opts: { checkpointer?: BaseCheckpointSaver; searchMcp?: TravelSearchMcp } = {}
 ): StatefulFlow {
   return createStatefulFlow<TravelStateType>({
-    buildGraph: (cp) => createTravelGraph(appConfig, cp),
+    buildGraph: (cp) => createTravelGraph(appConfig, cp, undefined, opts.searchMcp),
     toInput: (query) => ({ query }),
     toResult: (v) => ({ answer: v.output ?? "" }),
     checkpointer: durableCheckpointer(appConfig, opts.checkpointer),

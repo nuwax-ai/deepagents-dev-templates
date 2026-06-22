@@ -1,14 +1,13 @@
-/** 大纲与报告质量评审节点。 */
+/** 大纲与报告质量评审节点（用 createLlmRouterNode 收口「LLM 裁决 → Command goto」）。 */
 
-import { Command } from "@langchain/langgraph";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
-import { logger, type AppConfig } from "../../../../runtime/index.js";
-import { requireModel } from "../../../nodes/index.js";
-import { extractText, parseJson } from "../../../nodes/index.js";
+import type { AppConfig } from "../../../../runtime/index.js";
+import {
+  requireModel,
+  parseJson,
+  createLlmRouterNode,
+} from "../../../nodes/index.js";
 import type { ResearchStateShape } from "./types.js";
-import { invokeLLM } from "./helpers.js";
-
-const log = logger.child("deep-research");
 
 /** 大纲评审重试上限（防 reflection 死循环）。 */
 export const MAX_OUTLINE_REVIEW = 2;
@@ -16,38 +15,39 @@ export const MAX_OUTLINE_REVIEW = 2;
 export const MAX_DRAFT_REVIEW = 2;
 
 /**
- * outline_review：LLM 评审并行调研结果的质量。
- * 判断是否充分覆盖了大纲，不充分则带评审意见回 plan 重规划。
+ * outline_review：LLM 评审并行调研结果是否充分覆盖大纲。
+ * 不充分且未达上限 → 带 critique 回 plan 重规划；否则 → write_draft。
+ * 用 createLlmRouterNode 收口「调 LLM + parse + 包 Command + catch 放行」样板（route 内调 routeAfterOutlineReview）。
  */
-export async function outlineReviewNode(
-  state: ResearchStateShape,
-  appConfig?: AppConfig
-): Promise<Command> {
-  const model = requireModel(appConfig, "deep-research 示例");
-  const findingsSummary = state.findings
-    .map((f) => `## ${f.title}\n${f.summary.slice(0, 200)}...`)
-    .join("\n\n");
-  let update: Partial<ResearchStateShape>;
-  try {
-    const res = await invokeLLM(model, [
+export function outlineReviewNode(state: ResearchStateShape, appConfig?: AppConfig) {
+  return createLlmRouterNode<ResearchStateShape>({
+    model: () => requireModel(appConfig, "deep-research 示例"),
+    prompt: (s) => [
       new SystemMessage(
         `你是研究评审。判断调研结果是否充分覆盖了大纲的所有章节、每章是否有实质内容。` +
           `只输出 JSON：{"verdict":"sufficient"|"insufficient","critique":"一句话说明缺什么，或为何可通过"}。`
       ),
       new HumanMessage(
-        `主题：${state.refinedTopic}\n大纲章节：${state.outline.map((s) => s.title).join("、")}\n\n调研摘要：\n${findingsSummary}`
+        `主题：${s.refinedTopic}\n大纲章节：${s.outline.map((sec) => sec.title).join("、")}\n\n调研摘要：\n${s.findings
+          .map((f) => `## ${f.title}\n${f.summary.slice(0, 200)}...`)
+          .join("\n\n")}`
       ),
-    ], appConfig);
-    const v = parseJson<{ verdict?: string; critique?: string }>(extractText(res.content));
-    const decision = v.verdict === "insufficient" ? "insufficient" : "sufficient";
-    log.info("outline_review", { decision, findings: state.findings.length });
-    update = { outlineDecision: decision, outlineCritique: v.critique ?? "" };
-  } catch (err) {
-    log.warn("outline_review 失败 → 按 sufficient 放行", { error: String(err) });
-    update = { outlineDecision: "sufficient", outlineCritique: "(评审异常，已放行)" };
-  }
-  const goto = routeAfterOutlineReview({ ...state, ...update });
-  return new Command({ goto, update });
+    ],
+    parse: (t) => parseJson<{ verdict?: string; critique?: string }>(t),
+    route: (parsed, s) => {
+      const v = parsed as { verdict?: string; critique?: string };
+      const verdict = v.verdict === "insufficient" ? "insufficient" : "sufficient";
+      const update = { outlineDecision: verdict, outlineCritique: v.critique ?? "" };
+      return { goto: routeAfterOutlineReview({ ...s, ...update }), update };
+    },
+    routeFallback: (s) => {
+      const update = { outlineDecision: "sufficient", outlineCritique: "(评审异常，已放行)" };
+      return { goto: routeAfterOutlineReview({ ...s, ...update }), update };
+    },
+    config: appConfig,
+    attempts: 1,
+    label: "outline_review",
+  })(state);
 }
 
 /**
@@ -64,35 +64,36 @@ export function routeAfterOutlineReview(state: ResearchStateShape): "plan" | "wr
 }
 
 /**
- * quality_review：LLM 评审报告质量。
- * 不达标则带意见回 draft 重写。
+ * quality_review：LLM 评审报告质量（结构/论据/逻辑/遗漏）。
+ * 不达标且未达上限 → 带 critique 回 write_draft 重写；否则 → converse 进入持续会话。
  */
-export async function qualityReviewNode(
-  state: ResearchStateShape,
-  appConfig?: AppConfig
-): Promise<Command> {
-  const model = requireModel(appConfig, "deep-research 示例");
-  let update: Partial<ResearchStateShape>;
-  try {
-    const res = await invokeLLM(model, [
+export function qualityReviewNode(state: ResearchStateShape, appConfig?: AppConfig) {
+  return createLlmRouterNode<ResearchStateShape>({
+    model: () => requireModel(appConfig, "deep-research 示例"),
+    prompt: (s) => [
       new SystemMessage(
         `你是报告质量评审。判断报告是否：结构完整、论据充分、逻辑连贯、无明显遗漏。` +
           `只输出 JSON：{"verdict":"pass"|"fail","critique":"一句话说明问题，或为何通过"}。`
       ),
       new HumanMessage(
-        `主题：${state.refinedTopic}\n报告（前 2000 字）：\n${state.draft.slice(0, 2000)}`
+        `主题：${s.refinedTopic}\n报告（前 2000 字）：\n${s.draft.slice(0, 2000)}`
       ),
-    ], appConfig);
-    const v = parseJson<{ verdict?: string; critique?: string }>(extractText(res.content));
-    const decision = v.verdict === "fail" ? "fail" : "pass";
-    log.info("quality_review", { decision, attempt: state.draftAttempts, apiOk: true });
-    update = { draftDecision: decision, draftCritique: v.critique ?? "" };
-  } catch (err) {
-    log.warn("quality_review API 失败 → 按 pass 放行", { error: String(err), apiOk: false });
-    update = { draftDecision: "pass", draftCritique: "(评审异常，已放行)" };
-  }
-  const goto = routeAfterQualityReview({ ...state, ...update });
-  return new Command({ goto, update });
+    ],
+    parse: (t) => parseJson<{ verdict?: string; critique?: string }>(t),
+    route: (parsed, s) => {
+      const v = parsed as { verdict?: string; critique?: string };
+      const verdict = v.verdict === "fail" ? "fail" : "pass";
+      const update = { draftDecision: verdict, draftCritique: v.critique ?? "" };
+      return { goto: routeAfterQualityReview({ ...s, ...update }), update };
+    },
+    routeFallback: (s) => {
+      const update = { draftDecision: "pass", draftCritique: "(评审异常，已放行)" };
+      return { goto: routeAfterQualityReview({ ...s, ...update }), update };
+    },
+    config: appConfig,
+    attempts: 1,
+    label: "quality_review",
+  })(state);
 }
 
 /**

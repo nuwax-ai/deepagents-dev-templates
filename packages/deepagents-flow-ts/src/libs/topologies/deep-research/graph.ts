@@ -26,7 +26,7 @@
  *
  * 真实接入（无 demo fallback——未配凭证直接报错）：
  *  - plan / research / draft / outline_review / quality_review / finalize **真调大模型**
- *  - research：Context7 文档 + DuckDuckGo 网络并行，启发式取优合并；DDG 限流检测 + 4.5s 闸门
+ *  - research：Context7 文档检索（duckduckgo-mcp-server 实测不稳定已移除，原双源改单源）
  *  - onToolCall 透出每次搜索；HITL 用 interrupt 暂停。
  *
  * 长任务韧性（防一处抖动掐死整条长流水线）：

@@ -6,6 +6,7 @@ export {
   createTravelGraph,
   TravelState,
   type TravelStateType,
+  type TravelSearchMcp,
   gatherNode,
   fanoutToResearch,
 } from "./graph.js";

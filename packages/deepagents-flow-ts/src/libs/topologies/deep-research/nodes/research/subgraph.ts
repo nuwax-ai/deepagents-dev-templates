@@ -1,10 +1,9 @@
 /**
- * research 子图 —— 单章节调研（双源并行检索 + LLM 摘要）。
+ * research 子图 —— 单章节调研（Context7 检索 + LLM 摘要）。
  *
- *   START → prepare → search(Context7 ∥ DDG 取优合并) → summarize → END
+ *   START → prepare → search(Context7 文档检索) → summarize → END
  *
- * 每章节固定各搜一次；DDG 走 rateLimited 闸门，Context7 独立并行。
- * Send 扇出 N 路时，DDG 请求在章节间全局串行错峰。
+ * 每章节固定搜一次。⚠️ duckduckgo-mcp-server 实测不稳定已移除，现仅 Context7 单源。
  */
 
 import {
@@ -24,7 +23,6 @@ import { invokeLLM, langClause } from "../helpers.js";
 import { outlineToPlanEntries } from "../planning.js";
 import { invokeContext7Search } from "./context7.js";
 import { mergeResearchSources, type ResearchSourceResult } from "./merge.js";
-import { invokeDuckDuckGoSearch } from "./tools.js";
 
 const log = logger.child("deep-research");
 
@@ -57,20 +55,16 @@ function createPrepareNode() {
 }
 
 /**
- * 并行拉 Context7 文档 + DuckDuckGo 网络，merge 取优后写入 rawMaterial。
- * libraryHint 来自 plan 大纲，优先用于 Context7 resolve-library-id。
+ * 拉 Context7 文档（libraryHint 来自 plan 大纲，优先用于 resolve-library-id），写入 rawMaterial。
  */
-async function fetchDualSources(
+async function fetchContext7(
   query: string,
   libraryHint: string | undefined,
   onToolCall: FlowCallbacks["onToolCall"] | undefined
 ): Promise<ResearchSourceResult[]> {
   let c7Meta: { ok: boolean; libraryId?: string } = { ok: false };
-  let ddgMeta: { ok: boolean } = { ok: false };
-
   const c7Args = libraryHint ? { query, libraryHint } : { query };
-
-  const context7Task = runTool(
+  const c7 = await runTool(
     "context7_query",
     c7Args,
     async () => {
@@ -80,36 +74,12 @@ async function fetchDualSources(
     },
     onToolCall
   );
-
-  const ddgTask = runTool(
-    "duckduckgo_search",
-    { query },
-    async () => {
-      const r = await invokeDuckDuckGoSearch(query);
-      ddgMeta = { ok: r.ok };
-      return r.text;
-    },
-    onToolCall
-  );
-
-  const [c7, ddg] = await Promise.all([context7Task, ddgTask]);
-
   return [
-    {
-      source: "context7",
-      text: c7.result,
-      ok: c7Meta.ok,
-      libraryId: c7Meta.libraryId,
-    },
-    {
-      source: "duckduckgo",
-      text: ddg.result,
-      ok: ddgMeta.ok,
-    },
+    { source: "context7", text: c7.result, ok: c7Meta.ok, libraryId: c7Meta.libraryId },
   ];
 }
 
-/** search：双源并行检索 + 取优合并。 */
+/** search：Context7 检索 + 合并（单源，mergeResearchSources 兼容）。 */
 function createSearchNode() {
   return async (
     state: SectionState,
@@ -122,20 +92,18 @@ function createSearchNode() {
     const query = section.query;
     const libraryHint = section.libraryHint;
 
-    const sources = await fetchDualSources(query, libraryHint, onToolCall);
+    const sources = await fetchContext7(query, libraryHint, onToolCall);
     const rawMaterial = mergeResearchSources(sources, query);
-    const anyOk = sources.some((s) => s.ok);
 
-    if (!anyOk) {
-      log.warn("research 双源均未成功，summarize 将降级", {
+    if (!sources.some((s) => s.ok)) {
+      log.warn("research 检索未成功，summarize 将降级", {
         section: section.title,
         snippet: rawMaterial.slice(0, 80),
       });
     } else {
-      log.info("research 双源合并完成", {
+      log.info("research 检索完成", {
         section: section.title,
         libraryHint: libraryHint ?? null,
-        sources: sources.map((s) => ({ source: s.source, ok: s.ok })),
       });
     }
 
@@ -160,7 +128,6 @@ function createSummarizeNode(appConfig?: AppConfig) {
           new SystemMessage(
             `你是技术分析师。根据检索资料，为章节「${section.title}」写一段 200-400 字的结构化摘要。` +
               `提取关键事实、数据、结论，不要堆砌链接。只输出摘要正文。` +
-              `资料可能含 Context7 文档与 DuckDuckGo 网络两路来源，请综合主源与补充。` +
               `若资料标明检索失败，可结合主题常识简要推断，并注明依据有限。` +
               langClause(state.languageHint)
           ),
