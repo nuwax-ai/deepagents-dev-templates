@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
-"""agent_tool.py — Agent 工具配置管理 CLI（Python 版，与 agent_tool.sh 功能对齐）。
+"""agent_tool.py — 已弃用，请使用同目录 agent_tool.sh（nuwaclaw / Git Bash 统一入口）。
+
+保留本文件仅供无 bash 时的备选；新用法勿再依赖此脚本。
 
 封装 4sandbox/agent/dev/* 全部端点。使用标准库，无第三方依赖。
+所有 JSON 请求/响应统一 UTF-8，避免 Windows 下中文 systemPrompt 乱码。
 
 依赖环境变量：
     PLATFORM_BASE_URL   平台地址
@@ -15,20 +18,34 @@
     python3 agent_tool.py add-tool --type Plugin --id 611
     python3 agent_tool.py del-tool --type Plugin --id 611
     python3 agent_tool.py update-prompt --text "你是助手"
+    python3 agent_tool.py update-prompt --file prompts/weather.md
     python3 agent_tool.py update-opening --text "你好"
 
 任何写操作后，请自行调用 config 验证。
 """
 
+from __future__ import annotations
+
 import argparse
 import json
 import os
 import sys
-import urllib.request
 import urllib.error
+import urllib.request
+from pathlib import Path
 
 API_PATH = "/api/v1/4sandbox/agent/dev"
 VALID_TYPES = {"Plugin", "Workflow", "Knowledge"}
+
+
+def configure_stdio_utf8() -> None:
+    """Windows 控制台回显中文时尽量使用 UTF-8。"""
+    if hasattr(sys.stdout, "reconfigure"):
+        try:
+            sys.stdout.reconfigure(encoding="utf-8")
+            sys.stderr.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
 
 
 def env(name: str, required: bool = False) -> str:
@@ -47,27 +64,63 @@ def agent_id() -> int:
         sys.exit(f"ERROR: DEV_AGENT_ID 必须是整数，得到：{val}")
 
 
+def read_text_arg(text: str | None, file_path: str | None) -> str:
+    if text and file_path:
+        sys.exit("ERROR: --text 与 --file 不能同时使用")
+    if file_path:
+        path = Path(file_path)
+        if file_path == "-":
+            return sys.stdin.read().lstrip("\ufeff")
+        if not path.is_file():
+            sys.exit(f"ERROR: 文件不存在：{file_path}")
+        return path.read_text(encoding="utf-8-sig")
+    if text is None:
+        sys.exit("ERROR: 需要 --text \"...\" 或 --file <path>（- 表示 stdin）")
+    return text
+
+
 def call(method: str, path: str, body: dict | None = None) -> None:
     base = env("PLATFORM_BASE_URL", required=True)
     token = env("SANDBOX_ACCESS_KEY", required=True)
     url = f"{base}{API_PATH}{path}"
-    data = json.dumps(body).encode() if body is not None else None
+    data = (
+        json.dumps(body, ensure_ascii=False).encode("utf-8")
+        if body is not None
+        else None
+    )
     req = urllib.request.Request(
-        url, data=data, method=method,
+        url,
+        data=data,
+        method=method,
         headers={
-            "Content-Type": "application/json",
+            "Content-Type": "application/json; charset=utf-8",
+            "Accept": "application/json; charset=utf-8",
             "Authorization": f"Bearer {token}",
         },
     )
     try:
         with urllib.request.urlopen(req) as resp:
-            print(resp.read().decode())
+            raw = resp.read()
+            charset = resp.headers.get_content_charset() or "utf-8"
+            print(raw.decode(charset, errors="replace"))
     except urllib.error.HTTPError as e:
-        print(e.read().decode(), file=sys.stderr)
+        err_body = e.read()
+        try:
+            print(err_body.decode("utf-8"), file=sys.stderr)
+        except Exception:
+            print(err_body, file=sys.stderr)
         sys.exit(1)
 
 
+def add_text_args(parser: argparse.ArgumentParser) -> None:
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("--text", help="文本内容（短文本）")
+    group.add_argument("--file", help="UTF-8 文本文件路径；- 表示从 stdin 读取")
+
+
 def main() -> None:
+    configure_stdio_utf8()
+
     p = argparse.ArgumentParser(description="Agent 工具配置管理 CLI")
     sub = p.add_subparsers(dest="cmd", required=True)
 
@@ -88,10 +141,10 @@ def main() -> None:
     dele.add_argument("--id", type=int, required=True)
 
     up = sub.add_parser("update-prompt", help="更新系统提示词")
-    up.add_argument("--text", required=True)
+    add_text_args(up)
 
     uo = sub.add_parser("update-opening", help="更新开场白")
-    uo.add_argument("--text", required=True)
+    add_text_args(uo)
 
     args = p.parse_args()
 
@@ -113,9 +166,11 @@ def main() -> None:
         path = "/config/tool/add" if args.cmd == "add-tool" else "/config/tool/delete"
         call("POST", path, {"devAgentId": agent_id(), "targetType": args.type, "targetId": args.id})
     elif args.cmd == "update-prompt":
-        call("POST", "/config/update", {"devAgentId": agent_id(), "systemPrompt": args.text})
+        text = read_text_arg(getattr(args, "text", None), getattr(args, "file", None))
+        call("POST", "/config/update", {"devAgentId": agent_id(), "systemPrompt": text})
     elif args.cmd == "update-opening":
-        call("POST", "/config/update", {"devAgentId": agent_id(), "openingChatMsg": args.text})
+        text = read_text_arg(getattr(args, "text", None), getattr(args, "file", None))
+        call("POST", "/config/update", {"devAgentId": agent_id(), "openingChatMsg": text})
 
 
 if __name__ == "__main__":

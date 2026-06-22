@@ -3,13 +3,14 @@
 #
 # 封装 4sandbox/agent/dev/* 全部端点，提供统一的命令行入口：
 #   config         获取 Agent 配置（JSON）
-#   update-prompt  更新系统提示词   --text "..."
-#   update-opening 更新开场白       --text "..."
+#   update-prompt  更新系统提示词   --text "..." | --file <path>（- 表示 stdin）
+#   update-opening 更新开场白       --text "..." | --file <path>（- 表示 stdin）
 #   search         搜索可用工具     --kw "关键词" [--dev-space-id N] [--page N] [--page-size N]
 #   add-tool       添加工具         --type Plugin|Workflow|Knowledge --id N
 #   del-tool       删除工具         --type Plugin|Workflow|Knowledge --id N
 #
-# 依赖环境变量：
+# 依赖：curl + 环境变量（见下）。
+# update-prompt / update-opening / search 另需可用的 python3 或 python（拼 JSON）。
 #   PLATFORM_BASE_URL  平台地址，例如 https://testagent.xspaceagi.com
 #   SANDBOX_ACCESS_KEY Bearer 鉴权令牌
 #   DEV_AGENT_ID       开发的 Agent ID（config/update/add/del 必填）
@@ -32,6 +33,21 @@ API="${BASE}/api/v1/4sandbox/agent/dev"
 
 die() { echo "ERROR: $*" >&2; exit 1; }
 
+# 仅 update-prompt / update-opening / search 需要 Python 拼 JSON
+PYTHON=""
+resolve_python() {
+  if [ -n "$PYTHON" ]; then
+    return 0
+  fi
+  for candidate in python3 python; do
+    if command -v "$candidate" >/dev/null 2>&1 && "$candidate" -c 'import sys' >/dev/null 2>&1; then
+      PYTHON="$candidate"
+      return 0
+    fi
+  done
+  die "需要可用的 python3 或 python（用于拼 JSON）"
+}
+
 require_env() {
   [ -n "$BASE" ]    || die "缺少环境变量 PLATFORM_BASE_URL"
   [ -n "$TOKEN" ]   || die "缺少环境变量 SANDBOX_ACCESS_KEY"
@@ -46,19 +62,49 @@ post() {
   local path="$1"; local body="${2:-}"
   if [ -n "$body" ]; then
     curl -fsS -X POST "${API}${path}" \
-      -H "Content-Type: application/json" \
+      -H "Content-Type: application/json; charset=utf-8" \
       -H "Authorization: Bearer ${TOKEN}" \
       -d "$body"
   else
     curl -fsS -X POST "${API}${path}" \
-      -H "Content-Type: application/json" \
+      -H "Content-Type: application/json; charset=utf-8" \
       -H "Authorization: Bearer ${TOKEN}"
   fi
 }
 
-json_escape() {
-  # 将文本转义为可安全嵌入 JSON 字符串字面量的形式
-  python3 -c 'import json,sys; print(json.dumps(sys.argv[1]))' "$1"
+build_update_body() {
+  # 经 Python 拼 JSON，避免长文本经 shell 变量 / argv 传递触发 ARG_MAX
+  resolve_python
+  local field="$1" text="$2" file="$3"
+  if [ -n "$text" ] && [ -n "$file" ]; then
+    die "--text 与 --file 不能同时使用"
+  fi
+  if [ -z "$text" ] && [ -z "$file" ]; then
+    die "需要 --text \"...\" 或 --file <path>（- 表示 stdin）"
+  fi
+  if [ -n "$file" ]; then
+    if [ "$file" = "-" ]; then
+      $PYTHON - "$AGENT_ID" "$field" <<'PY'
+import json, sys
+agent_id, field = sys.argv[1], sys.argv[2]
+content = sys.stdin.read().lstrip("\ufeff")
+print(json.dumps({"devAgentId": int(agent_id), field: content}, ensure_ascii=False))
+PY
+    else
+      $PYTHON - "$AGENT_ID" "$field" "$file" <<'PY'
+import json, sys, pathlib
+agent_id, field, file_path = sys.argv[1:4]
+content = pathlib.Path(file_path).read_text(encoding="utf-8-sig")
+print(json.dumps({"devAgentId": int(agent_id), field: content}, ensure_ascii=False))
+PY
+    fi
+  else
+    $PYTHON - "$AGENT_ID" "$field" "$text" <<'PY'
+import json, sys
+agent_id, field, content = sys.argv[1], sys.argv[2], sys.argv[3]
+print(json.dumps({"devAgentId": int(agent_id), field: content}, ensure_ascii=False))
+PY
+  fi
 }
 
 valid_type() {
@@ -83,30 +129,30 @@ case "$cmd" in
     ;;
 
   update-prompt)
-    text=""
+    text=""; file=""
     while [ $# -gt 0 ]; do
       case "$1" in
         --text) text="$2"; shift 2 ;;
+        --file) file="$2"; shift 2 ;;
         *) die "未知参数：$1" ;;
       esac
     done
-    [ -n "$text" ] || die "需要 --text \"...\""
     require_agent
-    body="{\"devAgentId\":${AGENT_ID},\"systemPrompt\":$(json_escape "$text")}"
+    body="$(build_update_body "systemPrompt" "$text" "$file")"
     post "/config/update" "$body"; echo
     ;;
 
   update-opening)
-    text=""
+    text=""; file=""
     while [ $# -gt 0 ]; do
       case "$1" in
         --text) text="$2"; shift 2 ;;
+        --file) file="$2"; shift 2 ;;
         *) die "未知参数：$1" ;;
       esac
     done
-    [ -n "$text" ] || die "需要 --text \"...\""
     require_agent
-    body="{\"devAgentId\":${AGENT_ID},\"openingChatMsg\":$(json_escape "$text")}"
+    body="$(build_update_body "openingChatMsg" "$text" "$file")"
     post "/config/update" "$body"; echo
     ;;
 
@@ -123,15 +169,16 @@ case "$cmd" in
     done
     require_env
     [ -n "$dev_space" ] || die "需要 --dev-space-id 或环境变量 DEV_SPACE_ID"
+    resolve_python
     # 逐字段拼装，跳过空值字段
-    body=$(python3 - "$dev_space" "$kw" "$page" "$page_size" <<'PY'
+    body=$($PYTHON - "$dev_space" "$kw" "$page" "$page_size" <<'PY'
 import json, sys
 dev_space, kw, page, page_size = sys.argv[1:5]
 d = {"devSpaceId": int(dev_space)}
 if kw:        d["kw"] = kw
 if page:      d["page"] = int(page)
 if page_size: d["pageSize"] = int(page_size)
-print(json.dumps(d))
+print(json.dumps(d, ensure_ascii=False))
 PY
 )
     post "/tool/search" "$body"; echo

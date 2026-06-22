@@ -38,7 +38,7 @@ license: MIT
 
 > 完整接口字段表、请求/响应示例、错误码见 `references/api-docs.md`。
 > `deepagents-flow-ts` 工具对接示例（`tool()` + Zod + `createFlowTools()`）见 `references/langgraph-integration.md`。
-> 端点调用可使用 `scripts/agent_tool.sh`（bash）或 `scripts/agent_tool.py`（Python）。
+> 端点调用**必须**使用 `scripts/agent_tool.sh`（nuwaclaw / Git Bash 下统一入口，已处理 UTF-8）。**禁止**手写 `curl`/`Invoke-RestMethod` 拼含中文的 JSON body。
 
 ## 核心流程：平台工具接入 deepagents-flow-ts
 
@@ -149,11 +149,15 @@ curl -s -X POST "${PLATFORM_BASE_URL}/api/v1/4sandbox/agent/dev/config/update" \
   -d '{"devAgentId":'"${DEV_AGENT_ID}"',"systemPrompt":"You are a helpful assistant."}'
 ```
 
-或用脚本（自动只带对应字段）：
+或用脚本（自动 UTF-8 编码，只带对应字段）：
 
 ```bash
+# 短文本
 ./scripts/agent_tool.sh update-prompt  --text "You are a helpful assistant."
 ./scripts/agent_tool.sh update-opening --text "你好，有什么可以帮你？"
+
+# 长文本 / 多行（从 UTF-8 文件读取）
+./scripts/agent_tool.sh update-prompt --file prompts/weather-system.md
 ```
 
 ## 验证（每次写操作后必做）
@@ -179,6 +183,8 @@ curl -s -X POST "${PLATFORM_BASE_URL}/api/v1/4sandbox/agent/dev/config/update" \
 | 搜索接口报 dev space 错误 | `DEV_SPACE_ID` 缺失 | 确认 dev 空间 ID 并写入 `DEV_SPACE_ID` |
 | 工具没生效 | 忘了在 `createFlowTools()` 注册 | 在 `src/app/flow-tools.ts` 的 `buildTools()` 数组中加入新工具 |
 | `tool()` 返回类型错误 | 返回了对象而非 string | 用 `JSON.stringify()` 序列化 |
+| systemPrompt 中文变 `????` 或乱码 | 手写 `curl`/`Invoke-RestMethod` 拼 JSON，请求体非 UTF-8 | 改用 `./scripts/agent_tool.sh`；长文本用 `--file` 读 UTF-8 文件后重传 |
+| 终端显示乱码但 API 已成功 | 终端编码非 UTF-8 | 用 `./scripts/agent_tool.sh config` 或平台 Web UI / `jq` 核对为准 |
 
 ## Anti-patterns
 
@@ -191,6 +197,7 @@ curl -s -X POST "${PLATFORM_BASE_URL}/api/v1/4sandbox/agent/dev/config/update" \
 - ❌ 写系统提示词到配置时**把不相关字段填成空字符串**，导致原值被覆盖——省略即可。
 - ❌ 把 `${PLATFORM_BASE_URL}` / `${SANDBOX_ACCESS_KEY}` 当字面量写死在交付里——应来自环境变量。
 - ❌ 写操作后**不做验证**就声称"已完成"——必须重新查询配置确认。
+- ❌ **手写 `curl` / `Invoke-RestMethod` 拼含中文的 JSON body**——应使用 `./scripts/agent_tool.sh`。
 - ✅ **代码里只写"实际用到的工具"**（`src/libs/tools/`），配置变更走 dev 接口（开发期手动跑），两者分离。
 - ✅ 接入工具三步一致：**搜 → 加 → 按 schema 用 `tool()` + Zod 在 `src/libs/tools/` 实现 → 注册到 `createFlowTools()`**，指向同一 `targetType`+`targetId`。
 - ✅ 系统提示词保存到平台配置，`deepagents-flow-ts` 目标模板项目运行时统一读取，避免在代码里硬编码。
@@ -205,9 +212,9 @@ curl -s -X POST "${PLATFORM_BASE_URL}/api/v1/4sandbox/agent/dev/config/update" \
 | `./scripts/agent_tool.sh search --kw "关键词"` | 搜索可用工具 |
 | `./scripts/agent_tool.sh add-tool --type Plugin --id 611` | 添加工具 |
 | `./scripts/agent_tool.sh del-tool --type Plugin --id 611` | 删除工具 |
-| `./scripts/agent_tool.sh update-prompt --text "..."` | 更新系统提示词 |
+| `./scripts/agent_tool.sh update-prompt --text "..."` | 更新系统提示词（短文本） |
+| `./scripts/agent_tool.sh update-prompt --file path.md` | 从 UTF-8 文件更新系统提示词（支持长文本） |
 | `./scripts/agent_tool.sh update-opening --text "..."` | 更新开场白 |
-
-Python 版同功能：把扩展名换成 `.py` 即可，例如 `python3 scripts/agent_tool.py config`。
+| `./scripts/agent_tool.sh update-opening --file path.md` | 从 UTF-8 文件更新开场白 |
 
 > 脚本会自动从 `DEV_AGENT_ID` 取值：查询拼进 URL 路径，更新/增删工具放入请求体 `devAgentId`；缺失时报错提示。搜索接口不受 `DEV_AGENT_ID` 影响。

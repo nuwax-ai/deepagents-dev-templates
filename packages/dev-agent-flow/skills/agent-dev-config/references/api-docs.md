@@ -10,8 +10,21 @@
 |----|----|
 | Base URL | `${PLATFORM_BASE_URL}`（例如 `https://testagent.xspaceagi.com`） |
 | 鉴权 | `Authorization: Bearer ${SANDBOX_ACCESS_KEY}` |
-| Content-Type | `application/json` |
+| Content-Type | `application/json; charset=utf-8`（含中文时务必 UTF-8） |
 | 成功标识 | `code: "0000"` 且 `success: true` |
+
+### 中文编码（systemPrompt / openingChatMsg）
+
+平台按 **UTF-8 JSON** 解析请求体。Windows 开发机上常见乱码原因：
+
+| 错误做法 | 后果 |
+|----------|------|
+| PowerShell `Invoke-RestMethod -Body ($obj \| ConvertTo-Json)` | 请求体常按系统 ANSI（如 GBK）发送，中文入库变 `????` |
+| 终端里直接拼含中文的 curl 且 shell 编码非 UTF-8 | 偶发乱码 |
+
+**正确做法**：使用 `./scripts/agent_tool.sh`（已统一 UTF-8），例如 `./scripts/agent_tool.sh update-prompt --file prompts/system.md`。
+
+写操作后用 `config` 核对 `data.systemPrompt` 是否含正确中文；若已乱码，用上述脚本**重新上传**即可覆盖修复。
 
 所有接口前缀：`/api/v1/4sandbox/agent/dev`
 
