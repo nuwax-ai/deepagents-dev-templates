@@ -1,7 +1,6 @@
 {
   "name": "project-planner",
   "description": "项目规划：目标拆解 → 估时 → 评审重做 → 人审批定稿（stateful）",
-  "flowType": "stateful",
   "topology": "project-manager",
   "systemPrompt": "你是资深敏捷项目经理，擅长把模糊目标拆成有序、可执行、可验收的关键任务。",
   "tools": [],

@@ -38,7 +38,7 @@ export interface LlmRouterNodeOptions<S> {
   model: ChatModelLike | ((state: S) => ChatModelLike | null | undefined);
   /** 由 state 构造消息（含 SystemMessage；本 factory 不另注 systemPrompt）。 */
   prompt: (state: S) => BaseMessage[];
-  /** 结构化：把 content 文本 parse 成裁决对象（如 parseJson）。缺省则 parsed = content 原文。 */
+  /** 结构化：把 content 文本 parse 成裁决对象（如 parseJson）。**实际必填**——缺省则直接走 routeFallback("error")（route 需结构化裁决，不接受原始字符串）。 */
   parse?: (text: string) => unknown;
   /** 成功：parsed + state → { goto, update }。goto 通常由 routeAfterXxx({...state, ...update}) 算。 */
   route: (parsed: unknown, state: S) => { goto: string; update: Partial<S> };
@@ -93,7 +93,12 @@ export function createLlmRouterNode<S>(
         config,
       })) as { content: unknown };
       const content = extractText(ai.content);
-      const parsed = parse ? parse(content) : content;
+      if (!parse) {
+        return new Command(
+          routeFallback(state, "error", new Error("createLlmRouterNode: parse 未提供，无法结构化裁决（route 需结构化输入）"))
+        );
+      }
+      const parsed = parse(content);
       return new Command(route(parsed, state));
     } catch (err) {
       return new Command(routeFallback(state, "error", err));

@@ -1,7 +1,6 @@
 {
   "name": "grade-redo",
   "description": "草稿 → 评审 → 不合格重做（节点级 custom：conditional 边 + llm parse）",
-  "flowType": "stateful",
   "topology": "custom",
   "systemPrompt": "",
   "tools": [],
@@ -9,7 +8,8 @@
     "state": {
       "query": { "type": "string" },
       "draft": { "type": "string" },
-      "verdict": { "type": "string" }
+      "verdict": { "type": "string" },
+      "attempts": { "type": "number" }
     },
     "nodes": {
       "write": {
@@ -24,14 +24,14 @@
         "params": {
           "prompt": "(s) => [new SystemMessage('评判草稿质量，只输出 JSON：{\"verdict\":\"pass\"|\"fail\"}'), new HumanMessage(s.draft)]",
           "parse": "(t) => parseJson(t)",
-          "write": "(r) => ({ verdict: ((r.parsed ?? {}) as { verdict?: string }).verdict ?? 'pass' })"
+          "write": "(r, s) => ({ verdict: ((r.parsed ?? {}) as { verdict?: string }).verdict === 'pass' ? 'pass' : 'fail', attempts: (s.attempts ?? 0) + 1 })"
         }
       }
     },
     "edges": [
       { "kind": "static", "from": "__start__", "to": "write" },
       { "kind": "static", "from": "write", "to": "grade" },
-      { "kind": "conditional", "from": "grade", "condition": "(s) => s.verdict === 'fail' ? 'write' : '__end__'", "targets": ["write", "__end__"] }
+      { "kind": "conditional", "from": "grade", "condition": "(s) => (s.verdict === 'fail' && (s.attempts ?? 0) < 3) ? 'write' : '__end__'", "targets": ["write", "__end__"] }
     ],
     "input": { "queryField": "query" },
     "result": { "answerField": "draft" },

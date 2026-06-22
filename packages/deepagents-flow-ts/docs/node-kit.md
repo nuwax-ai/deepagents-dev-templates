@@ -227,6 +227,6 @@ parentGraph.addNode("research", researcher);   // 编译后的子图直接当节
 
 不想套预设拓扑、要按 nodes+edges+state 自由编排时,用 `custom` 拓扑(spec 即契约):
 spec 声明 `state`(channels + reducer 类型)/ `nodes`(name→type+params)/ `edges`(static/conditional/fanout)/ `input`/`result`,
-`buildCustomGraph`(`src/libs/topologies/custom/`)按 spec 用本目录 factory 构造图。节点 `type` 词表 + 选型见 [node-catalog.md](node-catalog.md);示例见 `scripts/scaffold/specs/_example.translate-review.flow.json` 等。
+`scripts/scaffold/blueprints/custom.mjs` **生成时渲染**真实 `src/app/flows/<name>/graph.ts`(内联本目录 factory,受 tsc 检查;无运行时解释器)。节点 `type` 词表 + 选型见 [node-catalog.md](node-catalog.md);示例见 `scripts/scaffold/specs/_example.*.flow.json`(translate-review / grade-redo / router-gate / multi-aspect-search 等)。
 
 进阶模式(Send/interrupt/Command/subgraph/checkpointer 的原生细节)见 [flow-patterns.md](flow-patterns.md)。

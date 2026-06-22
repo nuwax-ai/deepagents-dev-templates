@@ -1,7 +1,6 @@
 {
   "name": "content-review",
   "description": "内容审阅定稿：生成初稿 → 人审 → 按意见定稿（stateful）",
-  "flowType": "stateful",
   "topology": "human-in-loop",
   "systemPrompt": "你是资深内容编辑。根据用户要求撰写高质量初稿，结构清晰、语言精炼，直接给正文，不要寒暄。",
   "tools": [],

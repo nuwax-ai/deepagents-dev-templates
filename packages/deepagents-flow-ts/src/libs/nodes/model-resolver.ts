@@ -7,7 +7,7 @@
  * 提升自 examples/shared.ts（P1：拓扑进 libs 前先把共享件落 src）。runtime 的 resolveModel
  * 是框架默认图的模型解析；requireModel 是其「硬凭证」包装。
  */
-import { resolveModel, logger, type AppConfig } from "../../runtime/index.js";
+import { resolveModel, resolveApiKey, logger, type AppConfig } from "../../runtime/index.js";
 
 const log = logger.child("model-resolver");
 
@@ -15,17 +15,10 @@ const log = logger.child("model-resolver");
  * 真实接入：必须有模型，否则直接报错（不降级 demo fallback）。
  */
 export function requireModel(appConfig?: AppConfig, exampleName = "本示例") {
-  const vars = ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "OPENAI_API_KEY"];
-  const model = appConfig?.model as
-    | { apiKeyEnv?: string; authTokenEnv?: string }
-    | undefined;
-  if (model?.apiKeyEnv) vars.push(model.apiKeyEnv);
-  if (model?.authTokenEnv) vars.push(model.authTokenEnv);
-
-  if (!appConfig || !vars.some((v) => Boolean(process.env[v]))) {
-    log.warn("无模型凭证 → 不降级 demo，直接报错");
+  if (!appConfig || !resolveApiKey(appConfig)) {
+    log.warn("无模型凭证（provider-aware 校验失败）→ 不降级 demo，直接报错");
     throw new Error(
-      `${exampleName}需要模型凭证（无 demo fallback）：在 env / .env 设 ANTHROPIC_API_KEY（或 ANTHROPIC_AUTH_TOKEN / OPENAI_API_KEY）`
+      `${exampleName}需要模型凭证（无 demo fallback）：为 provider=${appConfig?.model?.provider ?? "?"} 设对应 env（OPENAI_API_KEY / ANTHROPIC_API_KEY / ANTHROPIC_AUTH_TOKEN，或 config 指定的 apiKeyEnv/authTokenEnv）`
     );
   }
 

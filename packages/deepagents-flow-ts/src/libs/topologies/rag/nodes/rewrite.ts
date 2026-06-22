@@ -11,9 +11,9 @@
  */
 
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
-import { resolveModel, type AppConfig } from "../../../../runtime/index.js";
+import { type AppConfig } from "../../../../runtime/index.js";
 import { resolveLlmResilience } from "../../../../runtime/services/llm-resilience.js";
-import { createLlmNode, parseJson } from "../../../nodes/index.js";
+import { createLlmNode, parseJson, requireModel } from "../../../nodes/index.js";
 import type { RAGState, RAGIntent } from "./types.js";
 
 const REWRITE_SYSTEM_PROMPT = `你是一个查询分析专家。你的任务是分析用户的问题，并提供结构化的分析结果。
@@ -68,11 +68,9 @@ function fallbackRewrite(query: string): Partial<RAGState> {
 /** rewrite 节点：框架 createLlmNode（parse JSON 结构化输出 + 无模型/异常 fallback 降级）。 */
 export function createRewriteNode(appConfig?: AppConfig) {
   return createLlmNode<RAGState>({
-    // 模型缺失返回 null（触发 fallback），与原 try/catch 降级同义。
-    model: () => {
-      const m = resolveModel(appConfig!);
-      return m && typeof m !== "string" ? m : null;
-    },
+    // 无凭证 → requireModel 抛清晰错误（在 createLlmNode 的 try 外，不走 fallback）；
+    // 调用失败（瞬态 429/超时）仍由下方 fallback 降级（用原 query 继续，不卡死整条 RAG）。
+    model: () => requireModel(appConfig, "RAG rewrite"),
     prompt: (s) => {
       let context = "";
       if (s.history && s.history.length > 0) {

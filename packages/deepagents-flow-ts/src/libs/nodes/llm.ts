@@ -102,7 +102,7 @@ export async function streamLLMText(
       const text = extractText(chunk.content);
       if (!text) continue;
       full += text;
-      emitTextToken(config, text);
+      await emitTextToken(config, text);
     }
     return full;
   };

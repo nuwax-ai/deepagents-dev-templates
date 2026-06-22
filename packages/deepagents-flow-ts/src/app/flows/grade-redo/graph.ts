@@ -23,6 +23,7 @@ const State = Annotation.Root({
   query: Annotation<string>(),
   draft: Annotation<string>(),
   verdict: Annotation<string>(),
+  attempts: Annotation<number>(),
 });
 export type StateShape = typeof State.State;
 
@@ -39,14 +40,14 @@ export function buildGraph(appConfig: AppConfig | undefined, checkpointer: BaseC
     .addNode("grade", createLlmNode<StateShape>({
       model: () => requireModel(appConfig, "grade"),
       prompt: (s) => [new SystemMessage('评判草稿质量，只输出 JSON：{"verdict":"pass"|"fail"}'), new HumanMessage(s.draft)],
-      write: (r) => ({ verdict: ((r.parsed ?? {}) as { verdict?: string }).verdict ?? 'pass' }),
+      write: (r, s) => ({ verdict: ((r.parsed ?? {}) as { verdict?: string }).verdict === 'pass' ? 'pass' : 'fail', attempts: (s.attempts ?? 0) + 1 }),
       parse: (t) => parseJson(t),
       config: appConfig,
       label: "grade",
     }))
     .addEdge(START, "write")
     .addEdge("write", "grade")
-    .addConditionalEdges("grade", (s) => s.verdict === 'fail' ? 'write' : '__end__', { "write": "write", "__end__": END })
+    .addConditionalEdges("grade", (s) => (s.verdict === 'fail' && (s.attempts ?? 0) < 3) ? 'write' : '__end__', { "write": "write", "__end__": END })
     .compile({ checkpointer });
 }
 

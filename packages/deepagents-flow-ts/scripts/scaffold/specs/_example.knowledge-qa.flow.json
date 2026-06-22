@@ -1,7 +1,6 @@
 {
   "name": "knowledge-qa",
   "description": "知识库问答：重写查询 → MCP 检索 → 评级重试 → 生成带来源的回答（one-shot）",
-  "flowType": "oneshot",
   "topology": "rag",
   "systemPrompt": "",
   "tools": [],

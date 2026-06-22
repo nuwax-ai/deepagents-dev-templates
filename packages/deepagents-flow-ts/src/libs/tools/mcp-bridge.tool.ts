@@ -6,12 +6,12 @@
  * 当某 MCP server 工具名单动态、或想手动发现时用本工具。
  *
  * 接收 runtime-context 合并后的 server 配置 map（default + session + platform），
- * 实际 MCP 调用走 flow-ts 自有的 mcp-stdio（直连），不经 MCPManager。
+ * 实际 MCP 调用走 flow-ts 自有的 stdio MCP 客户端（libs/mcp/stdio-client，直连），不经 MCPManager。
  */
 
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import { callMcpTool, listMcpTools, type McpServerConfig } from "../../runtime/services/mcp-stdio.js";
+import { callMcpTool, listMcpToolsRaw, type McpServerConfig } from "../mcp/stdio-client.js";
 import type { McpServerEntry } from "../../runtime/context/runtime-context.js";
 
 function toServerConfig(cfg: McpServerEntry): McpServerConfig | null {
@@ -32,7 +32,7 @@ export function createMcpBridgeTool(serverConfigs: Record<string, McpServerEntry
           if (!cfg) return `Error: MCP server "${server}" not found`;
           const sc = toServerConfig(cfg);
           if (!sc) return `Error: "${server}" is not a stdio server`;
-          const result = await listMcpTools(sc);
+          const result = await listMcpToolsRaw(sc);
           return JSON.stringify({ server, result });
         }
 

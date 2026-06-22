@@ -1,7 +1,6 @@
 {
   "name": "multi-aspect-search",
   "description": "多维度并行搜索 → 汇总（节点级 custom：fanout + mcp-retrieval + array 聚合）",
-  "flowType": "stateful",
   "topology": "custom",
   "systemPrompt": "",
   "tools": [],

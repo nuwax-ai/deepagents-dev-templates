@@ -16,6 +16,7 @@
  *   },
  * });
  */
+import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import { createLlmNode, type LlmNodeOptions } from "./llm.js";
 import { isApproval } from "./hitl.js";
 
@@ -41,10 +42,10 @@ export function createApprovalFinalizeNode<S>(
   const isApproved = opts.isApproved ?? isApproval;
   const rejected = createLlmNode<S>(opts.rejectedLlm);
 
-  return async (state: S): Promise<Partial<S>> => {
+  return async (state: S, config?: LangGraphRunnableConfig): Promise<Partial<S>> => {
     const raw = (state as Record<string, unknown>)[field];
     const fb = String(raw ?? "").trim();
     if (isApproved(fb)) return opts.approvedOutput(state);
-    return rejected(state);
+    return rejected(state, config);
   };
 }

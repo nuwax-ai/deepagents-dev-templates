@@ -64,9 +64,9 @@ config/ prompts/ skills/ scripts/ docs/ tests/
 
 **重用单位 = `src/libs/nodes/` 节点 factory**（泛型于 State + `prompt(state)`/`write(result,state)` 回调），不是手写节点体。详见 **[docs/node-kit.md](docs/node-kit.md)**：
 
-`createLlmNode`（一次调 LLM，文本/结构化 `parse`）· `createLlmStreamNode`（流式）· `createToolExecNode`（执行 tool_calls + 三态事件）· `createHumanApprovalNode`（HITL interrupt，`route` 可 Command 路由）· `createPrepareNode`（input→消息）· `createFanout`（Send 扇出）· `createSubgraphNode`（子图作节点）
+`createLlmNode` · `createLlmStreamNode` · `createLlmRouterNode`（LLM 裁决 → Command goto）· `createToolExecNode` · `createHumanApprovalNode`（HITL 前置 interrupt）· `createApprovalFinalizeNode`（HITL 后置定稿）· `createMcpRetrievalNode`（主动 MCP 检索）· `createPrepareNode` · `createFanout` · `createSubgraphNode`
 
-> bespoke 节点**不强塞** factory（isApproval 短路、自定义 MCP 检索、反射 Command-goto 路由）——保留手写，见各 example 注释。
+> bespoke 节点**不强塞** factory（多源检索取优、文件交付、converse 路由等）——保留手写，见各 example 注释与 [node-catalog.md](docs/node-catalog.md) ② BESPOKE。
 
 两种方式落地：
 

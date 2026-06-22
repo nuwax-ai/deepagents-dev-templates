@@ -4,8 +4,9 @@
  * 把默认 flow 的显式 StateGraph 反射成结构化 `{ nodes, edges }`(+ Mermaid 源),
  * 供 inspector / 文档 / 调试器直接消费:**不运行图、不需要模型凭证**。
  *
- * 数据来自 LangGraph 编译图的 `getGraphAsync()`(新版推荐入口,`getGraph()` 已 deprecated),
- * 所以拓扑永远与 graph.ts 的真实连线一致 —— 绝不与手抄的节点列表漂移。
+ * 数据来自 LangGraph 编译图的 `getGraphAsync()`(新版推荐入口,`getGraph()` 已 deprecated)。
+ * 静态边总是与 graph.ts 一致；返回 Command 的路由节点须声明 addNode 的 ends 才能反射其 goto 边
+ * (漏 ends 则丢边),其余不与手抄的节点列表漂移。
  *
  * 用法:
  *   import { getFlowTopology } from "deepagents-flow-ts/topology";

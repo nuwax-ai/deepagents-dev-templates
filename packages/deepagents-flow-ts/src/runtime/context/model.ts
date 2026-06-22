@@ -23,29 +23,36 @@ export function resolveModelString(config: AppConfig): string {
 // Cache the model instance to avoid redundant instantiation on repeated calls.
 let cachedModel: { key: string; instance: CreateDeepAgentParams["model"] } | null = null;
 
+/**
+ * provider-aware 解析 apiKey：openai 优先 OPENAI_API_KEY，其余（anthropic 系）优先 authToken。
+ * 空则返回 ""（不抛错）——requireModel 据此判定缺凭证；cacheKey 含它使 env 后置填充时重建实例。
+ */
+export function resolveApiKey(config: AppConfig): string {
+  if (config.model.provider === "openai") {
+    return (
+      process.env.OPENAI_API_KEY ||
+      process.env[config.model.apiKeyEnv] ||
+      process.env[config.model.authTokenEnv] ||
+      ""
+    );
+  }
+  return (
+    process.env[config.model.authTokenEnv] ||
+    process.env[config.model.apiKeyEnv] ||
+    process.env.ANTHROPIC_AUTH_TOKEN ||
+    process.env.ANTHROPIC_API_KEY ||
+    ""
+  );
+}
+
 /** Build the model instance/string accepted by deepagents. */
 export function resolveModel(config: AppConfig): CreateDeepAgentParams["model"] {
-  const cacheKey = `${config.model.provider}:${config.model.name}|${config.model.baseUrl ?? ""}|${config.model.settings.temperature}|${config.model.settings.maxTokens ?? ""}`;
+  const cacheKey = `${config.model.provider}:${config.model.name}|${config.model.baseUrl ?? ""}|${config.model.settings.temperature}|${config.model.settings.maxTokens ?? ""}|${resolveApiKey(config)}`;
   if (cachedModel && cachedModel.key === cacheKey) {
     return cachedModel.instance;
   }
 
-  // Resolve API key with provider-aware priority
-  let apiKey: string | undefined;
-  if (config.model.provider === "openai") {
-    apiKey =
-      process.env.OPENAI_API_KEY ||
-      process.env[config.model.apiKeyEnv] ||
-      process.env[config.model.authTokenEnv] ||
-      "";
-  } else {
-    apiKey =
-      process.env[config.model.authTokenEnv] ||
-      process.env[config.model.apiKeyEnv] ||
-      process.env.ANTHROPIC_AUTH_TOKEN ||
-      process.env.ANTHROPIC_API_KEY ||
-      "";
-  }
+  const apiKey = resolveApiKey(config);
 
   let instance: CreateDeepAgentParams["model"];
 

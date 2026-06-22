@@ -20,6 +20,10 @@ function renderState(state) {
     if (ch.type === "string-array-append") {
       return `  ${name}: Annotation<unknown[]>({ reducer: (a, b) => [...(a ?? []), ...(b ?? [])], default: () => [] }),`;
     }
+    if (ch.type === "any-last") {
+      // last-wins reducer：fanout/并发写时取最后值（无 reducer 的 LastValue 通道并发写会 InvalidUpdateError）
+      return `  ${name}: Annotation<unknown>({ reducer: (_a, b) => b }),`;
+    }
     return `  ${name}: Annotation<${TS_TYPE[ch.type] ?? "unknown"}>(),`;
   });
   return lines.join("\n");
@@ -96,6 +100,8 @@ function renderEdge(e) {
     return `    .addEdge(${from}, ${to})`;
   }
   if (e.kind === "conditional") {
+    // ⚠️ condition 的返回值必须 ∈ targets，否则运行时 LangGraph 抛 "Invalid edge"；
+    // 静态反射（COMPLETION_GATE 的 graph）不执行 condition，检不出该错配——需人工核对。
     const pm = e.targets
       .map((t) => `${JSON.stringify(t)}: ${t === "__end__" ? "END" : JSON.stringify(t)}`)
       .join(", ");
@@ -133,7 +139,11 @@ function collectImports(params) {
 
   const lg = ["StateGraph", "Annotation", "MemorySaver"];
   if (params.edges.some((e) => e.kind === "static" && e.from === "__start__")) lg.push("START");
+  const endsHasEnd = Object.values(params.nodes).some(
+    (n) => n.type === "llm-router" && Array.isArray(n.params?.ends) && n.params.ends.includes("__end__")
+  );
   if (
+    endsHasEnd ||
     params.edges.some(
       (e) =>
         (e.kind === "static" && e.to === "__end__") ||
@@ -157,9 +167,18 @@ function collectImports(params) {
 export function render(spec) {
   const P = spec.params;
   const imp = collectImports(P);
+  // 无 llm/llm-router/approval-finalize 节点时 appConfig 不被引用 → 加 _ 前缀避免 noUnusedParameters
+  const appConfigParam = imp.nodes.includes("requireModel") ? "appConfig" : "_appConfig";
 
   const nodeLines = Object.entries(P.nodes)
-    .map(([name, node]) => `    .addNode(${JSON.stringify(name)}, ${renderNode(name, node)})`)
+    .map(([name, node]) => {
+      // llm-router 的 Command goto 目标须经 addNode 第三参 ends 声明，否则 getGraphAsync 反射不出这些边
+      const ends =
+        node.type === "llm-router" && Array.isArray(node.params?.ends)
+          ? `, { ends: [${node.params.ends.map((e) => (e === "__end__" ? "END" : JSON.stringify(e))).join(", ")}] }`
+          : "";
+      return `    .addNode(${JSON.stringify(name)}, ${renderNode(name, node)}${ends})`;
+    })
     .join("\n");
   const edgeLines = P.edges.map(renderEdge).join("\n");
 
@@ -176,8 +195,7 @@ import {
   type BaseCheckpointSaver,
 } from "@langchain/langgraph";${imp.messages.length ? `\nimport { ${imp.messages.join(", ")} } from "@langchain/core/messages";` : ""}
 import type { AppConfig } from "../../../runtime/index.js";
-import { ${imp.nodes.join(", ")} } from "../../../libs/nodes/index.js";
-import { reflectTopology } from "../../../libs/topologies/reflect.js";
+${imp.nodes.length ? `import { ${imp.nodes.join(", ")} } from "../../../libs/nodes/index.js";\n` : ""}import { reflectTopology } from "../../../libs/topologies/reflect.js";
 import type { FlowTopology } from "../../../core/flow-types.js";
 
 const State = Annotation.Root({
@@ -186,7 +204,7 @@ ${renderState(P.state)}
 export type StateShape = typeof State.State;
 
 /** 按 spec 构造图（编译后）。被 index.ts 的 recipe.buildGraph 调用。 */
-export function buildGraph(appConfig: AppConfig | undefined, checkpointer: BaseCheckpointSaver = new MemorySaver()) {
+export function buildGraph(${appConfigParam}: AppConfig | undefined, checkpointer: BaseCheckpointSaver = new MemorySaver()) {
   return new StateGraph(State)
 ${nodeLines}
 ${edgeLines}

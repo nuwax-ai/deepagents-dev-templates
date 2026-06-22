@@ -25,8 +25,7 @@ const base = {
     .string()
     .regex(/^[a-z][a-z0-9-]*$/, "name 必须 kebab-case（小写字母开头，仅小写字母/数字/连字符）"),
   description: z.string().default(""),
-  flowType: z.enum(["oneshot", "stateful"]).default("oneshot"),
-  /** 目标 Agent 系统提示词（建议由 flow-prompt-designer 产出）。 */
+  /** 目标 Agent 系统提示词（建议由 flow-builder part5-prompt-design 产出）。 */
   systemPrompt: z.string().default(""),
   tools: z.array(toolRefSchema).default([]),
 };

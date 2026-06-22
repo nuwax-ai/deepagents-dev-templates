@@ -14,7 +14,7 @@ export {
   destroyRuntimeContext,
   type RuntimeContext,
 } from "./runtime-context.js";
-export { resolveModelString, resolveModel } from "./model.js";
+export { resolveModelString, resolveModel, resolveApiKey } from "./model.js";
 export { resolveSystemPrompt, resolveCliSystemPrompt, resolveOutputStyle } from "./prompt.js";
 export {
   discoverMemoryFiles,

@@ -1,7 +1,6 @@
 {
   "name": "translate-review",
   "description": "翻译草稿 → 人审 → 按意见定稿（节点级 custom 拓扑，重表达 human-in-loop）",
-  "flowType": "stateful",
   "topology": "custom",
   "systemPrompt": "",
   "tools": [],

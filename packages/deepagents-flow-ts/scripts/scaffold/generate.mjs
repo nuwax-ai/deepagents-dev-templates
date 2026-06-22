@@ -116,6 +116,11 @@ function main() {
     writeFileSync(cfgPath, origCfg);
   }
 
+  if (spec.topology === "custom" && (spec.params?.edges ?? []).some((e) => e.kind === "conditional")) {
+    console.log(
+      `⚠️  custom 含 conditional 边：确认每个 condition 的返回值 ∈ 其 targets，否则运行时 LangGraph 抛 "Invalid edge"（静态反射检不出）。`
+    );
+  }
   console.log(`\n✅ flow "${spec.name}" 已生成并通过 typecheck + graph(反射已验)。`);
   console.log(`   启用：把 config/flow-agent.config.json 的 "activeFlow" 设为 "${spec.name}"，`);
   console.log(`   再 \`pnpm graph\` 查看该 flow 的拓扑、\`pnpm flow "..."\` 试跑。`);

@@ -13,7 +13,7 @@ const catalog = readFileSync(resolve(here, "../docs/node-catalog.md"), "utf-8");
 
 /**
  * custom DSL 支持的节点 type（canonical）—— 须与 schema.mjs 的 customNodeSchema.type enum、
- * src/libs/topologies/custom/graph.ts 的 buildNode switch 三处保持一致。
+ * scripts/scaffold/blueprints/custom.mjs 的 renderNode switch 三处保持一致。
  * 新增 type 时三处同步 + 本列表同步。
  */
 const CUSTOM_NODE_TYPES = [

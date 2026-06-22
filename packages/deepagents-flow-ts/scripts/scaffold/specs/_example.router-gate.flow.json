@@ -1,7 +1,6 @@
 {
   "name": "router-gate",
   "description": "LLM 裁决门：pass→done，fail→redo（节点级 custom：llm-router Command goto）",
-  "flowType": "stateful",
   "topology": "custom",
   "systemPrompt": "",
   "tools": [],
@@ -25,7 +24,8 @@
           "prompt": "(s) => [new SystemMessage('评判，只输出 JSON：{\"verdict\":\"pass\"|\"fail\"}'), new HumanMessage(s.output)]",
           "parse": "(t) => parseJson(t)",
           "route": "(parsed) => { const v = (parsed ?? {}) as { verdict?: string }; const verdict = v.verdict === 'fail' ? 'fail' : 'pass'; return { goto: verdict === 'fail' ? 'draft' : '__end__', update: { verdict } }; }",
-          "routeFallback": "() => ({ goto: '__end__', update: { verdict: 'pass' } })"
+          "routeFallback": "() => ({ goto: '__end__', update: { verdict: 'pass' } })",
+          "ends": ["draft", "__end__"]
         }
       }
     },

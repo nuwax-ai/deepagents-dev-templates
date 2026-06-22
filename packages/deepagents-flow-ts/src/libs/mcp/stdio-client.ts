@@ -23,13 +23,15 @@ interface JsonRpcResponse {
   error?: { code?: number; message?: string };
 }
 
-/** spawn MCP server、initialize、调一个方法、收结果、关进程。 */
-async function callStdioMcp(
+/**
+ * 开一个 stdio MCP 会话：spawn → initialize 握手 → 把 `call(method, params)` 交给 fn 多次调用 → 关进程。
+ * 复用单个子进程完成 list+call 等多步逻辑检索（避免每步各冷启动一个进程）。
+ */
+async function withStdioMcpSession<T>(
   config: McpServerConfig,
-  method: string,
-  params?: Record<string, unknown>,
+  fn: (call: (method: string, params?: Record<string, unknown>) => Promise<unknown>) => Promise<T>,
   timeoutMs = 15000
-): Promise<unknown> {
+): Promise<T> {
   const child = spawn(config.command, config.args ?? [], {
     env: { ...process.env, ...config.env },
     stdio: ["pipe", "pipe", "pipe"],
@@ -110,12 +112,22 @@ async function callStdioMcp(
       clientInfo: { name: "flow-example", version: "1.0.0" },
     });
     child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" })}\n`);
-    return await send(method, params);
+    return await fn((method, params) => send(method, params));
   } finally {
     rl.close();
     child.stdin.end();
     if (!child.killed) child.kill();
   }
+}
+
+/** spawn MCP server、initialize、调一个方法、收结果、关进程（单方法便捷封装，复用 withStdioMcpSession）。 */
+async function callStdioMcp(
+  config: McpServerConfig,
+  method: string,
+  params?: Record<string, unknown>,
+  timeoutMs = 15000
+): Promise<unknown> {
+  return withStdioMcpSession(config, (call) => call(method, params), timeoutMs);
 }
 
 /** 从 MCP tools/call 响应提取纯文本（{ content: [{type:"text",text}] }）。 */
@@ -150,6 +162,11 @@ export async function listMcpTools(
   return tools.map((t) => t.name).filter((n): n is string => Boolean(n));
 }
 
+/** 列出工具的原始 tools/list 响应（含参数 schema）；需要完整响应时用（listMcpTools 只返回名字数组）。 */
+export async function listMcpToolsRaw(config: McpServerConfig, timeoutMs = 15000): Promise<unknown> {
+  return callStdioMcp(config, "tools/list", {}, timeoutMs);
+}
+
 /**
  * 解析真实工具名 —— 不同 MCP 包版本工具名可能不同。
  * 优先精确匹配 preferred，再试 aliases，再模糊匹配，最后若仅一个工具则用之。
@@ -178,8 +195,7 @@ export function chooseMcpToolName(
   const fuzzy = available.find(
     (n) =>
       n.toLowerCase().includes(prefLower) ||
-      prefLower.includes(n.toLowerCase()) ||
-      /search/i.test(n)
+      prefLower.includes(n.toLowerCase())
   );
   if (fuzzy) return fuzzy;
   if (available.length === 1) return available[0]!;
@@ -188,20 +204,31 @@ export function chooseMcpToolName(
   );
 }
 
-/** 先 resolve 工具名再调用（示例节点推荐入口）。 */
+/**
+ * 先 resolve 工具名再调用（示例节点推荐入口）。
+ * 单个子进程内完成 tools/list → 选名 → tools/call（避免 resolve 与 call 各冷启动一次）。
+ */
 export async function callResolvedMcpTool(
   config: McpServerConfig,
   preferred: string,
   args: Record<string, unknown>,
   options: { aliases?: string[]; timeoutMs?: number } = {}
 ): Promise<string> {
-  const toolName = await resolveMcpToolName(
+  const timeoutMs = options.timeoutMs ?? 15000;
+  const aliases = options.aliases ?? ["search", "web_search", "query"];
+  return withStdioMcpSession(
     config,
-    preferred,
-    options.aliases ?? ["search", "web_search", "query"],
-    options.timeoutMs ?? 15000
+    async (call) => {
+      const listResult = await call("tools/list", {});
+      const available = ((listResult as { tools?: Array<{ name?: string }> } | undefined)?.tools ?? [])
+        .map((t) => t.name)
+        .filter((n): n is string => Boolean(n));
+      const toolName = chooseMcpToolName(available, preferred, aliases);
+      const result = await call("tools/call", { name: toolName, arguments: args });
+      return extractMcpText(result);
+    },
+    timeoutMs
   );
-  return callMcpTool(config, toolName, args, options.timeoutMs ?? 15000);
 }
 
 /**

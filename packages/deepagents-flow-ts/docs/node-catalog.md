@@ -132,9 +132,16 @@ llm | llm-router | approval | approval-finalize | mcp-retrieval | prepare | pass
 
 ---
 
+## edge 约束(custom DSL)
+
+- **conditional 边**:`condition` 的返回值必须 ∈ 其 `targets`,否则运行时 LangGraph 抛 `Invalid edge`。静态反射(`pnpm graph` / COMPLETION_GATE)**不执行 condition,检不出该错配**——需人工核对(`generate` 时也会打印提醒)。
+- **llm-router 节点**:其 `route` 的 `goto` 目标须在 spec 的 `params.ends` 内声明,否则反射会丢掉这些 Command 路由边(如 `gate→draft` 重做边)。
+
+---
+
 ## 关系
 
 - **[node-kit.md](node-kit.md)**:各 factory 的完整 API + 用法 snippet(本文件只管选型/分类)。
 - **[flow-patterns.md](flow-patterns.md)**:Send/interrupt/Command/subgraph/checkpointer 的原生细节。
 - **节点级 scaffold**:`custom` topology 的 spec 用本目录的 `type` 编排 nodes+edges+state → 生成图(见 [scripts/scaffold/](../scripts/scaffold/))。
-- **dev-agent-flow**:`flow-scaffold` + `flow-builder` skill 的「节点选型」节 embed 本决策树。
+- **dev-agent-flow**：`flow-builder` + `agent-dev-config` skill 的「节点选型」节 embed 本决策树。

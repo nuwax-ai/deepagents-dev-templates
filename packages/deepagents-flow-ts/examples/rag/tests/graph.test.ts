@@ -2,7 +2,8 @@
  * 工作流图集成测试
  *
  * 跑真实编译后的 LangGraph 图（executeRAG），只 mock：
- *  - ../../../src/runtime/index.js 的 resolveModel → 假模型（rewrite/generate 不打真实 LLM）
+ *  - ../../../src/runtime/index.js 的 resolveModel → 假模型、resolveApiKey → 测试凭证
+ *    （rewrite 经 requireModel 取模型，requireModel 先校验 resolveApiKey 再调 resolveModel）
  *  - retrieve 节点 → 受控检索结果（不 spawn MCP）
  *
  * 验证：条件边的"重试一次后收敛"与"足够则不重试且带来源"。
@@ -36,7 +37,7 @@ const h = vi.hoisted(() => {
 
 vi.mock("../../../src/runtime/index.js", async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
-  return { ...actual, resolveModel: () => h.fakeModel };
+  return { ...actual, resolveModel: () => h.fakeModel, resolveApiKey: () => "test-key" };
 });
 
 // retrieve 已提升至 src/libs/topologies/rag/nodes/retrieve.ts；mock 指向新位置。

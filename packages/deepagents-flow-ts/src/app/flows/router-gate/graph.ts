@@ -10,6 +10,7 @@ import {
   Annotation,
   MemorySaver,
   START,
+  END,
   type BaseCheckpointSaver,
 } from "@langchain/langgraph";
 import { SystemMessage, HumanMessage } from "@langchain/core/messages";
@@ -43,7 +44,7 @@ export function buildGraph(appConfig: AppConfig | undefined, checkpointer: BaseC
       routeFallback: () => ({ goto: '__end__', update: { verdict: 'pass' } }),
       config: appConfig,
       label: "gate",
-    }))
+    }), { ends: ["draft", END] })
     .addEdge(START, "draft")
     .addEdge("draft", "gate")
     .compile({ checkpointer });

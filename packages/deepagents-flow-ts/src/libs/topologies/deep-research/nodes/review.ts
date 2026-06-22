@@ -44,9 +44,7 @@ export function outlineReviewNode(state: ResearchStateShape, appConfig?: AppConf
       const update = { outlineDecision: "sufficient", outlineCritique: "(评审异常，已放行)" };
       return { goto: routeAfterOutlineReview({ ...s, ...update }), update };
     },
-    config: appConfig,
-    attempts: 1,
-    label: "outline_review",
+    config: appConfig,    label: "outline_review",
   })(state);
 }
 
@@ -90,9 +88,7 @@ export function qualityReviewNode(state: ResearchStateShape, appConfig?: AppConf
       const update = { draftDecision: "pass", draftCritique: "(评审异常，已放行)" };
       return { goto: routeAfterQualityReview({ ...s, ...update }), update };
     },
-    config: appConfig,
-    attempts: 1,
-    label: "quality_review",
+    config: appConfig,    label: "quality_review",
   })(state);
 }
 

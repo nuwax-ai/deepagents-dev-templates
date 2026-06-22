@@ -29,7 +29,8 @@ interface ReflectableGraphViz {
 }
 
 /**
- * 反射编译图拓扑。数据来自 LangGraph `getGraphAsync()`，故拓扑永远与真实连线一致。
+ * 反射编译图拓扑。数据来自 LangGraph `getGraphAsync()`：静态边总是准确；返回 Command 的路由节点
+ * 须在 addNode 第三参声明 ends（列出 goto 目标），否则这些条件边反射不出——漏 ends 的节点会丢边。
  */
 export async function reflectTopology(
   compiled: ReflectableGraph

@@ -58,12 +58,22 @@ export async function emitPlan(
   if (onPlan) await onPlan({ entries });
 }
 
-/** 流式文本 token：经 custom writer 进入 onToken 管线。 */
-export function emitTextToken(
-  config: { writer?: StreamWriter } | undefined,
+/** 流式文本 token：优先 custom writer（streamMode:"custom"），否则退回 configurable.onToken（与 emitStage/emitPlan 一致）。 */
+export async function emitTextToken(
+  config:
+    | {
+        writer?: StreamWriter;
+        configurable?: { onToken?: (text: string) => void | Promise<void> };
+      }
+    | undefined,
   text: string
-): void {
+): Promise<void> {
   if (!text) return;
   const writer = getWriter(config);
-  if (writer) writer({ type: "text", text });
+  if (writer) {
+    writer({ type: "text", text });
+    return;
+  }
+  const onToken = config?.configurable?.onToken;
+  if (onToken) await onToken(text);
 }
