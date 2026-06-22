@@ -52,16 +52,14 @@ export function resolveSystemPrompt(
 4. Verify — test and validate results
 
 ## Tool Priority (MANDATORY)
-1. Platform MCP tools (query via platform_api) — ALWAYS check first
-2. Built-in tools (http_request, platform_api, agent_variable, json_utils)
+1. MCP tools (via mcp_tool_bridge or native bindings) — check first
+2. Built-in tools (bash, filesystem, search, http_request, json_utils)
 3. deepagents built-in tools (read_file, write_file, edit_file, execute, task)
 4. Write custom code (last resort only)
 
 ## Rules
-- When you need an external API key → create an agent variable
-- When you need a tool → search platform plugins first
+- Never hardcode secrets — use environment variables
 - Target agent prompts come from ACP — never hardcode them
-- Save generated prompts via platform_api(operation: "save_prompt")
 `;
   }
 

@@ -47,7 +47,7 @@ src/
   runtime/       底层运行时（config/model/logger/mcp/checkpoint/llm-resilience + flow-config/flow-runtime）
   libs/          ★ 可复用构建件（保护、消费不改）
     nodes/         节点 factory + 原语（建 flow 用，见 node-kit.md）+ model-resolver（凭证策略）
-    tools/         内置通用工具（bash/fs/search/demo/mcp-bridge/http/json/platform-api/agent-variable/skill）
+    tools/         内置通用工具（bash/fs/search/demo/mcp-bridge/http/json/skill）
     topologies/    7 拓扑积木（图逻辑单一权威：graph/topology/recipe；scaffold 生成薄封装复用；单向依赖 nodes/+mcp/）
     mcp/           stdio MCP 客户端（callResolvedMcpTool/rateLimited；零 src import，自包含）
     deepagents-acp/  vendored ACP SDK（自包含）
@@ -83,8 +83,8 @@ config/ prompts/ skills/ scripts/ docs/ tests/
 - **先 factory 后手写** — 节点先查 [node-kit.md](docs/node-kit.md)；bespoke 保留并注释「为何不用 factory」。
 - **保护区** — `core`/`runtime`/`libs`/`surfaces` 默认不改；`src/app/` 可改；`examples/` 只读。
 - **有状态用基座** — `createStatefulFlow`，不手写 run-loop。
-- **工具顺序** — MCP → `libs/tools` 内置 → platform_api/agent_variable → 自写代码。
-- **密钥** — env 或 agent_variable，禁止硬编码。
+- **工具顺序** — MCP → `libs/tools` 内置（bash/fs/search/http/json/mcp-bridge）→ 自写代码。
+- **密钥** — 环境变量，禁止硬编码。
 - **依赖只在本仓库** — 缺能力 `pnpm install` / 在 `src/runtime/` 扩展 / copy-in，不引仓库外路径。
 
 ## 默认图（标准 LangGraph ReAct）
@@ -106,7 +106,7 @@ START → prepare → think(model.bindTools) ──(toolsCondition)──┐
 | `respond` | 取回答流式输出（onToken） | — |
 
 状态用标准消息流（`MessagesAnnotation`），自动进 `FileCheckpointSaver`（跨重启恢复 + interrupt/resume）。
-工具集来自 `FlowRuntime.allTools`：bash / 文件读写 / search / http / json / mcp-bridge / platform_api / agent_variable + native MCP（context7）+ demo(echo/calculate/time)。
+工具集来自 `FlowRuntime.allTools`：bash / 文件读写 / search / http / json / mcp-bridge + native MCP（context7 等，经 ACP 或 `mcp.default.json` 配置）+ demo(echo/calculate/time) + 可选 `load_skill` / `task`。
 无模型凭证时 think 走 fallback（回显输入），图始终可跑、可测。见 [src/app/graph.ts](src/app/graph.ts)。
 
 **进阶模式**（并行 fan-out、HITL `interrupt`、subgraph 子代理、压缩、**长任务硬化**：跨重启续跑 / 阶段进度 / 单步护栏）见 [docs/flow-patterns.md](docs/flow-patterns.md)；
@@ -198,7 +198,7 @@ const { nodes, edges, mermaid } = await getFlowTopology();
 
 ## 配置与能力分层
 
-[config/flow-agent.config.json](config/flow-agent.config.json)：标准 `agent` / `model` / `mcp` / `platform` / `permissions` / `sandbox` / `skills` / `agentsDirectories` / `memory` / `compaction` / `middleware` 段（走 `loadFlowConfig` → 底层 `loadConfig`（[src/runtime/](src/runtime/)），Zod schema 校验）。自定义块加在顶层、用 `loadFlowConfig().raw` 取出（RAG 范例放 `rag` 段）。
+[config/flow-agent.config.json](config/flow-agent.config.json)：标准 `agent` / `model` / `mcp` / `permissions` / `sandbox` / `skills` / `agentsDirectories` / `memory` / `compaction` / `middleware` 段（走 `loadFlowConfig` → 底层 `loadConfig`（[src/runtime/](src/runtime/)），Zod schema 校验）。自定义块加在顶层、用 `loadFlowConfig().raw` 取出（RAG 范例放 `rag` 段）。
 
 **能力分层**（基础内置 / ACP 下发 / 环境 / 文件持久化）见 [docs/capabilities.md](docs/capabilities.md) 与 [.nuwax-agent/capability-sources.json](.nuwax-agent/capability-sources.json)——`capabilities` 命令查询当前可用工具/MCP/skills。
 

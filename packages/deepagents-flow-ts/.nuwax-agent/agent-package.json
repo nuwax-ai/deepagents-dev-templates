@@ -78,11 +78,6 @@
       }
     ]
   },
-  "platform": {
-    "agentId": "",
-    "spaceId": "",
-    "apiBaseUrl": "https://api.nuwax.com"
-  },
   "checksum": {
     "algorithm": "sha256",
     "value": ""

@@ -52,26 +52,7 @@ export const MCPConfigSchema = z.object({
   configPath: z.string().default("./config/mcp.default.json"),
   configPaths: z.array(z.string()).default([]),
   servers: z.record(z.unknown()).default({}),
-  mergeStrategy: z.enum(["session-wins", "platform-wins", "defaults-wins"]).default("session-wins"),
-});
-
-export const PlatformConfigSchema = z.object({
-  apiBaseUrl: z.string().url().default("https://api.nuwax.com"),
-  agentId: z.string().default(""),
-  spaceId: z.string().default(""),
-  endpoints: z.object({
-    savePrompt: z.object({ method: z.string().default("POST"), path: z.string().default("/api/agent/config/update") }).default({}),
-    queryPlugins: z.object({ method: z.string().default("GET"), path: z.string().default("/api/agent/component/search") }).default({}),
-    bindComponent: z.object({ method: z.string().default("POST"), path: z.string().default("/api/agent/component/add") }).default({}),
-    listComponents: z.object({ method: z.string().default("GET"), path: z.string().default("/api/agent/component/list/{agentId}") }).default({}),
-    createVariable: z.object({ method: z.string().default("POST"), path: z.string().default("/api/agent/variable/add") }).default({}),
-    updateVariable: z.object({ method: z.string().default("POST"), path: z.string().default("/api/agent/variable/update") }).default({}),
-    listVariables: z.object({ method: z.string().default("GET"), path: z.string().default("/api/agent/variable/list/{agentId}") }).default({}),
-    executePlugin: z.object({ method: z.string().default("POST"), path: z.string().default("/api/v1/plugin/{pluginId}/execute") }).default({}),
-    executeWorkflow: z.object({ method: z.string().default("POST"), path: z.string().default("/api/v1/workflow/{workflowId}/execute") }).default({}),
-    createDebugSession: z.object({ method: z.string().default("POST"), path: z.string().default("/api/agent/debug/session") }).default({}),
-    getDebugSession: z.object({ method: z.string().default("GET"), path: z.string().default("/api/agent/debug/session/{sessionId}") }).default({}),
-  }).default({}),
+  mergeStrategy: z.enum(["session-wins", "defaults-wins"]).default("session-wins"),
 });
 
 export const PermissionsConfigSchema = z.object({
@@ -116,7 +97,6 @@ export const SandboxConfigSchema = z.object({
       "OPENAI_API_KEY",
       "ANTHROPIC_API_KEY",
       "ANTHROPIC_AUTH_TOKEN",
-      "PLATFORM_API_TOKEN",
     ]),
   }).default({}),
 });
@@ -220,7 +200,6 @@ export const AppConfigSchema = z.object({
   }).default({}),
   model: ModelConfigSchema.default({}),
   mcp: MCPConfigSchema.default({}),
-  platform: PlatformConfigSchema.default({}),
   permissions: PermissionsConfigSchema.default({}),
   sandbox: SandboxConfigSchema.default({}),
   skills: SkillsConfigSchema.default({}),
@@ -263,7 +242,6 @@ export const AppConfigSchema = z.object({
 
 export type AppConfig = z.infer<typeof AppConfigSchema>;
 export type ModelConfig = z.infer<typeof ModelConfigSchema>;
-export type PlatformConfig = z.infer<typeof PlatformConfigSchema>;
 export type PermissionsConfig = z.infer<typeof PermissionsConfigSchema>;
 export type SandboxConfig = z.infer<typeof SandboxConfigSchema>;
 export type CompactionConfig = z.infer<typeof CompactionConfigSchema>;
@@ -275,7 +253,5 @@ export interface ACPSessionConfig {
   model?: string;
   systemPrompt?: string;
   cwd?: string;
-  agentId?: string;
-  spaceId?: string;
   mcpServers?: Record<string, unknown>;
 }

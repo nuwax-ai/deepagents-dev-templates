@@ -32,6 +32,6 @@ LangGraph 限制：**节点名不能与 state channel 同名**。判定字段叫
 
 ## 能力从哪来
 
-节点拿 `FlowRuntime`（`allTools` / `checkpointer` / `systemPrompt` / `ctx.mcpManager`）—— surface（ACP/CLI）注入，节点不裸调 `resolveModel`。
+节点拿 `FlowRuntime`（`allTools` / `checkpointer` / `systemPrompt` / `ctx.mcpServerConfigs` + `ctx.mcpTools`）—— surface（ACP/CLI）注入，节点不裸调 `resolveModel`。
 
 参考：`src/app/graph.ts`（默认图）、`examples/rag`（线性+条件重试）、`examples/travel-planner`（并行+HITL）、`examples/project-manager`（评估循环+HITL）、`examples/dev-agent`（全能力）。

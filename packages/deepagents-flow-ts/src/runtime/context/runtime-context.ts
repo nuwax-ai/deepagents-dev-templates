@@ -1,12 +1,12 @@
 /**
- * Runtime Context —— 装配运行时上下文（平台 client / 变量管理 / native MCP 工具）。
+ * Runtime Context —— 装配运行时上下文（native MCP 工具 + 合并后的 MCP 配置）。
  *
  * 设计要点：
- * - MCP：合并 default(含 configPath 文件) + platform + session
- *   （session-wins：default < platform < session），用 @langchain/mcp-adapters 的
- *   MultiServerMCPClient.getTools() 加载 native MCP 工具。
- * - onConnectionError="warn"：单个 server 连不上只告警，不炸掉其余 server 的工具。
- * - tools 不由本 context 创建（由 toolkit 的 createFlowTools 组装）。
+ * - MCP：合并 default(含 configPath 文件) + session（ACP 下发）
+ *   （session-wins：default < session），用 @langchain/mcp-adapters 的
+ *   MultiServerMCPClient.getTools() 加载 native MCP 工具。平台 MCP 经 ACP sessionConfig 下发，运行时不主动拉取。
+ * - onConnectionError="ignore"：单个 server 连不上只跳过，不炸掉其余 server 的工具。
+ * - tools 不由本 context 创建（由 app 层 createFlowTools 组装）。
  */
 
 import type { StructuredTool } from "@langchain/core/tools";
@@ -15,8 +15,6 @@ import { readFileSync, existsSync } from "node:fs";
 import { type AppConfig, type ACPSessionConfig } from "../config/config-loader.js";
 import { resolvePath } from "../config/config-paths.js";
 import { resolvePackageRoot } from "../package-root.js";
-import { PlatformClient } from "../platform/platform-client.js";
-import { VariableManager } from "../platform/variable-manager.js";
 import { logger } from "../logger.js";
 
 /** MCP server 配置（stdio command 或 http url）。 */
@@ -33,17 +31,14 @@ type McpConnection =
   | { transport: "http"; url: string };
 
 /**
- * The set of runtime components that tools and the agent depend on.
- * Created once per agent lifecycle (bootstrap or standalone factory call).
+ * 工具与 agent 依赖的运行时组件集合。
+ * 每个 agent 生命周期（bootstrap 或独立工厂调用）创建一次。
  */
 export interface RuntimeContext {
   config: AppConfig;
-  /** PlatformClient when platform credentials are configured, null in local-only mode */
-  platformClient: PlatformClient | null;
-  variableManager: VariableManager;
-  /** 合并后的 MCP server 配置（default + platform + session，session-wins）。供 mcp-bridge 元工具列/调。 */
+  /** 合并后的 MCP server 配置（default + session，session-wins）。供 mcp-bridge 元工具列/调。 */
   mcpServerConfigs: Record<string, McpServerEntry>;
-  /** MCP tools loaded from configured MCP servers via @langchain/mcp-adapters (native LangChain tools) */
+  /** 经 @langchain/mcp-adapters 从已配置 MCP server 加载的 native LangChain 工具 */
   mcpTools: StructuredTool[];
   /** @internal session MCP overrides（session-wins 最高优先级），hydrate 重新合并时用。 */
   sessionMcpServers: Record<string, McpServerEntry>;
@@ -107,7 +102,7 @@ function resolveDefaultMcpServers(config: AppConfig): Record<string, McpServerEn
 }
 
 /** 把 server 配置转成 mcp-adapters connection；跳过无 url 且无 command 的无效项。
- *  env 规范化：session/平台下发的 env 可能是 array（非法），清洗为 Record<string,string>，
+ *  env 规范化：session/ACP 下发的 env 可能是 array（非法），清洗为 Record<string,string>，
  *  否则单个非法 server 会让 mcp-adapters 整体 Zod 校验失败、连累其余合法 server。 */
 function toConnections(
   servers: Record<string, McpServerEntry>
@@ -141,9 +136,8 @@ function toConnections(
 }
 
 /**
- * Create the runtime context: PlatformClient (optional), VariableManager, and the
- * merged MCP server config (default + session). Platform MCP is fetched and merged
- * in hydrateRuntimeContext (async) under session-wins ordering.
+ * 创建运行时上下文：合并 default + session MCP 配置（session-wins）。
+ * native MCP 工具在 hydrateRuntimeContext（async）中加载。
  */
 export function createRuntimeContext(
   config: AppConfig,
@@ -152,42 +146,17 @@ export function createRuntimeContext(
 ): RuntimeContext {
   const log = logger.child("runtime-context");
 
-  const agentId = config.platform.agentId || sessionConfig?.agentId || "";
-  const spaceId = config.platform.spaceId || sessionConfig?.spaceId || "";
-
-  const hasPlatform = !!(agentId && spaceId);
-  const platformClient = hasPlatform
-    ? new PlatformClient({
-        apiBaseUrl: config.platform.apiBaseUrl,
-        agentId,
-        spaceId,
-        authToken: process.env.PLATFORM_API_TOKEN,
-        endpoints: config.platform.endpoints,
-      })
-    : null;
-
-  if (!hasPlatform) {
-    log.info("Platform credentials not provided — running in local-only mode");
-  }
-
-  const variableManager = new VariableManager({ platformClient: platformClient ?? undefined });
-
   const defaultServers = resolveDefaultMcpServers(config);
   const sessionServers =
     (sessionConfig?.mcpServers as Record<string, McpServerEntry> | undefined) ?? {};
-  // create 阶段（尚无 platform）：default < session
   const mcpServerConfigs = mergeServers(defaultServers, sessionServers);
 
   log.info("Runtime context created", {
-    mode: hasPlatform ? "platform" : "local",
-    agentId: agentId || "(none)",
     mcpServers: Object.keys(mcpServerConfigs),
   });
 
   return {
     config,
-    platformClient,
-    variableManager,
     mcpServerConfigs,
     mcpTools: [],
     sessionMcpServers: sessionServers,
@@ -196,44 +165,20 @@ export function createRuntimeContext(
 }
 
 /**
- * Hydrate async runtime layers: fetch platform MCP, re-merge under session-wins
- * (default < platform < session), then load native MCP tools via mcp-adapters.
- * onConnectionError="warn" so one bad server does not drop the rest.
+ * Hydrate async runtime layers: re-merge MCP under session-wins (default < session),
+ * then load native MCP tools via mcp-adapters.
+ * 平台 MCP 经 ACP sessionConfig（session/new params.mcpServers）下发，运行时不主动拉取。
  */
 export async function hydrateRuntimeContext(
   context: RuntimeContext
 ): Promise<RuntimeContext> {
   const log = logger.child("runtime-context");
 
-  // Fetch platform-delivered MCP servers.
-  let platformServers: Record<string, McpServerEntry> = {};
-  if (context.platformClient) {
-    try {
-      const platformMcp = await context.platformClient.listMcpServers();
-      if (platformMcp?.servers && Object.keys(platformMcp.servers).length > 0) {
-        platformServers = platformMcp.servers as Record<string, McpServerEntry>;
-        log.info("Hydrated platform MCP config", {
-          servers: Object.keys(platformServers),
-        });
-      }
-    } catch (err) {
-      log.warn("Failed to hydrate platform MCP config; continuing with default/session MCP only", {
-        error: err instanceof Error ? err.message : String(err),
-      });
-    }
-  }
-
-  // session-wins: default < platform < session（session 覆盖同名，优先级最高）。
   const defaultServers = resolveDefaultMcpServers(context.config);
-  context.mcpServerConfigs = mergeServers(
-    defaultServers,
-    platformServers,
-    context.sessionMcpServers
-  );
+  context.mcpServerConfigs = mergeServers(defaultServers, context.sessionMcpServers);
 
   // Load native MCP tools via mcp-adapters; onConnectionError=ignore so a single
   // unreachable server does not zero out all MCP tools.
-  // 注意：mcp-adapters 的 onConnectionError 仅接受 "throw"|"ignore"（不接受 "warn"）。
   const connections = toConnections(context.mcpServerConfigs);
   const connNames = Object.keys(connections);
   if (connNames.length > 0) {
@@ -246,8 +191,6 @@ export async function hydrateRuntimeContext(
       context.mcpTools = await client.getTools();
       log.info("Loaded MCP tools", { count: context.mcpTools.length });
     } catch (err) {
-      // 整体加载失败时，逐个 server 重试，避免单个坏 server 连累其余（onConnectionError=ignore 兜底连接级错误，
-      // 但 Zod 校验级错误会整体抛出，故此处再按 server 隔离重试一次）。
       log.warn("MCP bulk load failed; retrying per-server", {
         error: err instanceof Error ? err.message : String(err),
       });

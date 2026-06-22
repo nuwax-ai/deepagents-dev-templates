@@ -51,9 +51,7 @@
     "ANTHROPIC_MODEL",
     "ANTHROPIC_BASE_URL",
     "MAX_TOKENS",
-    "LOG_LEVEL",
-    "PLATFORM_AGENT_ID",
-    "PLATFORM_SPACE_ID"
+    "LOG_LEVEL"
   ],
   "secretPlaceholders": [
     "SECRET_OPENAI_API_KEY",

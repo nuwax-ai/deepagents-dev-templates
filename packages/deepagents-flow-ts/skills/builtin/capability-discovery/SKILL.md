@@ -18,16 +18,16 @@ deepagents-flow-ts sessions       # 已持久化的会话
 
 | 层 | 来源 | 例子 | 可编辑 |
 | --- | --- | --- | --- |
-| **基础能力**（agent-builtin） | 模板内置 | bash / 文件读写 / search / http / json / mcp_tool_bridge / platform_api / agent_variable / demo | 否（改源码） |
+| **基础能力**（agent-builtin） | 模板内置 | bash / 文件读写 / search / http / json / mcp_tool_bridge / load_skill / task / demo | 否（改源码） |
 | **扩展能力**（acp-dynamic） | ACP / nuwax 面板 / config | MCP servers / Skills / Subagent / 系统提示词 / 模型 | 是 |
-| 环境（env-builtin） | 环境变量 | API key / base URL | env |
+| 环境（env-builtin） | 环境变量 | API key / base URL / `LOG_LEVEL` / `LOG_DIR` | env |
 | 文件持久化（agent-builtin-file） | 用户目录（按 workspace 散列隔离） | sessionStore（默认 `~/.flowagents/`） | 否 |
 
 完整映射见 `.nuwax-agent/capability-sources.json`。
 
 ## 扩展能力（不改源码）
 
-- **加 MCP**：编辑 `config/mcp.default.json`（或经平台面板下发 `ACP_SESSION_CONFIG_JSON.mcpServers`）。`mergeStrategy: session-wins` → 会话级覆盖平台级覆盖默认。常用：context7（文档）、chrome-devtools（浏览）—— 见 `config/mcp.examples.json`。
+- **加 MCP**：编辑 `config/mcp.default.json`（或经 ACP `session/new` 的 `mcpServers` / `ACP_SESSION_CONFIG_JSON.mcpServers`）。`mergeStrategy: session-wins` → 会话级覆盖默认。常用：context7（文档）、chrome-devtools（浏览）—— 见 `config/mcp.examples.json`。
 - **加 Skill**：放 `skills/builtin/<name>/SKILL.md`（YAML frontmatter + 正文）。`resolveSkillsPaths` 自动发现。
 - **加 Subagent**：放 `.agents/agents/<name>/AGENT.md`（声明式）。`discoverSubAgents` 自动发现；在图里用 subgraph 调用。
 - **改系统提示词**：编辑 `prompts/flow.base.md`，或经 ACP session / `config.agent.systemPrompt` 下发。
@@ -35,4 +35,4 @@ deepagents-flow-ts sessions       # 已持久化的会话
 
 ## 工具优先级（给目标 Agent）
 
-需要外部能力时：① MCP 工具（先 `mcp_tool_bridge list_tools` 发现）→ ② 内置工具（bash/读写/search/http）→ ③ 平台工具（platform_api）→ ④ 自写代码（最后）。
+需要外部能力时：① MCP 工具（先 `mcp_tool_bridge list_tools` 发现或直接绑定）→ ② 内置工具（bash/读写/search/http/json）→ ③ 自写代码（最后）。密钥用环境变量。

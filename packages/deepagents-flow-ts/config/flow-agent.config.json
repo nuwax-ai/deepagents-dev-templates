@@ -20,11 +20,6 @@
     "configPath": "./config/mcp.default.json",
     "mergeStrategy": "session-wins"
   },
-  "platform": {
-    "apiBaseUrl": "https://api.nuwax.com",
-    "agentId": "",
-    "spaceId": ""
-  },
   "permissions": {
     "mode": "ask",
     "interruptOn": [

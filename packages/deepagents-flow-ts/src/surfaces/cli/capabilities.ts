@@ -21,8 +21,6 @@ const BUILTIN_TOOLS = [
   { name: "http_request", layer: "agent-builtin", desc: "HTTP 调用" },
   { name: "json_utils", layer: "agent-builtin", desc: "JSON 解析/校验/合并" },
   { name: "mcp_tool_bridge", layer: "agent-builtin", desc: "列出/调用任意 MCP server 工具" },
-  { name: "platform_api", layer: "agent-builtin", desc: "nuwax 平台 API（查询组件/保存 prompt/读写变量）" },
-  { name: "agent_variable", layer: "agent-builtin", desc: "agent 变量读写（放 API key/config）" },
   { name: "load_skill", layer: "agent-builtin", desc: "按需读取已发现 skill 的完整 SKILL.md" },
   { name: "task", layer: "agent-builtin", desc: "委派任务给 .agents/agents 下的声明式 subagent" },
   { name: "echo", layer: "agent-builtin", desc: "demo：回显（无凭证 fallback）" },

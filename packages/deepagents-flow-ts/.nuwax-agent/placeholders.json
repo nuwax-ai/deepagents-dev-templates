@@ -87,22 +87,6 @@
       "requiredAt": "runtime"
     },
     {
-      "name": "PLATFORM_AGENT_ID",
-      "description": "Platform-assigned agent identifier (enables platform_api tool + bound MCP delivery).",
-      "requiredAt": "install"
-    },
-    {
-      "name": "PLATFORM_SPACE_ID",
-      "description": "Platform workspace / tenant identifier.",
-      "requiredAt": "install"
-    },
-    {
-      "name": "PLATFORM_API_TOKEN",
-      "description": "Platform API token used by the platform_api tool.",
-      "secret": true,
-      "requiredAt": "install"
-    },
-    {
       "name": "PACKAGE_VERSION",
       "description": "Version stamped into generated install metadata.",
       "requiredAt": "package"

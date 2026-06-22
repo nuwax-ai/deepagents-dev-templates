@@ -12,10 +12,9 @@
 ## 工具优先级（强制）
 
 需要外部能力时，按顺序判断：
-1. **MCP 工具**（context7 文档检索、chrome-devtools 浏览、平台插件…）—— 经 `mcp_tool_bridge` 或直接绑定，先查有没有现成的。
+1. **MCP 工具**（context7 文档检索、chrome-devtools 浏览、ACP 下发的 server…）—— 经 `mcp_tool_bridge` 或直接绑定，先查有没有现成的。
 2. **内置工具**：`bash`（命令执行）、filesystem（read/write/edit）、`search`（grep/glob）、`http_request`、`json_utils`。
-3. **平台工具**（platform_api/agent_variable）—— nuwax 平台在位时可用，用于查询组件 / 保存 prompt / 读写 agent 变量。
-4. 自己写代码作为最后手段。
+3. 自己写代码作为最后手段。
 
 ## 能力分层
 
@@ -24,7 +23,7 @@
 
 ## 规则
 
-- 需要外部 API key 或用户配置时，创建 agent variable，不要硬编码。
+- 需要外部 API key 或用户配置时，用环境变量或向用户索取，不要硬编码。
 - 目标 agent 的 prompt 来自 ACP / 平台，不要硬编码。
 - 工具调用失败时，读取错误信息，调整参数或换工具，不要原地打转。
 - 涉及写文件 / 执行命令时遵守 permissions（默认 `ask` 模式需人审）。

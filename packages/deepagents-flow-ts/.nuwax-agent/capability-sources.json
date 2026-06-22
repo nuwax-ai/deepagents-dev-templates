@@ -12,7 +12,7 @@
     },
     "env-builtin": {
       "description": "Environment values provided by the cloud computer, local machine, CI, or installer.",
-      "examples": ["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_BASE_URL", "LOG_DIR"]
+      "examples": ["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_BASE_URL", "LOG_LEVEL", "LOG_DIR"]
     },
     "agent-builtin-file": {
       "description": "Persistent runtime data stored as files inside the template's own session dir (no DB).",
@@ -42,9 +42,7 @@
         "glob",
         "http_request",
         "json_utils",
-        "mcp_tool_bridge",
-        "platform_api",
-        "agent_variable"
+        "mcp_tool_bridge"
       ]
     },
     "compaction": { "source": "agent-builtin" },

@@ -23,16 +23,16 @@
 
 - `capability-sources.json` —— 把每项能力映射到其来源层（acp-dynamic / agent-builtin / env-builtin / agent-builtin-file / package-placeholder）。这是 `flow capabilities` 读取的契约。
 - `package.config.json` —— 声明打包目标、esbuild-bundle 依赖策略、安装时占位符替换、平台矩阵，以及供平台读取的 `include`/`exclude` 元数据。**注意**：实际进入制品的文件由 [`scripts/lib/staging.mjs`](../scripts/lib/staging.mjs) 的 `STAGING_EXCLUDES` 黑名单决定（`package.mjs` 用 `copyPackageTree` 复制整树后排除）；此处 `include`/`exclude` 仅为平台侧元数据，**改它不改变实际打包内容**，二者需手动保持一致。
-- `placeholders.json` —— 列出打包时与安装时的占位符（OpenAI 兼容与 Anthropic 两套模型 env、平台 id、安装根路径）。
+- `placeholders.json` —— 列出打包时与安装时的占位符（OpenAI 兼容与 Anthropic 两套模型 env、安装根路径）。
 
 ## 运行时各层如何被消费
 
 - **systemPrompt** —— `resolveSystemPrompt(appConfig, sessionConfig, root)` 优先级：ACP session > `config.agent.systemPrompt` > `prompts/flow.base.md` > 内联 fallback。
-- **mcpServers** —— runtime-context 按 `default < platform < session`（session-wins）合并 `config/mcp.default.json` < 平台绑定 MCP < ACP/session MCP；native 工具经 `@langchain/mcp-adapters` 的 `MultiServerMCPClient.getTools()` 加载。
+- **mcpServers** —— runtime-context 按 `default < session`（session-wins）合并 `config/mcp.default.json` 与 ACP/session MCP；native 工具经 `@langchain/mcp-adapters` 的 `MultiServerMCPClient.getTools()` 加载。
 - **model** —— `resolveModel(appConfig)` 取自 `config.model`（ACP session / env / config / defaults）。
 - **skills** —— `resolveSkillsPaths(appConfig)` 发现 `skills/builtin/`、`skills/platform/`、`.agents/*/skills/`。
 - **subagents** —— `discoverSubAgents(appConfig)` 解析 `.agents/agents/<name>/AGENT.md`。
 - **sessionStore** —— `FileCheckpointSaver`（继承 `MemorySaver`）持久化到 `config.memory.dir`（默认 `~/.flowagents/sessions/<workspace 散列>/`，可显式 opt-out 回 `./.flow-sessions`）；线程隔离、重启存活、恢复 interrupt/resume。
-- **builtInTools** —— `createFlowTools(ctx)` 组合 bash/fs/search/http/json/mcp-bridge/platform_api/agent_variable + demo 工具；经 `bindTools` 绑定到模型，由 `ToolNode` 执行。
+- **builtInTools** —— `createFlowTools(ctx)` 组合 bash/fs/search/http/json/mcp-bridge + demo 工具；经 `bindTools` 绑定到模型，由 `ToolNode` 执行。
 
 运行时查询：`deepagents-flow-ts capabilities`（无需凭证）。

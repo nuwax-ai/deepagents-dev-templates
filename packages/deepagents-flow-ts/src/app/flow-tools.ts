@@ -17,8 +17,6 @@ import type { FlowSandboxPolicy } from "../runtime/fs/sandbox.js";
 import {
   httpRequestTool,
   jsonUtilsTool,
-  createPlatformApiTool,
-  createAgentVariableTool,
   createBashTool,
   createFsTools,
   createSearchTools,
@@ -42,12 +40,7 @@ export function createFlowTools(
   const { workspaceRoot, policy, skills = [], subAgents = [] } = opts;
 
   // 与 cwd 无关的通用工具（无状态，主 agent 与子代理共享同实例）。
-  const reused: StructuredTool[] = [
-    httpRequestTool,
-    jsonUtilsTool,
-    createPlatformApiTool(ctx.platformClient),
-    createAgentVariableTool(ctx.variableManager),
-  ];
+  const reused: StructuredTool[] = [httpRequestTool, jsonUtilsTool];
   const skillTools = skills.length ? [createSkillTool(skills)] : [];
 
   // 按工作目录构建一套工具（bash/fs/search 沙箱受限于该 cwd）——**不含 task，防递归**。

@@ -21,7 +21,7 @@ import type { FileCheckpointSaver } from "./services/file-checkpoint-saver.js";
 
 export interface FlowRuntime {
   config: AppConfig;
-  /** runtime context（含 mcpServerConfigs/mcpTools/platformClient/variableManager + 平台 MCP hydration）。 */
+  /** runtime context（含 mcpServerConfigs/mcpTools + MCP hydration）。 */
   ctx: RuntimeContext;
   /** 全部工具（内置通用 + flow 自补 + native MCP）—— 供 think 节点 bindTools。 */
   allTools: StructuredTool[];

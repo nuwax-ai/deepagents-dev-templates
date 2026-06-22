@@ -2,7 +2,7 @@
  * src/libs/tools —— 模板内置**通用**工具集（框架级,只依赖 runtime）。
  *
  * 通用能力工具:bash / fs / search / demo / mcp-bridge / http-request / json-utils /
- * platform-api / agent-variable / skill。默认图与示例共享。
+ * skill。默认图与示例共享。
  *
  * 注意:`task`(子代理委派)依赖默认图(createFlowGraph + FlowState),属 app 专属,
  * 与 `createFlowTools`(工具集装配,共享 buildTools)同住在 src/app/flow-tools.ts。
@@ -11,8 +11,6 @@
 
 export { httpRequestTool } from "./http-request.tool.js";
 export { jsonUtilsTool } from "./json-utils.tool.js";
-export { createPlatformApiTool } from "./platform-api.tool.js";
-export { createAgentVariableTool } from "./agent-variable.tool.js";
 export { createBashTool } from "./bash.tool.js";
 export { createFsTools } from "./fs.tool.js";
 export { createSearchTools } from "./search.tool.js";

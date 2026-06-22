@@ -35,8 +35,8 @@ pnpm flow sessions
 
 ```
 createFlowRuntime(appConfig)
-  → ctx (createRuntimeContextAsync): mcpManager / platformClient / mcpTools
-  → allTools = app-ts 通用 + flow 自补(bash/fs/search/demo/mcp-bridge) + native MCP(context7)
+  → ctx (createRuntimeContextAsync): mcpServerConfigs / mcpTools
+  → allTools = libs 通用(http/json) + bash/fs/search/demo/mcp-bridge + native MCP + 可选 load_skill/task
   → checkpointer = FileCheckpointSaver (← MemorySaver)
 
 createDevAgentFlow(runtime)

@@ -153,8 +153,7 @@ export function loadConfig(options: LoadConfigOptions = {}): AppConfig {
     const sessionOverlay: Record<string, unknown> = {};
     const sc = options.sessionConfig;
     if (sc.model) setNestedValue(sessionOverlay, "model.name", sc.model);
-    if (sc.agentId) setNestedValue(sessionOverlay, "platform.agentId", sc.agentId);
-    if (sc.spaceId) setNestedValue(sessionOverlay, "platform.spaceId", sc.spaceId);
+    if (sc.systemPrompt) setNestedValue(sessionOverlay, "agent.systemPrompt", sc.systemPrompt);
     config = mergeConfigLayer(config, sessionOverlay as Partial<AppConfig>);
   }
 
