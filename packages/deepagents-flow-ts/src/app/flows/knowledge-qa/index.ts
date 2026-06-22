@@ -11,7 +11,7 @@ import type { FlowExecutor } from "../../../core/flow-types.js";
 import { createRagExecutor, getRagTopology } from "../../../libs/topologies/rag/index.js";
 
 /** 检索源 MCP 服务器（scaffold spec 注入；缺省空 → 无检索、走兜底回答）。 */
-const MCP_SERVERS = {"duckduckgo":{"command":"npx","args":["-y","duckduckgo-mcp-server"]}} as Record<
+const MCP_SERVERS = {"context7":{"command":"npx","args":["-y","@upstash/context7-mcp"]}} as Record<
   string,
   { command?: string; args?: string[]; env?: Record<string, string>; url?: string }
 >;
