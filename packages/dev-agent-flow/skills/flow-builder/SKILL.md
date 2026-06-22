@@ -16,6 +16,8 @@ version: "1.1.0"
 
 ## Step 1: 选型与对照
 
+> **节点选型权威**：有哪些 factory 节点 + 何时用见 `docs/node-catalog.md`（三层 taxonomy + 选型决策树）；各 factory 的 API/用法见 `docs/node-kit.md`。
+
 | 类型 | 场景 | seam | 范例 |
 |------|------|------|------|
 | `FlowExecutor` | 问答 / 检索 / 批处理 | 函数 `(query, cb) => Promise<FlowResult>` | `examples/rag` |

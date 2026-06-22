@@ -25,7 +25,7 @@
 packages/dev-agent-flow/
 ├── system-prompt.md              # 系统提示词（XML 分区；含 <SCAFFOLD_FIRST> 脚手架优先 + <COMPLETION_GATE> 完成闸门 + <CONTEXT_DISCIPLINE> 上下文纪律）
 ├── skills/
-│   ├── flow-scaffold/SKILL.md         # ⭐ 一句话→flow 首选：7 拓扑积木目录（react-tools/…/dev-agent）+ spec → 生成薄封装 + 自动注册 + typecheck/graph 自验；优先于从零手写
+│   ├── flow-scaffold/SKILL.md         # ⭐ 一句话→flow 首选：8 拓扑积木（7 预设 + custom 任意编排）+ spec → 生成薄封装 + 自动注册 + typecheck/graph 自验；优先于从零手写
 │   ├── flow-builder/SKILL.md          # 编排+创建+验证：State/节点 factory/graph 连线/Send/HITL/createStatefulFlow；Step 7=验证命令+.logs/ 六步排查（强制）
 │   ├── flow-tools-config/SKILL.md     # 工具与配置：src/libs/tools/ 用 tool()+Zod、注册 createFlowTools、MCP 服务器/合并策略、agent_variable 密钥
 │   ├── agent-dev-config/SKILL.md      # 平台接入：搜索/添加 Plugin·Workflow·Knowledge 到 dev Agent 配置、按 schema 实现工具、保存系统提示词/开场白
