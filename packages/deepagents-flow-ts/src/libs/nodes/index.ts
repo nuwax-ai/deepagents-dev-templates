@@ -22,6 +22,12 @@ export {
   isApproval,
   type HumanApprovalNodeOptions,
 } from "./hitl.js";
+export {
+  createApprovalFinalizeNode,
+  type ApprovalFinalizeNodeOptions,
+} from "./approval-finalize.js";
+export { createLlmRouterNode, type LlmRouterNodeOptions } from "./llm-router.js";
+export { createMcpRetrievalNode, type McpRetrievalNodeOptions } from "./mcp-retrieval.js";
 export { createToolExecNode, runTool, type ToolExecNodeOptions } from "./tools.js";
 export {
   createLlmNode,

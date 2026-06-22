@@ -18,6 +18,9 @@ import {
   createToolExecNode,
   createPrepareNode,
   createHumanApprovalNode,
+  createApprovalFinalizeNode,
+  createLlmRouterNode,
+  createMcpRetrievalNode,
   createFanout,
   extractText,
   parseJson,
@@ -176,6 +179,133 @@ describe("createLlmNode", () => {
       fallback: () => ({ out: "fallback" }),
     });
     expect((await node({})).out).toBe("fallback");
+  });
+});
+
+// ---------- createApprovalFinalizeNode ----------
+describe("createApprovalFinalizeNode", () => {
+  const mockModel = (content: unknown) => ({ invoke: async () => ({ content }) });
+  type S = { draft: string; feedback: string; output?: string };
+
+  it("feedback 通过词 → approvedOutput 短路(不调 LLM)", async () => {
+    let llmCalled = false;
+    const node = createApprovalFinalizeNode<S>({
+      approvedOutput: (s) => ({ output: `✅ ${s.draft}` }),
+      rejectedLlm: {
+        model: () => {
+          llmCalled = true;
+          return mockModel("x") as any;
+        },
+        prompt: () => [],
+        write: () => ({}),
+      },
+    });
+    const res = await node({ draft: "d", feedback: "ok" });
+    expect(res.output).toBe("✅ d");
+    expect(llmCalled).toBe(false);
+  });
+
+  it("feedback 非通过词 → rejectedLlm 改写", async () => {
+    const node = createApprovalFinalizeNode<S>({
+      approvedOutput: () => ({ output: "不应到这里" }),
+      rejectedLlm: {
+        model: mockModel("改写后") as any,
+        prompt: (s) => [new HumanMessage(`${s.draft}|${s.feedback}`)],
+        write: (r) => ({ output: `✏️ ${r.content}` }),
+      },
+    });
+    const res = await node({ draft: "d", feedback: "改短一点" });
+    expect(res.output).toBe("✏️ 改写后");
+  });
+
+  it("feedbackField 自定义 + isApproved 自定义", async () => {
+    const node = createApprovalFinalizeNode<{ v: string; out?: string }>({
+      feedbackField: "v",
+      isApproved: (fb) => fb === "Y",
+      approvedOutput: () => ({ out: "approved" }),
+      rejectedLlm: {
+        model: mockModel("r") as any,
+        prompt: () => [],
+        write: () => ({ out: "rejected" }),
+      },
+    });
+    expect((await node({ v: "Y" })).out).toBe("approved");
+    expect((await node({ v: "N" })).out).toBe("rejected");
+  });
+});
+
+// ---------- createLlmRouterNode ----------
+describe("createLlmRouterNode", () => {
+  const mockModel = (content: unknown) => ({ invoke: async () => ({ content }) });
+  type S = { draft: string; verdict?: string; attempts: number };
+
+  const buildOpts = (model: any) => ({
+    model,
+    prompt: (s: S) => [new HumanMessage(s.draft)],
+    parse: (t: string) => parseJson<{ verdict?: string }>(t),
+    route: (v: any, s: S) => {
+      const verdict = v.verdict === "fail" ? "fail" : "pass";
+      const goto = verdict === "fail" && s.attempts < 2 ? "redo" : "done";
+      return { goto, update: { verdict } };
+    },
+    routeFallback: () => ({ goto: "done", update: { verdict: "pass" } }),
+  });
+
+  it("成功 fail & 未达上限 → Command(goto=redo, update.verdict=fail)", async () => {
+    const node = createLlmRouterNode<S>(buildOpts(mockModel('{"verdict":"fail"}')) as any);
+    const cmd = (await node({ draft: "d", attempts: 0 })) as any;
+    // Command 把 goto string 包成数组
+    expect(cmd.goto).toEqual(["redo"]);
+    expect(cmd.update).toMatchObject({ verdict: "fail" });
+  });
+
+  it("成功 pass → goto=done", async () => {
+    const node = createLlmRouterNode<S>(buildOpts(mockModel('{"verdict":"pass"}')) as any);
+    expect((await node({ draft: "d", attempts: 0 }) as any).goto).toEqual(["done"]);
+  });
+
+  it("达上限 → 即便 fail 也 goto=done（route 内判定）", async () => {
+    const node = createLlmRouterNode<S>(buildOpts(mockModel('{"verdict":"fail"}')) as any);
+    expect((await node({ draft: "d", attempts: 2 }) as any).goto).toEqual(["done"]);
+  });
+
+  it("无模型 → routeFallback(no-model)", async () => {
+    const node = createLlmRouterNode<S>(buildOpts(null) as any);
+    const cmd = (await node({ draft: "d", attempts: 0 })) as any;
+    expect(cmd.goto).toEqual(["done"]);
+    expect(cmd.update).toMatchObject({ verdict: "pass" });
+  });
+
+  it("调用失败 → routeFallback(error)", async () => {
+    const node = createLlmRouterNode<S>(
+      buildOpts({ invoke: async () => Promise.reject(new Error("x")) }) as any
+    );
+    expect((await node({ draft: "d", attempts: 0 }) as any).goto).toEqual(["done"]);
+  });
+});
+
+// ---------- createMcpRetrievalNode ----------
+describe("createMcpRetrievalNode", () => {
+  type S = { q: string; out?: string };
+  // 真实 MCP 调用路径由 travel-planner 集成测试覆盖（需 npx + 网络）；此处测 guard。
+
+  it("retrieve 返回 null → 写回空结果(ok:false)", async () => {
+    const node = createMcpRetrievalNode<S>({
+      mcpServers: {},
+      retrieve: () => null,
+      write: (r) => ({ out: `${r.ok}:${r.text}` }),
+    });
+    expect((await node({ q: "x" })).out).toBe("false:");
+  });
+
+  it("server 未配置 → 写回错误信息(ok:false)", async () => {
+    const node = createMcpRetrievalNode<S>({
+      mcpServers: { a: { command: "x" } },
+      retrieve: () => ({ server: "missing", tool: "t", args: {} }),
+      write: (r) => ({ out: `${r.ok}:${r.text}` }),
+    });
+    const res = await node({ q: "x" });
+    expect(res.out).toMatch(/^false:.*missing/);
   });
 });
 
