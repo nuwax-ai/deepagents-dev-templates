@@ -2,7 +2,7 @@
 /**
  * dev-agent —— 综合能力示例。
  *
- * 把模板的全部能力串成一个可跑的 Agent：
+ * 把模板的全部能力串成一个可跑的 Agent（图逻辑已提升至 src/app/topologies/dev-agent.ts）：
  *  - 标准 LangGraph ReAct（prepare → think ↔ tools → respond），think 用 bindTools
  *  - 真实工具：bash / 文件读写 / search / http / context7 MCP（经 FlowRuntime.allTools）
  *  - 会话持久化：FileCheckpointSaver，多轮用同一 threadId → 跨重启续接历史
@@ -19,42 +19,8 @@
 
 import { loadFlowConfig } from "../../src/runtime/flow-config.js";
 import { createFlowRuntime } from "../../src/index.js";
-import type { FlowRuntime } from "../../src/runtime/flow-runtime.js";
-import { createFlowGraph } from "../../src/app/graph.js";
-import { applyCompaction } from "../../src/app/compaction.js";
 import { runFlowCli } from "../../src/surfaces/cli/run.js";
-import type { FlowState } from "../../src/app/state.js";
-import type { StatefulFlow } from "../../src/surfaces/flow-types.js";
-
-/**
- * dev-agent StatefulFlow：复用默认 ReAct 图，多轮用同一 threadId 续接。
- * 上下文压缩在 src/app/compaction.ts 实现（图内写回用 RemoveMessage 替换模式，见 docs/flow-patterns.md）。
- */
-export function createDevAgentFlow(runtime: FlowRuntime): StatefulFlow {
-  return {
-    async run(input, threadId, callbacks) {
-      const config = { configurable: { thread_id: threadId } };
-      // 每轮重新编译图（绑定本轮 callbacks）；checkpointer 持久化，同 threadId 续接历史
-      const graph = createFlowGraph({
-        allTools: runtime.allTools,
-        checkpointer: runtime.checkpointer,
-        config: runtime.config,
-        systemPrompt: runtime.systemPrompt,
-        callbacks: { onToken: callbacks?.onToken, onToolCall: callbacks?.onToolCall },
-      });
-
-      // 长任务上下文压缩：多轮累积超阈值时摘要+RemoveMessage 替换历史再跑本轮
-      // （与基座共用 applyCompaction；config.compaction 控制，无凭证仅裁剪不摘要）。
-      await applyCompaction(graph, config, runtime.config);
-
-      const result = (await graph.invoke(
-        { input: input.query ?? "", messages: [] } as unknown as FlowState,
-        config
-      )) as FlowState;
-      return { status: "done", answer: result.output ?? "" };
-    },
-  };
-}
+import { createDevAgentFlow } from "../../src/app/topologies/dev-agent.js";
 
 async function main(): Promise<void> {
   const { appConfig } = loadFlowConfig();

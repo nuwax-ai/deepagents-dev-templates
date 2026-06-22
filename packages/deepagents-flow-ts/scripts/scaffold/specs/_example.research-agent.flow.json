@@ -1,0 +1,8 @@
+{
+  "name": "research-agent",
+  "description": "深度研究：主题确认 → 大纲规划 → 并行调研 → 评审 → 撰写报告 → 持续会话改稿（stateful）",
+  "topology": "deep-research",
+  "systemPrompt": "",
+  "tools": [],
+  "params": {}
+}

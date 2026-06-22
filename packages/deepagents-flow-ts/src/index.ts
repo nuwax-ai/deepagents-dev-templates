@@ -34,12 +34,13 @@ import { createFlowTools } from "./app/flow-tools.js";
 import { getFlowSandboxPolicy } from "./runtime/fs/sandbox.js";
 import { createFileCheckpointer } from "./runtime/services/file-checkpoint-saver.js";
 import type { FlowRuntime } from "./runtime/flow-runtime.js";
-import { createDefaultExecutor } from "./app/default-flow.js";
 import { bootstrapFlowAcp } from "./surfaces/acp/server.js";
 import { runFlowCli } from "./surfaces/cli/run.js";
 import { runCapabilities } from "./surfaces/cli/capabilities.js";
 import { runSessions } from "./surfaces/cli/sessions.js";
-import { getFlowTopology } from "./app/topology.js";
+import { resolveFlow, type FlowDef } from "./app/flows/index.js";
+import { createStatefulFlow } from "./surfaces/stateful-flow.js";
+import type { FlowExecutor, StatefulFlow } from "./core/flow-types.js";
 
 /**
  * createFlowRuntime —— 组合根(原 `compose/flow-runtime.ts` 折入入口)。
@@ -92,6 +93,24 @@ export async function createFlowRuntime(
     workspaceRoot,
     checkpointer,
   };
+}
+
+/**
+ * materializeFlow —— 把 FlowDef 物化成 surface 能用的 FlowExecutor | StatefulFlow。
+ *
+ * `stateful-recipe` 在此（root，能 import surfaces）调 createStatefulFlow 把 recipe 包成 StatefulFlow
+ * （规避 app/libs → surfaces 分层违规）；oneshot / stateful-custom 直接调各自 createExecutor。
+ * createStatefulFlow 全工程仅此一处调用。
+ */
+function materializeFlow(def: FlowDef, runtime: FlowRuntime): FlowExecutor | StatefulFlow {
+  if (def.kind === "stateful-recipe") {
+    return createStatefulFlow({
+      ...def.recipe(runtime),
+      checkpointer: runtime.checkpointer,
+      appConfig: runtime.config,
+    });
+  }
+  return def.createExecutor(runtime);
 }
 
 interface ParsedArgs {
@@ -183,7 +202,9 @@ async function main(): Promise<void> {
 
   // graph：导出图拓扑（静态，不运行图、不需要凭证）——对接可视化 / 文档。
   if (args.command === "graph") {
-    const { nodes, edges, mermaid } = await getFlowTopology();
+    const { raw } = loadFlowConfig({ configPath: args.configPath });
+    const activeFlow = typeof raw.activeFlow === "string" ? raw.activeFlow : undefined;
+    const { nodes, edges, mermaid } = await resolveFlow(activeFlow).getTopology();
     process.stdout.write(
       args.mermaid ? mermaid + "\n" : JSON.stringify({ nodes, edges }, null, 2) + "\n"
     );
@@ -212,7 +233,9 @@ async function main(): Promise<void> {
   if (args.command === "flow") {
     // CLI one-shot：单 runtime 共用即可，无需 per-session。
     const runtime = await createFlowRuntime(baseConfig.appConfig);
-    const executor = createDefaultExecutor(runtime);
+    const activeFlow =
+      typeof baseConfig.raw.activeFlow === "string" ? baseConfig.raw.activeFlow : undefined;
+    const executor = materializeFlow(resolveFlow(activeFlow), runtime);
     await runFlowCli(executor, {
       query: args.query,
       interactive: args.interactive,
@@ -227,14 +250,15 @@ async function main(): Promise<void> {
     appConfig: baseConfig.appConfig,
     debug: args.debug,
     createExecutor: async ({ sessionConfig, workspaceRoot }) => {
-      const { appConfig } = loadFlowConfig({
+      const { appConfig, raw } = loadFlowConfig({
         configPath: args.configPath,
         workspaceRoot,
         sessionConfig,
       });
       const runtime = await createFlowRuntime(appConfig, { sessionConfig, workspaceRoot });
+      const activeFlow = typeof raw.activeFlow === "string" ? raw.activeFlow : undefined;
       return {
-        executor: createDefaultExecutor(runtime),
+        executor: materializeFlow(resolveFlow(activeFlow), runtime),
         dispose: async () => {
           await destroyRuntimeContext(runtime.ctx).catch(() => {
             /* best-effort teardown of MCP stdio procs */

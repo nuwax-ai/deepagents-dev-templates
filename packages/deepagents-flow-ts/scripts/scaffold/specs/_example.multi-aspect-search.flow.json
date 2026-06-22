@@ -1,0 +1,41 @@
+{
+  "name": "multi-aspect-search",
+  "description": "多维度并行搜索 → 汇总（节点级 custom：fanout + mcp-retrieval + array 聚合）",
+  "topology": "custom",
+  "systemPrompt": "",
+  "tools": [],
+  "params": {
+    "state": {
+      "query": { "type": "string" },
+      "aspect": { "type": "string" },
+      "findings": { "type": "string-array-append" },
+      "output": { "type": "string" }
+    },
+    "nodes": {
+      "gather": { "type": "passthrough", "params": { "write": "() => ({})" } },
+      "research": {
+        "type": "mcp-retrieval",
+        "params": {
+          "mcpServers": { "context7": { "command": "npx", "args": ["-y", "@upstash/context7-mcp"] } },
+          "retrieve": "(s) => ({ server: 'context7', tool: 'query-docs', args: { libraryId: '/langchain-ai/langgraph', query: `${s.aspect}` } })",
+          "write": "(r, s) => ({ findings: [`${s.aspect}：${r.ok ? r.text.slice(0, 120) : '（检索失败）'}`] })"
+        }
+      },
+      "aggregate": {
+        "type": "llm",
+        "params": {
+          "prompt": "(s) => [new SystemMessage('把各维度搜索结果整理成简短摘要，按维度列出。'), new HumanMessage(s.findings.join(' / '))]",
+          "write": "(r) => ({ output: r.content })"
+        }
+      }
+    },
+    "edges": [
+      { "kind": "static", "from": "__start__", "to": "gather" },
+      { "kind": "fanout", "from": "gather", "target": "research", "items": "() => ['StateGraph', 'Send', 'interrupt']", "input": "(item, s) => ({ aspect: item, query: s.query })" },
+      { "kind": "static", "from": "research", "to": "aggregate" },
+      { "kind": "static", "from": "aggregate", "to": "__end__" }
+    ],
+    "input": { "queryField": "query" },
+    "result": { "answerField": "output" }
+  }
+}

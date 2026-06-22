@@ -4,8 +4,9 @@
  * 把默认 flow 的显式 StateGraph 反射成结构化 `{ nodes, edges }`(+ Mermaid 源),
  * 供 inspector / 文档 / 调试器直接消费:**不运行图、不需要模型凭证**。
  *
- * 数据来自 LangGraph 编译图的 `getGraphAsync()`(新版推荐入口,`getGraph()` 已 deprecated),
- * 所以拓扑永远与 graph.ts 的真实连线一致 —— 绝不与手抄的节点列表漂移。
+ * 数据来自 LangGraph 编译图的 `getGraphAsync()`(新版推荐入口,`getGraph()` 已 deprecated)。
+ * 静态边总是与 graph.ts 一致；返回 Command 的路由节点须声明 addNode 的 ends 才能反射其 goto 边
+ * (漏 ends 则丢边),其余不与手抄的节点列表漂移。
  *
  * 用法:
  *   import { getFlowTopology } from "deepagents-flow-ts/topology";
@@ -15,26 +16,14 @@
 
 import { createFlowGraph, type CreateFlowGraphConfig } from "./graph.js";
 
-export interface FlowTopologyNode {
-  id: string;
-  label: string;
-}
-
-export interface FlowTopologyEdge {
-  source: string;
-  target: string;
-  /** 条件边(addConditionalEdges)为 true,普通边为 false。 */
-  conditional: boolean;
-  /** 条件分支标签(如路由目标名);普通边无标签。 */
-  label?: string;
-}
-
-export interface FlowTopology {
-  nodes: FlowTopologyNode[];
-  edges: FlowTopologyEdge[];
-  /** 同一拓扑的 Mermaid 源,可直接渲染 / 贴进文档。 */
-  mermaid: string;
-}
+// 拓扑类型契约下沉 core/flow-types.ts（app + libs/topologies 共享；libs 不能 import app）。
+// 本模块 import 供下方 getFlowTopology 使用，并 re-export 维持公开 `deepagents-flow-ts/topology` 子路径。
+import type {
+  FlowTopology,
+  FlowTopologyNode,
+  FlowTopologyEdge,
+} from "../core/flow-types.js";
+export type { FlowTopology, FlowTopologyNode, FlowTopologyEdge } from "../core/flow-types.js";
 
 /**
  * 提取默认 flow 图的拓扑(静态:只构建图结构,不执行节点,无需凭证)。

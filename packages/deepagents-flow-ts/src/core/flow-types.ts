@@ -112,3 +112,30 @@ export interface StatefulFlow {
    */
   hasStarted?(threadId: string): Promise<boolean>;
 }
+
+/**
+ * 图拓扑反射的结构化产物（getFlowTopology / 各拓扑 getXxxTopology 返回）。
+ *
+ * 放 core（纯契约）：app/topology 与 libs/topologies 都要产出/消费它，libs 不能 import app，
+ * 故契约下沉 core。app/topology.ts re-export 以维持公开 `deepagents-flow-ts/topology` 子路径。
+ */
+export interface FlowTopologyNode {
+  id: string;
+  label: string;
+}
+
+export interface FlowTopologyEdge {
+  source: string;
+  target: string;
+  /** 条件边(addConditionalEdges)为 true，普通边为 false。 */
+  conditional: boolean;
+  /** 条件分支标签(如路由目标名)；普通边无标签。 */
+  label?: string;
+}
+
+export interface FlowTopology {
+  nodes: FlowTopologyNode[];
+  edges: FlowTopologyEdge[];
+  /** 同一拓扑的 Mermaid 源，可直接渲染 / 贴进文档。 */
+  mermaid: string;
+}

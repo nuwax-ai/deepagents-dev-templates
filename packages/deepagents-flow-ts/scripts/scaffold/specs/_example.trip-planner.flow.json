@@ -1,0 +1,8 @@
+{
+  "name": "trip-planner",
+  "description": "旅行规划：并行搜索交通/住宿/景点/美食 → 整理成行程 → 人审确认（stateful）",
+  "topology": "travel-planner",
+  "systemPrompt": "你是经验丰富的旅行规划师，擅长把多源搜索结果整合成按天、可执行、预算友好的行程。",
+  "tools": [],
+  "params": {}
+}

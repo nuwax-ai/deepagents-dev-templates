@@ -102,7 +102,7 @@ export async function streamLLMText(
       const text = extractText(chunk.content);
       if (!text) continue;
       full += text;
-      emitTextToken(config, text);
+      await emitTextToken(config, text);
     }
     return full;
   };
@@ -124,8 +124,8 @@ export interface LlmNodeOptions<S> {
   model: ChatModelLike | ((state: S) => ChatModelLike | null | undefined);
   /** 由 state 构造消息。 */
   prompt: (state: S) => BaseMessage[];
-  /** 把结果写回 state。parse 提供时 parsed = parse(content)。 */
-  write: (r: { content: string; parsed?: unknown }, state: S) => Partial<S>;
+  /** 把结果写回 state。parse 提供时 parsed = parse(content)。可选 config 供 write 内发副作用（emitPlan/emitStage）。 */
+  write: (r: { content: string; parsed?: unknown }, state: S, config?: LangGraphRunnableConfig) => Partial<S>;
   /** 结构化输出：把 content 文本 parse 成 T。 */
   parse?: (text: string) => unknown;
   /** 可选系统提示词（首条非 system 时前置）。 */
@@ -160,7 +160,7 @@ export function createLlmNode<S>(opts: LlmNodeOptions<S>) {
     fallback,
   } = opts;
 
-  return async (state: S): Promise<Partial<S>> => {
+  return async (state: S, lgConfig?: LangGraphRunnableConfig): Promise<Partial<S>> => {
     const model = typeof modelOpt === "function" ? modelOpt(state) : modelOpt;
     if (!model) {
       if (fallback) return fallback(state, "no-model");
@@ -179,7 +179,7 @@ export function createLlmNode<S>(opts: LlmNodeOptions<S>) {
       })) as { content: unknown };
       const content = extractText(ai.content);
       const parsed = parse ? parse(content) : undefined;
-      return write(parse ? { content, parsed } : { content }, state);
+      return write(parse ? { content, parsed } : { content }, state, lgConfig);
     } catch (err) {
       if (fallback) return fallback(state, "error", err);
       throw err;
@@ -191,7 +191,7 @@ export function createLlmNode<S>(opts: LlmNodeOptions<S>) {
 export interface LlmStreamNodeOptions<S> {
   model: LLMLike | ((state: S) => LLMLike);
   prompt: (state: S) => BaseMessage[];
-  write: (r: { text: string; streamed: boolean }, state: S) => Partial<S>;
+  write: (r: { text: string; streamed: boolean }, state: S, config?: LangGraphRunnableConfig) => Partial<S>;
   config?: AppConfig;
   label?: string;
   retryLabel?: string;
@@ -211,7 +211,7 @@ export function createLlmStreamNode<S>(opts: LlmStreamNodeOptions<S>) {
         label,
         retryLabel,
       });
-      return write({ text: text.trim(), streamed }, state);
+      return write({ text: text.trim(), streamed }, state, lgConfig);
     } catch (err) {
       if (fallback) return fallback(state);
       throw err;

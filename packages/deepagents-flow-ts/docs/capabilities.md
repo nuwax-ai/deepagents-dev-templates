@@ -37,7 +37,7 @@ deepagents-flow-ts sessions       # 已持久化的会话
 
 ## 扩展（不改源码）
 
-- **加 MCP**：编辑 `config/mcp.default.json`，或经平台面板下发 `ACP_SESSION_CONFIG_JSON.mcpServers`。常用 server 见 [config/mcp.examples.json](../config/mcp.examples.json)（context7 / chrome-devtools / filesystem / bash / duckduckgo）。
+- **加 MCP**：编辑 `config/mcp.default.json`，或经平台面板下发 `ACP_SESSION_CONFIG_JSON.mcpServers`。常用 server 见 [config/mcp.examples.json](../config/mcp.examples.json)（context7 / chrome-devtools / filesystem / bash）。
 - **加 Skill**：放 `skills/builtin/<name>/SKILL.md`（YAML frontmatter `name`/`description` + 正文）。自动发现。
 - **加 Subagent**：放 `.agents/agents/<name>/AGENT.md`（frontmatter `name`/`description`，可选 `model`/`tools`/`workdir`；`model` 可写同 provider 模型名，也可写 `openai/<model>` / `anthropic/<model>`；正文=systemPrompt）。默认图自动暴露为 `task` 委派工具；自定义图可用 subgraph（见 [examples/dev-agent/researcher.ts](../examples/dev-agent/researcher.ts)）。
 - **改系统提示词**：编辑 `prompts/flow.base.md`，或经 ACP session / `config.agent.systemPrompt`。

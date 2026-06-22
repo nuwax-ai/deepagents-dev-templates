@@ -36,6 +36,7 @@ export {
   destroyRuntimeContext,
   resolveModelString,
   resolveModel,
+  resolveApiKey,
   resolveCliSystemPrompt,
   resolveSystemPrompt,
   discoverMemoryFiles,
