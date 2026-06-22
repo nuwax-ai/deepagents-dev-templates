@@ -20,6 +20,7 @@ import * as travelPlanner from "./blueprints/travel-planner.mjs";
 import * as rag from "./blueprints/rag.mjs";
 import * as deepResearch from "./blueprints/deep-research.mjs";
 import * as devAgent from "./blueprints/dev-agent.mjs";
+import * as custom from "./blueprints/custom.mjs";
 
 /** topology → blueprint 渲染器。新增拓扑在此注册。 */
 const BLUEPRINTS = {
@@ -30,6 +31,7 @@ const BLUEPRINTS = {
   rag,
   "deep-research": deepResearch,
   "dev-agent": devAgent,
+  custom,
 };
 
 const SCAFFOLD_DIR = dirname(fileURLToPath(import.meta.url));
@@ -102,10 +104,19 @@ function main() {
   // —— COMPLETION_GATE：未跑通不算完成 ——
   console.log("→ pnpm typecheck ...");
   execSync("pnpm typecheck", { cwd: PKG_ROOT, stdio: "inherit" });
-  console.log("→ pnpm graph（确认注册表未破坏全局拓扑）...");
-  execSync("pnpm graph", { cwd: PKG_ROOT, stdio: "inherit" });
+  // graph 验证：临时把 activeFlow 切到新 flow,验「该 flow 的拓扑真能反射」(不只是默认图没坏),
+  // 验完还原原 activeFlow。否则生成的 flow 可能在 COMPLETION_GATE 绿、激活时才崩(如节点名/channel 冲突)。
+  const cfgPath = resolve(PKG_ROOT, "config/flow-agent.config.json");
+  const origCfg = readFileSync(cfgPath, "utf-8");
+  try {
+    writeFileSync(cfgPath, JSON.stringify({ ...JSON.parse(origCfg), activeFlow: spec.name }, null, 2));
+    console.log(`→ pnpm graph（反射 activeFlow=${spec.name} 的拓扑）...`);
+    execSync("pnpm graph", { cwd: PKG_ROOT, stdio: "inherit" });
+  } finally {
+    writeFileSync(cfgPath, origCfg);
+  }
 
-  console.log(`\n✅ flow "${spec.name}" 已生成并通过 typecheck + graph。`);
+  console.log(`\n✅ flow "${spec.name}" 已生成并通过 typecheck + graph(反射已验)。`);
   console.log(`   启用：把 config/flow-agent.config.json 的 "activeFlow" 设为 "${spec.name}"，`);
   console.log(`   再 \`pnpm graph\` 查看该 flow 的拓扑、\`pnpm flow "..."\` 试跑。`);
 }

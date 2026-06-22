@@ -7,7 +7,7 @@
   "tools": [],
   "params": {
     "mcpServers": {
-      "duckduckgo": { "command": "npx", "args": ["-y", "duckduckgo-mcp-server"] }
+      "context7": { "command": "npx", "args": ["-y", "@upstash/context7-mcp"] }
     }
   }
 }

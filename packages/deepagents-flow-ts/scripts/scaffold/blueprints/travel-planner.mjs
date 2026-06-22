@@ -6,7 +6,7 @@
  * 图逻辑单一权威在 src/libs/topologies/travel-planner/；本 blueprint 只生成薄封装绑 spec。
  *
  * systemPrompt 注入主节点 aggregate（角色开场）；research/confirm/finalize 领域默认。
- * ⚠️ research 真实联网（DuckDuckGo MCP），需 npx + 网络。
+ * ⚠️ research 需传入可用搜索 MCP（searchMcp；duckduckgo 实测不稳定已移除），未传则优雅降级。
  */
 
 /** 拓扑 kind。 */

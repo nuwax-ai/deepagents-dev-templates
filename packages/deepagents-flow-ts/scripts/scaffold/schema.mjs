@@ -32,6 +32,61 @@ const base = {
 };
 
 /**
+ * custom 拓扑的节点级编排 spec —— state/nodes/edges/input/result。
+ * spec 即契约：custom blueprint 在**生成时**把 spec 渲染成真实 graph.ts（catalog factory + prompt/route
+ * 内联为受 tsc 检查的真实代码，非运行时解释）。node.type 词表见 docs/node-catalog.md。
+ */
+const customChannelSchema = z.object({
+  type: z.enum(["string", "number", "boolean", "string-array-append", "any-last"]),
+  default: z.unknown().optional(),
+});
+const customNodeSchema = z.object({
+  // custom blueprint 渲染支持的节点 type（llm-stream/tool-exec/subgraph 暂不支持 → 用别的 type 或生成后手改）
+  type: z.enum([
+    "llm",
+    "llm-router",
+    "approval",
+    "approval-finalize",
+    "mcp-retrieval",
+    "prepare",
+    "passthrough",
+  ]),
+  /** factory 选项；回调（prompt/write/route/retrieve/question）为箭头函数字符串，生成时内联为真实代码（受 tsc 检查，非运行时 eval）。 */
+  params: z.record(z.string(), z.unknown()).default({}),
+});
+const customEdgeSchema = z.union([
+  z.object({ kind: z.literal("static"), from: z.string(), to: z.string() }),
+  z.object({
+    kind: z.literal("conditional"),
+    from: z.string(),
+    /** 条件函数体（箭头函数字符串，返回目标节点名）。 */
+    condition: z.string(),
+    targets: z.array(z.string()),
+  }),
+  z.object({
+    kind: z.literal("fanout"),
+    from: z.string(),
+    target: z.string(),
+    items: z.string(),
+    input: z.string(),
+  }),
+]);
+const customParamsSchema = z.object({
+  /** State channels（reducer 类型别名）。 */
+  state: z.record(z.string(), customChannelSchema),
+  /** 节点名 → {type, params}。 */
+  nodes: z.record(z.string(), customNodeSchema),
+  edges: z.array(customEdgeSchema),
+  input: z
+    .object({ queryField: z.string().default("query"), extra: z.record(z.string(), z.unknown()).optional() })
+    .default({}),
+  result: z
+    .object({ answerField: z.string().default("output"), footerField: z.string().optional() })
+    .default({}),
+  recursionLimit: z.number().optional(),
+});
+
+/**
  * spec 主 schema —— 按 topology 区分 params（discriminated union）。
  * 当前已实现：react-tools。其余拓扑陆续加成员（见 SUPPORTED_TOPOLOGIES）。
  */
@@ -82,6 +137,12 @@ export const specSchema = z.discriminatedUnion("topology", [
     ...base,
     topology: z.literal("dev-agent"),
     params: z.object({}).default({}),
+  }),
+  // 节点级编排：spec 声明 state/nodes/edges → 生成时渲染成真实 graph.ts（catalog factory + 内联代码，stateful-recipe）。
+  z.object({
+    ...base,
+    topology: z.literal("custom"),
+    params: customParamsSchema,
   }),
 ]);
 
