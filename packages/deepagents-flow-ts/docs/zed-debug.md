@@ -145,7 +145,7 @@ Windows 用 `tsx.cmd`：`"<REPO>/node_modules/.bin/tsx.cmd"`。
 |-------|-------------|------|
 | 默认 ReAct | 有 key 则调；无则启发式 fallback | 可不填 key 做连通性测试 |
 | RAG | **必须** | rewrite / retrieve / generate + MCP |
-| travel-planner | 是（调研节点） | 建议有效 key；含 DuckDuckGo MCP |
+| travel-planner | 是（调研节点） | 建议有效 key；research 需配置搜索 MCP（DDG 已移除） |
 | project-manager | 是（规划/评估） | 建议有效 key |
 | human-in-loop | 是（生成草稿） | 建议有效 key |
 | Deepresearch | **必须** | 多阶段长任务，耗时长、token 多 |
