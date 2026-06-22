@@ -18,7 +18,9 @@ import type { FlowState } from "../state.js";
 
 const log = logger.child("flow-think");
 
-type BoundModel = { invoke: (m: BaseMessage[]) => Promise<AIMessage> };
+type BoundModel = {
+  invoke: (m: BaseMessage[], options?: { signal?: AbortSignal }) => Promise<AIMessage>;
+};
 
 /** Model-like interface that has bindTools (BaseChatModel, ConfigurableModel, etc.) */
 interface ModelWithTools {
@@ -60,7 +62,10 @@ export function createThinkNode(deps: ThinkNodeDeps) {
     }
   }
 
-  return async (state: FlowState): Promise<Partial<FlowState>> => {
+  return async (
+    state: FlowState,
+    runtimeConfig?: { signal?: AbortSignal }
+  ): Promise<Partial<FlowState>> => {
     if (!boundModel || !hasCreds) {
       // 无凭证 fallback：直接回显输入为回答（不调工具，保证图始终可跑）
       return {
@@ -73,7 +78,13 @@ export function createThinkNode(deps: ThinkNodeDeps) {
       const ai = await invokeWithResilience(
         boundModel,
         withSystemPrompt(state.messages, systemPrompt ?? ""),
-        { timeoutMs: shortTimeoutMs, label: "think 调模型", retryLabel: "think LLM", config }
+        {
+          timeoutMs: shortTimeoutMs,
+          label: "think 调模型",
+          retryLabel: "think LLM",
+          config,
+          signal: runtimeConfig?.signal,
+        }
       );
       return {
         messages: [ai],

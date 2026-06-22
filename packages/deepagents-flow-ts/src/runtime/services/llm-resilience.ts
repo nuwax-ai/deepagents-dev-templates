@@ -67,34 +67,75 @@ export function resolveLlmResilience(config?: AppConfig): LlmResilienceSettings 
 
 /**
  * 单步 Promise 超时护栏。超时 reject，由调用方或 invokeWithResilience 决定重试/降级。
+ *
+ * 传入 `signal` 时，abort 立即以 AbortError reject（不等超时）——用于 ACP cancel
+ * 即时打断正在跑的 LLM 调用，而非等到 between-node 边界或 timeout 兜底。
  */
-export async function withTimeout<T>(p: Promise<T>, ms: number, label = "操作"): Promise<T> {
+export async function withTimeout<T>(
+  p: Promise<T>,
+  ms: number,
+  label = "操作",
+  signal?: AbortSignal
+): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let onAbort: (() => void) | undefined;
+  const abortPromise = new Promise<never>((_, reject) => {
+    if (!signal) return;
+    const fail = () => {
+      const err = new Error(`${label}已取消`);
+      err.name = "AbortError";
+      reject(err);
+    };
+    if (signal.aborted) {
+      fail();
+    } else {
+      onAbort = fail;
+      signal.addEventListener("abort", fail, { once: true });
+    }
+  });
   const timeout = new Promise<never>((_, reject) => {
     timer = setTimeout(() => reject(new Error(`${label}超时（${ms}ms）`)), ms);
   });
   try {
-    return await Promise.race([p, timeout]);
+    return await Promise.race([p, timeout, abortPromise]);
   } finally {
     if (timer) clearTimeout(timer);
+    if (onAbort && signal) signal.removeEventListener("abort", onAbort);
   }
 }
 
 /**
  * 指数退避重试。重试用尽仍失败才抛，交调用方降级。
+ *
+ * 传入 `signal` 时：abort 或捕获到 AbortError 立即抛出、不再重试——用户已取消，
+ * 退避后重试只会拖长取消响应。
  */
 export async function withRetry<T>(
   fn: () => Promise<T>,
-  opts: { attempts?: number; baseDelayMs?: number; label?: string } = {}
+  opts: {
+    attempts?: number;
+    baseDelayMs?: number;
+    label?: string;
+    signal?: AbortSignal;
+  } = {}
 ): Promise<T> {
   const attempts = opts.attempts ?? 3;
   const base = opts.baseDelayMs ?? 800;
   let lastErr: unknown;
   for (let i = 0; i < attempts; i++) {
+    if (opts.signal?.aborted) {
+      const err = new Error(`${opts.label ?? "LLM"}已取消`);
+      err.name = "AbortError";
+      throw err;
+    }
     try {
       return await fn();
     } catch (err) {
       lastErr = err;
+      // 取消不重试：用户已取消，立即抛出由调用方降级/收尾
+      if ((err as Error)?.name === "AbortError" || opts.signal?.aborted) {
+        throw err;
+      }
       if (i < attempts - 1) {
         log.warn(`${opts.label ?? "LLM"}失败，重试 ${i + 1}/${attempts - 1}`, {
           error: String(err),
@@ -181,9 +222,19 @@ export interface InvokeWithResilienceOptions {
   useSharedLimiter?: boolean;
   /** useSharedLimiter 时用于解析并发上限的 config。 */
   config?: AppConfig;
+  /**
+   * 取消信号（ACP cancel）。传入后透传到 model.invoke + 超时 + 重试：
+   * abort 时正在跑的 LLM 调用立即以 AbortError reject，且不重试。
+   */
+  signal?: AbortSignal;
 }
 
-type InvokeModel = { invoke: (messages: BaseMessage[]) => Promise<{ content: unknown }> };
+type InvokeModel = {
+  invoke: (
+    messages: BaseMessage[],
+    options?: { signal?: AbortSignal }
+  ) => Promise<{ content: unknown }>;
+};
 
 /**
  * 标准 LLM 调用链：可选并发闸门 → 超时 → 重试。
@@ -206,11 +257,18 @@ export function invokeWithResilience<M extends InvokeModel>(
   }));
   const run = () =>
     withRetry(
-      () => withTimeout(model.invoke(messages), timeoutMs, label),
+      () =>
+        withTimeout(
+          model.invoke(messages, options.signal ? { signal: options.signal } : undefined),
+          timeoutMs,
+          label,
+          options.signal
+        ),
       {
         attempts: options.attempts,
         baseDelayMs: options.baseDelayMs,
         label: options.retryLabel ?? label,
+        signal: options.signal,
       }
     )
       .then((result) => {

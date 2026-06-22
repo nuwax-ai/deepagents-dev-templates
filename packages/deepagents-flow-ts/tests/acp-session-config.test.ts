@@ -85,3 +85,41 @@ describe("sessionConfigFromParams（cwd / mcpServers / model 提取）", () => {
     expect(Object.keys(sessionConfig)).toEqual(["cwd"]);
   });
 });
+
+describe("sessionConfigFromParams（systemPrompt 提取，ACP 最高优先级链路）", () => {
+  it("顶层 params.systemPrompt → sessionConfig.systemPrompt", () => {
+    const { sessionConfig } = sessionConfigFromParams({
+      cwd: "/w",
+      systemPrompt: "你是 dev-agent",
+    });
+    expect(sessionConfig.systemPrompt).toBe("你是 dev-agent");
+  });
+
+  it("顶层无 systemPrompt → 回退 configOptions.systemPrompt 别名", () => {
+    const { sessionConfig } = sessionConfigFromParams({
+      cwd: "/w",
+      configOptions: { systemPrompt: "来自 configOptions" },
+    });
+    expect(sessionConfig.systemPrompt).toBe("来自 configOptions");
+  });
+
+  it("顶层优先于 configOptions.systemPrompt", () => {
+    const { sessionConfig } = sessionConfigFromParams({
+      cwd: "/w",
+      systemPrompt: "顶层",
+      configOptions: { systemPrompt: "别名" },
+    });
+    expect(sessionConfig.systemPrompt).toBe("顶层");
+  });
+
+  it("空串 / 全空白 systemPrompt → 忽略（不写入 sessionConfig）", () => {
+    const { sessionConfig } = sessionConfigFromParams({ cwd: "/w", systemPrompt: "   " });
+    expect(sessionConfig.systemPrompt).toBeUndefined();
+    expect(Object.keys(sessionConfig)).toEqual(["cwd"]);
+  });
+
+  it("configOptions 非对象 → 不抛、systemPrompt 缺省", () => {
+    const { sessionConfig } = sessionConfigFromParams({ cwd: "/w", configOptions: "x" });
+    expect(sessionConfig.systemPrompt).toBeUndefined();
+  });
+});

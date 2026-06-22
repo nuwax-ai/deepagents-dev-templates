@@ -55,8 +55,14 @@ function withSystemPrompt(messages: BaseMessage[], systemPrompt: string): BaseMe
 }
 
 export type LLMLike = {
-  invoke: (messages: BaseMessage[]) => Promise<{ content: unknown }>;
-  stream?: (messages: BaseMessage[]) =>
+  invoke: (
+    messages: BaseMessage[],
+    options?: { signal?: AbortSignal }
+  ) => Promise<{ content: unknown }>;
+  stream?: (
+    messages: BaseMessage[],
+    options?: { signal?: AbortSignal }
+  ) =>
     | Promise<AsyncIterable<{ content?: unknown }>>
     | AsyncIterable<{ content?: unknown }>;
 };
@@ -91,13 +97,17 @@ export async function streamLLMText(
       retryLabel,
       useSharedLimiter: true,
       config: appConfig,
+      signal: config?.signal,
     });
     return { text: extractText(res.content), streamed: false };
   }
 
+  const signal = config?.signal;
   const run = async () => {
     let full = "";
-    const stream = await Promise.resolve(m.stream!(messages));
+    const stream = await Promise.resolve(
+      m.stream!(messages, signal ? { signal } : undefined)
+    );
     for await (const chunk of stream) {
       const text = extractText(chunk.content);
       if (!text) continue;
@@ -109,8 +119,8 @@ export async function streamLLMText(
 
   const text = await getSharedLlmLimiter(appConfig)(() =>
     withRetry(
-      () => withTimeout(run(), timeoutMs, label),
-      { label: retryLabel }
+      () => withTimeout(run(), timeoutMs, label, signal),
+      { label: retryLabel, signal }
     )
   );
   return { text, streamed: true };
@@ -176,6 +186,7 @@ export function createLlmNode<S>(opts: LlmNodeOptions<S>) {
         useSharedLimiter: true,
         attempts,
         config,
+        signal: lgConfig?.signal,
       })) as { content: unknown };
       const content = extractText(ai.content);
       const parsed = parse ? parse(content) : undefined;

@@ -96,9 +96,14 @@ export async function executeFlow(
 ): Promise<{ output: string; steps: string[]; messages: FlowState["messages"] }> {
   const graph = createFlowGraph({ ...deps, callbacks });
   const threadId = randomUUID();
+  // signal 透传：ACP cancel（callbacks.signal）必须进 graph.invoke 才能在节点边界
+  // 中止；节点内 LLM 调用再经 invokeWithResilience(signal) 即时打断（见 think/llm 节点）。
   const result = (await graph.invoke(
     { input, messages: [] } as unknown as FlowState,
-    { configurable: { thread_id: threadId } }
+    {
+      configurable: { thread_id: threadId },
+      ...(callbacks?.signal ? { signal: callbacks.signal } : {}),
+    }
   )) as FlowState;
   return {
     output: result.output ?? "",

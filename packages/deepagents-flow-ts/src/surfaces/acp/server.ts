@@ -289,10 +289,25 @@ export function sessionConfigFromParams(params: Record<string, unknown>): {
   const cwd = typeof params.cwd === "string" && params.cwd ? params.cwd : process.cwd();
   const mcpServers = acpMcpToRecord(params.mcpServers);
   const model = typeof params.model === "string" ? params.model : undefined;
+  // systemPrompt：ACP 下发的目标 agent 提示词（最高优先级，见 resolveSystemPrompt）。
+  // 顶层 params.systemPrompt 为主约定（与 cwd/mcpServers/model 同列），
+  // configOptions.systemPrompt 作为别名兜底（agent 选择等字段走 configOptions）。
+  const configOptions =
+    params.configOptions && typeof params.configOptions === "object"
+      ? (params.configOptions as Record<string, unknown>)
+      : undefined;
+  const systemPromptRaw =
+    typeof params.systemPrompt === "string"
+      ? params.systemPrompt
+      : typeof configOptions?.systemPrompt === "string"
+        ? configOptions.systemPrompt
+        : undefined;
+  const systemPrompt = systemPromptRaw && systemPromptRaw.trim() ? systemPromptRaw : undefined;
   const sessionConfig: ACPSessionConfig = {
     cwd,
     ...(mcpServers ? { mcpServers } : {}),
     ...(model ? { model } : {}),
+    ...(systemPrompt ? { systemPrompt } : {}),
   };
   // 诊断告警：cwd 不是 flow-ts 项目根（缺 config/mcp.default.json 与 package.json）时提示。
   // 不改写客户端意图（cwd 由 ACP 客户端控制），仅记录便于排查 "MCP config file not found" 类问题。
