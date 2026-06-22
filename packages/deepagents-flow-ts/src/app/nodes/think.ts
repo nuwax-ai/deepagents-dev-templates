@@ -75,9 +75,15 @@ export function createThinkNode(deps: ThinkNodeDeps) {
     }
     try {
       const { shortTimeoutMs } = resolveLlmResilience(config);
+      const promptForModel = withSystemPrompt(state.messages, systemPrompt ?? "");
+      log.debug("think 注入 systemPrompt", {
+        systemPromptChars: systemPrompt?.trim().length ?? 0,
+        messageCount: promptForModel.length,
+        firstMessageType: promptForModel[0]?._getType?.() ?? "unknown",
+      });
       const ai = await invokeWithResilience(
         boundModel,
-        withSystemPrompt(state.messages, systemPrompt ?? ""),
+        promptForModel,
         {
           timeoutMs: shortTimeoutMs,
           label: "think 调模型",

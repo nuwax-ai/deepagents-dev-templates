@@ -10,39 +10,76 @@
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { type AppConfig, type ACPSessionConfig } from "../config/config-loader.js";
+import { logger } from "../logger.js";
+import { previewText } from "../preview-text.js";
 import { PLATFORM_CONVENTIONS } from "./harness-profile.js";
+
+const log = logger.child("system-prompt");
+
+/** resolveSystemPrompt 分支来源（诊断日志用）。 */
+type SystemPromptResolveSource =
+  | "acp-session"
+  | "config-inline"
+  | "config-file"
+  | "inline-fallback"
+  | "none";
 
 /**
  * Resolve system prompt with priority chain:
  *   ACP session prompt > config.agent.systemPrompt > config.agent.systemPromptPath > inline fallback
  */
-export function resolveSystemPrompt(
+export interface SystemPromptResolveMeta {
+  prompt: string;
+  source: SystemPromptResolveSource;
+  /** 文件来源时的绝对路径；inline-fallback 时为尝试过的路径。 */
+  promptPath?: string;
+  promptChars: number;
+  promptPreview?: string;
+}
+
+/** 解析系统提示词并返回来源元数据（供诊断日志与 resolveSystemPrompt 共用）。 */
+export function resolveSystemPromptMeta(
   config: AppConfig,
   sessionConfig: ACPSessionConfig | undefined,
   workspaceRoot: string
-): string {
+): SystemPromptResolveMeta {
   // ACP session prompt takes highest priority. This prompt is supplied
   // externally (the scenario / target-agent prompt) and does not carry this
   // template's platform conventions, so append them here. This is the one path
   // that bypasses the bundled prompt files; for every other source the
   // conventions already live in the prompt file (or are irrelevant).
   if (sessionConfig?.systemPrompt) {
-    return `${sessionConfig.systemPrompt.trimEnd()}\n\n${PLATFORM_CONVENTIONS}`;
+    const prompt = `${sessionConfig.systemPrompt.trimEnd()}\n\n${PLATFORM_CONVENTIONS}`;
+    return {
+      prompt,
+      source: "acp-session",
+      promptChars: prompt.length,
+      promptPreview: previewText(prompt),
+    };
   }
 
   if (config.agent.systemPrompt) {
-    return withOutputStyle(config.agent.systemPrompt, config, workspaceRoot);
+    const prompt = withOutputStyle(config.agent.systemPrompt, config, workspaceRoot);
+    return {
+      prompt,
+      source: "config-inline",
+      promptChars: prompt.length,
+      promptPreview: previewText(prompt),
+    };
   }
 
   // Try loading from the configured prompt path.
   const promptPath = resolvePromptPath(config.agent.systemPromptPath, workspaceRoot);
   let basePrompt: string;
+  let source: SystemPromptResolveSource;
   if (existsSync(promptPath)) {
     const content = readFileSync(promptPath, "utf-8");
     // Strip the H1 title line (metadata, not prompt content)
     basePrompt = content.replace(/^# .*\r?\n/, "").trim();
+    source = "config-file";
   } else {
     // Inline fallback
+    source = "inline-fallback";
     basePrompt = `You are ${config.agent.name} — an AI application agent.
 
 ## Workflow
@@ -64,7 +101,33 @@ export function resolveSystemPrompt(
   }
 
   // Append output style if configured
-  return withOutputStyle(basePrompt, config, workspaceRoot);
+  const prompt = withOutputStyle(basePrompt, config, workspaceRoot);
+  return {
+    prompt,
+    source,
+    promptPath,
+    promptChars: prompt.length,
+    promptPreview: previewText(prompt),
+  };
+}
+
+export function resolveSystemPrompt(
+  config: AppConfig,
+  sessionConfig: ACPSessionConfig | undefined,
+  workspaceRoot: string
+): string {
+  const meta = resolveSystemPromptMeta(config, sessionConfig, workspaceRoot);
+  log.info("resolveSystemPrompt", {
+    source: meta.source,
+    promptPath: meta.promptPath,
+    promptChars: meta.promptChars,
+    promptPreview: meta.promptPreview,
+    sessionHasSystemPrompt: Boolean(sessionConfig?.systemPrompt?.trim()),
+    configInlinePromptChars: config.agent.systemPrompt?.trim().length ?? 0,
+    configuredPromptPath: config.agent.systemPromptPath,
+    workspaceRoot,
+  });
+  return meta.prompt;
 }
 
 /**

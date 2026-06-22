@@ -1,15 +1,15 @@
-# Part 3：工具 / MCP / 变量
+# Part 3：工具 / MCP / 密钥
 
 > 所属：`flow-builder` L2-C。入口路由见 [SKILL.md](../SKILL.md)。平台工具接入 → `agent-dev-config` skill。
 
-需要添加自定义工具、配置 MCP、管理 API key / 变量时读本层。
+需要添加自定义工具、配置 MCP、管理 API key 时读本层。
 
 ## 工具优先级（强制）
 
 ```
-1. 平台 Plugin / Workflow / Knowledge  ← agent-dev-config 搜索并添加
-2. 内置 libs/tools（bash/fs/search/http/json/platform_api/agent_variable/mcp_tool_bridge）
-3. native MCP（runtime 自动合并）
+1. 平台 Plugin / Workflow / Knowledge  ← agent-dev-config 搜索并 tool/add（开发期）；运行时经 ACP 下发
+2. 内置 libs/tools（bash/fs/search/http/json/mcp_tool_bridge）
+3. native MCP（default + ACP session，runtime-context 自动合并）
 4. 自写 src/libs/tools/ + 注册 createFlowTools()
 ```
 
@@ -22,8 +22,8 @@ import { z } from "zod";
 
 export const weatherTool = tool(
   async ({ city }) => {
-    const apiKey = process.env.AGENT_VAR_WEATHER_API_KEY;
-    if (!apiKey) return "错误：请填写 WEATHER_API_KEY";
+    const apiKey = process.env.WEATHER_API_KEY;
+    if (!apiKey) return "错误：请设置环境变量 WEATHER_API_KEY";
     // ...
     return `${city}: …`;
   },
@@ -35,10 +35,10 @@ export const weatherTool = tool(
 );
 ```
 
-**平台绑定（工厂）：**
+**需运行时上下文（工厂）：**
 ```typescript
 export function createMyTool(ctx: RuntimeContext) {
-  return tool(async ({ query }) => { /* ctx.variableManager / platformClient */ }, { ... });
+  return tool(async ({ query }) => { /* 可读 ctx.mcpServerConfigs / ctx.config */ }, { ... });
 }
 ```
 
@@ -55,7 +55,7 @@ export function createMyTool(ctx: RuntimeContext) {
 
 ## MCP 配置
 
-默认：`config/mcp.default.json`
+默认：`config/mcp.default.json`；ACP `session/new` 的 `mcpServers` 可覆盖（`session-wins`）。
 
 **Stdio：**
 ```json
@@ -63,7 +63,7 @@ export function createMyTool(ctx: RuntimeContext) {
   "my-server": {
     "command": "pnpm",
     "args": ["dlx", "my-mcp-package"],
-    "env": { "API_KEY": "${AGENT_VAR_MY_API_KEY}" }
+    "env": { "API_KEY": "${OPENAI_API_KEY}" }
   }
 }
 ```
@@ -72,19 +72,17 @@ export function createMyTool(ctx: RuntimeContext) {
 
 | 策略 | 行为 |
 |------|------|
-| `session-wins` | ACP session 覆盖（默认） |
-| `platform-wins` | 平台覆盖 session |
+| `session-wins` | ACP session 覆盖 default（默认） |
 | `defaults-wins` | 本地 default 优先 |
 
 调试：`pnpm exec tsx src/index.ts capabilities` · `mcp_tool_bridge list_servers`
 
 ---
 
-## agent_variable
+## 密钥与环境变量
 
-- 禁止硬编码密钥；`UPPER_SNAKE_CASE`；AI 创建占位用户填值
-- 读取：`ctx.variableManager.get()` 或 `process.env.AGENT_VAR_XXX`
-- MCP env：`"${AGENT_VAR_XXX}"`
+- 禁止硬编码密钥；工具内读 `process.env`；MCP server `env` 引用同名变量
+- 平台保存的系统提示词 / MCP 经 **ACP session** 注入运行时，不经 `platform_api` 工具
 
 ---
 
@@ -92,5 +90,6 @@ export function createMyTool(ctx: RuntimeContext) {
 
 - ❌ 不查平台/内置/MCP 就自写工具
 - ❌ 硬编码 API key / 忘记注册 createFlowTools()
+- ❌ 引用已删除的 `platform_api` / `agent_variable` 运行时工具
 - ❌ Zod 无 `.describe()` / 返回非 string
-- ✅ 平台优先 → 内置 → MCP → 自写
+- ✅ 平台优先（dev 配置）→ 内置 → MCP → 自写

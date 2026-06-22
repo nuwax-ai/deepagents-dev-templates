@@ -21,6 +21,7 @@ import {
   type BuiltinTemplateConfigName,
   type ACPSessionConfig,
 } from "./config-schema.js";
+import { logger } from "../logger.js";
 import {
   resolveBuiltinTemplateConfig,
   readBuiltinTemplateConfigNameFromEnv,
@@ -41,6 +42,8 @@ import {
 
 export * from "./config-schema.js";
 export { deepMerge } from "./deep-merge.js";
+
+const log = logger.child("config-loader");
 
 // ─── Defaults ───────────────────────────────────────────
 
@@ -154,6 +157,15 @@ export function loadConfig(options: LoadConfigOptions = {}): AppConfig {
     const sc = options.sessionConfig;
     if (sc.model) setNestedValue(sessionOverlay, "model.name", sc.model);
     if (sc.systemPrompt) setNestedValue(sessionOverlay, "agent.systemPrompt", sc.systemPrompt);
+    log.info("loadConfig layer-6 ACP session overlay", {
+      workspaceRoot,
+      cwd: sc.cwd,
+      model: sc.model,
+      mcpServerNames: sc.mcpServers ? Object.keys(sc.mcpServers) : [],
+      systemPromptChars: sc.systemPrompt?.trim().length ?? 0,
+      overlayModel: Boolean(sc.model),
+      overlaySystemPrompt: Boolean(sc.systemPrompt?.trim()),
+    });
     config = mergeConfigLayer(config, sessionOverlay as Partial<AppConfig>);
   }
 

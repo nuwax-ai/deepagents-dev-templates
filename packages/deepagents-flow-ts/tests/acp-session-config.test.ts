@@ -6,8 +6,8 @@
  * 无凭证、纯函数、确定性。
  */
 
-import { describe, it, expect } from "vitest";
-import { acpMcpToRecord, sessionConfigFromParams } from "../src/surfaces/acp/server.js";
+import { afterEach, describe, it, expect } from "vitest";
+import { acpMcpToRecord, resolveAcpSessionConfig, sessionConfigFromParams } from "../src/surfaces/acp/server.js";
 
 describe("acpMcpToRecord（MCP 形态归一化）", () => {
   it("undefined / null / 非对象 → undefined", () => {
@@ -121,5 +121,57 @@ describe("sessionConfigFromParams（systemPrompt 提取，ACP 最高优先级链
   it("configOptions 非对象 → 不抛、systemPrompt 缺省", () => {
     const { sessionConfig } = sessionConfigFromParams({ cwd: "/w", configOptions: "x" });
     expect(sessionConfig.systemPrompt).toBeUndefined();
+  });
+
+  it("_meta.systemPrompt → sessionConfig.systemPrompt", () => {
+    const { sessionConfig } = sessionConfigFromParams({
+      cwd: "/w",
+      _meta: { systemPrompt: "来自 _meta" },
+    });
+    expect(sessionConfig.systemPrompt).toBe("来自 _meta");
+  });
+
+  it("_meta.sessionConfig.systemPrompt 嵌套", () => {
+    const { sessionConfig } = sessionConfigFromParams({
+      cwd: "/w",
+      _meta: { sessionConfig: { systemPrompt: "meta-session" } },
+    });
+    expect(sessionConfig.systemPrompt).toBe("meta-session");
+  });
+});
+
+describe("resolveAcpSessionConfig（env + params 合并）", () => {
+  const ENV_KEY = "ACP_SESSION_CONFIG_JSON";
+
+  afterEach(() => {
+    delete process.env[ENV_KEY];
+  });
+
+  it("env 有 systemPrompt、params 无 → 合并后保留 env prompt", () => {
+    process.env[ENV_KEY] = JSON.stringify({ systemPrompt: "env-prompt", model: "gpt-4o" });
+    const { sessionConfig, fromParams } = resolveAcpSessionConfig({ cwd: "/w" });
+    expect(fromParams.systemPrompt).toBeUndefined();
+    expect(sessionConfig.systemPrompt).toBe("env-prompt");
+    expect(sessionConfig.model).toBe("gpt-4o");
+    expect(sessionConfig.cwd).toBe("/w");
+  });
+
+  it("params systemPrompt 优先于 env", () => {
+    process.env[ENV_KEY] = JSON.stringify({ systemPrompt: "env-prompt" });
+    const { sessionConfig } = resolveAcpSessionConfig({
+      cwd: "/w",
+      systemPrompt: "params-prompt",
+    });
+    expect(sessionConfig.systemPrompt).toBe("params-prompt");
+  });
+
+  it("params mcpServers 优先，env model 补齐", () => {
+    process.env[ENV_KEY] = JSON.stringify({ model: "from-env" });
+    const { sessionConfig } = resolveAcpSessionConfig({
+      cwd: "/w",
+      mcpServers: [{ name: "ctx", command: "npx" }],
+    });
+    expect(sessionConfig.model).toBe("from-env");
+    expect(sessionConfig.mcpServers).toEqual({ ctx: { command: "npx" } });
   });
 });

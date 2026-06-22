@@ -29,6 +29,15 @@ import {
   type ACPSessionConfig,
 } from "../../runtime/index.js";
 import {
+  loadSessionConfigFromEnv,
+  mergeAcpSessionConfig,
+  resolveAcpSessionConfig,
+} from "./session-config.js";
+import {
+  logConfigureSessionDiagnostics,
+  logStartupAcpEnvDiagnostics,
+} from "./session-diagnostics.js";
+import {
   runInAcpPromptCycle,
   traceFlowCallbacks,
   traceFlowRun,
@@ -264,72 +273,15 @@ export interface FlowAcpOptions {
   debug?: boolean;
 }
 
-/** ACP session/new 的 mcpServers（数组 [{name,...}] 或 record）→ 我们的 Record<name, cfg>。 */
-export function acpMcpToRecord(raw: unknown): Record<string, unknown> | undefined {
-  if (!raw) return undefined;
-  if (Array.isArray(raw)) {
-    const rec: Record<string, unknown> = {};
-    for (const s of raw) {
-      if (s && typeof s === "object" && typeof (s as { name?: unknown }).name === "string") {
-        const { name, ...rest } = s as { name: string } & Record<string, unknown>;
-        rec[name] = rest;
-      }
-    }
-    return Object.keys(rec).length ? rec : undefined;
-  }
-  if (typeof raw === "object") return raw as Record<string, unknown>;
-  return undefined;
-}
-
-/** 从 ACP session/new|load 的 raw params 提取 cwd / mcpServers / model → ACPSessionConfig。 */
-export function sessionConfigFromParams(params: Record<string, unknown>): {
-  sessionConfig: ACPSessionConfig;
-  workspaceRoot: string;
-} {
-  const cwd = typeof params.cwd === "string" && params.cwd ? params.cwd : process.cwd();
-  const mcpServers = acpMcpToRecord(params.mcpServers);
-  const model = typeof params.model === "string" ? params.model : undefined;
-  // systemPrompt：ACP 下发的目标 agent 提示词（最高优先级，见 resolveSystemPrompt）。
-  // 顶层 params.systemPrompt 为主约定（与 cwd/mcpServers/model 同列），
-  // configOptions.systemPrompt 作为别名兜底（agent 选择等字段走 configOptions）。
-  const configOptions =
-    params.configOptions && typeof params.configOptions === "object"
-      ? (params.configOptions as Record<string, unknown>)
-      : undefined;
-  const systemPromptRaw =
-    typeof params.systemPrompt === "string"
-      ? params.systemPrompt
-      : typeof configOptions?.systemPrompt === "string"
-        ? configOptions.systemPrompt
-        : undefined;
-  const systemPrompt = systemPromptRaw && systemPromptRaw.trim() ? systemPromptRaw : undefined;
-  const sessionConfig: ACPSessionConfig = {
-    cwd,
-    ...(mcpServers ? { mcpServers } : {}),
-    ...(model ? { model } : {}),
-    ...(systemPrompt ? { systemPrompt } : {}),
-  };
-  // 诊断告警：cwd 不是 flow-ts 项目根（缺 config/mcp.default.json 与 package.json）时提示。
-  // 不改写客户端意图（cwd 由 ACP 客户端控制），仅记录便于排查 "MCP config file not found" 类问题。
-  void (async () => {
-    try {
-      const fs = await import("node:fs");
-      const path = await import("node:path");
-      const hasProject =
-        fs.existsSync(path.join(cwd, "package.json")) &&
-        fs.existsSync(path.join(cwd, "config", "mcp.default.json"));
-      if (!hasProject) {
-        log.warn(
-          "ACP session cwd 不是 flow-ts 项目根（缺 package.json / config/mcp.default.json），MCP 默认配置与项目代码将读不到",
-          { cwd }
-        );
-      }
-    } catch {
-      // 诊断失败不影响主流程
-    }
-  })();
-  return { sessionConfig, workspaceRoot: cwd };
-}
+export {
+  acpMcpToRecord,
+  sessionConfigFromParams,
+  resolveAcpSessionConfig,
+  extractSystemPromptFromParams,
+  coalesceSystemPromptValue,
+  loadSessionConfigFromEnv,
+  mergeAcpSessionConfig,
+} from "./session-config.js";
 
 /**
  * 构造 flow surface 的三个 ACP hook（configureSession / onPrompt / onSessionClosed）。
@@ -368,9 +320,12 @@ export function createFlowHooks(options: FlowAcpOptions): DeepAgentsServerHooks 
         throw new Error(`ACP session runtime 初始化失败: ${failure}`);
       }
       const configured = sessionConfigs.get(sessionId);
-      // configureSession 未触发时的最后兜底：只能用于 host 未发 session/new 的场景。
+      // configureSession 未触发时的最后兜底：合并 env + 进程 cwd。
+      const fallbackConfig = mergeAcpSessionConfig(loadSessionConfigFromEnv(), {
+        cwd: process.cwd(),
+      });
       const built = await options.createExecutor({
-        sessionConfig: configured?.sessionConfig ?? { cwd: process.cwd() },
+        sessionConfig: configured?.sessionConfig ?? fallbackConfig,
         workspaceRoot: configured?.workspaceRoot ?? process.cwd(),
       });
       sessions.set(sessionId, built);
@@ -385,7 +340,15 @@ export function createFlowHooks(options: FlowAcpOptions): DeepAgentsServerHooks 
       // 无论单/多 executor，都先绑定 per-session 日志（幂等）。
       setLogSession(ctx.sessionId);
       if (!options.createExecutor) return undefined;
-      const { sessionConfig, workspaceRoot } = sessionConfigFromParams(ctx.params);
+      const { sessionConfig, workspaceRoot, fromParams } = resolveAcpSessionConfig(ctx.params);
+      logConfigureSessionDiagnostics({
+        sessionId: ctx.sessionId,
+        phase: ctx.phase,
+        params: ctx.params,
+        fromParams,
+        merged: sessionConfig,
+        workspaceRoot,
+      });
       sessionConfigs.set(ctx.sessionId, { sessionConfig, workspaceRoot });
       try {
         const built = await options.createExecutor({ sessionConfig, workspaceRoot });
@@ -406,6 +369,8 @@ export function createFlowHooks(options: FlowAcpOptions): DeepAgentsServerHooks 
           phase: ctx.phase,
           cwd: workspaceRoot,
           mcpServers: sessionConfig.mcpServers ? Object.keys(sessionConfig.mcpServers) : [],
+          systemPromptChars: sessionConfig.systemPrompt?.trim().length ?? 0,
+          model: sessionConfig.model,
         });
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -590,6 +555,7 @@ export async function bootstrapFlowAcp(options: FlowAcpOptions): Promise<void> {
     model: `${appConfig.model.provider}:${appConfig.model.name}`,
     mode: options.createExecutor ? "per-session" : "single-executor",
   });
+  logStartupAcpEnvDiagnostics();
 
   // 极简 throwaway agent —— onPrompt 会短路，它永不进入请求路径。
   const agentConfig = {

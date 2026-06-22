@@ -33,6 +33,7 @@ import {
 import { createFlowTools } from "./app/flow-tools.js";
 import { getFlowSandboxPolicy } from "./runtime/fs/sandbox.js";
 import { createFileCheckpointer } from "./runtime/services/file-checkpoint-saver.js";
+import { logRuntimeSystemPromptDiagnostics } from "./surfaces/acp/session-diagnostics.js";
 import type { FlowRuntime } from "./runtime/flow-runtime.js";
 import { bootstrapFlowAcp } from "./surfaces/acp/server.js";
 import { runFlowCli } from "./surfaces/cli/run.js";
@@ -77,6 +78,16 @@ export async function createFlowRuntime(
   const systemPrompt = sections.length
     ? `${baseSystemPrompt}\n\n${sections.join("\n\n")}`
     : baseSystemPrompt;
+
+  logRuntimeSystemPromptDiagnostics({
+    sessionConfig: options.sessionConfig,
+    configInlinePrompt: appConfig.agent.systemPrompt,
+    systemPromptPath: appConfig.agent.systemPromptPath,
+    workspaceRoot,
+    finalSystemPromptChars: systemPrompt.length,
+    skillsSectionChars: sections[0]?.length,
+    subagentsSectionChars: sections[1]?.length,
+  });
 
   // 文件后端 checkpointer(跨重启恢复 + interrupt/resume 持久化)。
   const checkpointer = createFileCheckpointer(appConfig, workspaceRoot);

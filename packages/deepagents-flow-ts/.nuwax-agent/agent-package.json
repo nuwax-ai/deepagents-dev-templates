@@ -43,6 +43,9 @@
   "env": {
     "required": [],
     "optional": [
+      "ACP_SESSION_CONFIG_JSON",
+      "SYSTEM_PROMPT",
+      "AGENT_SYSTEM_PROMPT",
       "ANTHROPIC_API_KEY",
       "ANTHROPIC_MODEL",
       "ANTHROPIC_BASE_URL",
