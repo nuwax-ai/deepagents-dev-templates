@@ -27,7 +27,7 @@ deepagents-flow-ts sessions       # 已持久化的会话
 
 ## 扩展能力（不改源码）
 
-- **加 MCP**：编辑 `config/mcp.default.json`（或经平台面板下发 `ACP_SESSION_CONFIG_JSON.mcpServers`）。`mergeStrategy: session-wins` → 会话级覆盖平台级覆盖默认。常用：context7（文档）、chrome-devtools（浏览）、duckduckgo（搜索）—— 见 `config/mcp.examples.json`。
+- **加 MCP**：编辑 `config/mcp.default.json`（或经平台面板下发 `ACP_SESSION_CONFIG_JSON.mcpServers`）。`mergeStrategy: session-wins` → 会话级覆盖平台级覆盖默认。常用：context7（文档）、chrome-devtools（浏览）—— 见 `config/mcp.examples.json`。
 - **加 Skill**：放 `skills/builtin/<name>/SKILL.md`（YAML frontmatter + 正文）。`resolveSkillsPaths` 自动发现。
 - **加 Subagent**：放 `.agents/agents/<name>/AGENT.md`（声明式）。`discoverSubAgents` 自动发现；在图里用 subgraph 调用。
 - **改系统提示词**：编辑 `prompts/flow.base.md`，或经 ACP session / `config.agent.systemPrompt` 下发。
