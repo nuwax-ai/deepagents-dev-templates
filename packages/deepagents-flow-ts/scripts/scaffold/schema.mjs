@@ -125,6 +125,17 @@ export const specSchema = z.discriminatedUnion("topology", [
       })
       .default({}),
   }),
+  // 自适应检索增强：route_question + web_search + LLM 逐文档 grade + 幻觉/答案评分自纠正（one-shot，对齐官方 Adaptive RAG）。
+  z.object({
+    ...base,
+    topology: z.literal("adaptive-rag"),
+    params: z
+      .object({
+        /** 检索源 MCP 服务器（语义名 → stdio MCP 配置）；web_search 走原生工具（默认 DuckDuckGo，可切 Tavily）。 */
+        mcpServers: z.record(z.string(), z.unknown()).default({}),
+      })
+      .default({}),
+  }),
   // 深度研究：clarify → plan → outline_gate →(Send) research → review → draft → converse → delivery（多阶段 stateful）。
   z.object({
     ...base,

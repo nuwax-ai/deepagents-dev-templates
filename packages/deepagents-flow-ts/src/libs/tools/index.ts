@@ -10,6 +10,7 @@
  */
 
 export { httpRequestTool } from "./http-request.tool.js";
+export { webSearchTool } from "./web-search.tool.js";
 export { jsonUtilsTool } from "./json-utils.tool.js";
 export { createBashTool } from "./bash.tool.js";
 export { createFsTools } from "./fs.tool.js";

@@ -18,6 +18,7 @@ import * as humanInLoop from "./blueprints/human-in-loop.mjs";
 import * as projectManager from "./blueprints/project-manager.mjs";
 import * as travelPlanner from "./blueprints/travel-planner.mjs";
 import * as rag from "./blueprints/rag.mjs";
+import * as adaptiveRag from "./blueprints/adaptive-rag.mjs";
 import * as deepResearch from "./blueprints/deep-research.mjs";
 import * as devAgent from "./blueprints/dev-agent.mjs";
 import * as custom from "./blueprints/custom.mjs";
@@ -29,6 +30,7 @@ const BLUEPRINTS = {
   "project-manager": projectManager,
   "travel-planner": travelPlanner,
   rag,
+  "adaptive-rag": adaptiveRag,
   "deep-research": deepResearch,
   "dev-agent": devAgent,
   custom,

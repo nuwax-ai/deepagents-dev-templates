@@ -22,6 +22,7 @@ import { logger } from "../../runtime/index.js";
 import * as codingAgentFlow from "./coding-agent/index.js";
 import * as researchAgentFlow from "./research-agent/index.js";
 import * as knowledgeQaFlow from "./knowledge-qa/index.js";
+import * as adaptiveKnowledgeQaFlow from "./adaptive-knowledge-qa/index.js";
 import * as tripPlannerFlow from "./trip-planner/index.js";
 import * as projectPlannerFlow from "./project-planner/index.js";
 import * as contentReviewFlow from "./content-review/index.js";
@@ -76,6 +77,7 @@ export const flows: Record<string, FlowDef> = {
   "coding-agent": { name: "coding-agent", kind: "stateful-custom", createExecutor: codingAgentFlow.createExecutor, getTopology: codingAgentFlow.getTopology },
   "research-agent": { name: "research-agent", kind: "stateful-recipe", recipe: researchAgentFlow.recipe, getTopology: researchAgentFlow.getTopology },
   "knowledge-qa": { name: "knowledge-qa", kind: "oneshot", createExecutor: knowledgeQaFlow.createExecutor, getTopology: knowledgeQaFlow.getTopology },
+  "adaptive-knowledge-qa": { name: "adaptive-knowledge-qa", kind: "oneshot", createExecutor: adaptiveKnowledgeQaFlow.createExecutor, getTopology: adaptiveKnowledgeQaFlow.getTopology },
   "trip-planner": { name: "trip-planner", kind: "stateful-recipe", recipe: tripPlannerFlow.recipe, getTopology: tripPlannerFlow.getTopology },
   "project-planner": { name: "project-planner", kind: "stateful-recipe", recipe: projectPlannerFlow.recipe, getTopology: projectPlannerFlow.getTopology },
   "content-review": { name: "content-review", kind: "stateful-recipe", recipe: contentReviewFlow.recipe, getTopology: contentReviewFlow.getTopology },
