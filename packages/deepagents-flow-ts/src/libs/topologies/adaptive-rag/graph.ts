@@ -21,7 +21,7 @@
  * 复用 rag 的 rewrite / retrieve / prepare / generate（图逻辑单一权威在 libs/topologies/rag/），
  * 本拓扑只新增自适应路由与评分节点。
  */
-import { StateGraph, END, START, Annotation } from "@langchain/langgraph";
+import { StateGraph, END, START, Annotation, type BaseCheckpointSaver } from "@langchain/langgraph";
 import { BaseMessage } from "@langchain/core/messages";
 import { logger, type AppConfig } from "../../../runtime/index.js";
 // 复用 rag 节点
@@ -57,7 +57,12 @@ const log = logger.child("adaptive-rag-graph");
 const AdaptiveRAGStateAnnotation = Annotation.Root({
   // 输入
   query: Annotation<string>,
-  history: Annotation<BaseMessage[]>,
+  // append reducer：conversational 多轮把 (query, answer) 累积进 history（generate 节点写回），
+  // 配合稳定 threadId + checkpointer → 下一轮 rewrite/generate 读到对话上下文。oneshot 单轮无副作用。
+  history: Annotation<BaseMessage[]>({
+    reducer: (a, b) => [...(a ?? []), ...(b ?? [])],
+    default: () => [],
+  }),
 
   // Rewrite 输出（复用 rag）
   rewritten_query: Annotation<string>,
@@ -115,7 +120,7 @@ export interface CreateAdaptiveRAGGraphConfig extends AdaptiveRAGConfig {
 /**
  * 创建 Adaptive RAG Graph（编译后的 LangGraph 图）。
  */
-export function createAdaptiveRAGGraph(config: CreateAdaptiveRAGGraphConfig) {
+export function createAdaptiveRAGGraph(config: CreateAdaptiveRAGGraphConfig, checkpointer?: BaseCheckpointSaver) {
   const retrieveConfig: RetrieveNodeConfig = {
     mcpServers: config.mcpServers,
     retrievalTools: config.retrievalTools,
@@ -146,15 +151,15 @@ export function createAdaptiveRAGGraph(config: CreateAdaptiveRAGGraphConfig) {
     // ── 节点 ────────────────────────────────────────────
     .addNode("rewrite", async (state: AdaptiveRAGStateType) => rewriteNode(state))
     .addNode("route_question", async (state: AdaptiveRAGStateType) => routeQuestionNode(state))
-    .addNode("retrieve", async (state: AdaptiveRAGStateType) => retrieveNode(state, retrieveConfig))
+    .addNode("retrieve", async (state: AdaptiveRAGStateType, lgConfig) => retrieveNode(state, retrieveConfig, lgConfig))
     .addNode("web_search", async (state: AdaptiveRAGStateType) => webSearchNode(state, config))
     .addNode("grade_documents", async (state: AdaptiveRAGStateType) =>
       gradeDocumentsNode(state, config.appConfig)
     )
     .addNode("transform_query", async (state: AdaptiveRAGStateType) => transformQueryNode(state))
     .addNode("prepare", async (state: AdaptiveRAGStateType) => prepareNode(state, config))
-    .addNode("generate", async (state: AdaptiveRAGStateType) =>
-      generateNode(state, config, config.appConfig, config.callbacks)
+    .addNode("generate", async (state: AdaptiveRAGStateType, lgConfig) =>
+      generateNode(state, config, config.appConfig, lgConfig)
     )
     .addNode("grade_gen", async (state: AdaptiveRAGStateType) =>
       gradeGenerationNode(state, config.appConfig)
@@ -186,7 +191,7 @@ export function createAdaptiveRAGGraph(config: CreateAdaptiveRAGGraphConfig) {
     "Adaptive graph compiled: START → rewrite → route_question →{web_search|retrieve} → grade_documents →{transform_query|prepare} → generate → grade_gen →{useful:END|not_supported:generate|not_useful:transform_query}"
   );
 
-  return graph.compile();
+  return graph.compile(checkpointer ? { checkpointer } : undefined);
 }
 
 /**
@@ -204,15 +209,18 @@ export async function executeAdaptiveRAG(
   }
 ): Promise<RAGResponse> {
   const { config, callbacks } = options;
-  const graph = createAdaptiveRAGGraph({ ...config, callbacks });
+  const graph = createAdaptiveRAGGraph(config);
 
   const startTime = Date.now();
 
   try {
-    const result = await graph.invoke({
-      query,
-      history: options?.history || [],
-    });
+    // onToken/onToolCall 经 configurable 注入（节点统一从运行时 config 读，见 generate/retrieve）。
+    const result = await graph.invoke(
+      { query, history: options?.history || [] },
+      callbacks
+        ? { configurable: { onToken: callbacks.onToken, onToolCall: callbacks.onToolCall } }
+        : undefined
+    );
 
     return {
       answer: result.answer || "无法生成回答",

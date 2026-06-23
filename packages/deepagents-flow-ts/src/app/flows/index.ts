@@ -12,7 +12,7 @@
 
 import type { FlowRuntime } from "../../runtime/flow-runtime.js";
 import type { FlowExecutor, StatefulFlow } from "../../core/flow-types.js";
-import { createDefaultExecutor } from "../default-flow.js";
+import { recipe as defaultRecipe } from "../default-flow.js";
 import { getFlowTopology, type FlowTopology } from "../topology.js";
 import * as routerGateFlow from "./router-gate/index.js";
 import * as gradeRedoFlow from "./grade-redo/index.js";
@@ -53,6 +53,11 @@ export type FlowDef =
       name: string;
       kind: "stateful-recipe";
       recipe: (runtime: FlowRuntime) => StatefulTopologyRecipe;
+      /**
+       * 对话型（多轮对话，非 HITL）。物化时透传 createStatefulFlow → 不暴露 hasStarted，
+       * surface 每轮走 query + 稳定 threadId 累积历史（见 surfaces/stateful-flow.ts）。
+       */
+      conversational?: boolean;
       getTopology: () => Promise<FlowTopology>;
     }
   | {
@@ -65,8 +70,9 @@ export type FlowDef =
 export const flows: Record<string, FlowDef> = {
   default: {
     name: "default",
-    kind: "oneshot",
-    createExecutor: createDefaultExecutor,
+    kind: "stateful-recipe",
+    conversational: true,
+    recipe: defaultRecipe,
     getTopology: () => getFlowTopology(),
   },
   // --- SCAFFOLD-REGISTRY-START (generator 自动维护，勿手改此区) ---
@@ -76,12 +82,12 @@ export const flows: Record<string, FlowDef> = {
   "translate-review": { name: "translate-review", kind: "stateful-recipe", recipe: translateReviewFlow.recipe, getTopology: translateReviewFlow.getTopology },
   "coding-agent": { name: "coding-agent", kind: "stateful-custom", createExecutor: codingAgentFlow.createExecutor, getTopology: codingAgentFlow.getTopology },
   "research-agent": { name: "research-agent", kind: "stateful-recipe", recipe: researchAgentFlow.recipe, getTopology: researchAgentFlow.getTopology },
-  "knowledge-qa": { name: "knowledge-qa", kind: "oneshot", createExecutor: knowledgeQaFlow.createExecutor, getTopology: knowledgeQaFlow.getTopology },
-  "adaptive-knowledge-qa": { name: "adaptive-knowledge-qa", kind: "oneshot", createExecutor: adaptiveKnowledgeQaFlow.createExecutor, getTopology: adaptiveKnowledgeQaFlow.getTopology },
+  "knowledge-qa": { name: "knowledge-qa", kind: "stateful-recipe", conversational: true, recipe: knowledgeQaFlow.recipe, getTopology: knowledgeQaFlow.getTopology },
+  "adaptive-knowledge-qa": { name: "adaptive-knowledge-qa", kind: "stateful-recipe", conversational: true, recipe: adaptiveKnowledgeQaFlow.recipe, getTopology: adaptiveKnowledgeQaFlow.getTopology },
   "trip-planner": { name: "trip-planner", kind: "stateful-recipe", recipe: tripPlannerFlow.recipe, getTopology: tripPlannerFlow.getTopology },
   "project-planner": { name: "project-planner", kind: "stateful-recipe", recipe: projectPlannerFlow.recipe, getTopology: projectPlannerFlow.getTopology },
   "content-review": { name: "content-review", kind: "stateful-recipe", recipe: contentReviewFlow.recipe, getTopology: contentReviewFlow.getTopology },
-  "customer-support": { name: "customer-support", kind: "oneshot", createExecutor: customerSupportFlow.createExecutor, getTopology: customerSupportFlow.getTopology },
+  "customer-support": { name: "customer-support", kind: "stateful-recipe", conversational: true, recipe: customerSupportFlow.recipe, getTopology: customerSupportFlow.getTopology },
   // --- SCAFFOLD-REGISTRY-END ---
 };
 

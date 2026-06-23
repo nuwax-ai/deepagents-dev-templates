@@ -35,7 +35,7 @@ const graph = new StateGraph(S)
 ```
 
 - **节点选型**见 [docs/node-catalog.md](docs/node-catalog.md)；**factory API** 见 [docs/node-kit.md](docs/node-kit.md)
-- **一句话需求 → flow**：`scripts/scaffold/`（8 拓扑：7 预设 + `custom` 任意节点级编排）
+- **一句话需求 → flow**：`scripts/scaffold/`（9 拓扑：8 预设 = react-tools / human-in-loop / project-manager / travel-planner / rag / adaptive-rag / deep-research / dev-agent + `custom` 任意节点级编排）
 - 进阶模式（Send / interrupt / subgraph / 长任务硬化）见 [docs/flow-patterns.md](docs/flow-patterns.md)
 - 6 个完整可跑范例见 [examples/](examples/)
 
@@ -48,7 +48,7 @@ src/
   libs/          ★ 可复用构建件（保护、消费不改）
     nodes/         节点 factory + 原语（建 flow 用，见 node-kit.md）+ model-resolver（凭证策略）
     tools/         内置通用工具（bash/fs/search/demo/mcp-bridge/http/json/skill）
-    topologies/    7 拓扑积木（图逻辑单一权威：graph/topology/recipe；scaffold 生成薄封装复用；单向依赖 nodes/+mcp/）
+    topologies/    拓扑积木（adaptive-rag/rag/deep-research/human-in-loop/project-manager/travel-planner；图逻辑单一权威 graph/topology/recipe；scaffold 生成薄封装复用；单向依赖 nodes/+mcp/；react-tools 复用默认图、dev-agent 在 app/topologies/）
     mcp/           stdio MCP 客户端（callResolvedMcpTool/rateLimited；零 src import，自包含）
     deepagents-acp/  vendored ACP SDK（自包含）
   app/           默认 ReAct 图（★ 可改、开发工作区）：graph.ts + nodes/ + flow-tools/task + state/topology/default-flow/compaction + flows/（注册表+scaffold 薄封装）+ topologies/（app 层拓扑，如 dev-agent stateful-custom）
@@ -74,8 +74,10 @@ config/ prompts/ skills/ scripts/ docs/ tests/
 2. **直接改默认图**：编辑 [src/app/graph.ts](src/app/graph.ts) 连线 + [src/app/nodes/](src/app/nodes/) 节点逻辑；或对照 [examples/](examples/) 在 `src/app/` 实现
 
 **两类 flow**（[src/core/flow-types.ts](src/core/flow-types.ts)）：
-- `FlowExecutor`：one-shot，`(query, cb) => Promise<FlowResult>`。适合问答 / 检索 / 批处理（见 examples/rag）。
-- `StatefulFlow`：支持 human-in-the-loop，`run({query|resume}, threadId, cb) => {done|interrupted}`。图里 `interrupt` 暂停 → surface 把问题发给用户 → 下一轮 `resume`。**别手写 run-loop**——用 `createStatefulFlow`（[src/surfaces/stateful-flow.ts](src/surfaces/stateful-flow.ts)）。
+- `FlowExecutor`：one-shot，`(query, cb) => Promise<FlowResult>`。无记忆单次调用（见 examples/rag）。
+- `StatefulFlow`：支持 human-in-the-loop，`run({query|resume}, threadId, cb) => {done|interrupted}`。图里 `interrupt` 暂停 → surface 把问题发给用户 → 下一轮 `resume`。**别手写 run-loop**——用 `createStatefulFlow`（[src/surfaces/stateful-flow.ts](src/surfaces/stateful-flow.ts)），它有**两种用法**：
+  - **HITL 长任务**（默认）：暴露 `hasStarted`，首条 query 开题、之后续跑同一任务（`resume` 走 interrupt 续跑）。
+  - **conversational 对话**（`conversational: true`，如 default / knowledge-qa / adaptive-knowledge-qa / customer-support）：不暴露 `hasStarted`，surface 每轮走 query + 稳定 threadId + checkpointer → 多轮记忆；图层 `graph.stream` 真流式。详见 [docs/flow-patterns.md](docs/flow-patterns.md) 第 6 节。
 
 ## 开发规则
 
@@ -200,7 +202,7 @@ const { nodes, edges, mermaid } = await getFlowTopology();
 
 [config/flow-agent.config.json](config/flow-agent.config.json)：标准 `agent` / `model` / `mcp` / `permissions` / `sandbox` / `skills` / `agentsDirectories` / `memory` / `compaction` / `middleware` 段（走 `loadFlowConfig` → 底层 `loadConfig`（[src/runtime/](src/runtime/)），Zod schema 校验）。自定义块加在顶层、用 `loadFlowConfig().raw` 取出（RAG 范例放 `rag` 段）。
 
-**能力分层**（基础内置 / ACP 下发 / 环境 / 文件持久化）见 [docs/capabilities.md](docs/capabilities.md) 与 [.nuwax-agent/capability-sources.json](.nuwax-agent/capability-sources.json)——`capabilities` 命令查询当前可用工具/MCP/skills。
+**能力分层**（工作区配置 / 内置 / 环境 / 文件持久化）见 [docs/capabilities.md](docs/capabilities.md) 与 [.nuwax-agent/capability-sources.json](.nuwax-agent/capability-sources.json)——`capabilities` 命令查询当前可用工具/MCP/skills。
 
 默认模型 `openai / deepseek-chat`（见 [config/flow-agent.config.json](config/flow-agent.config.json)，已对齐国内 OpenAI 兼容端点；切回 Anthropic 把 `model.provider` 设为 `anthropic`）。各端点配置见 [`.env.example`](.env.example)。
 
@@ -223,6 +225,7 @@ pnpm test
 
 ## 扩展阅读
 
+- [docs/flow-orchestration.md](docs/flow-orchestration.md) — **编排速查**（框架优先 / 核心编排模式 / 命名坑 / 能力来源）
 - [docs/node-catalog.md](docs/node-catalog.md) — **节点选型入口**（type 目录 + 何时用哪个）
 - [docs/node-kit.md](docs/node-kit.md) — **factory catalog（建 flow 必读）**
 - [docs/flow-patterns.md](docs/flow-patterns.md) — 进阶模式（Send/interrupt/Command/subgraph/checkpointer/长任务硬化）

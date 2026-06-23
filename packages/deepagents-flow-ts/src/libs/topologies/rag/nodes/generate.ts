@@ -14,7 +14,7 @@
  * 在工作流模板中更名为 `generateNode` —— 它只是图里的一个生成节点。
  */
 
-import { HumanMessage, SystemMessage, type BaseMessage } from "@langchain/core/messages";
+import { HumanMessage, AIMessage, SystemMessage, type BaseMessage } from "@langchain/core/messages";
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import { type AppConfig } from "../../../../runtime/index.js";
 import { resolveLlmResilience } from "../../../../runtime/services/llm-resilience.js";
@@ -62,20 +62,29 @@ function buildGenerateMessages(state: RAGState, config: RAGConfig): BaseMessage[
  * Generate 节点：基于检索上下文生成回答（复用 createLlmStreamNode）。
  * 无凭证 → requireModel 抛清晰错误（在 createLlmStreamNode 的 try 外，由 executeRAG 顶层 catch 兜底）；
  * 调用失败 → 下方 fallback 降级为可读错误提示。
+ *
+ * 流式：直接透传运行时 `lgConfig`（含 configurable.onToken）给 streamLLMText —— 由它按
+ * configurable.onToken / writer 决定逐 token emit（oneshot 经 executeRAG invoke 注入；
+ * conversational 经底座 graph.stream 注入）。统一从运行时 config 读，不再用闭包 callbacks。
+ *
+ * 记忆：write 顺带把 (query, answer) 追加进 `history` channel（append reducer）—— 配合稳定
+ * threadId + checkpointer，下一轮 rewrite/generate 即可读到本轮对话（见 rag/graph.ts history channel）。
  */
 export async function generateNode(
   state: RAGState,
   config: RAGConfig,
   appConfig?: AppConfig,
-  callbacks?: {
-    onToken?: (token: string) => void | Promise<void>;
-  }
+  lgConfig?: LangGraphRunnableConfig
 ): Promise<Partial<RAGState>> {
   const startTime = Date.now();
   const node = createLlmStreamNode<RAGState>({
     model: () => requireModel(appConfig, "RAG generate"),
     prompt: (s) => buildGenerateMessages(s, config),
-    write: ({ text }, s) => ({ answer: text, metadata: buildMetadata(s, startTime) }),
+    write: ({ text }, s) => ({
+      answer: text,
+      history: [new HumanMessage(s.query), new AIMessage(text)],
+      metadata: buildMetadata(s, startTime),
+    }),
     config: appConfig,
     label: "rag generate",
     timeoutMs: resolveLlmResilience(appConfig).longTimeoutMs,
@@ -88,12 +97,6 @@ export async function generateNode(
       },
     }),
   });
-  // RAG 经 invoke 执行（非 streamMode:"custom"，无 writer），把 onToken 接进 configurable，
-  // 由 streamLLMText → emitTextToken 的 configurable.onToken 退路 emit。
-  const lgConfig: LangGraphRunnableConfig | undefined =
-    config.agent.streaming && callbacks?.onToken
-      ? { configurable: { onToken: callbacks.onToken } }
-      : undefined;
   return node(state, lgConfig);
 }
 

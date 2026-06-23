@@ -184,6 +184,10 @@ travel-planner / project-manager / human-in-loop / deep-research 是 `StatefulFl
 机制：`interrupt` 后本轮 `end_turn`；**下一条用户消息** 作为 `resume`（同 session = 同 thread，checkpoint 续状态）。
 `rcoder-cli` 冒烟是 one-shot，多轮 HITL 请在 Zed 手测。
 
+### conversational 对话怎么玩（多轮记忆）
+
+`default` / `knowledge-qa` / `adaptive-knowledge-qa` / `customer-support` 是 **conversational** `StatefulFlow`（`conversational: true`）——与上面 HITL 不同：**每条消息都是独立 `query`**（不暴露 `hasStarted`、不走 `resume`），靠稳定 threadId（= ACP sessionId）+ checkpointer 累积历史 → 多轮记忆。在 Zed 里像普通聊天一样连续问，agent 记得上下文；图层 `graph.stream` 真流式输出。`adaptive-knowledge-qa` 走 adaptive-rag 拓扑（路由检索 + 检索/生成双自纠正），需配检索源 MCP。
+
 ## 看日志
 
 `LOG_DIR`（如 `<REPO>/.logs`）下会有各 flow 的结构化日志（`runtime:flow-graph`、`runtime:travel` 等）。

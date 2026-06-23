@@ -32,7 +32,7 @@ import {
 | 并行扇出(Send map-reduce) | `createFanout` | travel/deep-research research |
 | 把一张小图当节点用 | `createSubgraphNode` | dev-agent researcher |
 
-> **bespoke 不要硬塞**:isApproval 短路定稿、LLM 裁决路由、主动 MCP 检索**已有 factory**(见下各节);剩余真正 bespoke(如 deep-research converse 的 interrupt 路由、RAG retrieve 的意图驱动多工具并行、文件交付)才保留手写,见各 example「保留 bespoke」注释。
+> **bespoke 不要硬塞**:isApproval 短路定稿、LLM 裁决路由、主动 MCP 检索**已有 factory**(见下各节);剩余真正 bespoke(如 deep-research converse 的 interrupt 路由、RAG retrieve 的意图驱动多工具并行、adaptive-rag 的逐项 LLM 评分 grade_documents / grade_generation 与原生 `webSearchTool` 调用、文件交付)才保留手写,见各 example「保留 bespoke」注释。
 
 ---
 
@@ -55,7 +55,7 @@ graph.addNode("compose", compose);
 - `r.content` 已是 `extractText` 后的纯文本;`parse` 提供时 `r.parsed = parse(content)`。
 - **结构化**:加 `parse`(常用 `parseJson`),`write` 里读 `r.parsed`。PM 的 plan/evaluate、rag 的 rewrite 都用这个。
 - **`write` 可收第三参 `config?`**(LangGraphRunnableConfig)——供 write 内发 `emitPlan(config,…)`/`emitStage(config,…)` 副作用;不用就忽略(默认两参 `(r, s)`)。
-- 例:[human-in-loop](../examples/human-in-loop/) compose、[travel-planner](../examples/travel-planner/) aggregate、[project-manager](../examples/project-manager/) plan/estimate/evaluate、[rag](../examples/rag/) rewrite。
+- 例:[human-in-loop](../examples/human-in-loop/) compose、[travel-planner](../examples/travel-planner/) aggregate、[project-manager](../examples/project-manager/) plan/estimate/evaluate、[rag](../examples/rag/) rewrite、[adaptive-rag](../src/libs/topologies/adaptive-rag/) route_question / transform_query（`{ parse }` 结构化裁决 / 查询重写）。
 
 ## createLlmStreamNode —— 流式 LLM
 

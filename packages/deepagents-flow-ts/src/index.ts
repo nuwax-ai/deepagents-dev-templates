@@ -36,6 +36,7 @@ import { createFileCheckpointer } from "./runtime/services/file-checkpoint-saver
 import { logRuntimeSystemPromptDiagnostics } from "./surfaces/acp/session-diagnostics.js";
 import type { FlowRuntime } from "./runtime/flow-runtime.js";
 import { bootstrapFlowAcp } from "./surfaces/acp/server.js";
+import { loadSessionConfigFromEnv } from "./surfaces/acp/session-config.js";
 import { runFlowCli } from "./surfaces/cli/run.js";
 import { runCapabilities } from "./surfaces/cli/capabilities.js";
 import { runSessions } from "./surfaces/cli/sessions.js";
@@ -119,6 +120,7 @@ function materializeFlow(def: FlowDef, runtime: FlowRuntime): FlowExecutor | Sta
       ...def.recipe(runtime),
       checkpointer: runtime.checkpointer,
       appConfig: runtime.config,
+      conversational: def.conversational,
     });
   }
   return def.createExecutor(runtime);
@@ -242,15 +244,23 @@ async function main(): Promise<void> {
   setLogAgent(baseConfig.appConfig.agent.name);
 
   if (args.command === "flow") {
-    // CLI one-shot：单 runtime 共用即可，无需 per-session。
-    const runtime = await createFlowRuntime(baseConfig.appConfig);
+    // CLI：单 runtime；可用 ACP_SESSION_CONFIG_JSON 模拟 host 下发的 mcpServers（与 ACP 会话合并逻辑一致）。
+    const sessionConfig = loadSessionConfigFromEnv();
+    const workspaceRoot = sessionConfig?.cwd ?? process.cwd();
+    const { appConfig, raw } = loadFlowConfig({
+      configPath: args.configPath,
+      workspaceRoot,
+      sessionConfig,
+    });
+    const runtime = await createFlowRuntime(appConfig, { sessionConfig, workspaceRoot });
     const activeFlow =
-      typeof baseConfig.raw.activeFlow === "string" ? baseConfig.raw.activeFlow : undefined;
+      typeof raw.activeFlow === "string" ? raw.activeFlow : undefined;
     const executor = materializeFlow(resolveFlow(activeFlow), runtime);
     await runFlowCli(executor, {
       query: args.query,
       interactive: args.interactive,
     });
+    await destroyRuntimeContext(runtime.ctx).catch(() => {});
     return;
   }
 

@@ -13,7 +13,7 @@
 
 | 层 | 示例 | 归属 |
 | --- | --- | --- |
-| ACP 动态 | 系统提示词、MCP 服务、skills、模型、subagent | Nuwax 平台与工作区配置 |
+| 工作区配置 | 系统提示词、MCP 服务、skills、模型、subagent（`config/`、`prompts/`、`skills/`、`.agents/`） | 项目内配置文件 |
 | Agent 内置 | 运行时工具（bash/fs/search/http/mcp-bridge）、压缩、demo 工具 | 模板包 |
 | 环境内置 | API key、base URL、日志路径 | 云计算机 / 本机 / 安装器 |
 | Agent 内置文件 | 会话存储（文件 JSON checkpointer） | 用户目录（`~/.flowagents/<workspace 散列>/`） |
@@ -21,14 +21,14 @@
 
 ## 文件
 
-- `capability-sources.json` —— 把每项能力映射到其来源层（acp-dynamic / agent-builtin / env-builtin / agent-builtin-file / package-placeholder）。这是 `flow capabilities` 读取的契约。
+- `capability-sources.json` —— 把每项能力映射到其来源层（workspace-config / agent-builtin / env-builtin / agent-builtin-file / package-placeholder）。这是 `flow capabilities` 读取的契约。
 - `package.config.json` —— 声明打包目标、esbuild-bundle 依赖策略、安装时占位符替换、平台矩阵，以及供平台读取的 `include`/`exclude` 元数据。**注意**：实际进入制品的文件由 [`scripts/lib/staging.mjs`](../scripts/lib/staging.mjs) 的 `STAGING_EXCLUDES` 黑名单决定（`package.mjs` 用 `copyPackageTree` 复制整树后排除）；此处 `include`/`exclude` 仅为平台侧元数据，**改它不改变实际打包内容**，二者需手动保持一致。
 - `placeholders.json` —— 列出打包时与安装时的占位符（OpenAI 兼容与 Anthropic 两套模型 env、安装根路径）。
 
 ## 运行时各层如何被消费
 
-- **systemPrompt** —— `resolveSystemPrompt(appConfig, sessionConfig, root)` 优先级：ACP session > `config.agent.systemPrompt` > `prompts/flow.base.md` > 内联 fallback。
-- **mcpServers** —— runtime-context 按 `default < session`（session-wins）合并 `config/mcp.default.json` 与 ACP/session MCP；native 工具经 `@langchain/mcp-adapters` 的 `MultiServerMCPClient.getTools()` 加载。
+- **systemPrompt** —— `resolveSystemPrompt(appConfig, sessionConfig, root)` 优先级：`config.agent.systemPrompt` / `prompts/flow.base.md` > 内联 fallback。（IDE host 经 ACP session 注入时可临时覆盖。）
+- **mcpServers** —— runtime-context 加载 `config/mcp.default.json`；native 工具经 `@langchain/mcp-adapters` 的 `MultiServerMCPClient.getTools()` 加载。ACP session 可合并追加（`session-wins`）。
 - **model** —— `resolveModel(appConfig)` 取自 `config.model`（ACP session / env / config / defaults）。
 - **skills** —— `resolveSkillsPaths(appConfig)` 发现 `skills/builtin/`、`skills/platform/`、`.agents/*/skills/`。
 - **subagents** —— `discoverSubAgents(appConfig)` 解析 `.agents/agents/<name>/AGENT.md`。

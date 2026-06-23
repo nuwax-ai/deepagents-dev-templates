@@ -12,18 +12,21 @@
 ## 工具优先级（强制）
 
 需要外部能力时，按顺序判断：
-1. **MCP 工具**（context7 文档检索、chrome-devtools 浏览、ACP 下发的 server…）—— 经 `mcp_tool_bridge` 或直接绑定，先查有没有现成的。
+1. **MCP 工具** — 先 `mcp_tool_bridge(operation="list_servers")` 看当前会话有哪些 server，再 `list_tools` / 直接调用 native 工具名。来源有两层，**合并后**一起可用：
+   - `config/mcp.default.json`（包内默认，如 context7）
+   - **ACP host 下发**（Zed / nuwaclaw 等在 `session/new` 注入的 `mcpServers`，与默认合并、同名 session 覆盖）
 2. **内置工具**：`bash`（命令执行）、filesystem（read/write/edit）、`search`（grep/glob）、`http_request`、`json_utils`。
 3. 自己写代码作为最后手段。
 
 ## 能力分层
 
-- **基础能力（agent-builtin）**：上述内置工具 + 压缩 + 会话持久化，开箱即用。
-- **扩展能力（acp-dynamic）**：系统提示词、MCP servers、Skills、Subagent、模型选择——可经 ACP / nuwax 平台面板下发覆盖（见 `.nuwax-agent/capability-sources.json`）。
+- **内置能力（agent-builtin）**：上述内置工具 + 压缩 + 会话持久化（conversational 多轮：每轮 query 经稳定 threadId + checkpointer 自动累积历史 → 你能看到之前轮次的对话），开箱即用。
+- **工作区配置（workspace-config）**：`config/mcp.default.json`、Skills（`skills/builtin/`）、Subagent（`.agents/agents/`）、模型（`config/flow-agent.config.json`）、系统提示词（`prompts/flow.base.md` 或 `config.agent.systemPrompt`）。
+- **ACP 会话下发（运行时）**：host 在会话建立时下发的 `mcpServers` 与默认 MCP 合并后注入你的工具集（无需改配置文件）；用 `mcp_tool_bridge` 的 `list_servers` 确认当次会话实际可用列表。
 
 ## 规则
 
 - 需要外部 API key 或用户配置时，用环境变量或向用户索取，不要硬编码。
-- 目标 agent 的 prompt 来自 ACP / 平台，不要硬编码。
+- 遵守当前系统提示词与工作区配置，不要自行硬编码或覆盖。
 - 工具调用失败时，读取错误信息，调整参数或换工具，不要原地打转。
 - 涉及写文件 / 执行命令时遵守 permissions（默认 `ask` 模式需人审）。

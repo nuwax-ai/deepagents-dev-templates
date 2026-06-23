@@ -129,6 +129,15 @@ export function createMyFlow(appConfig?, opts: { checkpointer?: BaseCheckpointSa
 | **阶段进度** | 节点 `emitStage(config, { stage, detail })` → `onStage` 回调 | 长流水线每步可见（CLI 打印 `▸`，ACP 发 message chunk） |
 | **单步护栏** | `recursionLimit` + `withTimeout(model.invoke(...), ms)` | 回边/挂死步骤不拖垮整图 |
 
+> **conversational 模式**（`conversational: true`，区别于上述 HITL 长任务）：
+> 默认有状态示例用 `hasStarted` 做「一个会话一个主题」续跑；**对话型 flow**（default /
+> knowledge-qa / adaptive-knowledge-qa / customer-support）传 `conversational: true` →
+> `createStatefulFlow` **不暴露 `hasStarted`**，surface 每轮都走 `query`（配合稳定
+> threadId = ACP sessionId + checkpointer），历史经 `MessagesAnnotation` reducer 自动累积
+> → **多轮记忆**；图层 `graph.stream` 真流式。图逻辑不变，只是 surface 入口从「续跑同一任务」
+> 变成「多轮对话」。压缩仍在新 query 入口触发。见 `src/app/default-flow.ts` 的 `recipe()`
+> 与 `src/surfaces/stateful-flow.ts` 的 `conversational` 选项。
+
 > **长任务上下文压缩**:多轮消息累积超阈值时，`compactHistory` 摘要旧历史，再用
 > `compactionUpdate`（`RemoveMessage` 替换模式）写回 channel。见 [dev-agent](../examples/dev-agent/) 的 run-loop
 > 与 `src/app/compaction.ts`（`config.compaction` 控制触发）。
@@ -151,6 +160,8 @@ export function createMyFlow(appConfig?, opts: { checkpointer?: BaseCheckpointSa
 | 多阶段流水线 + 多轮 HITL + 双层 reflection + 并行调研 + **持续会话** | [examples/deep-research](../examples/deep-research/)（长任务示例：选题确认 → 大纲规划 → Send 并行调研 → 初稿 → 质量评审 → 报告 → **converse↔respond 持续会话回路**，2 确认门 + 2 reflection 循环 + 报告后就同一研究反复改/问，回「结束」定稿） |
 | 长任务硬化（跨重启续跑 + 阶段进度 + 单步护栏） | `createStatefulFlow`（`src/surfaces/stateful-flow.ts`）——deep-research / travel / pm / human-in-loop 全部基于它；持久化默认 `FileCheckpointSaver` |
 | 长任务上下文压缩（摘要 + `RemoveMessage` 替换） | [examples/dev-agent](../examples/dev-agent/) run-loop + `src/app/compaction.ts` |
+| 条件边路由 + 检索/生成**双自纠正循环**（对齐官方 Adaptive RAG） | [libs/topologies/adaptive-rag](../src/libs/topologies/adaptive-rag/)（app flow `adaptive-knowledge-qa`） |
+| **conversational 多轮对话**（不暴露 `hasStarted` + 稳定 threadId + checkpointer 累积历史 + 图层流式） | `createStatefulFlow`（`conversational: true`）：default / knowledge-qa / adaptive-knowledge-qa / customer-support |
 
 > `interrupt` 的"采集回复 → resume"已由模板的 **`StatefulFlow`** seam 在 acp/cli surface 接好——
 > 不用自己写 host 端恢复逻辑。且续跑状态由 checkpointer 推断（`hasStarted`）——**一个会话一个主题**：

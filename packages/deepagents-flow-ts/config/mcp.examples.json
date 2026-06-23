@@ -1,5 +1,5 @@
 {
-  "_comment": "扩展能力 MCP 示例（不会被自动加载）。复制需要的 server 到 mcp.default.json 的 servers，或经 ACP/nuwax 平台面板下发。这些属于 acp-dynamic 扩展能力层。",
+  "_comment": "可选 MCP 示例（不会被自动加载）。复制需要的 server 到 mcp.default.json 的 servers 即可启用。",
   "servers": {
     "chrome-devtools": {
       "command": "npx",

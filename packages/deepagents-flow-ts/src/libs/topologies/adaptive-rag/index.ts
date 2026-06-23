@@ -17,6 +17,7 @@ export {
 export { getAdaptiveRagTopology } from "./topology.js";
 export {
   createAdaptiveRagExecutor,
+  createAdaptiveRagRecipe,
   type AdaptiveRagExecutorOptions,
 } from "./executor.js";
 export {

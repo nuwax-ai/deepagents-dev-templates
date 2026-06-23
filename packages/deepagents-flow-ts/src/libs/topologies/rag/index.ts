@@ -11,7 +11,7 @@ export {
   type RAGStateType,
 } from "./graph.js";
 export { getRagTopology } from "./topology.js";
-export { createRagExecutor, formatSourcesFooter, type RagExecutorOptions } from "./executor.js";
+export { createRagExecutor, createRagRecipe, formatSourcesFooter, type RagExecutorOptions } from "./executor.js";
 export {
   DEFAULT_RAG_CONFIG,
   type RAGConfig,

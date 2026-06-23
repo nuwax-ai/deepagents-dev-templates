@@ -7,8 +7,7 @@
  * 注意：检索驱动，spec.systemPrompt 不注入节点（领域 RAG prompt）。
  */
 import type { FlowRuntime } from "../../../runtime/flow-runtime.js";
-import type { FlowExecutor } from "../../../core/flow-types.js";
-import { createAdaptiveRagExecutor, getAdaptiveRagTopology } from "../../../libs/topologies/adaptive-rag/index.js";
+import { createAdaptiveRagRecipe, getAdaptiveRagTopology } from "../../../libs/topologies/adaptive-rag/index.js";
 
 /** 检索源 MCP 服务器（scaffold spec 注入；缺省空 → 无检索、走兜底回答）。 */
 const MCP_SERVERS = {"context7":{"command":"npx","args":["-y","@upstash/context7-mcp"]}} as Record<
@@ -16,7 +15,6 @@ const MCP_SERVERS = {"context7":{"command":"npx","args":["-y","@upstash/context7
   { command?: string; args?: string[]; env?: Record<string, string>; url?: string }
 >;
 
-export const createExecutor = (runtime: FlowRuntime): FlowExecutor =>
-  createAdaptiveRagExecutor(runtime, { mcpServers: MCP_SERVERS });
+export const recipe = (runtime: FlowRuntime) => createAdaptiveRagRecipe(runtime, { mcpServers: MCP_SERVERS });
 
 export const getTopology = () => getAdaptiveRagTopology();

@@ -286,6 +286,78 @@ const makeFanFlow = (cp: BaseCheckpointSaver, fail: { v: boolean }) =>
     checkpointer: cp,
   });
 
+// ── 对话型（conversational）：每轮 query 带历史累积，不走 resume —— 默认 flow 多轮记忆 ──
+const ConvState = Annotation.Root({
+  input: Annotation<string>,
+  turns: Annotation<string[]>({ reducer: (a, b) => [...a, ...b], default: () => [] }),
+  output: Annotation<string>,
+});
+type ConvStateType = typeof ConvState.State;
+
+/** 玩具对话图：prepare 把 input 追加进 turns（贴近默认图 MessagesAnnotation 累积）；answer 回显累计轮数。 */
+function buildConvGraph(checkpointer: BaseCheckpointSaver) {
+  return new StateGraph(ConvState)
+    .addNode("prepare", (s: ConvStateType) => ({ turns: [`u:${s.input}`] }))
+    .addNode("answer", (s: ConvStateType) => ({ output: `history=${s.turns.length}` }))
+    .addEdge(START, "prepare")
+    .addEdge("prepare", "answer")
+    .addEdge("answer", END)
+    .compile({ checkpointer });
+}
+
+const makeConvFlow = (cp: BaseCheckpointSaver) =>
+  createStatefulFlow<ConvStateType>({
+    buildGraph: (saver) => buildConvGraph(saver),
+    toInput: (query) => ({ input: query }),
+    toResult: (v) => ({ answer: v.output ?? "" }),
+    checkpointer: cp,
+    conversational: true,
+  });
+
+describe("对话型 flow：多轮记忆（conversational）", () => {
+  it("不暴露 hasStarted → surface 每轮走 query 分支（非 resume）", () => {
+    const flow = makeConvFlow(new MemorySaver());
+    expect(flow.hasStarted).toBeUndefined();
+  });
+
+  it("同 threadId 连续 query → 历史经 checkpointer 累积（每轮 done，轮数递增）", async () => {
+    const flow = makeConvFlow(new MemorySaver());
+    const tid = randomUUID();
+
+    const r1 = await flow.run({ query: "我叫张三" }, tid);
+    expect(r1.status).toBe("done");
+    if (r1.status === "done") expect(r1.answer).toBe("history=1");
+
+    const r2 = await flow.run({ query: "我叫什么" }, tid);
+    expect(r2.status).toBe("done");
+    if (r2.status === "done") expect(r2.answer).toBe("history=2"); // ← 记得上一轮
+
+    const r3 = await flow.run({ query: "再说一次" }, tid);
+    if (r3.status === "done") expect(r3.answer).toBe("history=3");
+  });
+
+  it("不同 threadId 互相隔离（新会话从零开始）", async () => {
+    const flow = makeConvFlow(new MemorySaver());
+    await flow.run({ query: "a" }, "sess-A");
+    const other = await flow.run({ query: "b" }, "sess-B");
+    if (other.status === "done") expect(other.answer).toBe("history=1");
+  });
+
+  it("跨实例（模拟进程/IDE 重启）同 threadId 仍续上历史", async () => {
+    const dir = freshDir();
+    const tid = "conv-restart-1";
+
+    const flowA = makeConvFlow(new FileCheckpointSaver({ dir }));
+    await flowA.run({ query: "第一句" }, tid);
+    await flowA.run({ query: "第二句" }, tid);
+
+    // 全新实例 + 全新 saver（同目录）= 重启后内存全空
+    const flowB = makeConvFlow(new FileCheckpointSaver({ dir }));
+    const resumed = await flowB.run({ query: "重启后这句" }, tid);
+    if (resumed.status === "done") expect(resumed.answer).toBe("history=3"); // ← 从磁盘恢复了前两轮
+  });
+});
+
 describe("长任务韧性：节点抛错 → 续跑不重头（回归用户 bug）", () => {
   it("review 抛错后，新实例(同目录)仍 hasStarted=true，resume 续跑到底", async () => {
     const dir = freshDir();

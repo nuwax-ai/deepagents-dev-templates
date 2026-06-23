@@ -10,7 +10,8 @@
  */
 import type { FlowRuntime } from "../../../runtime/flow-runtime.js";
 import type { FlowExecutor } from "../../../core/flow-types.js";
-import { executeRAG, type CreateRAGGraphConfig } from "./graph.js";
+import type { StatefulTopologyRecipe } from "../types.js";
+import { executeRAG, createRAGGraph, type CreateRAGGraphConfig, type RAGStateType } from "./graph.js";
 import { DEFAULT_RAG_CONFIG, type RAGResponse } from "./nodes/types.js";
 
 /** rag 检索 MCP 服务器配置（语义名 → server 配置）；scaffold spec.params.mcpServers 提供。 */
@@ -55,5 +56,38 @@ export function createRagExecutor(
       callbacks: { onToken, onToolCall },
     });
     return { answer: res.answer, footer: formatSourcesFooter(res) };
+  };
+}
+
+/**
+ * 把 rag 图包成 conversational recipe（多轮记忆 + 流式 + checkpointer 持久化）。
+ * 由组合根 materializeFlow 调 createStatefulFlow({...recipe, conversational:true, checkpointer})。
+ * history 经 generate 节点写回 + append reducer 累积（见 rag/graph.ts）；
+ * 节点 onToken/onToolCall 从运行时 configurable 读（底座 graph.stream 注入）。
+ */
+export function createRagRecipe(
+  runtime: FlowRuntime,
+  opts: RagExecutorOptions = {}
+): StatefulTopologyRecipe {
+  const mcpServers = opts.mcpServers ?? {};
+  const graphConfig: Omit<CreateRAGGraphConfig, "callbacks"> = {
+    ...DEFAULT_RAG_CONFIG,
+    retrievalTools: opts.retrievalTools ?? Object.keys(mcpServers),
+    mcpServers,
+    appConfig: runtime.config,
+  };
+  return {
+    buildGraph: (checkpointer) => createRAGGraph({ ...graphConfig }, checkpointer),
+    // 只传 query；history 由 checkpointer 恢复（稳定 threadId）+ append reducer 累积，不在此覆盖。
+    toInput: (query) => ({ query }),
+    toResult: (values) => {
+      const s = values as RAGStateType;
+      const response: RAGResponse = {
+        answer: s.answer || "无法生成回答",
+        sources: s.sources || [],
+        metadata: s.metadata ?? { tools_used: [], token_count: 0, duration_ms: 0 },
+      };
+      return { answer: response.answer, footer: formatSourcesFooter(response) };
+    },
   };
 }

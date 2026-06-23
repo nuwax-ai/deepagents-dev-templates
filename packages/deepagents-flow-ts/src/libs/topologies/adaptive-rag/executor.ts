@@ -10,7 +10,13 @@
  */
 import type { FlowRuntime } from "../../../runtime/flow-runtime.js";
 import type { FlowExecutor } from "../../../core/flow-types.js";
-import { executeAdaptiveRAG, type CreateAdaptiveRAGGraphConfig } from "./graph.js";
+import type { StatefulTopologyRecipe } from "../types.js";
+import {
+  executeAdaptiveRAG,
+  createAdaptiveRAGGraph,
+  type CreateAdaptiveRAGGraphConfig,
+  type AdaptiveRAGStateType,
+} from "./graph.js";
 import { DEFAULT_ADAPTIVE_RAG_CONFIG } from "./nodes/types.js";
 import { formatSourcesFooter } from "../rag/executor.js";
 import type { RAGResponse } from "../rag/nodes/types.js";
@@ -45,5 +51,35 @@ export function createAdaptiveRagExecutor(
       callbacks: { onToken, onToolCall },
     });
     return { answer: res.answer, footer: formatSourcesFooter(res) };
+  };
+}
+
+/**
+ * 把 adaptive-rag 图包成 conversational recipe（多轮记忆 + 流式 + checkpointer 持久化）。
+ * 对照 rag/executor.ts 的 createRagRecipe；history / 节点 callbacks 机制同 rag（见 adaptive-rag/graph.ts）。
+ */
+export function createAdaptiveRagRecipe(
+  runtime: FlowRuntime,
+  opts: AdaptiveRagExecutorOptions = {}
+): StatefulTopologyRecipe {
+  const mcpServers = opts.mcpServers ?? {};
+  const graphConfig: Omit<CreateAdaptiveRAGGraphConfig, "callbacks"> = {
+    ...DEFAULT_ADAPTIVE_RAG_CONFIG,
+    retrievalTools: opts.retrievalTools ?? Object.keys(mcpServers),
+    mcpServers,
+    appConfig: runtime.config,
+  };
+  return {
+    buildGraph: (checkpointer) => createAdaptiveRAGGraph({ ...graphConfig }, checkpointer),
+    toInput: (query) => ({ query }),
+    toResult: (values) => {
+      const s = values as AdaptiveRAGStateType;
+      const response: RAGResponse = {
+        answer: s.answer || "无法生成回答",
+        sources: s.sources || [],
+        metadata: s.metadata ?? { tools_used: [], token_count: 0, duration_ms: 0 },
+      };
+      return { answer: response.answer, footer: formatSourcesFooter(response) };
+    },
   };
 }

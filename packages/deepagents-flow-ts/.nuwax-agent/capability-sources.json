@@ -2,8 +2,8 @@
   "$schema": "https://agent.nuwax.com/schemas/nuwax-agent-capability-sources.v1.json",
   "schemaVersion": "nuwax.agent.capability-sources.v1",
   "sources": {
-    "acp-dynamic": {
-      "description": "Workspace-specific values delivered by ACP or the Nuwax configuration panel.",
+    "workspace-config": {
+      "description": "Workspace configuration files editable in the project tree.",
       "examples": ["systemPrompt", "mcpServers", "skills", "model", "subagents"]
     },
     "agent-builtin": {
@@ -24,11 +24,11 @@
     }
   },
   "capabilities": {
-    "systemPrompt": { "source": "acp-dynamic", "fallback": "prompts/flow.base.md" },
-    "mcpServers": { "source": "acp-dynamic", "fallback": "config/mcp.default.json" },
-    "skills": { "source": "acp-dynamic", "fallback": "skills/builtin" },
-    "model": { "source": "acp-dynamic", "fallback": "env-builtin" },
-    "subagents": { "source": "acp-dynamic", "fallback": ".agents/agents" },
+    "systemPrompt": { "source": "workspace-config", "fallback": "prompts/flow.base.md" },
+    "mcpServers": { "source": "workspace-config", "fallback": "config/mcp.default.json" },
+    "skills": { "source": "workspace-config", "fallback": "skills/builtin" },
+    "model": { "source": "workspace-config", "fallback": "env-builtin" },
+    "subagents": { "source": "workspace-config", "fallback": ".agents/agents" },
     "openaiApiKey": { "source": "env-builtin", "secret": true },
     "anthropicApiKey": { "source": "env-builtin", "secret": true },
     "builtInTools": {

@@ -1,5 +1,5 @@
 {
-  "_comment": "默认 MCP servers（agent-builtin 基础能力）。mergeStrategy=session-wins 时，ACP/平台下发的 mcpServers 会覆盖/追加这里的项。更多扩展能力（chrome-devtools 浏览抓取 / filesystem / bash）见 mcp.examples.json。",
+  "_comment": "默认 MCP servers。更多示例（chrome-devtools 浏览抓取 / filesystem / bash）见 mcp.examples.json，复制到 servers 即可启用。",
   "servers": {
     "context7": {
       "command": "npx",

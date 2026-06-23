@@ -65,6 +65,9 @@ export function resolveModel(config: AppConfig): CreateDeepAgentParams["model"] 
       },
       temperature: config.model.settings.temperature,
       maxTokens: config.model.settings.maxTokens,
+      // 开启 streaming 后 invoke 仍返回聚合 AIMessage（LangChain 内部聚合 stream），但底层以流式发出，
+      // 使 graph.stream(streamMode:"messages") 能逐 token 透出最终回答（对齐 anthropic 分支）。
+      streaming: true,
     }) as unknown as CreateDeepAgentParams["model"];
   } else {
     instance = new ChatAnthropic({

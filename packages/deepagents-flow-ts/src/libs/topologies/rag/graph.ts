@@ -13,7 +13,7 @@
  * 节点与连线都是静态可读、可被 inspector 抽取/可视化的结构。
  */
 
-import { StateGraph, END, START, Annotation } from "@langchain/langgraph";
+import { StateGraph, END, START, Annotation, type BaseCheckpointSaver } from "@langchain/langgraph";
 import { BaseMessage } from "@langchain/core/messages";
 import { logger, type AppConfig } from "../../../runtime/index.js";
 import { createRewriteNode } from "./nodes/rewrite.js";
@@ -38,7 +38,12 @@ const log = logger.child("rag-graph");
 const RAGStateAnnotation = Annotation.Root({
   // 输入
   query: Annotation<string>,
-  history: Annotation<BaseMessage[]>,
+  // append reducer：conversational 多轮把 (query, answer) 累积进 history（generate 节点写回），
+  // 配合稳定 threadId + checkpointer → 下一轮 rewrite/generate 读到对话上下文。oneshot 单轮无副作用。
+  history: Annotation<BaseMessage[]>({
+    reducer: (a, b) => [...(a ?? []), ...(b ?? [])],
+    default: () => [],
+  }),
 
   // Rewrite 输出
   rewritten_query: Annotation<string>,
@@ -87,9 +92,11 @@ export interface CreateRAGGraphConfig extends RAGConfig {
 }
 
 /**
- * 创建 RAG Graph（编译后的 LangGraph 图）
+ * 创建 RAG Graph（编译后的 LangGraph 图）。
+ * 传 checkpointer（conversational recipe 经 buildGraph 注入）→ 稳定 threadId 跨轮恢复 history；
+ * 不传（oneshot executeRAG）→ 无持久化，单轮。
  */
-export function createRAGGraph(config: CreateRAGGraphConfig) {
+export function createRAGGraph(config: CreateRAGGraphConfig, checkpointer?: BaseCheckpointSaver) {
   const retrieveConfig: RetrieveNodeConfig = {
     mcpServers: config.mcpServers,
     retrievalTools: config.retrievalTools,
@@ -111,8 +118,8 @@ export function createRAGGraph(config: CreateRAGGraphConfig) {
       log.info("node rewrite done", { intent: result.intent });
       return result;
     })
-    .addNode("retrieve", async (state: RAGStateType) => {
-      const result = await retrieveNode(state, retrieveConfig);
+    .addNode("retrieve", async (state: RAGStateType, lgConfig) => {
+      const result = await retrieveNode(state, retrieveConfig, lgConfig);
       log.info("node retrieve done", {
         resultCount: result.raw_results?.length,
         attempts: result.attempts,
@@ -126,8 +133,8 @@ export function createRAGGraph(config: CreateRAGGraphConfig) {
       log.info("node prepare done", { tokenCount: result.token_count });
       return result;
     })
-    .addNode("generate", async (state: RAGStateType) => {
-      const result = await generateNode(state, config, config.appConfig, config.callbacks);
+    .addNode("generate", async (state: RAGStateType, lgConfig) => {
+      const result = await generateNode(state, config, config.appConfig, lgConfig);
       log.info("node generate done", { answerLength: result.answer?.length });
       return result;
     })
@@ -147,7 +154,7 @@ export function createRAGGraph(config: CreateRAGGraphConfig) {
     "Graph compiled: START → rewrite → retrieve → grade_docs →(cond) rewrite|prepare → generate → END"
   );
 
-  return graph.compile();
+  return graph.compile(checkpointer ? { checkpointer } : undefined);
 }
 
 /**
@@ -165,15 +172,18 @@ export async function executeRAG(
   }
 ): Promise<RAGResponse> {
   const { config, callbacks } = options;
-  const graph = createRAGGraph({ ...config, callbacks });
+  const graph = createRAGGraph(config);
 
   const startTime = Date.now();
 
   try {
-    const result = await graph.invoke({
-      query,
-      history: options?.history || [],
-    });
+    // onToken/onToolCall 经 configurable 注入（节点统一从运行时 config 读，见 generate/retrieve）。
+    const result = await graph.invoke(
+      { query, history: options?.history || [] },
+      callbacks
+        ? { configurable: { onToken: callbacks.onToken, onToolCall: callbacks.onToolCall } }
+        : undefined
+    );
 
     return {
       answer: result.answer || "无法生成回答",

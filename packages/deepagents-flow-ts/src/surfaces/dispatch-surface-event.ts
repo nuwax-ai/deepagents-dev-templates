@@ -7,8 +7,14 @@
 import type { FlowCallbacks } from "../core/flow-types.js";
 import type { SurfaceStreamEvent } from "./stream-events.js";
 
-/** 仅对用户可见的回答节点放行 messages mode 文本（避免 plan/review JSON token 泄漏）。 */
-export const STREAM_TEXT_NODES = new Set(["write_draft", "respond", "respondNode"]);
+/**
+ * 仅对用户可见的回答节点放行 messages mode 文本（避免 plan/review JSON token 泄漏）。
+ *
+ * 默认 ReAct 图的最终回答在 `think` 节点产生（无 tool_calls 分支直接回答，respond 仅转存
+ * output）——故 think 也放行。工具决策轮 think 的 content 通常为空（emitTextToken 对空串 no-op），
+ * 不会把中间推理吐给用户。
+ */
+export const STREAM_TEXT_NODES = new Set(["write_draft", "respond", "respondNode", "think"]);
 
 /**
  * 将单个 surface 事件分发给 callbacks。

@@ -83,6 +83,14 @@ export interface StatefulFlowOptions<S = Record<string, unknown>> {
    * （超阈值摘要 + RemoveMessage 替换，见 app/compaction）。状态无 messages 或未超阈值时 no-op。
    */
   appConfig?: AppConfig;
+  /**
+   * 对话型 flow（多轮对话，非 HITL 长任务）。
+   * true 时返回的 StatefulFlow **不暴露 hasStarted** → surface（ACP server / CLI run）每轮都走
+   * query 分支：配合稳定 threadId（ACP=sessionId）+ checkpointer，历史经 MessagesAnnotation
+   * reducer 自动累积 → 多轮记忆。压缩仍在新 query 入口触发（见 appConfig）。
+   * （HITL 型保持 false：暴露 hasStarted，首条开题、之后 resume 续跑同一任务。）
+   */
+  conversational?: boolean;
 }
 
 /** 从 stream 各 chunk 里取最后一个 interrupt 的 value（沿用各示例既有约定）。 */
@@ -161,7 +169,7 @@ export function createStatefulFlow<S = Record<string, unknown>>(
     recursionLimit,
   });
 
-  return {
+  const flow: StatefulFlow = {
     async run(input, threadId, callbacks): Promise<FlowRunResult> {
       const config = baseConfig(threadId, callbacks ?? {});
 
@@ -191,12 +199,16 @@ export function createStatefulFlow<S = Record<string, unknown>>(
       const { answer, footer } = options.toResult(snapshot.values as S);
       return { status: "done", answer, footer };
     },
+  };
 
+  // 对话型不暴露 hasStarted → surface 每轮走 query（带历史累积，多轮对话）；
+  // HITL 型暴露 → surface 据 checkpoint 判断 resume 续跑同一任务。
+  if (!options.conversational) {
     /**
      * 持久化推断：该 thread 是否已有 checkpoint（开过题）。
      * 有 checkpoint ⇒ 同一会话的续跑（interrupt / 出错 / 已完成皆然）；无 ⇒ 全新会话、首条开题。
      */
-    async hasStarted(threadId): Promise<boolean> {
+    flow.hasStarted = async (threadId): Promise<boolean> => {
       const snapshot = await graph.getState({
         configurable: { thread_id: threadId },
       });
@@ -204,6 +216,8 @@ export function createStatefulFlow<S = Record<string, unknown>>(
         Boolean(snapshot.config?.configurable?.checkpoint_id) ||
         (snapshot.next?.length ?? 0) > 0
       );
-    },
-  };
+    };
+  }
+
+  return flow;
 }

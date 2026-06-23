@@ -42,7 +42,7 @@ const PKG_ROOT = resolve(SCAFFOLD_DIR, "../..");
 const camel = (s) => s.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
 
 /** 把生成的 flow 注册进 src/app/flows/index.ts（import + 表项，幂等）。 */
-function registerFlow(name, kind) {
+function registerFlow(name, kind, conversational = false) {
   const regPath = resolve(PKG_ROOT, "src/app/flows/index.ts");
   let src = readFileSync(regPath, "utf-8");
   const alias = `${camel(name)}Flow`;
@@ -64,9 +64,11 @@ function registerFlow(name, kind) {
     );
   }
   // kind 决定注册表项形态：stateful-recipe 用 recipe；oneshot / stateful-custom 用 createExecutor。
+  // conversational（react-tools/rag/adaptive-rag 等对话型）→ 注册项加 conversational:true，
+  // 物化时透传 createStatefulFlow → 多轮记忆 + 图层流式（见 src/app/default-flow.ts）。
   const entry =
     kind === "stateful-recipe"
-      ? `  "${name}": { name: "${name}", kind: "stateful-recipe", recipe: ${alias}.recipe, getTopology: ${alias}.getTopology },`
+      ? `  "${name}": { name: "${name}", kind: "stateful-recipe",${conversational ? " conversational: true," : ""} recipe: ${alias}.recipe, getTopology: ${alias}.getTopology },`
       : `  "${name}": { name: "${name}", kind: "${kind}", createExecutor: ${alias}.createExecutor, getTopology: ${alias}.getTopology },`;
   src = src
     .replace(importAnchor, `${importAnchor}\n${importLine}`)
@@ -100,7 +102,7 @@ function main() {
     console.log(`✓ 写入 ${f.path}`);
   }
 
-  registerFlow(spec.name, bp.kind);
+  registerFlow(spec.name, bp.kind, bp.conversational);
   console.log(`✓ 注册 flow "${spec.name}" 到 src/app/flows/index.ts`);
 
   // —— COMPLETION_GATE：未跑通不算完成 ——

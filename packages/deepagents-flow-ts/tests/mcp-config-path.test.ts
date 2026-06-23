@@ -41,4 +41,26 @@ describe("createRuntimeContext 默认 MCP servers", () => {
       args: ["-y", "@upstash/context7-mcp"],
     });
   });
+
+  it("ACP session 下发的 mcpServers 与默认合并（session-wins 同名覆盖）", () => {
+    const { appConfig } = loadFlowConfig({ workspaceRoot: ALIEN_WORKSPACE });
+    const ctx = createRuntimeContext(appConfig, {
+      cwd: ALIEN_WORKSPACE,
+      mcpServers: {
+        context7: { command: "echo", args: ["acp-override"] },
+        whois: { command: "npx", args: ["-y", "@whois-mcp/example"] },
+      },
+    });
+    expect(Object.keys(ctx.mcpServerConfigs).sort()).toEqual(
+      ["context7", "whois"].sort()
+    );
+    expect(ctx.mcpServerConfigs.context7).toMatchObject({
+      command: "echo",
+      args: ["acp-override"],
+    });
+    expect(ctx.mcpServerConfigs.whois).toMatchObject({
+      command: "npx",
+      args: ["-y", "@whois-mcp/example"],
+    });
+  });
 });

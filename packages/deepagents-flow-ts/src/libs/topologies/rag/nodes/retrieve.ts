@@ -10,6 +10,7 @@
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { createInterface } from "node:readline";
+import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import type { RAGState, RetrievalResult } from "./types.js";
 import { logger } from "../../../../runtime/index.js";
 import type { ToolCallEvent } from "../../../../core/flow-types.js";
@@ -297,7 +298,8 @@ function selectTools(
  */
 export async function retrieveNode(
   state: RAGState,
-  config: RetrieveNodeConfig
+  config: RetrieveNodeConfig,
+  lgConfig?: LangGraphRunnableConfig
 ): Promise<Partial<RAGState>> {
   const { rewritten_query, intent, mcp_hint, keywords } = state;
   const query = rewritten_query || state.query;
@@ -315,8 +317,12 @@ export async function retrieveNode(
 
     log.info("Using retrieval tools", { tools: toolsToUse, intent });
 
-    // 并行调用工具；每个工具发一次 tool_call 事件（供 surface 展示「工具调用过程」）
-    const onToolCall = config.onToolCall;
+    // 并行调用工具；每个工具发一次 tool_call 事件（供 surface 展示「工具调用过程」）。
+    // 优先运行时 configurable.onToolCall（conversational 底座 / oneshot invoke 经 config 注入），
+    // 回退建图时闭包 config.onToolCall（向后兼容）。
+    const onToolCall =
+      (lgConfig?.configurable?.onToolCall as RetrieveNodeConfig["onToolCall"]) ??
+      config.onToolCall;
     const results = await Promise.allSettled(
       toolsToUse.map(async (toolName) => {
         const toolCallId = onToolCall ? randomUUID() : "";

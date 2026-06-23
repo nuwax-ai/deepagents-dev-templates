@@ -8,6 +8,7 @@
  *
  * 本文件**只做「建节点 + 连边」**（图是契约）：4 个节点的实现拆在 `./nodes/`，这里聚合并连线。
  * 工具集来自 FlowRuntime.allTools（内置通用 + flow 自补 bash/fs/search/demo/mcp-bridge + native MCP）。
+ * ACP 模式下 allTools 含 host session/new 下发的 mcpServers（与 mcp.default.json 合并，见 runtime-context）。
  * 状态用标准消息流（MessagesAnnotation），自动进 FileCheckpointSaver（跨重启恢复 + interrupt/resume）。
  *
  * CreateFlowGraphConfig 是 FlowRuntime 的**结构子集** —— getFlowTopology 反射拓扑时传最小子集
