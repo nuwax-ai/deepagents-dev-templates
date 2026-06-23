@@ -121,6 +121,13 @@ export function createTaskTool(deps: TaskToolDeps) {
         const threadId = `subagent-${subagent_type}-${randomUUID()}`;
         // 透传父级 cancel signal（ACP cancel）给 subagent，避免父级取消时 subagent 仍跑完整轮。
         const parentSignal = (runConfig as { signal?: AbortSignal } | undefined)?.signal;
+        // subagent 开始边界（surface 经此知道 subagent 生命周期；后续 token 带 source=name 区分主/subagent 流）。
+        await parentCallbacks.onStage?.({
+          stage: `委派 subagent: ${subagent_type}`,
+          index: 1,
+          total: 1,
+          detail: description.slice(0, 100),
+        });
         const stream = await graph.stream(
           { input: description, messages: [] } as unknown as FlowState,
           {
@@ -141,7 +148,7 @@ export function createTaskTool(deps: TaskToolDeps) {
           const node = meta?.langgraph_node;
           if (node && STREAM_TEXT_NODES.has(node)) {
             const text = extractText(msg?.content);
-            if (text) await parentCallbacks.onToken?.(text);
+            if (text) await parentCallbacks.onToken?.(text, subagent_type);
           }
         }
         const finalState = (await graph.getState({ configurable: { thread_id: threadId } }))
@@ -160,6 +167,13 @@ export function createTaskTool(deps: TaskToolDeps) {
         return finalState.output || fallback || "(subagent 无输出)";
       } catch (err) {
         return `Error: subagent "${subagent_type}" 执行失败: ${err instanceof Error ? err.message : String(err)}`;
+      } finally {
+        // subagent 结束边界（成功/失败均发，与开始 onStage 对称，避免客户端「进行中」悬挂）。
+        await parentCallbacks.onStage?.({
+          stage: `subagent ${subagent_type} 完成`,
+          index: 1,
+          total: 1,
+        });
       }
     },
     {

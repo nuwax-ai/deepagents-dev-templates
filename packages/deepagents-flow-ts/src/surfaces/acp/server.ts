@@ -61,8 +61,8 @@ interface AcpConnection {
   sessionUpdate(params: {
     sessionId: string;
     update:
-      | { sessionUpdate: "agent_message_chunk"; content: { type: "text"; text: string } }
-      | { sessionUpdate: "agent_thought_chunk"; content: { type: "text"; text: string } }
+      | { sessionUpdate: "agent_message_chunk"; messageId?: string; content: { type: "text"; text: string } }
+      | { sessionUpdate: "agent_thought_chunk"; messageId?: string; content: { type: "text"; text: string } }
       | {
           sessionUpdate: "plan";
           entries: Array<{
@@ -156,11 +156,15 @@ function buildAcpCallbacks(
 ): ReturnType<typeof traceFlowCallbacks> {
   return traceFlowCallbacks(
     {
-      onToken: (token) => {
+      onToken: (token, source) => {
         stats.streamed = true;
         stats.streamChars += token.length;
         stats.tokenChunks += 1;
-        return streamText(conn, sessionId, token, "agent");
+        // source（subagent name）→ 独立 messageId（清洗 : 与空白，避免 name 含 ':' 污染前缀分组）。
+        const messageId = source
+          ? `subagent:${source.replace(/[:\s]/g, "_")}`
+          : undefined;
+        return streamText(conn, sessionId, token, "agent", messageId);
       },
       onToolCall: async (e) => {
         await emitToolCall(conn, sessionId, e);
@@ -213,13 +217,17 @@ async function streamText(
   conn: AcpConnection,
   sessionId: string,
   text: string,
-  kind: "agent" | "thought" = "agent"
+  kind: "agent" | "thought" = "agent",
+  messageId?: string
 ): Promise<void> {
   if (!text) return;
   await conn.sessionUpdate({
     sessionId,
     update: {
       sessionUpdate: kind === "thought" ? "agent_thought_chunk" : "agent_message_chunk",
+      // messageId（ACP spec）：同 messageId 的 chunks 属同一消息；subagent 用独立 messageId，
+      // 客户端据此分组区分主 agent 与各 subagent 的消息流。
+      ...(messageId ? { messageId } : {}),
       content: { type: "text", text },
     },
   });

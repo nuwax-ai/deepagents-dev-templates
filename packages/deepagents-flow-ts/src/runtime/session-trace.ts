@@ -106,7 +106,7 @@ export function traceFlowCallbacks(
 ): FlowCallbacks {
   return {
     ...callbacks,
-    onToken: async (token) => callbacks.onToken?.(token),
+    onToken: async (token, source) => callbacks.onToken?.(token, source),
     onToolCall: async (e) => {
       traceToolCallEvent(e, ctx);
       await callbacks.onToolCall?.(e);

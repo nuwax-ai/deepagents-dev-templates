@@ -61,7 +61,7 @@ export interface StageEvent {
  * `graph.stream({signal})`；中止时 LangGraph 以 AbortError reject，surface 据此快速收尾。
  */
 export interface FlowCallbacks {
-  onToken?: (token: string) => void | Promise<void>;
+  onToken?: (token: string, source?: string) => void | Promise<void>;
   onToolCall?: (e: ToolCallEvent) => void | Promise<void>;
   /** 长任务阶段推进（可选）。 */
   onStage?: (e: StageEvent) => void | Promise<void>;
