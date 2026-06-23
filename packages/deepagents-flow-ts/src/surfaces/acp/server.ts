@@ -571,7 +571,7 @@ export async function bootstrapFlowAcp(options: FlowAcpOptions): Promise<void> {
   const server = new DeepAgentsServer({
     agents: agentConfig,
     serverName: appConfig.agent.name,
-    serverVersion: appConfig.agent.version || "0.1.0",
+    serverVersion: appConfig.agent.version || "1.0.0",
     debug: process.env.LOG_LEVEL === "debug",
     hooks,
   });

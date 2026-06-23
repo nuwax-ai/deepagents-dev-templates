@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- `deepagents-flow-ts` 1.0.0 — 版本号从 0.2.0 升至 1.0.0，同步 `flow-agent.config.json`、`.nuwax-agent/agent-package.json` 等发布元数据
+
 ### Fixed
 - CI workflow references `packages/template` → `packages/deepagents-app-ts`
 - Unified package manager to pnpm (added pnpm-lock.yaml, updated CI)

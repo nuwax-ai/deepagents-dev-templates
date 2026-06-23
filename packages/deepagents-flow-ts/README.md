@@ -47,7 +47,7 @@ src/
   runtime/       底层运行时（config/model/logger/mcp/checkpoint/llm-resilience + flow-config/flow-runtime）
   libs/          ★ 可复用构建件（保护、消费不改）
     nodes/         节点 factory + 原语（建 flow 用，见 node-kit.md）+ model-resolver（凭证策略）
-    tools/         内置通用工具（bash/fs/search/demo/mcp-bridge/http/json/skill）
+    tools/         内置通用工具（bash/fs/search/demo/http/json/skill；MCP 工具由 runtime 经 @langchain/mcp-adapters 原生注入，非 toolkit 静态导出）
     topologies/    拓扑积木（adaptive-rag/rag/deep-research/human-in-loop/project-manager/travel-planner；图逻辑单一权威 graph/topology/recipe；scaffold 生成薄封装复用；单向依赖 nodes/+mcp/；react-tools 复用默认图、dev-agent 在 app/topologies/）
     mcp/           stdio MCP 客户端（callResolvedMcpTool/rateLimited；零 src import，自包含）
     deepagents-acp/  vendored ACP SDK（自包含）
@@ -70,8 +70,10 @@ config/ prompts/ skills/ scripts/ docs/ tests/
 
 两种方式落地：
 
-1. **脚手架优先**（一句话 / 简单场景）：写 spec → `node scripts/scaffold/generate.mjs <spec>` → 改 `config` 的 `activeFlow`（自带 typecheck+graph 自验）
+1. **脚手架优先**（一句话 / 简单场景）：写 spec → `node scripts/scaffold/generate.mjs <spec>` → 改 `config/flow-agent.config.json` 的 `activeFlow`（自带 typecheck+graph 自验）
 2. **直接改默认图**：编辑 [src/app/graph.ts](src/app/graph.ts) 连线 + [src/app/nodes/](src/app/nodes/) 节点逻辑；或对照 [examples/](examples/) 在 `src/app/` 实现
+
+**多 flow 选图**：`config/flow-agent.config.json` 顶层 `activeFlow`（缺省 `default`）经 [src/app/flows/index.ts](src/app/flows/index.ts) 注册表解析——`flow` / `graph` / ACP 三条入口共用。已注册：`default`（conversational ReAct）、`knowledge-qa` / `adaptive-knowledge-qa` / `customer-support`（conversational）、`trip-planner` / `project-planner` / `content-review` / `research-agent` 等 scaffold 场景 flow，及 `coding-agent`（stateful-custom）。`pnpm graph` 导出**当前 activeFlow** 的拓扑。
 
 **两类 flow**（[src/core/flow-types.ts](src/core/flow-types.ts)）：
 - `FlowExecutor`：one-shot，`(query, cb) => Promise<FlowResult>`。无记忆单次调用（见 examples/rag）。
@@ -85,13 +87,13 @@ config/ prompts/ skills/ scripts/ docs/ tests/
 - **先 factory 后手写** — 节点先查 [node-kit.md](docs/node-kit.md)；bespoke 保留并注释「为何不用 factory」。
 - **保护区** — `core`/`runtime`/`libs`/`surfaces` 默认不改；`src/app/` 可改；`examples/` 只读。
 - **有状态用基座** — `createStatefulFlow`，不手写 run-loop。
-- **工具顺序** — MCP → `libs/tools` 内置（bash/fs/search/http/json/mcp-bridge）→ 自写代码。
+- **工具顺序** — native MCP（`config/mcp.default.json` + ACP session 合并）→ `libs/tools` 内置（bash/fs/search/http/json）→ 自写代码。
 - **密钥** — 环境变量，禁止硬编码。
 - **依赖只在本仓库** — 缺能力 `pnpm install` / 在 `src/runtime/` 扩展 / copy-in，不引仓库外路径。
 
 ## 默认图（标准 LangGraph ReAct）
 
-开箱即用的默认图是标准 ReAct，工具/持久化全用框架原生能力：
+开箱即用的默认图是标准 ReAct，经 **StatefulFlow conversational** 运行（稳定 threadId + checkpointer 多轮记忆 + `graph.stream` 真流式；见 [src/app/default-flow.ts](src/app/default-flow.ts)）。工具/持久化全用框架原生能力：
 
 ```
 START → prepare → think(model.bindTools) ──(toolsCondition)──┐
@@ -108,7 +110,7 @@ START → prepare → think(model.bindTools) ──(toolsCondition)──┐
 | `respond` | 取回答流式输出（onToken） | — |
 
 状态用标准消息流（`MessagesAnnotation`），自动进 `FileCheckpointSaver`（跨重启恢复 + interrupt/resume）。
-工具集来自 `FlowRuntime.allTools`：bash / 文件读写 / search / http / json / mcp-bridge + native MCP（context7 等，经 ACP 或 `mcp.default.json` 配置）+ demo(echo/calculate/time) + 可选 `load_skill` / `task`。
+工具集来自 `FlowRuntime.allTools`（[src/app/flow-tools.ts](src/app/flow-tools.ts)）：bash / 文件读写 / grep·glob / http / json + **native MCP**（context7 等，经 `@langchain/mcp-adapters` 加载；`config/mcp.default.json` + ACP session `mcpServers` 合并）+ demo(echo/calculate/time) + 可选 `load_skill` / `task`（子智能体 subagent 委派，流式透出 token 与 `[subagent] tool` 调用）。
 无模型凭证时 think 走 fallback（回显输入），图始终可跑、可测。见 [src/app/graph.ts](src/app/graph.ts)。
 
 **进阶模式**（并行 fan-out、HITL `interrupt`、subgraph 子智能体（subagent）、压缩、**长任务硬化**：跨重启续跑 / 阶段进度 / 单步护栏）见 [docs/flow-patterns.md](docs/flow-patterns.md)；
@@ -140,7 +142,7 @@ START → prepare → think(model.bindTools) ──(toolsCondition)──┐
 ```bash
 pnpm install && pnpm build
 
-# 默认 flow：CLI
+# 默认 flow：CLI（尊重 config.activeFlow）
 pnpm flow "随便说点什么"
 pnpm exec tsx src/index.ts flow -i
 
@@ -148,15 +150,20 @@ pnpm exec tsx src/index.ts flow -i
 pnpm start:acp
 
 # 导出图拓扑 / 能力查询 / 会话
-pnpm graph                              # JSON；加 --mermaid 输出 Mermaid
-pnpm exec tsx src/index.ts capabilities # 无凭证，工具/MCP/skills
+pnpm graph                              # 当前 activeFlow 拓扑 JSON；加 --mermaid 输出 Mermaid
+pnpm exec tsx src/index.ts capabilities # 无凭证，工具/MCP/skills/subagents
 pnpm exec tsx src/index.ts sessions     # 已持久化会话
+pnpm exec tsx src/index.ts sessions delete <thread-id>
+
+# 可选：--config <path> 指定配置文件（默认 config/flow-agent.config.json）
 
 # 跑范例（travel/pm/review 会在中途暂停等你输入确认/审阅）
 pnpm example:rag:cli "什么是 LangGraph？"
 pnpm example:travel "东京 3 天 美食优先"
 pnpm example:pm "做一个落地页"
 pnpm example:review "写一段产品介绍"
+pnpm example:dev-agent
+pnpm example:research "调研 LangGraph 生态"
 
 # 验证
 pnpm test && pnpm typecheck && pnpm typecheck:examples
@@ -171,15 +178,17 @@ pnpm smoke:acp                          # ACP 冒烟（-- --dry-run 仅打印）
 |---|---|
 | 默认 flow CLI | `pnpm flow "..."` / `pnpm exec tsx src/index.ts flow -i` |
 | 导出图拓扑 | `pnpm graph`（JSON）/ `pnpm graph --mermaid`（Mermaid 源） |
-| 能力分层查询 | `pnpm exec tsx src/index.ts capabilities`（无凭证，工具/MCP/skills） |
-| 已持久化会话 | `pnpm exec tsx src/index.ts sessions` |
+| 能力分层查询 | `pnpm exec tsx src/index.ts capabilities`（无凭证，工具/MCP/skills/subagents） |
+| 已持久化会话 | `pnpm exec tsx src/index.ts sessions` / `sessions delete <id>` |
 | 默认 flow ACP 冒烟（rcoder） | `pnpm smoke:acp` |
 | RAG 范例 CLI | `pnpm example:rag:cli "..."` / `pnpm example:rag:interactive` |
 | travel/pm/review 范例 CLI | `pnpm example:travel "..."` / `example:pm "..."` / `example:review "..."`（中途暂停等输入；加 `-i` 交互） |
+| dev-agent / deep-research 范例 | `pnpm example:dev-agent` / `pnpm example:research "..."` |
 | RAG 范例 ACP 冒烟（rcoder） | `pnpm smoke:rag` |
+| dev-agent / research ACP 冒烟 | `pnpm smoke:dev-agent` / `pnpm smoke:research` |
 | 类型检查 | `pnpm typecheck`（src）/ `pnpm typecheck:examples`（examples + src，noEmit） |
 
-`smoke:acp` / `smoke:rag` / `smoke:travel` / `smoke:pm` / `smoke:review` 用 rcoder-cli 端到端驱动 ACP（握手 → `onPrompt` → 整图 → 流式答案）；`scripts/smoke-acp.mjs` 的 `--entry` 或 `AGENT_ENTRY` 可指向任意 flow 入口。
+`smoke:acp` / `smoke:rag` / `smoke:travel` / `smoke:pm` / `smoke:review` / `smoke:dev-agent` / `smoke:research` 用 rcoder-cli 端到端驱动 ACP（握手 → `onPrompt` → 整图 → 流式答案）；`scripts/smoke-acp.mjs` 的 `--entry` 或 `AGENT_ENTRY` 可指向任意 flow 入口。
 **在 Zed 里 chat 调试**全部入口的 `agent_servers` 配置 + HITL 两轮玩法见 [docs/zed-debug.md](docs/zed-debug.md)。
 
 ## 导出图拓扑（可视化对接）
@@ -187,7 +196,7 @@ pnpm smoke:acp                          # ACP 冒烟（-- --dry-run 仅打印）
 显式 StateGraph 的好处之一：节点连线是**静态可提取**的。`./topology` 把编译图反射成结构化数据（不运行图、不需要凭证），供 inspector / 文档 / 调试器消费：
 
 ```bash
-pnpm graph              # → { nodes, edges } JSON
+pnpm graph              # → 当前 activeFlow 的 { nodes, edges } JSON
 pnpm graph --mermaid    # → Mermaid 源，可直接渲染
 ```
 
@@ -200,9 +209,11 @@ const { nodes, edges, mermaid } = await getFlowTopology();
 
 ## 配置与能力分层
 
-[config/flow-agent.config.json](config/flow-agent.config.json)：标准 `agent` / `model` / `mcp` / `permissions` / `sandbox` / `skills` / `agentsDirectories` / `memory` / `compaction` / `middleware` 段（走 `loadFlowConfig` → 底层 `loadConfig`（[src/runtime/](src/runtime/)），Zod schema 校验）。自定义块加在顶层、用 `loadFlowConfig().raw` 取出（RAG 范例放 `rag` 段）。
+[config/flow-agent.config.json](config/flow-agent.config.json)：标准 `agent` / `model` / `mcp` / `permissions` / `sandbox` / `skills` / `agentsDirectories` / `memory` / `compaction` / `middleware` 段，以及顶层 **`activeFlow`**（选 [src/app/flows/](src/app/flows/) 注册表中的 flow；缺省 `default`）。配置走 `loadFlowConfig` → 底层 `loadConfig`（[src/runtime/](src/runtime/)），Zod schema 校验。自定义块加在顶层、用 `loadFlowConfig().raw` 取出（RAG 范例放 `rag` 段）。
 
-**能力分层**（工作区配置 / 内置 / 环境 / 文件持久化）见 [docs/capabilities.md](docs/capabilities.md) 与 [.nuwax-agent/capability-sources.json](.nuwax-agent/capability-sources.json)——`capabilities` 命令查询当前可用工具/MCP/skills。
+**能力分层**（工作区配置 / 内置 / 环境 / 文件持久化）见 [docs/capabilities.md](docs/capabilities.md) 与 [.nuwax-agent/capability-sources.json](.nuwax-agent/capability-sources.json)——`capabilities` 命令查询当前可用工具/MCP/skills/子智能体（subagents）。
+
+**版本同步**：以 `package.json` 的 `version` 为权威源；`pnpm version:sync` 同步 `agent.version` 与 `.nuwax-agent/agent-package.json` 发布元数据（`pnpm package` 前置 `version:check`）。
 
 默认模型 `openai / deepseek-chat`（见 [config/flow-agent.config.json](config/flow-agent.config.json)，已对齐国内 OpenAI 兼容端点；切回 Anthropic 把 `model.provider` 设为 `anthropic`）。各端点配置见 [`.env.example`](.env.example)。
 

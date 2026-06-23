@@ -206,7 +206,7 @@ pnpm install
 pnpm build            # tsc → dist/
 pnpm bundle           # esbuild → dist/bundle.mjs（自包含，可直接 node 运行）
 # 可选：产出可分发制品
-pnpm package          # → dist-packages/deepagents-flow-ts-0.1.0-{.tgz,nuwax.tar.gz,nuwax.zip}
+pnpm package          # → dist-packages/deepagents-flow-ts-1.0.0-{.tgz,nuwax.tar.gz,nuwax.zip}
 ```
 
 `dist/bundle.mjs` 是单文件入口，`bin.start` 指向它（见 [.nuwax-agent/agent-package.json](../.nuwax-agent/agent-package.json)）。

@@ -2,7 +2,7 @@
   "agent": {
     "name": "deepagents-flow-ts",
     "description": "RAG 工作流 agent — 按显式 LangGraph 节点图运行（rewrite → retrieve → grade → prepare → generate）",
-    "version": "0.1.0"
+    "version": "1.0.0"
   },
   "model": {
     "provider": "anthropic",
