@@ -5,36 +5,28 @@
  * 1. 根据意图 + mcp_hint 决策调用哪些 MCP 工具
  * 2. 并行调用多个工具
  * 3. 收集原始结果
+ *
+ * MCP 调用走 libs/mcp/mcp-access（基于 @langchain/mcp-adapters）：
+ * 优先级 toolInvoker（agent 已加载工具回调）> 注入 mcpClient（持久，复用连接）>
+ * 自管临时 client（createAccessorFromConfig，多 transport，用完 close）。不再自管 spawn→kill。
  */
 
-import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { createInterface } from "node:readline";
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
+import type { MultiServerMCPClient } from "@langchain/mcp-adapters";
 import type { RAGState, RetrievalResult } from "./types.js";
 import { logger } from "../../../../runtime/index.js";
 import type { ToolCallEvent } from "../../../../core/flow-types.js";
+import {
+  resolveAccessor,
+  type McpServerConfig,
+} from "../../../mcp/mcp-access.js";
 
 // ACP stdio 模式下 stdout 是协议通道，日志必须走 logger（stderr）
 const log = logger.child("rag-retrieve");
 
-interface JsonRpcResponse {
-  id?: number;
-  result?: unknown;
-  error?: {
-    code?: number;
-    message?: string;
-    data?: unknown;
-  };
-}
-
-interface MCPServerConfig {
-  command?: string;
-  args?: string[];
-  env?: Record<string, string>;
-  url?: string;
-  enabled?: boolean;
-}
+/** RAG retrieve 专用 server 配置：mcp-access 多 transport 配置 + 启用开关。 */
+type RagServerConfig = McpServerConfig & { enabled?: boolean };
 
 /**
  * 通过 agent 框架已加载的 MCP 工具执行调用的回调。
@@ -48,7 +40,7 @@ export type McpToolInvoker = (
 
 /** MCP 服务器配置（从 config 传入） */
 export interface RetrieveNodeConfig {
-  mcpServers: Record<string, MCPServerConfig>;
+  mcpServers: Record<string, RagServerConfig>;
   retrievalTools: string[];
   retrieve: {
     maxResults: number;
@@ -57,174 +49,13 @@ export interface RetrieveNodeConfig {
   };
   /** 可选：复用 agent 框架已加载的 MCP 工具，避免重复 spawn 进程 */
   toolInvoker?: McpToolInvoker;
+  /**
+   * 可选：runtime 注入的持久 MultiServerMCPClient（经 getClient(server) 复用持久连接，多 transport）。
+   * 优先级高于自管临时 client；低于 toolInvoker。
+   */
+  mcpClient?: MultiServerMCPClient;
   /** 可选：每个检索工具调用时回调一次（供 surface 展示「工具调用过程」） */
   onToolCall?: (e: ToolCallEvent) => void | Promise<void>;
-}
-
-/**
- * 调用 stdio MCP 服务器的方法
- */
-async function callStdioMcpMethod(
-  server: string,
-  config: MCPServerConfig,
-  method: string,
-  params?: Record<string, unknown>,
-  timeoutMs = 10000
-): Promise<unknown> {
-  if (!config.command) {
-    throw new Error(`MCP server "${server}" is not a stdio server`);
-  }
-
-  const child = spawn(config.command, config.args ?? [], {
-    env: { ...process.env, ...config.env },
-    stdio: ["pipe", "pipe", "pipe"],
-  });
-
-  type PendingEntry = {
-    resolve: (result: unknown) => void;
-    reject: (err: Error) => void;
-    timer: ReturnType<typeof setTimeout> | undefined;
-  };
-  let nextId = 1;
-  const pending = new Map<number, PendingEntry>();
-  const stderr: string[] = [];
-
-  const rl = createInterface({ input: child.stdout });
-  rl.on("line", (line) => {
-    if (!line.trim()) return;
-    try {
-      const message = JSON.parse(line) as JsonRpcResponse;
-      if (typeof message.id === "number") {
-        const entry = pending.get(message.id);
-        if (entry) {
-          clearTimeout(entry.timer);
-          if (message.error) {
-            entry.reject(
-              new Error(
-                message.error.message ?? `MCP error ${message.error.code ?? ""}`
-              )
-            );
-          } else {
-            entry.resolve(message.result);
-          }
-          pending.delete(message.id);
-        }
-      }
-    } catch {
-      // Ignore non-JSON output
-    }
-  });
-
-  child.stderr.on("data", (chunk: Buffer) => {
-    if (stderr.length < 128) {
-      stderr.push(chunk.toString("utf-8"));
-    }
-  });
-
-  child.on("close", (code) => {
-    if (pending.size > 0) {
-      const err = new Error(
-        `MCP server "${server}" exited unexpectedly (code ${code})${stderr.length ? ": " + stderr.join("").trim() : ""}`
-      );
-      for (const [, entry] of pending) {
-        if (entry.timer) clearTimeout(entry.timer);
-        entry.reject(err);
-      }
-      pending.clear();
-    }
-  });
-
-  const send = (
-    method: string,
-    params?: Record<string, unknown>
-  ): Promise<unknown> => {
-    const id = nextId++;
-    const payload = JSON.stringify({ jsonrpc: "2.0", id, method, params });
-
-    return new Promise((resolve, reject) => {
-      const timer =
-        timeoutMs > 0
-          ? setTimeout(() => {
-              pending.delete(id);
-              reject(
-                new Error(
-                  `MCP ${server}/${method} timed out after ${timeoutMs}ms`
-                )
-              );
-            }, timeoutMs)
-          : undefined;
-
-      pending.set(id, {
-        resolve,
-        reject,
-        timer: timer as ReturnType<typeof setTimeout>,
-      });
-
-      child.stdin.write(`${payload}\n`, (err) => {
-        if (err) {
-          if (timer) clearTimeout(timer);
-          pending.delete(id);
-          reject(err);
-        }
-      });
-    });
-  };
-
-  try {
-    // Initialize
-    await send("initialize", {
-      protocolVersion: "2024-11-05",
-      capabilities: {},
-      clientInfo: { name: "rag-agent", version: "1.0.0" },
-    });
-    child.stdin.write(
-      `${JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" })}\n`
-    );
-
-    return await send(method, params);
-  } finally {
-    rl.close();
-    child.stdin.end();
-    if (!child.killed) {
-      child.kill();
-    }
-  }
-}
-
-/**
- * 列出 MCP 服务器的可用工具
- */
-async function listMcpTools(
-  server: string,
-  config: MCPServerConfig
-): Promise<Array<{ name: string }>> {
-  const result = (await callStdioMcpMethod(
-    server,
-    config,
-    "tools/list",
-    {},
-    5000
-  )) as { tools?: Array<{ name: string }> } | undefined;
-  return result?.tools ?? [];
-}
-
-/**
- * 调用 MCP 工具
- */
-async function callMcpTool(
-  server: string,
-  config: MCPServerConfig,
-  toolName: string,
-  args: Record<string, unknown>,
-  timeoutMs: number
-): Promise<unknown> {
-  return await callStdioMcpMethod(
-    server,
-    config,
-    "tools/call",
-    { name: toolName, arguments: args },
-    timeoutMs
-  );
 }
 
 /**
@@ -317,12 +148,16 @@ export async function retrieveNode(
 
     log.info("Using retrieval tools", { tools: toolsToUse, intent });
 
-    // 并行调用工具；每个工具发一次 tool_call 事件（供 surface 展示「工具调用过程」）。
-    // 优先运行时 configurable.onToolCall（conversational 底座 / oneshot invoke 经 config 注入），
-    // 回退建图时闭包 config.onToolCall（向后兼容）。
+    // 运行时 configurable 透传：onToolCall（工具调用过程回调）+ mcpClient（持久 MCP 连接）。
     const onToolCall =
       (lgConfig?.configurable?.onToolCall as RetrieveNodeConfig["onToolCall"]) ??
       config.onToolCall;
+    const mcpClient =
+      (lgConfig?.configurable?.mcpClient as MultiServerMCPClient | undefined) ??
+      config.mcpClient;
+    const effConfig: RetrieveNodeConfig = mcpClient ? { ...config, mcpClient } : config;
+
+    // 并行调用工具；每个工具发一次 tool_call 事件（供 surface 展示「工具调用过程」）。
     const results = await Promise.allSettled(
       toolsToUse.map(async (toolName) => {
         const toolCallId = onToolCall ? randomUUID() : "";
@@ -331,7 +166,7 @@ export async function retrieveNode(
           await onToolCall({ toolCallId, toolName, args, status: "in_progress" });
         }
         try {
-          const res = await callRetrievalTool(toolName, query, config, keywords);
+          const res = await callRetrievalTool(toolName, query, effConfig, keywords);
           if (onToolCall) {
             await onToolCall({
               toolCallId,
@@ -375,20 +210,6 @@ export async function retrieveNode(
     console.error("[Retrieve] Error:", error);
     return { raw_results: [], attempts };
   }
-}
-
-/**
- * 从 MCP tools/call 响应里提取纯文本内容。
- * 响应结构: { content: [{ type: "text", text: "..." }, ...] }
- */
-function extractMcpText(result: unknown): string {
-  if (!result || typeof result !== "object") return "";
-  const r = result as { content?: Array<{ type?: string; text?: string }> };
-  if (!Array.isArray(r.content)) return JSON.stringify(result);
-  return r.content
-    .filter((b) => b.type === "text" && typeof b.text === "string")
-    .map((b) => b.text as string)
-    .join("\n");
 }
 
 /**
@@ -443,7 +264,8 @@ function extractHowtocookContent(text: string): string {
 }
 
 /**
- * 调用检索工具
+ * 调用检索工具。优先级：toolInvoker > 注入 mcpClient > 自管临时 client（mcp-access）。
+ * accessor.callTool 已返回提取后的纯文本（extractMcpText 内置），无需再 extract。
  */
 async function callRetrievalTool(
   toolName: string,
@@ -461,54 +283,41 @@ async function callRetrievalTool(
     throw new Error(`MCP server "${toolName}" is disabled`);
   }
 
-  log.info("Calling MCP tool", { tool: toolName, query, viaInvoker: !!config.toolInvoker });
+  log.info("Calling MCP tool", {
+    tool: toolName,
+    query,
+    viaInvoker: !!config.toolInvoker,
+    viaClient: !!config.mcpClient,
+  });
 
-  // 有 toolInvoker 时直接复用 agent 框架已加载的工具，避免重复 spawn 进程
+  // 有 toolInvoker 时直接复用 agent 框架已加载的工具，避免任何额外 client。
   if (config.toolInvoker) {
     return callRetrievalToolViaInvoker(toolName, query, config, keywords);
   }
 
+  // 构造 accessor：注入持久 mcpClient 优先（该 server 已连则复用）；否则自管临时 client。
+  // resolveAccessor 处理「注入 client 中该 server 未连」的 fallback，并透传 timeout_ms。
+  const { accessor, dispose } = await resolveAccessor({
+    client: config.mcpClient,
+    server: toolName,
+    config: serverConfig,
+    timeoutMs: config.retrieve.timeout_ms,
+  });
   try {
-    // 先列出可用工具
-    const tools = await listMcpTools(toolName, serverConfig);
-    log.info("Listed MCP tools", { tool: toolName, toolCount: tools.length });
-
-    // 根据服务器选择合适的工具和参数
-    let targetTool: string;
-    let toolArgs: Record<string, unknown>;
-
     if (toolName === "context7") {
-      // Step 1: 解析库 ID
       // libraryName 用 keywords[0]（rewrite 提取的技术名词），query 用于相关性排序
       const libraryName = keywords?.[0] ?? query.split(/\s+/)[0];
-      const resolveResult = await callMcpTool(
-        toolName,
-        serverConfig,
-        "resolve-library-id",
-        { libraryName, query },
-        config.retrieve.timeout_ms
-      );
-
-      const resolveText = extractMcpText(resolveResult);
+      const resolveText = await accessor.callTool("resolve-library-id", { libraryName, query });
       const libraryId = extractBestLibraryId(resolveText);
 
       if (libraryId) {
-        // Step 2: 查询文档
-        const queryResult = await callMcpTool(
-          toolName,
-          serverConfig,
-          "query-docs",
-          { libraryId, query },
-          config.retrieve.timeout_ms
-        );
-
+        const docsText = await accessor.callTool("query-docs", { libraryId, query });
         return {
           tool: toolName,
-          content: extractMcpText(queryResult),
+          content: docsText,
           metadata: { server: toolName, libraryId, query },
         };
       }
-
       // resolve 没拿到 ID，把 resolve 文本作为上下文返回
       return {
         tool: toolName,
@@ -516,49 +325,38 @@ async function callRetrievalTool(
         metadata: { server: toolName, query },
       };
     } else if (toolName === "howtocook-mcp") {
-      // 优先使用 getRecipeById（模糊匹配菜名），其次按分类，fallback 到第一个工具
-      const recipeById = tools.find((t) => t.name.includes("getRecipeById"));
-      const byCategory = tools.find((t) => t.name.includes("ByCategory"));
-      targetTool = recipeById?.name ?? byCategory?.name ?? tools[0]?.name ?? "mcp_howtocook_getRecipeById";
+      // 优先 getRecipeById（模糊匹配菜名），其次按分类，fallback 到第一个工具
+      const tools = await accessor.listTools();
+      const recipeById = tools.find((n) => n.includes("getRecipeById"));
+      const byCategory = tools.find((n) => n.includes("ByCategory"));
+      const targetTool =
+        recipeById ?? byCategory ?? tools[0] ?? "mcp_howtocook_getRecipeById";
 
       // getRecipeById 用菜名关键词（keywords[0]）效果最好；其他工具回退到完整 query
       const dishName = keywords?.[0] ?? query.split(/\s+/)[0];
-      toolArgs = recipeById ? { query: dishName } : { query };
+      const toolArgs = recipeById ? { query: dishName } : { query };
 
-      const result = await callMcpTool(
-        toolName,
-        serverConfig,
-        targetTool,
-        toolArgs,
-        config.retrieve.timeout_ms
-      );
-
+      const result = await accessor.callTool(targetTool, toolArgs);
       return {
         tool: toolName,
-        content: extractHowtocookContent(extractMcpText(result)),
+        content: extractHowtocookContent(result),
         metadata: { server: toolName, tool: targetTool, query: dishName },
       };
     } else {
       // 通用：使用第一个可用工具
-      targetTool = tools[0]?.name || "query";
-      toolArgs = { query };
-
-      const result = await callMcpTool(
-        toolName,
-        serverConfig,
-        targetTool,
-        toolArgs,
-        config.retrieve.timeout_ms
-      );
-
+      const tools = await accessor.listTools();
+      const targetTool = tools[0] ?? "query";
+      const result = await accessor.callTool(targetTool, { query });
       return {
         tool: toolName,
-        content: extractMcpText(result),
+        content: result,
         metadata: { server: toolName, tool: targetTool, query },
       };
     }
   } catch (error) {
     console.error(`[Retrieve] Error calling ${toolName}:`, error);
     throw error;
+  } finally {
+    await dispose?.();
   }
 }

@@ -11,7 +11,7 @@
  */
 
 import type { FlowRuntime } from "../../runtime/flow-runtime.js";
-import type { FlowExecutor, StatefulFlow } from "../../core/flow-types.js";
+import type { StatefulFlow } from "../../core/flow-types.js";
 import { recipe as defaultRecipe } from "../default-flow.js";
 import { getFlowTopology, type FlowTopology } from "../topology.js";
 import * as routerGateFlow from "./router-gate/index.js";
@@ -32,23 +32,15 @@ import type { StatefulTopologyRecipe } from "../../libs/topologies/types.js";
 /**
  * 一个可挂载到 surface 的 flow 定义（discriminated union on `kind`）。
  *
- * 三类：
- *  - `oneshot`：createExecutor 在 app 层造 FlowExecutor（无 surface 依赖）。
- *  - `stateful-recipe`：stateful 拓扑（用 createStatefulFlow）只给「图构造配方」recipe；recipe
- *    零 surface 依赖、可存 app 层；createStatefulFlow 的实际调用由组合根 index.ts（root，能 import
- *    surfaces）的 materializeFlow 完成——规避 app/libs → surfaces 分层违规。
- *  - `stateful-custom`：手写 run-loop 的 stateful（如 dev-agent，依赖 app/graph），不经
- *    createStatefulFlow，createExecutor 留 app 层。
+ * 两类：
+ *  - `stateful-recipe`：拓扑只给「图构造配方」recipe；recipe 零 surface 依赖、可存 app 层；
+ *    createStatefulFlow 的实际调用由组合根 index.ts（root，能 import surfaces）的 materializeFlow 完成
+ *    ——规避 app/libs → surfaces 分层违规。
+ *  - `stateful-custom`：自定义 StatefulFlow（如 dev-agent，依赖 app/graph），createExecutor 留 app 层。
  *
  * getTopology 静态导出图拓扑（不运行图、不需凭证），供 `graph` 命令 / inspector 消费。
  */
 export type FlowDef =
-  | {
-      name: string;
-      kind: "oneshot";
-      createExecutor: (runtime: FlowRuntime) => FlowExecutor;
-      getTopology: () => Promise<FlowTopology>;
-    }
   | {
       name: string;
       kind: "stateful-recipe";

@@ -25,6 +25,7 @@ import {
 } from "@langchain/langgraph";
 import type { RunnableConfig } from "@langchain/core/runnables";
 import { type AppConfig } from "../runtime/index.js";
+import type { MultiServerMCPClient } from "@langchain/mcp-adapters";
 import type {
   StatefulFlow,
   FlowRunResult,
@@ -91,6 +92,11 @@ export interface StatefulFlowOptions<S = Record<string, unknown>> {
    * （HITL 型保持 false：暴露 hasStarted，首条开题、之后 resume 续跑同一任务。）
    */
   conversational?: boolean;
+  /**
+   * runtime 注入的持久 MCP client。放进 configurable.mcpClient，供图内检索节点
+   * （retrieve / mcp-retrieval）经 getClient(server) 复用持久连接，避免各自 spawn 临时 client。
+   */
+  mcpClient?: MultiServerMCPClient;
 }
 
 /** 从 stream 各 chunk 里取最后一个 interrupt 的 value（沿用各示例既有约定）。 */
@@ -160,6 +166,7 @@ export function createStatefulFlow<S = Record<string, unknown>>(
     configurable: {
       ...options.configurable,
       thread_id: threadId,
+      mcpClient: options.mcpClient,
       // 节点仍可直接读 callbacks（与 writer 双轨兼容过渡期）
       onToolCall: callbacks?.onToolCall,
       onStage: callbacks?.onStage,

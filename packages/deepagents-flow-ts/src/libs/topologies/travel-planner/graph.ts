@@ -30,7 +30,7 @@ import {
   requireModel,
 } from "../../nodes/index.js";
 import { resolveLlmResilience } from "../../../runtime/services/llm-resilience.js";
-import type { McpServerConfig } from "../../mcp/stdio-client.js";
+import type { McpServerConfig } from "../../mcp/mcp-access.js";
 
 const log = logger.child("travel");
 

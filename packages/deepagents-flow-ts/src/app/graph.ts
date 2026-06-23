@@ -7,7 +7,7 @@
  *                                               └─ 无 tool_calls → respond(流式) → END
  *
  * 本文件**只做「建节点 + 连边」**（图是契约）：4 个节点的实现拆在 `./nodes/`，这里聚合并连线。
- * 工具集来自 FlowRuntime.allTools（内置通用 + flow 自补 bash/fs/search/demo/mcp-bridge + native MCP）。
+ * 工具集来自 FlowRuntime.allTools（内置通用 + flow 自补 bash/fs/search/demo + native MCP）。
  * ACP 模式下 allTools 含 host session/new 下发的 mcpServers（与 mcp.default.json 合并，见 runtime-context）。
  * 状态用标准消息流（MessagesAnnotation），自动进 FileCheckpointSaver（跨重启恢复 + interrupt/resume）。
  *
@@ -84,7 +84,7 @@ export function createFlowGraph(config: CreateFlowGraphConfig = {}) {
   return graph;
 }
 
-/** 跑一次默认 flow（one-shot，每次新 thread；续接历史走 StatefulFlow）。 */
+/** 单次 invoke 默认图（每次新 thread；多轮续跑经 surface + checkpointer）。 */
 export async function executeFlow(
   input: string,
   deps: {

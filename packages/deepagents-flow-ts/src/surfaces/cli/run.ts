@@ -1,10 +1,8 @@
 /**
- * Flow CLI — 命令行跑一次工作流（与具体图解耦）。
+ * Flow CLI — 命令行跑工作流（与具体图解耦）。
  *
- * 支持两种 flow：
- *  - one-shot FlowExecutor：单输入 → 单输出（默认图 / RAG / router 等）。
- *  - StatefulFlow：human-in-the-loop —— 图 interrupt 暂停时，CLI 用 readline 采集用户回复、
- *    再 resume，直到跑到底（见 examples/human-in-loop）。
+ * 主入口（`src/index.ts` → materializeFlow）只传入 **StatefulFlow**（checkpointer + 多轮续跑）。
+ * 仍兼容 examples 直连时传入的 legacy function executor（新 flow 请用 createStatefulFlow）。
  *
  * 用法：
  *   tsx src/index.ts flow "你的输入"
@@ -32,7 +30,7 @@ export interface FlowCliOptions {
 const DEFAULT_USAGE =
   '用法：\n  tsx src/index.ts flow "你的输入"\n  tsx src/index.ts flow --interactive\n';
 
-/** 工具调用 + 阶段进度打印（▶/✓/✗ 工具，▸ 阶段）——one-shot 与 stateful 共用。 */
+/** 工具调用 + 阶段进度打印（▶/✓/✗ 工具，▸ 阶段）。 */
 const toolCallbacks: FlowCallbacks = {
   onToolCall: (e) => {
     const tag =
@@ -54,7 +52,7 @@ export async function runFlowCli(
 ): Promise<void> {
   const sessionId = options.threadId ?? randomUUID();
   setLogSession(sessionId);
-  // 对象（有 run）⇒ StatefulFlow（支持 HITL）；function ⇒ one-shot。
+  // StatefulFlow（有 run）走 HITL / conversational 驱动；function 仅 examples legacy 兼容。
   if (typeof flow !== "function") {
     return runStatefulCli(flow, { ...options, threadId: sessionId });
   }

@@ -1,7 +1,7 @@
 /**
- * rag 拓扑执行器（one-shot FlowExecutor）+ 来源脚注（自 examples/rag/run-rag.ts 提升）。
+ * rag 拓扑执行器（FlowExecutor 单次包装）+ 来源脚注（自 examples/rag/run-rag.ts 提升）。
  *
- * rag 是检索增强 one-shot：rewrite → retrieve(MCP) → grade(重试) → prepare → generate。
+ * rag 检索增强：rewrite → retrieve(MCP) → grade(重试) → prepare → generate。
  * scaffold 生成的 flow 用 createRagExecutor（mcpServers 驱动，不需 rag 配置文件）；
  * example 的 config-file-driven 入口仍在 examples/rag/{config,run-rag,index}.ts。
  *

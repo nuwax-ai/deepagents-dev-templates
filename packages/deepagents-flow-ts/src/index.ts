@@ -42,7 +42,7 @@ import { runCapabilities } from "./surfaces/cli/capabilities.js";
 import { runSessions } from "./surfaces/cli/sessions.js";
 import { resolveFlow, type FlowDef } from "./app/flows/index.js";
 import { createStatefulFlow } from "./surfaces/stateful-flow.js";
-import type { FlowExecutor, StatefulFlow } from "./core/flow-types.js";
+import type { StatefulFlow } from "./core/flow-types.js";
 
 /**
  * createFlowRuntime —— 组合根(原 `compose/flow-runtime.ts` 折入入口)。
@@ -108,19 +108,20 @@ export async function createFlowRuntime(
 }
 
 /**
- * materializeFlow —— 把 FlowDef 物化成 surface 能用的 FlowExecutor | StatefulFlow。
+ * materializeFlow —— 把 FlowDef 物化成 surface 能用的 StatefulFlow。
  *
- * `stateful-recipe` 在此（root，能 import surfaces）调 createStatefulFlow 把 recipe 包成 StatefulFlow
- * （规避 app/libs → surfaces 分层违规）；oneshot / stateful-custom 直接调各自 createExecutor。
+ * `stateful-recipe` 在此（root，能 import surfaces）调 createStatefulFlow 包装 recipe
+ * （规避 app/libs → surfaces 分层违规）；`stateful-custom` 直接调各自 createExecutor。
  * createStatefulFlow 全工程仅此一处调用。
  */
-function materializeFlow(def: FlowDef, runtime: FlowRuntime): FlowExecutor | StatefulFlow {
+function materializeFlow(def: FlowDef, runtime: FlowRuntime): StatefulFlow {
   if (def.kind === "stateful-recipe") {
     return createStatefulFlow({
       ...def.recipe(runtime),
       checkpointer: runtime.checkpointer,
       appConfig: runtime.config,
       conversational: def.conversational,
+      mcpClient: runtime.ctx.mcpClient ?? undefined,
     });
   }
   return def.createExecutor(runtime);
@@ -197,8 +198,7 @@ const HELP = `deepagents-flow-ts — 通用工作流编排模板
   deepagents-flow-ts sessions       列出已持久化的会话（thread id）
   deepagents-flow-ts sessions delete <id>  删除某个已持久化会话
 
-默认图是标准 LangGraph ReAct（prepare → think ↔ tools → respond）。
-工具/会话/压缩经 FlowRuntime（框架原生 + 能力分层）驱动。
+默认图经 StatefulFlow 运行（checkpointer 多轮记忆 + 可选 HITL interrupt/resume）。
 
 选项:
   --config <path>   指定配置文件（默认 config/flow-agent.config.json）

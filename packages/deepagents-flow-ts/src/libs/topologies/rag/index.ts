@@ -1,6 +1,6 @@
 /**
  * rag 拓扑（libs 层，零 surface 依赖）。
- * 检索增强 one-shot：rewrite → retrieve(MCP) → grade(重试) → prepare → generate。
+ * 检索增强：rewrite → retrieve(MCP) → grade(重试) → prepare → generate。
  * 图逻辑单一权威在此；examples（config-file-driven）与 scaffold（mcpServers-driven）复用。
  */
 export {

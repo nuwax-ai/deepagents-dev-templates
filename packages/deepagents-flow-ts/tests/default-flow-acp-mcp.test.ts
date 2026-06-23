@@ -1,8 +1,10 @@
 /**
- * 默认 flow + ACP session MCP —— 合并后的 server 经 createFlowTools 进入默认 ReAct 图。
+ * 默认 flow + ACP session MCP —— 合并后的 server 配置进入 runtime。
  *
- * 不 spawn 真实 MCP 子进程：只验证 mcp_tool_bridge 读到合并后的 mcpServerConfigs，
- * 以及 default recipe 的 buildGraph 接受含 bridge 的 allTools。
+ * MCP server 经 runtime-context（@langchain/mcp-adapters）hydrate 加载为 native 工具
+ * （ctx.mcpTools），不再经 mcp_tool_bridge 元工具（已移除：它与有状态 server 冲突，
+ * 每次 call kill 子进程导致 chrome-devtools 页面反复关闭）。本测试不 spawn 真实 MCP 子进程：
+ * 只验证 mcpServerConfigs 合并正确（default + ACP session），以及工具集不再含 bridge。
  */
 
 import { describe, it, expect } from "vitest";
@@ -18,7 +20,7 @@ import { createFileCheckpointer } from "../src/runtime/services/file-checkpoint-
 const ALIEN_WORKSPACE = "/tmp/deepagents-flow-ts-default-flow-acp-mcp";
 
 describe("默认 flow：ACP session mcpServers → 工具集", () => {
-  it("mcp_tool_bridge list_servers 含默认 context7 + ACP 下发 server", async () => {
+  it("mcpServerConfigs 合并 default context7 + ACP 下发 server；工具集不再含 mcp_tool_bridge", () => {
     const { appConfig } = loadFlowConfig({ workspaceRoot: ALIEN_WORKSPACE });
     const ctx = createRuntimeContext(appConfig, {
       cwd: ALIEN_WORKSPACE,
@@ -26,19 +28,18 @@ describe("默认 flow：ACP session mcpServers → 工具集", () => {
         time: { command: "npx", args: ["-y", "@modelcontextprotocol/server-time"] },
       },
     });
+    // 合并后的 server 配置：default(context7) + ACP session(time)
+    const serverNames = Object.keys(ctx.mcpServerConfigs);
+    expect(serverNames).toContain("context7");
+    expect(serverNames).toContain("time");
+
     const policy = getFlowSandboxPolicy(appConfig);
     const allTools = createFlowTools(ctx, {
       workspaceRoot: ALIEN_WORKSPACE,
       policy,
     });
-    const bridge = allTools.find((t) => t.name === "mcp_tool_bridge");
-    expect(bridge).toBeDefined();
-
-    const listed = JSON.parse(
-      String(await bridge!.invoke({ operation: "list_servers" }))
-    ) as string[];
-    expect(listed).toContain("context7");
-    expect(listed).toContain("time");
+    // MCP 工具走 native（hydrate 加载到 ctx.mcpTools），不再有 mcp_tool_bridge 元工具
+    expect(allTools.find((t) => t.name === "mcp_tool_bridge")).toBeUndefined();
   });
 
   it("default recipe buildGraph 接受含 ACP 合并工具集的 runtime.allTools", () => {
@@ -67,6 +68,7 @@ describe("默认 flow：ACP session mcpServers → 工具集", () => {
 
     const graph = recipe(runtime).buildGraph(new MemorySaver());
     expect(graph).toBeDefined();
-    expect(allTools.some((t) => t.name === "mcp_tool_bridge")).toBe(true);
+    // bridge 已移除：allTools 不应再含 mcp_tool_bridge
+    expect(allTools.some((t) => t.name === "mcp_tool_bridge")).toBe(false);
   });
 });

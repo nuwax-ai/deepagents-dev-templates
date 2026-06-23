@@ -16,8 +16,8 @@
 /** Harness-level rules injected into ACP-delivered prompts. Kept small — not agent identity. */
 export const PLATFORM_CONVENTIONS = `\
 ## Tool Selection Priority (MANDATORY)
-1. MCP tools — check bound/native MCP tools first via \`mcp_tool_bridge\` or direct bindings.
-2. Built-in tools — \`http_request\`, \`json_utils\`, \`mcp_tool_bridge\`, bash / filesystem / search.
+1. MCP tools — use the bound native MCP tools (loaded from configured MCP servers) first.
+2. Built-in tools — \`http_request\`, \`json_utils\`, bash / filesystem / search.
 3. deepagents built-in tools — \`read_file\`, \`write_file\`, \`edit_file\`, \`execute\`, \`task\`.
 4. Write custom code — only when no existing tool fits the need.
 

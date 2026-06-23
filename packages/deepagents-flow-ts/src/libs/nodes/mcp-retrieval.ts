@@ -16,13 +16,14 @@
  * });
  */
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
+import type { MultiServerMCPClient } from "@langchain/mcp-adapters";
 import type { FlowCallbacks } from "../../core/flow-types.js";
 import { runTool } from "./tools.js";
 import {
-  callResolvedMcpTool,
+  resolveAccessor,
   rateLimited,
   type McpServerConfig,
-} from "../mcp/stdio-client.js";
+} from "../mcp/mcp-access.js";
 
 export interface McpRetrievalNodeOptions<S> {
   /** MCP 服务器配置（语义名 → stdio spec），或按 state 解析。 */
@@ -65,9 +66,24 @@ export function createMcpRetrievalNode<S>(
     const onToolCall = config?.configurable?.onToolCall as
       | FlowCallbacks["onToolCall"]
       | undefined;
+    // 注入持久 mcpClient 优先（该 server 已连则复用）；否则自管临时 client。透传 timeoutMs。
+    const mcpClient = config?.configurable?.mcpClient as
+      | MultiServerMCPClient
+      | undefined;
     const fn = () => {
-      const call = () =>
-        callResolvedMcpTool(serverCfg, target.tool, target.args, { timeoutMs });
+      const call = async () => {
+        const { accessor, dispose } = await resolveAccessor({
+          client: mcpClient,
+          server: target.server,
+          config: serverCfg,
+          timeoutMs,
+        });
+        try {
+          return await accessor.callResolved(target.tool, target.args);
+        } finally {
+          await dispose?.();
+        }
+      };
       return opts.rateLimited === false ? call() : rateLimited(call);
     };
     const { result, ok } = await runTool(target.tool, target.args, fn, onToolCall);

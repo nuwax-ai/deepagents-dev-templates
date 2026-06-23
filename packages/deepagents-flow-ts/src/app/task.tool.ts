@@ -1,7 +1,7 @@
 /**
  * task 工具 —— 把子任务委派给一个声明式 subagent（.agents/agents/<name>/AGENT.md）。
  *
- * 框架原生实现：每个子代理复用默认 ReAct 图（createFlowGraph）跑一次 one-shot——
+ * 框架原生实现：每个子代理复用默认 ReAct 图（createFlowGraph）单次 invoke——
  * 自带 systemPrompt（AGENT.md 正文）、工具子集、独立工作目录、可选独立模型。
  * LangGraph 无「声明式子代理」原生概念，故参考 deepagents 的 `task` 委派语义。
  *

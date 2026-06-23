@@ -3,7 +3,7 @@
  *
  * 框架级构建件层:`core → runtime → kit → app → surfaces`。kit 只依赖 runtime+core。
  * - nodes/ :LangGraph 节点 factory(createLlmNode/createToolExecNode/...) + 构建原语(emit/runTool/extractText/...)。
- * - tools/ :模板内置通用工具(bash/fs/search/demo/mcp-bridge/http/json/...)。
+ * - tools/ :模板内置通用工具(bash/fs/search/demo/http/json/...)。MCP 工具经 mcp-access + runtime-context 加载为 native。
  * nodes/ 与 tools/ 互不引用。
  */
 

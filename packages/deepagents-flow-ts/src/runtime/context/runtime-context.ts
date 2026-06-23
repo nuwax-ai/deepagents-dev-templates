@@ -5,7 +5,8 @@
  * - MCP：合并 default(含 configPath 文件) + session（ACP 下发）
  *   （session-wins：default < session），用 @langchain/mcp-adapters 的
  *   MultiServerMCPClient.getTools() 加载 native MCP 工具。平台 MCP 经 ACP sessionConfig 下发，运行时不主动拉取。
- * - onConnectionError="ignore"：单个 server 连不上只跳过，不炸掉其余 server 的工具。
+ * - onConnectionError=per-server handler：单个 server 连不上记录原因并跳过（不炸其余 server），
+ *   启动日志列 connected/failed；stdio 默认挂 restart 供长驻 server（chrome-devtools 等）崩溃自愈。
  * - tools 不由本 context 创建（由 app 层 createFlowTools 组装）。
  */
 
@@ -17,18 +18,86 @@ import { resolvePath } from "../config/config-paths.js";
 import { resolvePackageRoot } from "../package-root.js";
 import { logger } from "../logger.js";
 
-/** MCP server 配置（stdio command 或 http url）。 */
+/** stdio 进程退出后自动重启配置（chrome-devtools 等长驻 server 崩溃自愈）。 */
+export interface McpRestartOpts {
+  enabled: boolean;
+  maxAttempts?: number;
+  delayMs?: number;
+}
+/** sse 断线自动重连配置。 */
+export interface McpReconnectOpts {
+  enabled: boolean;
+  maxAttempts?: number;
+  delayMs?: number;
+}
+
+/**
+ * MCP server 配置（多 transport：stdio / Streamable HTTP / SSE）。
+ * 省略 transport 时按字段推断：有 url→http，有 command→stdio；显式 transport:"sse" 走 SSE。
+ */
 export interface McpServerEntry {
   command?: string;
   args?: string[];
   url?: string;
   env?: Record<string, string>;
+  /** 显式 transport；省略则按 url/command 推断。 */
+  transport?: "stdio" | "sse" | "http";
+  /** http/sse 自定义请求头（如 Authorization）。 */
+  headers?: Record<string, string>;
+  /** stdio 进程退出后自动重启（默认对 stdio 开启，见 toConnections）。 */
+  restart?: McpRestartOpts;
+  /** sse 断线自动重连。 */
+  reconnect?: McpReconnectOpts;
+  /** 该 server 所有工具的默认超时（ms）。 */
+  defaultToolTimeout?: number;
 }
 
-/** mcp-adapters connection 形状（stdio | http）。 */
+/** mcp-adapters connection 形状（stdio | http(Streamable) | sse）。 */
 type McpConnection =
-  | { transport: "stdio"; command: string; args: string[]; env?: Record<string, string> }
-  | { transport: "http"; url: string };
+  | {
+      transport: "stdio";
+      command: string;
+      args: string[];
+      env?: Record<string, string>;
+      restart?: McpRestartOpts;
+      defaultToolTimeout?: number;
+    }
+  | {
+      transport: "sse";
+      url: string;
+      headers?: Record<string, string>;
+      reconnect?: McpReconnectOpts;
+      defaultToolTimeout?: number;
+    }
+  | {
+      transport: "http";
+      url: string;
+      headers?: Record<string, string>;
+      automaticSSEFallback?: boolean;
+      defaultToolTimeout?: number;
+    };
+
+/** stdio connection 默认重启策略（长驻 MCP server 进程意外退出时自愈）。 */
+const DEFAULT_STDIO_RESTART: McpRestartOpts = {
+  enabled: true,
+  maxAttempts: 3,
+  delayMs: 1000,
+};
+
+/**
+ * 规范化 headers：只保留 plain object 且值为 string（ACP/session 下发可能是脏数据，
+ * 如 array）。与 env 清洗同理——避免单个非法 server 让 mcp-adapters 整体 Zod 失败。
+ */
+function cleanHeaders(
+  raw: unknown
+): Record<string, string> | undefined {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof v === "string") out[k] = v;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
 
 /**
  * 工具与 agent 依赖的运行时组件集合。
@@ -36,14 +105,20 @@ type McpConnection =
  */
 export interface RuntimeContext {
   config: AppConfig;
-  /** 合并后的 MCP server 配置（default + session，session-wins）。供 mcp-bridge 元工具列/调。 */
+  /** 合并后的 MCP server 配置（default + session，session-wins）。图内检索节点无注入 client 时 fallback 自管用。 */
   mcpServerConfigs: Record<string, McpServerEntry>;
-  /** 经 @langchain/mcp-adapters 从已配置 MCP server 加载的 native LangChain 工具 */
+  /** 经 @langchain/mcp-adapters 从已配置 MCP server 加载的 native LangChain 工具（agent 工具来源）。 */
   mcpTools: StructuredTool[];
   /** @internal session MCP overrides（session-wins 最高优先级），hydrate 重新合并时用。 */
   sessionMcpServers: Record<string, McpServerEntry>;
-  /** mcp-adapters client（destroy 时 close 以释放 stdio 子进程 / http 连接）。hydrate 前为 null。 */
+  /**
+   * mcp-adapters 主 client（bulk 模式，session 内持久复用）；destroy 时 close。
+   * hydrate 前或 bulk 失败走 per-server fallback 时为 null（此时用 mcpFallbackClients）。
+   * 图内检索节点优先经它 getClient(server) 调任意 MCP 工具。
+   */
   mcpClient: MultiServerMCPClient | null;
+  /** @internal bulk 失败时逐 server 加载的 clients，destroy 时一并 close（修复旧 fallback 泄漏）。 */
+  mcpFallbackClients?: MultiServerMCPClient[];
 }
 
 /** 合并 MCP server 配置层：后者覆盖同名（最后一层优先级最高）。 */
@@ -109,8 +184,27 @@ function toConnections(
 ): Record<string, McpConnection> {
   const out: Record<string, McpConnection> = {};
   for (const [name, s] of Object.entries(servers)) {
-    if (s.url) {
-      out[name] = { transport: "http", url: s.url };
+    const headers = cleanHeaders(s.headers);
+    const timeout =
+      typeof s.defaultToolTimeout === "number" ? s.defaultToolTimeout : undefined;
+
+    if (s.transport === "sse" && s.url) {
+      // 显式 SSE（旧 server 或需强制 SSE）。
+      out[name] = {
+        transport: "sse",
+        url: s.url,
+        ...(headers ? { headers } : {}),
+        ...(s.reconnect ? { reconnect: s.reconnect } : {}),
+        ...(timeout ? { defaultToolTimeout: timeout } : {}),
+      };
+    } else if (s.url) {
+      // Streamable HTTP（官方自动 SSE fallback；给 url 即识别为 http）。
+      out[name] = {
+        transport: "http",
+        url: s.url,
+        ...(headers ? { headers } : {}),
+        ...(timeout ? { defaultToolTimeout: timeout } : {}),
+      };
     } else if (s.command) {
       // env 仅保留 plain object 且值为 string；其余形态（array / 非 string 值）一律丢弃。
       const rawEnv = s.env as unknown;
@@ -123,11 +217,15 @@ function toConnections(
             )
           : undefined;
       const hasEnv = cleanEnv && Object.keys(cleanEnv).length > 0;
+      // stdio 默认挂 restart（配置显式给 restart 则尊重配置，含 enabled:false）。
+      const restart = s.restart ?? DEFAULT_STDIO_RESTART;
       out[name] = {
         transport: "stdio",
         command: s.command,
         args: s.args ?? [],
         ...(hasEnv ? { env: cleanEnv } : {}),
+        restart,
+        ...(timeout ? { defaultToolTimeout: timeout } : {}),
       };
     }
     // else: 既无 url 又无 command —— 跳过，避免 mcp-adapters Zod 'command: Required'。
@@ -161,6 +259,7 @@ export function createRuntimeContext(
     mcpTools: [],
     sessionMcpServers: sessionServers,
     mcpClient: null,
+    mcpFallbackClients: [],
   };
 }
 
@@ -177,42 +276,83 @@ export async function hydrateRuntimeContext(
   const defaultServers = resolveDefaultMcpServers(context.config);
   context.mcpServerConfigs = mergeServers(defaultServers, context.sessionMcpServers);
 
-  // Load native MCP tools via mcp-adapters; onConnectionError=ignore so a single
-  // unreachable server does not zero out all MCP tools.
   const connections = toConnections(context.mcpServerConfigs);
   const connNames = Object.keys(connections);
-  if (connNames.length > 0) {
-    try {
-      const client = new MultiServerMCPClient({
-        mcpServers: connections,
-        onConnectionError: "ignore",
-      } as never);
-      context.mcpClient = client;
-      context.mcpTools = await client.getTools();
-      log.info("Loaded MCP tools", { count: context.mcpTools.length });
-    } catch (err) {
-      log.warn("MCP bulk load failed; retrying per-server", {
-        error: err instanceof Error ? err.message : String(err),
-      });
-      const tools: typeof context.mcpTools = [];
-      for (const name of connNames) {
-        try {
-          const single = new MultiServerMCPClient({
-            mcpServers: { [name]: connections[name] },
-            onConnectionError: "ignore",
-          } as never);
-          tools.push(...(await single.getTools()));
-        } catch (e) {
-          log.warn("MCP server skipped", {
-            server: name,
-            error: e instanceof Error ? e.message : String(e),
-          });
-        }
-      }
-      context.mcpTools = tools;
-      log.info("Loaded MCP tools (per-server fallback)", { count: tools.length });
-    }
+  context.mcpFallbackClients = [];
+
+  // 配置非法（无 url/command，或 transport=sse 缺 url）的 server 在 toConnections 被静默丢弃——
+  // 显式记录，避免「server 消失」无从排查。
+  const dropped = Object.keys(context.mcpServerConfigs).filter((n) => !connections[n]);
+  if (dropped.length > 0) {
+    log.warn("MCP server 配置无效（无 url/command 或 transport=sse 缺 url），已跳过", { dropped });
   }
+
+  if (connNames.length === 0) {
+    return context;
+  }
+
+  // per-server handler：单个 server 连不上记录原因并跳过（不 throw = ignore 该 server，其余继续）。
+  const failed: Array<{ server: string; reason: string }> = [];
+  const onConnectionError = ({
+    serverName,
+    error,
+  }: {
+    serverName: string;
+    error: unknown;
+  }) => {
+    const reason = error instanceof Error ? error.message : String(error);
+    if (!failed.some((f) => f.server === serverName)) {
+      failed.push({ server: serverName, reason });
+    }
+    log.warn("MCP server 连接失败，已跳过", { server: serverName, error: reason });
+  };
+
+  try {
+    const client = new MultiServerMCPClient({
+      mcpServers: connections,
+      onConnectionError,
+      // 工具名带 server 前缀（如 chrome-devtools__new_page），让 agent 识别 MCP 工具来源、
+      // 选对工具，避免在「打开 chrome-devtools」类指令下盲目探索。
+      prefixToolNameWithServerName: true,
+    } as never);
+    context.mcpClient = client;
+    context.mcpTools = await client.getTools();
+  } catch (err) {
+    // bulk 整体抛（如 Zod 校验失败）→ 逐 server 隔离重试，避免单个非法 server 连累全部。
+    log.warn("MCP bulk load failed; retrying per-server", {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    failed.length = 0;
+    const tools: typeof context.mcpTools = [];
+    const fallbackClients: MultiServerMCPClient[] = [];
+    for (const name of connNames) {
+      try {
+        const single = new MultiServerMCPClient({
+          mcpServers: { [name]: connections[name] },
+          onConnectionError,
+          prefixToolNameWithServerName: true,
+        } as never);
+        tools.push(...(await single.getTools()));
+        fallbackClients.push(single); // 保留到 session 结束（工具持有其连接，close 会让工具失效）
+      } catch (e) {
+        failed.push({
+          server: name,
+          reason: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }
+    context.mcpTools = tools;
+    context.mcpClient = null;
+    context.mcpFallbackClients = fallbackClients;
+  }
+
+  const connected = connNames.filter((n) => !failed.some((f) => f.server === n));
+  log.info("Loaded MCP tools", {
+    total: context.mcpTools.length,
+    connectedServers: connected,
+    failedServers: failed,
+    mode: context.mcpClient ? "bulk" : "per-server-fallback",
+  });
 
   return context;
 }
@@ -226,15 +366,27 @@ export async function createRuntimeContextAsync(
 }
 
 /**
- * Tear down runtime resources: close the mcp-adapters client to release stdio
- * child processes / http connections. Safe to call multiple times.
+ * Tear down runtime resources: close the mcp-adapters client(s) to release stdio
+ * child processes / http connections（含 per-server fallback 的 clients）。Safe to call multiple times.
  */
 export async function destroyRuntimeContext(context: RuntimeContext): Promise<void> {
-  if (context.mcpClient) {
+  const log = logger.child("runtime-context");
+  const clients = [
+    context.mcpClient,
+    ...(context.mcpFallbackClients ?? []),
+  ].filter((c): c is MultiServerMCPClient => Boolean(c));
+  if (clients.length === 0) return;
+  const servers = Object.keys(context.mcpServerConfigs);
+  let closed = 0;
+  for (const c of clients) {
     try {
-      await (context.mcpClient as { close?: () => Promise<void> }).close?.();
+      await (c as { close?: () => Promise<void> }).close?.();
+      closed++;
     } catch {
       // best-effort teardown
     }
   }
+  context.mcpClient = null;
+  context.mcpFallbackClients = [];
+  log.info("MCP client closed", { servers, clientsClosed: closed });
 }

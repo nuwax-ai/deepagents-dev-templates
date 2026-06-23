@@ -56,7 +56,7 @@ export interface StageEvent {
 }
 
 /**
- * 回调集合（流式 token + 工具调用 + 阶段 + Plan）——one-shot 与 stateful flow 共用。
+ * 回调集合（流式 token + 工具调用 + 阶段 + Plan）——FlowExecutor 与 StatefulFlow 共用。
  * signal（可选）：任务取消信号。surface 从 ACP cancel controller 取，透传到
  * `graph.stream({signal})`；中止时 LangGraph 以 AbortError reject，surface 据此快速收尾。
  */
@@ -72,7 +72,7 @@ export interface FlowCallbacks {
 }
 
 /**
- * Flow 执行器（one-shot）：给定查询产出结果。
+ * Flow 执行器（单次调用）：给定查询产出结果。
  * - onToken：流式推送回答增量（surface 据此决定是否再整段重发 answer）。
  * - onToolCall：推送工具调用事件（如检索），surface 据此向客户端发 ACP tool_call。
  */
@@ -81,7 +81,7 @@ export type FlowExecutor = (query: string, opts: FlowCallbacks) => Promise<FlowR
 /**
  * 有状态 flow —— 支持 human-in-the-loop（interrupt / resume）。
  *
- * 与 one-shot FlowExecutor 互补：executor 跑完即结束；StatefulFlow 可在中途 `interrupt`
+ * 与 FlowExecutor（单次）互补：executor 跑完即结束；StatefulFlow 可在中途 `interrupt`
  * 暂停、把问题抛给用户，下一轮带 `resume` 恢复（节点从暂停点之后续跑）。
  * threadId 隔离多会话（ACP 用 sessionId），图状态由 checkpointer 持久化。
  *

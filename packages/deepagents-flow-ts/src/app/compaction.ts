@@ -10,7 +10,7 @@
  *  - 超阈值 + 无凭证 → 仅 trimMessages 裁剪（不摘要，避免调模型）
  *
  * 典型接入：StatefulFlow.run 入口 load history → compactHistory → 作为初始 messages 传图
- * （见 examples/dev-agent）。默认图（one-shot）单 turn，历史不增长，压缩不触发。
+ * （见 examples/dev-agent）。默认图单 turn，历史不增长，压缩不触发。
  */
 
 import {

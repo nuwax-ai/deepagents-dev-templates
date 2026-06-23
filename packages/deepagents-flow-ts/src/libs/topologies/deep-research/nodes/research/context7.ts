@@ -5,7 +5,7 @@
  */
 
 import { logger } from "../../../../../runtime/index.js";
-import { callResolvedMcpTool, type McpServerConfig } from "../../../../mcp/stdio-client.js";
+import { callResolvedMcpTool, type McpServerConfig } from "../../../../mcp/mcp-access.js";
 
 const log = logger.child("deep-research-context7");
 

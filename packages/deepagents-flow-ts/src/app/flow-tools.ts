@@ -21,7 +21,6 @@ import {
   createFsTools,
   createSearchTools,
   createDemoTools,
-  createMcpBridgeTool,
   createSkillTool,
 } from "../libs/tools/index.js";
 import { createTaskTool } from "./task.tool.js";
@@ -51,7 +50,6 @@ export function createFlowTools(
     ...createFsTools({ workspaceRoot: wsRoot, policy }),
     ...createSearchTools({ workspaceRoot: wsRoot, policy }),
     ...createDemoTools(),
-    createMcpBridgeTool(ctx.mcpServerConfigs),
     ...ctx.mcpTools,
     ...skillTools,
   ];

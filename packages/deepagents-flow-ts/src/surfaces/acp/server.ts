@@ -2,7 +2,8 @@
  * ACP Server — 让工作流图成为请求路径（与具体图解耦）。
  *
  * 关键 seam：deepagents-acp 的 `onPrompt` 钩子在 agent 运行前触发，
- * 返回 `{ stopReason }` 即短路 agent。我们在这里跑传入的 FlowExecutor，
+ * 返回 `{ stopReason }` 即短路 agent。主入口经 materializeFlow 传入 StatefulFlow；
+ * examples 仍可能传入 legacy function executor。
  * 把回答经 `conn` 流式推给客户端，然后短路——deep agent 永不进入请求路径。
  *
  * per-session 配置（D）：`createExecutor` 工厂 + `configureSession` 钩子让 ACP `session/new`
@@ -256,8 +257,8 @@ export interface SessionExecutor {
 
 export interface FlowAcpOptions {
   /**
-   * 单 executor 模式：one-shot FlowExecutor 或支持 HITL 的 StatefulFlow，所有 session 共用
-   * （无 per-session 配置）。与 createExecutor 二选一；createExecutor 优先。
+   * 单 executor 模式：StatefulFlow（主路径）；legacy function executor 仅 examples 兼容。
+   * 与 createExecutor 二选一；createExecutor 优先。
    */
   executor?: FlowExecutor | StatefulFlow;
   /**
@@ -543,7 +544,7 @@ export function createFlowHooks(options: FlowAcpOptions): DeepAgentsServerHooks 
   };
 }
 
-/** 启动 Flow ACP 服务（stdio）。任意 FlowExecutor / per-session 工厂都能插进来。 */
+/** 启动 Flow ACP 服务（stdio）。主路径 StatefulFlow；per-session 工厂见 createExecutor。 */
 export async function bootstrapFlowAcp(options: FlowAcpOptions): Promise<void> {
   if (options.debug) {
     process.env.LOG_LEVEL = "debug";

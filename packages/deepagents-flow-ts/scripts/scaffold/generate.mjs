@@ -63,7 +63,7 @@ function registerFlow(name, kind, conversational = false) {
       `flows/index.ts 缺少 REGISTRY-START 标记（\`${regAnchor}\`）；勿手动删除该标记区。`
     );
   }
-  // kind 决定注册表项形态：stateful-recipe 用 recipe；oneshot / stateful-custom 用 createExecutor。
+  // kind 决定注册表项形态：stateful-recipe 用 recipe；stateful-custom 用 createExecutor。
   // conversational（react-tools/rag/adaptive-rag 等对话型）→ 注册项加 conversational:true，
   // 物化时透传 createStatefulFlow → 多轮记忆 + 图层流式（见 src/app/default-flow.ts）。
   const entry =

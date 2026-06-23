@@ -89,7 +89,7 @@ export function resolveSystemPromptMeta(
 4. Verify — test and validate results
 
 ## Tool Priority (MANDATORY)
-1. MCP tools (via mcp_tool_bridge or native bindings) — check first
+1. MCP tools (native, bound from configured MCP servers) — check first
 2. Built-in tools (bash, filesystem, search, http_request, json_utils)
 3. deepagents built-in tools (read_file, write_file, edit_file, execute, task)
 4. Write custom code (last resort only)
@@ -131,7 +131,7 @@ export function resolveSystemPrompt(
 }
 
 /**
- * Resolve system prompt for CLI modes (REPL / one-shot).
+ * Resolve system prompt for CLI modes (REPL / 单次调用).
  * Priority: explicit text > custom file > default prompt file > generic fallback.
  */
 export function resolveCliSystemPrompt(options: {

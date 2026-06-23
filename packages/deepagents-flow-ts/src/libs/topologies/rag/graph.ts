@@ -39,7 +39,7 @@ const RAGStateAnnotation = Annotation.Root({
   // 输入
   query: Annotation<string>,
   // append reducer：conversational 多轮把 (query, answer) 累积进 history（generate 节点写回），
-  // 配合稳定 threadId + checkpointer → 下一轮 rewrite/generate 读到对话上下文。oneshot 单轮无副作用。
+  // 配合稳定 threadId + checkpointer → 下一轮 rewrite/generate 读到对话上下文。无 checkpointer 时单轮无副作用。
   history: Annotation<BaseMessage[]>({
     reducer: (a, b) => [...(a ?? []), ...(b ?? [])],
     default: () => [],
