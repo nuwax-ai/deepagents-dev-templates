@@ -114,6 +114,9 @@ export function mapStreamChunk(mode: string, chunk: unknown): SurfaceStreamEvent
     // ToolNode 生命周期（spike 确认 @langchain/langgraph 多模式）：
     //   { event: "on_tool_start"|"on_tool_end", toolCallId, name, input<string>, output?<ToolMessage 序列化> }
     //   output 为 LangChain 序列化 ToolMessage：{ kwargs: { content, status:"success"|"error", ... } }
+    // 注：实际 ReAct+model 运行下 on_tool_end 的 output 序列化结构可能取不到 content
+    //（session-trace 工具结果会显示空 resultChars=2），但 ToolMessage 真实 content 正常进 history
+    // 给 LLM（见 checkpointer state.messages），不影响 agent。日志诊断工具结果时以 checkpointer 为准。
     const e = chunk as {
       event?: string;
       toolCallId?: string;
