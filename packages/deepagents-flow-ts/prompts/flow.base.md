@@ -21,7 +21,7 @@
 ## 能力分层
 
 - **内置能力（agent-builtin）**：上述内置工具 + 压缩 + 会话持久化（conversational 多轮：每轮 query 经稳定 threadId + checkpointer 自动累积历史 → 你能看到之前轮次的对话），开箱即用。
-- **工作区配置（workspace-config）**：`config/mcp.default.json`、Skills（`skills/builtin/`）、Subagent（`.agents/agents/`）、模型（`config/flow-agent.config.json`）、系统提示词（`prompts/flow.base.md` 或 `config.agent.systemPrompt`）。
+- **工作区配置（workspace-config）**：`config/mcp.default.json`、Skills（`skills/builtin/`）、子智能体 Subagent（`.agents/agents/`）、模型（`config/flow-agent.config.json`）、系统提示词（`prompts/flow.base.md` 或 `config.agent.systemPrompt`）。
 - **ACP 会话下发（运行时）**：host 在会话建立时下发的 `mcpServers` 与默认 MCP 合并后注入你的工具集（无需改配置文件）；用 `mcp_tool_bridge` 的 `list_servers` 确认当次会话实际可用列表。
 
 ## 规则

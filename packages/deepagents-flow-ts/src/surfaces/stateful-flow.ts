@@ -130,11 +130,7 @@ async function consumeStream(
           interruptQuestion = ev.question;
           continue;
         }
-        const meta =
-          mode === "messages" && Array.isArray(payload)
-            ? (payload[1] as { langgraph_node?: string } | undefined)
-            : undefined;
-        await dispatchSurfaceEvent(ev, callbacks, meta);
+        await dispatchSurfaceEvent(ev, callbacks);
       }
       continue;
     }

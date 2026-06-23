@@ -1,11 +1,11 @@
 /**
  * task 工具 —— 把子任务委派给一个声明式 subagent（.agents/agents/<name>/AGENT.md）。
  *
- * 框架原生实现：每个子代理复用默认 ReAct 图（createFlowGraph）单次 invoke——
+ * 框架原生实现：每个子智能体（subagent）复用默认 ReAct 图（createFlowGraph）单次 invoke——
  * 自带 systemPrompt（AGENT.md 正文）、工具子集、独立工作目录、可选独立模型。
- * LangGraph 无「声明式子代理」原生概念，故参考 deepagents 的 `task` 委派语义。
+ * LangGraph 无「声明式子智能体（subagent）」原生概念，故参考 deepagents 的 `task` 委派语义。
  *
- * 防递归：子代理拿到的工具集**不含 `task` 本身**（由 createFlowTools 的 buildTools 保证）。
+ * 防递归：子智能体拿到的工具集**不含 `task` 本身**（由 createFlowTools 的 buildTools 保证）。
  * 工作目录：默认 = 父级 workspaceRoot（启动 agent 的当前目录）；AGENT.md `workdir` 指定相对子目录。
  * 临时态：用图默认 MemorySaver，不落父会话 checkpointer。
  */
@@ -18,13 +18,15 @@ import type { StructuredTool } from "@langchain/core/tools";
 import type { AppConfig, DiscoveredSubAgent } from "../runtime/index.js";
 import { createFlowGraph } from "./graph.js";
 import type { FlowState } from "./state.js";
+import { extractText } from "../libs/nodes/index.js";
+import type { FlowCallbacks } from "../core/flow-types.js";
 
 export interface TaskToolDeps {
   subAgents: DiscoveredSubAgent[];
   config: AppConfig;
-  /** 父 agent 的工作目录（子代理未指定 workdir 时继承）。 */
+  /** 父 agent 的工作目录（子智能体未指定 workdir 时继承）。 */
   parentWorkspaceRoot: string;
-  /** 按工作目录重建子代理工具集（不含 task，防递归）。 */
+  /** 按工作目录重建子智能体工具集（不含 task，防递归）。 */
   buildTools: (workspaceRoot: string) => StructuredTool[];
 }
 
@@ -70,7 +72,7 @@ export function createTaskTool(deps: TaskToolDeps) {
   const names = subAgents.map((a) => a.name).join(", ") || "(none)";
 
   return tool(
-    async ({ subagent_type, description }) => {
+    async ({ subagent_type, description }, runConfig) => {
       const agent = byName.get(subagent_type);
       if (!agent) return `Error: 未找到 subagent "${subagent_type}"。可用: ${names}`;
 
@@ -79,7 +81,7 @@ export function createTaskTool(deps: TaskToolDeps) {
         ? resolve(parentWorkspaceRoot, agent.workdir)
         : parentWorkspaceRoot;
 
-      // 工具：按子代理工作目录重建（沙箱受限于 subRoot）；AGENT.md tools 进一步收窄为 allowlist。
+      // 工具：按子智能体工作目录重建（沙箱受限于 subRoot）；AGENT.md tools 进一步收窄为 allowlist。
       let tools = buildTools(subRoot);
       if (agent.tools?.length) {
         const allow = new Set(agent.tools);
@@ -100,26 +102,54 @@ export function createTaskTool(deps: TaskToolDeps) {
       const subConfig = modelOverride.config;
 
       try {
+        // 流式委派：subagent 的工具调用经 callbacks.onToolCall（带 [subagent] 前缀）实时透出；
+        // LLM token 经 graph.stream messages 模式逐个 onToken；最终 output 取终态（替代原 invoke）。
+        const parentCallbacks = ((runConfig as { configurable?: Record<string, unknown> } | undefined)
+          ?.configurable ?? {}) as Partial<FlowCallbacks>;
+        const wrapToolCall: FlowCallbacks["onToolCall"] = async (e) => {
+          await parentCallbacks.onToolCall?.({
+            ...e,
+            toolName: `[${subagent_type}] ${e.toolName}`,
+          });
+        };
         const graph = createFlowGraph({
           allTools: tools,
           config: subConfig,
           systemPrompt: agent.systemPrompt,
+          callbacks: { onToolCall: wrapToolCall },
         });
-        const result = (await graph.invoke(
+        const threadId = `subagent-${subagent_type}-${randomUUID()}`;
+        const stream = await graph.stream(
           { input: description, messages: [] } as unknown as FlowState,
-          { configurable: { thread_id: `subagent-${subagent_type}-${randomUUID()}` }, recursionLimit: 50 }
-        )) as FlowState;
-        return result.output || "(subagent 无输出)";
+          {
+            configurable: { thread_id: threadId },
+            recursionLimit: 50,
+            streamMode: ["messages"],
+          }
+        );
+        for await (const raw of stream) {
+          // 多模式 chunk = [mode, payload]；messages 模式 payload = [messageChunk, metadata]
+          if (!Array.isArray(raw) || raw[0] !== "messages") continue;
+          const pair = raw[1] as [{ content?: unknown }, unknown] | undefined;
+          if (!Array.isArray(pair)) continue;
+          const [msg] = pair;
+          // 全放开：subagent 所有节点的 token 透出（messages token 是模型输出，不含模型配置）。
+          const text = extractText(msg?.content);
+          if (text) await parentCallbacks.onToken?.(text);
+        }
+        const finalState = (await graph.getState({ configurable: { thread_id: threadId } }))
+          .values as FlowState;
+        return finalState.output || "(subagent 无输出)";
       } catch (err) {
         return `Error: subagent "${subagent_type}" 执行失败: ${err instanceof Error ? err.message : String(err)}`;
       }
     },
     {
       name: "task",
-      description: `把子任务委派给一个声明式子代理（各自独立 prompt/工具/工作目录），返回其最终结果。可用 subagent_type: ${names}。`,
+      description: `把子任务委派给一个声明式子智能体（subagent，各自独立 prompt/工具/工作目录），返回其最终结果。可用 subagent_type: ${names}。`,
       schema: z.object({
-        subagent_type: z.string().describe("子代理名（见系统提示词 Subagents 列表）"),
-        description: z.string().describe("交给子代理执行的完整任务说明（自包含，子代理看不到主对话历史）"),
+        subagent_type: z.string().describe("子智能体名 subagent_type（见系统提示词 Subagents 列表）"),
+        description: z.string().describe("交给子智能体（subagent）执行的完整任务说明（自包含，子智能体看不到主对话历史）"),
       }),
     }
   );

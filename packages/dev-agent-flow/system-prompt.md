@@ -74,7 +74,7 @@
 | `http_request` | 通用 HTTP 请求 |
 | `json_utils` | JSON 解析、验证、提取、合并 |
 | `load_skill` | 按需加载已发现 skill 的 SKILL.md |
-| `task` | 委派给 `.agents/` 声明式 subagent |
+| `task` | 委派给 `.agents/` 声明式子智能体（subagent） |
 | `echo` / `calculate` / `time` | demo 工具（无凭证 fallback） |
 
 Native MCP 工具经 `config/mcp.default.json` + ACP session `mcpServers` 由 runtime 原生加载（无 `mcp_tool_bridge`）。

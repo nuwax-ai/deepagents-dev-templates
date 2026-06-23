@@ -250,7 +250,7 @@ platform_api(operation: "query_plugins", params: { query: "<所需能力>" })
 |------|------|
 | `read_file` / `write_file` / `edit_file` | 文件读写操作 |
 | `execute` | 执行 shell 命令 |
-| `task` | 委托子 Agent 处理子任务 |
+| `task` | 委托子智能体（subagent）处理子任务 |
 
 ### MCP 服务工具
 | 工具 | 用途 |

@@ -302,12 +302,14 @@ ${lines.join("\n")}`;
 /**
  * Render the "Subagents" prompt section. Empty when no subagents.
  * Tells the model it can delegate via the `task` tool.
+ *
+ * 术语：中文用户文案统一称「子智能体」，英文 API/标识保留 subagent（如 subagent_type）。
  */
 export function renderSubagentsSection(subAgents: DiscoveredSubAgent[]): string {
   if (!subAgents.length) return "";
   const lines = subAgents.map((a) => `- **${a.name}** — ${a.description}`);
   return `## Subagents（用 task 委派）
 
-需要专门能力时，调用 \`task({ subagent_type, description })\` 把子任务委派给下列子代理（各自独立 prompt/工具/工作目录），拿回结果后继续：
+需要专门能力时，调用 \`task({ subagent_type, description })\` 把子任务委派给下列子智能体（subagent，各自独立 prompt/工具/工作目录），拿回结果后继续：
 ${lines.join("\n")}`;
 }

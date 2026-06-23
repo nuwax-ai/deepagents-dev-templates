@@ -7,31 +7,18 @@
 import type { FlowCallbacks } from "../core/flow-types.js";
 import type { SurfaceStreamEvent } from "./stream-events.js";
 
-/**
- * 仅对用户可见的回答节点放行 messages mode 文本（避免 plan/review JSON token 泄漏）。
- *
- * 默认 ReAct 图的最终回答在 `think` 节点产生（无 tool_calls 分支直接回答，respond 仅转存
- * output）——故 think 也放行。工具决策轮 think 的 content 通常为空（emitTextToken 对空串 no-op），
- * 不会把中间推理吐给用户。
- */
-export const STREAM_TEXT_NODES = new Set(["write_draft", "respond", "respondNode", "think"]);
-
-/**
- * 将单个 surface 事件分发给 callbacks。
- * @param metadata LangGraph messages mode 附带的 metadata（含 langgraph_node）。
- */
+/** 将单个 surface 事件分发给 callbacks。 */
 export async function dispatchSurfaceEvent(
   event: SurfaceStreamEvent,
-  callbacks: FlowCallbacks | undefined,
-  metadata?: { langgraph_node?: string }
+  callbacks: FlowCallbacks | undefined
 ): Promise<void> {
   if (!callbacks) return;
 
   switch (event.type) {
     case "text": {
-      const node = metadata?.langgraph_node;
-      // custom writer 的 text 无 metadata，直接透出；messages mode 需过滤节点。
-      if (node && !STREAM_TEXT_NODES.has(node)) return;
+      // 全放开：所有节点的流式文本 token 都透出（含 RAG rewrite/grade 等中间决策节点——
+      // 有噪声但无害；需要时再收）。messages token 是模型输出文本，不含模型配置（model/api key），
+      // 不会泄漏；模型配置泄漏的真实通道是工具结果/错误日志，不经此 token 流。
       await callbacks.onToken?.(event.text);
       break;
     }

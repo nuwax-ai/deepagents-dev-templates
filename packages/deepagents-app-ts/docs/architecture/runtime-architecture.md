@@ -19,9 +19,9 @@ flowchart TD
     acp --> build["buildAgentConfig<br/>runtime/agent-config · acp/config-builder<br/>组装 DeepAgentConfig"]
     cli --> build
     app["app/ 可编辑业务区<br/>tools/* · hooks · harness-profile"] --> build
-    rt["runtime 引擎输入<br/>model · prompt(+conventions)<br/>permissions · discovery(子代理/技能/记忆)"] --> build
+    rt["runtime 引擎输入<br/>model · prompt(+conventions)<br/>permissions · discovery(子智能体/技能/记忆)"] --> build
 
-    build --> cda["deepagents createDeepAgent → LangGraph ReAct agent<br/><br/>内置: todo · filesystem(权限/驱逐) · task/子代理 · 摘要 · 缓存 · memory · HITL<br/>app: harnessLifecycle · fsPathResolver · stuckLoop · periodic · cost · hooks"]
+    build --> cda["deepagents createDeepAgent → LangGraph ReAct agent<br/><br/>内置: todo · filesystem(权限/驱逐) · task/子智能体 · 摘要 · 缓存 · memory · HITL<br/>app: harnessLifecycle · fsPathResolver · stuckLoop · periodic · cost · hooks"]
 
     cda --> model["Model · Anthropic / OpenAI"]
     cda --> mcp["MCP 服务器 · @langchain/mcp-adapters"]

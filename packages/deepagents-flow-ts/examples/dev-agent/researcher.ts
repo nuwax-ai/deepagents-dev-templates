@@ -49,7 +49,7 @@ export function createResearcherSubgraph(appConfig: AppConfig, allTools: Structu
           bound,
           [
             new SystemMessage(
-              "你是 researcher 子代理。用工具研究给定问题，返回结构化发现：关键事实 / 矛盾证据 / 未决问题 / 建议下一步。"
+              "你是 researcher 子智能体（subagent）。用工具研究给定问题，返回结构化发现：关键事实 / 矛盾证据 / 未决问题 / 建议下一步。"
             ),
             ...state.messages,
           ],

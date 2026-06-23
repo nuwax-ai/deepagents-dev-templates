@@ -111,7 +111,7 @@ START → prepare → think(model.bindTools) ──(toolsCondition)──┐
 工具集来自 `FlowRuntime.allTools`：bash / 文件读写 / search / http / json / mcp-bridge + native MCP（context7 等，经 ACP 或 `mcp.default.json` 配置）+ demo(echo/calculate/time) + 可选 `load_skill` / `task`。
 无模型凭证时 think 走 fallback（回显输入），图始终可跑、可测。见 [src/app/graph.ts](src/app/graph.ts)。
 
-**进阶模式**（并行 fan-out、HITL `interrupt`、subgraph 子代理、压缩、**长任务硬化**：跨重启续跑 / 阶段进度 / 单步护栏）见 [docs/flow-patterns.md](docs/flow-patterns.md)；
+**进阶模式**（并行 fan-out、HITL `interrupt`、subgraph 子智能体（subagent）、压缩、**长任务硬化**：跨重启续跑 / 阶段进度 / 单步护栏）见 [docs/flow-patterns.md](docs/flow-patterns.md)；
 能力分层与配置见 [docs/capabilities.md](docs/capabilities.md)。
 
 ## 示例：不同需求 → 不同拓扑

@@ -4,12 +4,12 @@
 
 ## 框架优先（强制）
 
-工具执行 / 持久化 / 压缩 / 子代理都优先用 LangGraph、LangChain、deepagents 现成能力：
+工具执行 / 持久化 / 压缩 / 子智能体（subagent）都优先用 LangGraph、LangChain、deepagents 现成能力：
 
 - 工具 → `tool()`+Zod 的 `StructuredTool` + `bindTools` + `ToolNode` + `toolsCondition`
 - 持久化 → `BaseCheckpointSaver`（本模板的 `FileCheckpointSaver` 继承 `MemorySaver`）
 - 压缩 → core `trimMessages` + LLM 摘要（见 `src/app/compaction.ts`）
-- 子代理 → LangGraph **subgraph**（`addNode(name, compiledSubgraph)`）或 `Send` 并行
+- 子智能体（subagent）→ LangGraph **subgraph**（`addNode(name, compiledSubgraph)`）或 `Send` 并行
 
 不要手搓工具调度、checkpointer、summarizer。
 
@@ -19,7 +19,7 @@
 - **条件边循环**：`addConditionalEdges(router)` + 上限计数器（防死循环）。
 - **HITL（人审）**：`interrupt(...)` 暂停 + `Command({ resume })` 恢复，需 checkpointer + `StatefulFlow`。
 - **并行 map-reduce**：`Send` 扇出多路 + reducer 聚合（见 `examples/travel-planner`）。
-- **子代理**：把一个编译后的子图作为父图节点（subgraph），子图有独立 state。
+- **子智能体（subagent）**：把一个编译后的子图作为父图节点（subgraph），子图有独立 state。
 - **自适应 RAG**（`libs/topologies/adaptive-rag`，对齐官方 Adaptive RAG）：`route_question` 路由（向量检索 / 网页搜索 / 直接回答）+ `grade_documents` 文档评分 + `grade_generation` 幻觉/答案双评分 + 检索/生成双自纠正循环（带上限计数器）。适合需要路由与生成质量把关的进阶问答。
 - **conversational 多轮对话**：对话型 flow（`default` / `knowledge-qa` / `adaptive-knowledge-qa` / `customer-support`）用 `createStatefulFlow({ conversational: true })`——不暴露 `hasStarted`，surface 每轮走 `query` + 稳定 threadId + checkpointer 累积历史 → 多轮记忆（区别于 HITL 的 `resume` 续跑同一任务）。
 
