@@ -114,15 +114,14 @@ export function mapStreamChunk(mode: string, chunk: unknown): SurfaceStreamEvent
     // ToolNode 生命周期（spike 确认 @langchain/langgraph 多模式）：
     //   { event: "on_tool_start"|"on_tool_end", toolCallId, name, input<string>, output?<ToolMessage 序列化> }
     //   output 为 LangChain 序列化 ToolMessage：{ kwargs: { content, status:"success"|"error", ... } }
-    // 注：实际 ReAct+model 运行下 on_tool_end 的 output 序列化结构可能取不到 content
-    //（session-trace 工具结果会显示空 resultChars=2），但 ToolMessage 真实 content 正常进 history
-    // 给 LLM（见 checkpointer state.messages），不影响 agent。日志诊断工具结果时以 checkpointer 为准。
+    // output 为 LangChain 序列化 ToolMessage（{kwargs:{content,status,...}}）；content 多路径取
+    //（kwargs.content 标准 + output.content 兜底），实测完整 ReAct 下正常（不再 resultChars=2）。
     const e = chunk as {
       event?: string;
       toolCallId?: string;
       name?: string;
       input?: string;
-      output?: { kwargs?: { content?: unknown; status?: string } };
+      output?: { kwargs?: { content?: unknown; status?: string }; content?: unknown };
     } | undefined;
     if (!e || !e.event) return events;
     const id = e.toolCallId ?? e.name ?? "";
@@ -142,11 +141,13 @@ export function mapStreamChunk(mode: string, chunk: unknown): SurfaceStreamEvent
     } else if (e.event === "on_tool_end") {
       const k = e.output?.kwargs;
       const status: "completed" | "failed" = k?.status === "error" ? "failed" : "completed";
+      // content 多路径取：kwargs.content（序列化标准形态，实测完整 ReAct 正常）+ output.content（兜底）。
+      const content = k?.content ?? e.output?.content;
       events.push({
         type: "tool_update",
         id,
         status,
-        ...(k?.content !== undefined ? { output: k.content } : {}),
+        ...(content !== undefined ? { output: content } : {}),
       });
     }
     return events;
