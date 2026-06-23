@@ -6,19 +6,25 @@
 
 import type { FlowCallbacks } from "../core/flow-types.js";
 import type { SurfaceStreamEvent } from "./stream-events.js";
+import { STREAM_TEXT_NODES } from "../libs/nodes/index.js";
 
-/** 将单个 surface 事件分发给 callbacks。 */
+/**
+ * 将单个 surface 事件分发给 callbacks。
+ * @param metadata LangGraph messages mode 附带的 metadata（含 langgraph_node）。
+ */
 export async function dispatchSurfaceEvent(
   event: SurfaceStreamEvent,
-  callbacks: FlowCallbacks | undefined
+  callbacks: FlowCallbacks | undefined,
+  metadata?: { langgraph_node?: string }
 ): Promise<void> {
   if (!callbacks) return;
 
   switch (event.type) {
     case "text": {
-      // 全放开：所有节点的流式文本 token 都透出（含 RAG rewrite/grade 等中间决策节点——
-      // 有噪声但无害；需要时再收）。messages token 是模型输出文本，不含模型配置（model/api key），
-      // 不会泄漏；模型配置泄漏的真实通道是工具结果/错误日志，不经此 token 流。
+      const node = metadata?.langgraph_node;
+      // custom writer 的 text 无 metadata，直接透出；messages mode 按节点白名单过滤，
+      // 避免中间决策节点（RAG rewrite/grade/route 等）的 token 泄漏给用户。
+      if (node && !STREAM_TEXT_NODES.has(node)) return;
       await callbacks.onToken?.(event.text);
       break;
     }

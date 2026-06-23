@@ -4,7 +4,7 @@
  * 默认图的收尾节点：think 决定「直接回答」时路由到此（无 tool_calls 分支）。
  *
  * 注意：**不再在此 onToken**。回答的流式 token 由 think 节点的 LLM 调用经 graph.stream
- * 的 messages 模式逐个透出（think 在 STREAM_TEXT_NODES 白名单）；若此处再整段 onToken 会与
+ * 的 messages 模式逐个透出（token 全放开、不再按节点过滤）；若此处再整段 onToken 会与
  * 流式重复。仅设 output 兜底（surface 在未收到任何流式 token 时回退整段发，见 acp/server.ts）。
  */
 

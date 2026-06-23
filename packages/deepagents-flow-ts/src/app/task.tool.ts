@@ -18,7 +18,7 @@ import type { StructuredTool } from "@langchain/core/tools";
 import type { AppConfig, DiscoveredSubAgent } from "../runtime/index.js";
 import { createFlowGraph } from "./graph.js";
 import type { FlowState } from "./state.js";
-import { extractText } from "../libs/nodes/index.js";
+import { extractText, STREAM_TEXT_NODES } from "../libs/nodes/index.js";
 import type { FlowCallbacks } from "../core/flow-types.js";
 
 export interface TaskToolDeps {
@@ -119,27 +119,45 @@ export function createTaskTool(deps: TaskToolDeps) {
           callbacks: { onToolCall: wrapToolCall },
         });
         const threadId = `subagent-${subagent_type}-${randomUUID()}`;
+        // 透传父级 cancel signal（ACP cancel）给 subagent，避免父级取消时 subagent 仍跑完整轮。
+        const parentSignal = (runConfig as { signal?: AbortSignal } | undefined)?.signal;
         const stream = await graph.stream(
           { input: description, messages: [] } as unknown as FlowState,
           {
             configurable: { thread_id: threadId },
             recursionLimit: 50,
             streamMode: ["messages"],
+            ...(parentSignal ? { signal: parentSignal } : {}),
           }
         );
         for await (const raw of stream) {
           // 多模式 chunk = [mode, payload]；messages 模式 payload = [messageChunk, metadata]
           if (!Array.isArray(raw) || raw[0] !== "messages") continue;
-          const pair = raw[1] as [{ content?: unknown }, unknown] | undefined;
+          const pair = raw[1] as
+            | [{ content?: unknown }, { langgraph_node?: string }]
+            | undefined;
           if (!Array.isArray(pair)) continue;
-          const [msg] = pair;
-          // 全放开：subagent 所有节点的 token 透出（messages token 是模型输出，不含模型配置）。
-          const text = extractText(msg?.content);
-          if (text) await parentCallbacks.onToken?.(text);
+          const [msg, meta] = pair;
+          const node = meta?.langgraph_node;
+          if (node && STREAM_TEXT_NODES.has(node)) {
+            const text = extractText(msg?.content);
+            if (text) await parentCallbacks.onToken?.(text);
+          }
         }
         const finalState = (await graph.getState({ configurable: { thread_id: threadId } }))
           .values as FlowState;
-        return finalState.output || "(subagent 无输出)";
+        // output 由 respond 写入；若 subagent 撞 recursionLimit/中断没到 respond，output 为空——
+        // 从末条 AIMessage 取兜底，避免「stream 已透 token 却返回(无输出)」的不一致。
+        const msgs = finalState.messages ?? [];
+        let fallback = "";
+        for (let i = msgs.length - 1; i >= 0; i--) {
+          const m = msgs[i] as { _getType?: () => string; content?: unknown };
+          if (m?._getType?.() === "ai") {
+            fallback = extractText(m.content);
+            break;
+          }
+        }
+        return finalState.output || fallback || "(subagent 无输出)";
       } catch (err) {
         return `Error: subagent "${subagent_type}" 执行失败: ${err instanceof Error ? err.message : String(err)}`;
       }

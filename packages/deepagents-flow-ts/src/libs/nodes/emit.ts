@@ -77,3 +77,13 @@ export async function emitTextToken(
   const onToken = config?.configurable?.onToken;
   if (onToken) await onToken(text);
 }
+
+/**
+ * 流式文本放行节点白名单：仅这些节点的 messages-mode 文本 token 透出给用户
+ * （避免 RAG rewrite/grade/route 等中间决策节点的 token 泄漏）。默认 ReAct 的最终回答在
+ * think 产生（respond 仅转存 output）——故 think 放行；工具决策轮 think 的 content 通常为空。
+ *
+ * 单一来源：surfaces/dispatch-surface-event（主图 messages 过滤）与 app/task.tool
+ * （subagent messages 过滤）共用，避免两处副本漂移。
+ */
+export const STREAM_TEXT_NODES = new Set(["write_draft", "respond", "respondNode", "think"]);

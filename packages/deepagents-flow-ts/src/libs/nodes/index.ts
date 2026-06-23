@@ -15,7 +15,7 @@
  * checkpointer 选择（durableCheckpointer）在 runtime/services/file-checkpoint-saver。
  */
 
-export { emitStage, emitPlan, emitTextToken } from "./emit.js";
+export { emitStage, emitPlan, emitTextToken, STREAM_TEXT_NODES } from "./emit.js";
 export { createPrepareNode, type PrepareNodeOptions } from "./prepare.js";
 export {
   createHumanApprovalNode,
