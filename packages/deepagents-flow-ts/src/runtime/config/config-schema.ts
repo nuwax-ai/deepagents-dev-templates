@@ -9,6 +9,7 @@
 
 import { z } from "zod";
 import { getPackageVersion } from "../version.js";
+import { FLOWAGENTS_DIRNAME } from "../paths.js";
 
 export const BUILTIN_TEMPLATE_CONFIGS = {
   flowAgent: {
@@ -103,10 +104,9 @@ export const SandboxConfigSchema = z.object({
 
 export const SkillsConfigSchema = z.object({
   directories: z.array(z.string()).default([
-    "~/.deepagents/skills",
-    "./.deepagents/skills",
-    "./skills/builtin/",
-    "./skills/platform/",
+    `~/${FLOWAGENTS_DIRNAME}/skills`,   // 全局用户 skills（跨项目共享）
+    `./${FLOWAGENTS_DIRNAME}/skills`,   // 项目级 .flowagents 目录
+    "./skills/",                        // 项目直接 skills 目录
   ]),
   progressiveLoading: z.boolean().default(true),
 });
@@ -122,7 +122,7 @@ export const MemoryConfigSchema = z.object({
    * `<workspace 散列>` 子目录（按 workspace 隔离）。设为相对路径（如 `./.flow-sessions`）
    * 可 opt-out 回项目内存储。
    */
-  dir: z.string().default("~/.flowagents"),
+  dir: z.string().default(`~/${FLOWAGENTS_DIRNAME}`),
   addCacheControl: z.boolean().default(true),
 });
 
@@ -144,7 +144,7 @@ export const HookConfigSchema = z.object({
 });
 
 export const PluginsConfigSchema = z.object({
-  directories: z.array(z.string()).default(["~/.deepagents/plugins", "./.deepagents/plugins"]),
+  directories: z.array(z.string()).default([`~/${FLOWAGENTS_DIRNAME}/plugins`, `./${FLOWAGENTS_DIRNAME}/plugins`]),
   enabled: z.array(z.string()).default([]),
   disabled: z.array(z.string()).default([]),
 });
@@ -214,7 +214,7 @@ export const AppConfigSchema = z.object({
    *
    * @example ["../examples/thesis-ppt/.agents", "./my-custom-agents"]
    */
-  agentsDirectories: z.array(z.string()).default(["~/.deepagents", "./.deepagents", "./.agents"]),
+  agentsDirectories: z.array(z.string()).default([`~/${FLOWAGENTS_DIRNAME}`, `./${FLOWAGENTS_DIRNAME}`, "./.agents"]),
   memory: MemoryConfigSchema.default({}),
   hooks: z.array(HookConfigSchema).default([]),
   plugins: PluginsConfigSchema.default({}),

@@ -13,6 +13,7 @@ import { resolve, join } from "node:path";
 import { parse as parseYaml } from "yaml";
 import { type AppConfig } from "../config/config-loader.js";
 import { logger } from "../logger.js";
+import { FLOWAGENTS_DIRNAME } from "../paths.js";
 
 // ─── Memory Files ───────────────────────────────────────
 
@@ -28,8 +29,7 @@ export function discoverMemoryFiles(workspaceRoot: string, includeWorkspaceInstr
   const candidates = [
     "AGENTS.md",
     "CLAUDE.md",
-    ".deepagents/AGENTS.md",  // legacy path (backward compat)
-    ".deepagents/agent.md",   // deepagents standard path
+    `${FLOWAGENTS_DIRNAME}/AGENTS.md`,
   ];
   const found: string[] = [];
   for (const candidate of candidates) {
@@ -64,11 +64,15 @@ export function resolveSkillsPaths(config: AppConfig): string[] {
 }
 
 function normalizeResourcePath(path: string): string {
-  if (path === "~/.deepagents") {
-    return resolve(process.env.DEEPAGENTS_HOME || resolve(homedir(), ".deepagents"));
+  const flowagentsPrefix = `~/${FLOWAGENTS_DIRNAME}`;
+  if (path === flowagentsPrefix) {
+    return resolve(process.env.FLOWAGENTS_HOME || resolve(homedir(), FLOWAGENTS_DIRNAME));
   }
-  if (path.startsWith("~/.deepagents/")) {
-    return resolve(process.env.DEEPAGENTS_HOME || resolve(homedir(), ".deepagents"), path.slice("~/.deepagents/".length));
+  if (path.startsWith(`${flowagentsPrefix}/`)) {
+    return resolve(
+      process.env.FLOWAGENTS_HOME || resolve(homedir(), FLOWAGENTS_DIRNAME),
+      path.slice(`${flowagentsPrefix}/`.length)
+    );
   }
   if (path.startsWith("~/")) {
     return resolve(homedir(), path.slice(2));

@@ -2,7 +2,7 @@
  * Configuration Loader
  *
  * Implements the config priority chain:
- *   ACP/session meta > Environment variables > template config > project .deepagents > user .deepagents > Defaults
+ *   ACP/session meta > Environment variables > template config > project .flowagents > user ~/.flowagents > Defaults
  *
  * Pattern borrowed from pydantic-deepagents CLI configuration system.
  *
@@ -22,13 +22,13 @@ import {
   type ACPSessionConfig,
 } from "./config-schema.js";
 import { logger } from "../logger.js";
+import { FLOWAGENTS_DIRNAME } from "../paths.js";
 import {
   resolveBuiltinTemplateConfig,
   readBuiltinTemplateConfigNameFromEnv,
-  deepAgentsHome,
+  flowAgentsHome,
   resolvePath,
 } from "./config-paths.js";
-import { FLOWAGENTS_HOME } from "../paths.js";
 import { mergeConfigLayer, setNestedValue } from "./config-merge.js";
 import {
   loadJsonFile,
@@ -58,7 +58,7 @@ export interface LoadConfigOptions {
   builtinConfig?: BuiltinTemplateConfigName;
   /** Base directory for relative paths inside the template config file */
   configBaseDir?: string;
-  /** Workspace root used for project-level .deepagents config discovery */
+  /** Workspace root used for project-level .flowagents config discovery */
   workspaceRoot?: string;
   /** ACP session-level overrides (highest priority) */
   sessionConfig?: ACPSessionConfig;
@@ -66,7 +66,7 @@ export interface LoadConfigOptions {
 
 /**
  * Load configuration with priority chain:
- *   defaults < user .deepagents < project .deepagents < template config < env vars < ACP/session meta
+ *   defaults < user ~/.flowagents < project .flowagents < template config < env vars < ACP/session meta
  */
 export function loadConfig(options: LoadConfigOptions = {}): AppConfig {
   const builtinConfig = resolveBuiltinTemplateConfig(
@@ -77,7 +77,7 @@ export function loadConfig(options: LoadConfigOptions = {}): AppConfig {
     process.env.APP_AGENT_CONFIG_PATH ||
     undefined;
   const configPath = options.configPath ?? envConfigPath ?? builtinConfig.path;
-  const userDir = deepAgentsHome();
+  const globalDir = flowAgentsHome();
   const envWorkspaceRoot =
     process.env.DEEPAGENTS_WORKING_DIR ||
     process.env.AGENT_WORKING_DIR ||
@@ -86,30 +86,18 @@ export function loadConfig(options: LoadConfigOptions = {}): AppConfig {
   // Layer 1: Defaults
   let config: AppConfig = { ...DEFAULTS };
 
-  // Layer 2: User-level ~/.deepagents config
-  const userConfig = loadJsonFile(join(userDir, "config.json"));
+  // Layer 2: 全局用户级配置（~/.flowagents/config.json / models.json / mcp.json）
+  const userConfig = loadJsonFile(join(globalDir, "config.json"));
   if (userConfig) {
     config = mergeConfigLayer(config, userConfig as Partial<AppConfig>);
   }
-  const userModels = modelsOverlayFromFile(join(userDir, "models.json"));
+  const userModels = modelsOverlayFromFile(join(globalDir, "models.json"));
   if (userModels) {
     config = mergeConfigLayer(config, userModels);
   }
-  const userMcp = mcpOverlayFromFile(join(userDir, "mcp.json"));
+  const userMcp = mcpOverlayFromFile(join(globalDir, "mcp.json"));
   if (userMcp) {
     config = mergeConfigLayer(config, userMcp);
-  }
-
-  // Layer 2b: flowagents 用户级配置（~/.flowagents/config.json，与 sessions/artifacts/logs 同根；
-  //           覆盖 ~/.deepagents，被项目 config 覆盖）。存 agent 参数 + 模型（models.json）。
-  const flowHome = resolvePath(FLOWAGENTS_HOME);
-  const flowConfig = loadJsonFile(join(flowHome, "config.json"));
-  if (flowConfig) {
-    config = mergeConfigLayer(config, flowConfig as Partial<AppConfig>);
-  }
-  const flowModels = modelsOverlayFromFile(join(flowHome, "models.json"));
-  if (flowModels) {
-    config = mergeConfigLayer(config, flowModels);
   }
 
   const workspaceRoot = resolveConfiguredWorkspaceRoot(
@@ -119,9 +107,9 @@ export function loadConfig(options: LoadConfigOptions = {}): AppConfig {
   const resolvedConfigPath = resolvePath(configPath, workspaceRoot);
   const usingBuiltinConfig = resolvedConfigPath === builtinConfig.path;
   const configBaseDir = options.configBaseDir ?? (usingBuiltinConfig ? builtinConfig.resourceBase : workspaceRoot);
-  const projectDir = resolve(workspaceRoot, ".deepagents");
+  const projectDir = resolve(workspaceRoot, FLOWAGENTS_DIRNAME);
 
-  // Layer 3: Project-level <workspace>/.deepagents config
+  // Layer 3: Project-level <workspace>/.flowagents config
   const projectConfig = loadJsonFile(join(projectDir, "config.json"));
   if (projectConfig) {
     config = mergeConfigLayer(config, projectConfig as Partial<AppConfig>);

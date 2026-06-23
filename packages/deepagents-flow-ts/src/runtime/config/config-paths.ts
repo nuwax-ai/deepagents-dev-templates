@@ -1,7 +1,7 @@
 /**
  * Config path resolution.
  *
- * Filesystem locations for the template package, the user's ~/.deepagents home,
+ * Filesystem locations for the template package, the user's ~/.flowagents home,
  * and the built-in template config presets. Pure path logic — no config parsing
  * or merging. Extracted from config-loader.ts.
  */
@@ -9,6 +9,7 @@ import { homedir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
 import { logger } from "../logger.js";
 import { resolvePackageRoot } from "../package-root.js";
+import { FLOWAGENTS_DIRNAME } from "../paths.js";
 import {
   BUILTIN_TEMPLATE_CONFIGS,
   DEFAULT_BUILTIN_TEMPLATE_CONFIG,
@@ -43,23 +44,26 @@ export function resolveBuiltinTemplateConfig(
   };
 }
 
-export function deepAgentsHome(): string {
-  return resolve(process.env.DEEPAGENTS_HOME || join(homedir(), ".deepagents"));
+/** ~/.flowagents —— 全局配置目录（config.json / models.json / mcp.json / skills / plugins / sessions）。 */
+export function flowAgentsHome(): string {
+  return resolve(process.env.FLOWAGENTS_HOME || join(homedir(), FLOWAGENTS_DIRNAME));
 }
 
+
 export function resolveConfigResourcePath(path: string, baseDir: string): string {
-  if (path.startsWith("~/") || path.startsWith("~/.deepagents/") || isAbsolute(path)) {
+  if (path.startsWith("~/") || isAbsolute(path)) {
     return path;
   }
   return resolve(baseDir, path);
 }
 
 export function resolvePath(filePath: string, baseDir = process.cwd()): string {
-  if (filePath === "~/.deepagents") {
-    return deepAgentsHome();
+  // ~/.flowagents — 全局配置根
+  if (filePath === `~/${FLOWAGENTS_DIRNAME}`) {
+    return flowAgentsHome();
   }
-  if (filePath.startsWith("~/.deepagents/")) {
-    return resolve(deepAgentsHome(), filePath.slice("~/.deepagents/".length));
+  if (filePath.startsWith(`~/${FLOWAGENTS_DIRNAME}/`)) {
+    return resolve(flowAgentsHome(), filePath.slice(`~/${FLOWAGENTS_DIRNAME}/`.length));
   }
   if (filePath.startsWith("~/")) {
     return resolve(homedir(), filePath.slice(2));
