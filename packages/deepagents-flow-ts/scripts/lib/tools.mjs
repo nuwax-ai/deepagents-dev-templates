@@ -1,6 +1,7 @@
 /**
  * 检测可选打包 CLI 工具（rsync、zip、gzip、tar）。
  * Windows 可通过 `pnpm run setup:tools`（Chocolatey）安装。
+ * zip 缺失时 staging 会兜底 `npx -y bestzip@2.2.5 --force node`（纯 Node，无需预装 zip）。
  */
 import { spawnSync } from "node:child_process";
 

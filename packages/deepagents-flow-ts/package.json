@@ -82,6 +82,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "bestzip": "2.2.5",
     "tsx": "^4.22.4",
     "esbuild": "^0.25.0",
     "typescript": "^5.5.0",

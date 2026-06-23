@@ -253,6 +253,42 @@ async function createZipPowerShell(artifact, parentDir, folderName) {
   });
 }
 
+/** bestzip@2 纯 Node 实现；经 npx 按需拉取，无需预装系统 zip（兼容 Node >=20）。 */
+const NPX_BESTZIP = "bestzip@2.2.5";
+
+function npxCommand() {
+  return process.platform === "win32" ? "npx.cmd" : "npx";
+}
+
+/**
+ * Node 兜底：npx -y bestzip --force node（纯 JS，不依赖系统 zip/tar/PowerShell）。
+ * 若项目已安装 bestzip（如 devDependency），优先本地 import 避免重复下载。
+ */
+async function createZipNode(artifact, parentDir, folderName) {
+  const absArtifact = path.resolve(artifact);
+  const absParent = path.resolve(parentDir);
+
+  try {
+    const { nodeZip } = await import("bestzip");
+    await nodeZip({ source: folderName, destination: absArtifact, cwd: absParent });
+    return;
+  } catch {
+    // 未安装 bestzip → npx 按需拉取
+  }
+
+  await new Promise((resolve, reject) => {
+    const child = spawn(
+      npxCommand(),
+      ["-y", NPX_BESTZIP, "--force", "node", absArtifact, folderName],
+      { cwd: absParent, stdio: "inherit", shell: process.platform === "win32" },
+    );
+    child.on("error", reject);
+    child.on("close", (code) =>
+      code === 0 ? resolve() : reject(new Error(`npx ${NPX_BESTZIP} exited ${code}`)),
+    );
+  });
+}
+
 export async function createZipArchive(artifact, parentDir, folderName) {
   const absArtifact = path.resolve(artifact);
   await mkdir(path.dirname(absArtifact), { recursive: true });
@@ -281,9 +317,13 @@ export async function createZipArchive(artifact, parentDir, folderName) {
   }
 
   if (process.platform === "win32") {
-    await createZipPowerShell(absArtifact, parentDir, folderName);
-    return;
+    try {
+      await createZipPowerShell(absArtifact, parentDir, folderName);
+      return;
+    } catch {
+      // PowerShell 不可用或失败 → Node 兜底
+    }
   }
 
-  throw new Error("No zip tool available (install zip, or use tar with zip support)");
+  await createZipNode(absArtifact, parentDir, folderName);
 }
