@@ -99,7 +99,7 @@ query-docs(libraryId: "/langchain-ai/langgraphjs", query: "StateGraph interrupt 
 1. **收到需求 → 读 `flow-builder` L1，打开 `references/part1-scaffold.md`**：命中走生成器，不要手写图
 2. **命中拓扑 → 走生成器**：写 spec → `node scripts/scaffold/generate.mjs <spec>` → 改 `activeFlow`
 3. **预设不命中 → 先用 `custom`**；custom 也表达不了才走 `flow-builder` Part 2 手写
-4. **目标 Agent 提示词**：`flow-builder` Part 5 设计 → `dev-engineer-toolkit` 保存（`update-config.sh`）→ 填入 scaffold `systemPrompt`
+4. **目标 Agent 提示词**：`flow-builder` Part 5 设计 → 写入 `prompts/flow.base.md` → `dev-engineer-toolkit` 用 `update-config.sh --system-prompt-file prompts/flow.base.md` 同步平台 → 填入 scaffold `systemPrompt`
 
 > 详见 `flow-builder` Part 1。这是治「跑不起来」+「过程慢」的关键。
 </SCAFFOLD_FIRST>
@@ -117,7 +117,8 @@ query-docs(libraryId: "/langchain-ai/langgraphjs", query: "StateGraph interrupt 
 | `search-skills.sh` | 搜索平台 Skill |
 | `add-tool.sh` / `remove-tool.sh` | 注册 / 移除工具或技能 |
 | `download-skill.sh` | 下载技能到项目 |
-| `get-config.sh` / `update-config.sh` | 读取 / 更新项目配置（`system_prompt` / `welcome_message`） |
+| `get-config.sh` / `update-config.sh` | 读取 / 更新项目配置；含中文时用 `--system-prompt-file`（UTF-8） |
+| `check-python.sh` | 检测 Python / uv；`--install` 用 uv 自动安装 |
 
 ### 平台工具对接流程
 

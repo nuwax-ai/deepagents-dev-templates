@@ -38,7 +38,7 @@ license: MIT
 
 > 完整接口字段表、请求/响应示例、错误码见 `references/api-docs.md`。
 > `deepagents-flow-ts` 工具对接示例（`tool()` + Zod + `createFlowTools()`）见 `references/langgraph-integration.md`。
-> 端点调用**必须**使用 `scripts/agent_tool.sh`（nuwaclaw / Git Bash 下统一入口，已处理 UTF-8）。**禁止**手写 `curl`/`Invoke-RestMethod` 拼含中文的 JSON body。
+> 端点调用**必须**使用 `scripts/agent_tool.sh`（Git Bash 下统一入口，已处理 UTF-8）。**禁止**手写 `curl`/`Invoke-RestMethod` 拼含中文的 JSON body。
 
 ## 核心流程：平台工具接入 deepagents-flow-ts
 

@@ -11,8 +11,8 @@
 | 资源搜索 | `/api/v1/4sandbox/agent/dev/tool/search` | POST | `scripts/search-apis.sh` / `scripts/search-skills.sh` |
 | 注册工具 | `/api/v1/4sandbox/agent/dev/config/tool/add` | POST | `scripts/add-tool.sh` |
 | 删除工具 | `/api/v1/4sandbox/agent/dev/config/tool/delete` | POST | `scripts/remove-tool.sh` |
-| 获取配置 | `/api/v1/4sandbox/agent/dev/config/{devAgentId}` | GET | `scripts/get-config.sh` |
-| 更新配置 | `/api/v1/4sandbox/agent/dev/config/update` | POST | `scripts/update-config.sh` |
+| 获取配置 | `/api/v1/4sandbox/agent/dev/config/{devAgentId}` | GET | `scripts/get-config.sh`（→ `get-config.py`） |
+| 更新配置 | `/api/v1/4sandbox/agent/dev/config/update` | POST | `scripts/update-config.sh`（→ `update-config.py`） |
 
 ---
 
@@ -239,11 +239,13 @@ Authorization: Bearer {SANDBOX_ACCESS_KEY}
 
 更新智能体的系统提示词和/或开场白。
 
+> **编码**：请求体必须为 **UTF-8 JSON**。请使用 `scripts/update-config.sh`（内部调用 `update-config.py`），含中文时长文本用 `--system-prompt-file` 读 UTF-8 文件。禁止手写 `curl`/`Invoke-RestMethod` 拼中文 body。
+
 ### 请求
 
 ```
 POST {PLATFORM_BASE_URL}/api/v1/4sandbox/agent/dev/config/update
-Content-Type: application/json
+Content-Type: application/json; charset=utf-8
 Authorization: Bearer {SANDBOX_ACCESS_KEY}
 ```
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""agent_tool.py — 已弃用，请使用同目录 agent_tool.sh（nuwaclaw / Git Bash 统一入口）。
+"""agent_tool.py — 已弃用，请使用同目录 agent_tool.sh（Git Bash 统一入口）。
 
 保留本文件仅供无 bash 时的备选；新用法勿再依赖此脚本。
 
