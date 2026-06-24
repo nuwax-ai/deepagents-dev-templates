@@ -154,7 +154,10 @@ export function resolveRealPath(absPath: string): string {
   // 目标不存在：realpath 最近存在的祖先目录，再拼回不存在的尾部段。
   let dir = normalized;
   const tail: string[] = [];
-  while (dir && dir !== "/" && !/^[A-Za-z]:\\?$/.test(dir) && !existsSync(dir)) {
+  let prev = "";
+  // dirname 不再收缩（到 POSIX 根 / 或 Windows 盘符根）即停；prev 守卫平台无关，比硬编码盘符正则稳。
+  while (dir && dir !== prev && !existsSync(dir)) {
+    prev = dir;
     tail.unshift(basename(dir));
     dir = dirname(dir);
   }

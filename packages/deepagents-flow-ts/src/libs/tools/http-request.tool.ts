@@ -71,6 +71,7 @@ function isPrivateAddress(ip: string): boolean {
         v === "::1" || // loopback
         v === "::" || // unspecified
         v.startsWith("fe80") || // link-local
+        v.startsWith("fec0") || // site-local（deprecated fec0::/10，部署中仍存在）
         v.startsWith("fc") || // ULA fc00::/7
         v.startsWith("fd")
       );
@@ -124,19 +125,21 @@ async function safeFetch(
   init: RequestInit & { signal?: AbortSignal },
   opts: { allowPrivateNetwork: boolean; maxRedirects: number }
 ): Promise<Response> {
+  // 首请求单独发出；重定向最多 follow maxRedirects 跳，每跳重新 assertSafeUrl（防 302 引入内网）。
   let current = rawUrl;
-  for (let hop = 0; hop <= opts.maxRedirects; hop++) {
+  await assertSafeUrl(current, opts.allowPrivateNetwork);
+  let res = await fetch(current, { ...init, redirect: "manual" });
+  for (let hop = 0; hop < opts.maxRedirects && res.status >= 300 && res.status < 400; hop++) {
+    const loc = res.headers.get("location");
+    if (!loc) break;
+    current = new URL(loc, current).toString(); // 相对 Location 按当前 URL 解析
     await assertSafeUrl(current, opts.allowPrivateNetwork);
-    const res = await fetch(current, { ...init, redirect: "manual" });
-    if (res.status >= 300 && res.status < 400) {
-      const loc = res.headers.get("location");
-      if (!loc) return res;
-      current = new URL(loc, current).toString(); // 相对 Location 按当前 URL 解析
-      continue;
-    }
-    return res;
+    res = await fetch(current, { ...init, redirect: "manual" });
   }
-  throw new Error(`too many redirects (>${opts.maxRedirects})`);
+  if (res.status >= 300 && res.status < 400) {
+    throw new Error(`too many redirects (>${opts.maxRedirects})`);
+  }
+  return res;
 }
 
 /** 流式读取响应体，累计到 maxBytes 即停 + cancel reader，防巨型响应整读 OOM。 */
@@ -201,29 +204,34 @@ export function createHttpRequestTool(opts: HttpRequestToolOptions = {}) {
           return `HTTP request failed: ${err instanceof Error ? err.message : String(err)}`;
         }
 
-        const contentType = response.headers.get("content-type") || "";
-        const raw = await readBodyCapped(response, MAX_RESPONSE_BYTES);
-        let responseBody: string;
-        if (contentType.includes("application/json")) {
-          try {
-            responseBody = JSON.stringify(JSON.parse(raw), null, 2);
-          } catch {
-            responseBody = raw; // 非合法 JSON：原样返回（截断后的 body 常如此）。
+        try {
+          const contentType = response.headers.get("content-type") || "";
+          const raw = await readBodyCapped(response, MAX_RESPONSE_BYTES);
+          let responseBody: string;
+          if (contentType.includes("application/json")) {
+            try {
+              responseBody = JSON.stringify(JSON.parse(raw), null, 2);
+            } catch {
+              responseBody = raw; // 非合法 JSON：原样返回（截断后的 body 常如此）。
+            }
+          } else {
+            responseBody = raw;
           }
-        } else {
-          responseBody = raw;
-        }
 
-        // 给 LLM 的上下文截断（独立于 OOM 字节上限）。
-        if (responseBody.length > MAX_RETURN_CHARS) {
-          responseBody = responseBody.slice(0, MAX_RETURN_CHARS) + "\n... [truncated]";
-        }
+          // 给 LLM 的上下文截断（独立于 OOM 字节上限）。
+          if (responseBody.length > MAX_RETURN_CHARS) {
+            responseBody = responseBody.slice(0, MAX_RETURN_CHARS) + "\n... [truncated]";
+          }
 
-        return JSON.stringify({
-          status: response.status,
-          statusText: response.statusText,
-          body: responseBody,
-        });
+          return JSON.stringify({
+            status: response.status,
+            statusText: response.statusText,
+            body: responseBody,
+          });
+        } catch (err) {
+          // 读流阶段异常（超时 abort 打在 body 中段、socket reset）也降级为结果字符串，不抛出 tool。
+          return `HTTP request failed: ${err instanceof Error ? err.message : String(err)}`;
+        }
       } finally {
         clearTimeout(timeoutId);
       }

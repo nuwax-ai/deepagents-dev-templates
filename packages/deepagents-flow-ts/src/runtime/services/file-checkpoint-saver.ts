@@ -249,7 +249,11 @@ export class FileCheckpointSaver extends MemorySaver {
     const tid = config.configurable?.thread_id as string | undefined;
     if (tid) this.ensureLoaded(tid);
     const ret = await super.put(config, checkpoint, metadata);
-    if (tid) this.persist(tid);
+    if (tid) {
+      this.persist(tid);
+      this.loaded.add(tid); // 内存已就绪，后续 ensureLoaded 无需读盘
+      this.corrupted.delete(tid); // 已写入健康 checkpoint，不再视为损坏
+    }
     return ret;
   }
 
@@ -261,7 +265,11 @@ export class FileCheckpointSaver extends MemorySaver {
     const tid = config.configurable?.thread_id as string | undefined;
     if (tid) this.ensureLoaded(tid);
     await super.putWrites(config, writes, taskId);
-    if (tid) this.persist(tid);
+    if (tid) {
+      this.persist(tid);
+      this.loaded.add(tid);
+      this.corrupted.delete(tid);
+    }
   }
 
   /** 列出所有已持久化的 thread id（供 CLI sessions list）。 */
@@ -279,8 +287,12 @@ export class FileCheckpointSaver extends MemorySaver {
 
   /** 删除某 thread 的持久化文件 + 内存。 */
   async deleteThread(threadId: string): Promise<void> {
-    if (typeof super.deleteThread === "function") {
-      await super.deleteThread(threadId);
+    try {
+      if (typeof super.deleteThread === "function") {
+        await super.deleteThread(threadId);
+      }
+    } catch {
+      // super 对非法 threadId 抛错（assertSafeStorageKey）时仍继续清理本地文件/标志，避免残留。
     }
     const file = this.threadFile(threadId);
     if (existsSync(file)) unlinkSync(file);

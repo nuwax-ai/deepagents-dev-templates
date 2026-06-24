@@ -268,15 +268,19 @@ function extractUsageFields(result: unknown): Record<string, number> {
       if (typeof det.cache_creation === "number") fields.cacheCreationTokens = det.cache_creation;
     }
   }
-  // provider 原生 usage（标准位取不到缓存时的兜底）
+  // provider 原生 usage（标准位取不到缓存时的兜底）；命中数统一归一到 cachedTokens，
+  // 使 grep cachedTokens 覆盖所有 provider（mimo/deepseek/openai 兼容），raw_* 仅留作对账。
   const raw = r.response_metadata?.usage ?? r.response_metadata?.tokenUsage;
   if (raw && typeof raw === "object") {
-    for (const k of ["prompt_cache_hit_tokens", "prompt_cache_miss_tokens", "cached_tokens"]) {
-      const v = (raw as Record<string, unknown>)[k];
-      if (typeof v === "number") fields[`raw_${k}`] = v;
-    }
+    const trySetCached = (v: unknown) => {
+      if (typeof v === "number" && fields.cachedTokens === undefined) fields.cachedTokens = v;
+    };
+    trySetCached((raw as Record<string, unknown>).prompt_cache_hit_tokens);
+    trySetCached((raw as Record<string, unknown>).cached_tokens);
+    const miss = (raw as Record<string, unknown>).prompt_cache_miss_tokens;
+    if (typeof miss === "number") fields.raw_prompt_cache_miss_tokens = miss;
     const ptd = (raw as { prompt_tokens_details?: { cached_tokens?: number } }).prompt_tokens_details;
-    if (ptd && typeof ptd.cached_tokens === "number") fields.raw_prompt_tokens_details_cached = ptd.cached_tokens;
+    if (ptd) trySetCached(ptd.cached_tokens);
   }
   return fields;
 }
