@@ -8,7 +8,7 @@
 
 - 工具 → `tool()`+Zod 的 `StructuredTool` + `bindTools` + `ToolNode` + `toolsCondition`
 - 持久化 → `BaseCheckpointSaver`（本模板的 `FileCheckpointSaver` 继承 `MemorySaver`）
-- 压缩 → core `trimMessages` + LLM 摘要（见 `src/app/compaction.ts`）
+- 压缩 → core `trimMessages` + LLM 摘要（见 `src/libs/compaction.ts`）
 - 子智能体（subagent）→ LangGraph **subgraph**（`addNode(name, compiledSubgraph)`）或 `Send` 并行
 
 不要手搓工具调度、checkpointer、summarizer。

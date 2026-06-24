@@ -140,7 +140,7 @@ export function createMyFlow(appConfig?, opts: { checkpointer?: BaseCheckpointSa
 
 > **长任务上下文压缩**:多轮消息累积超阈值时，`compactHistory` 摘要旧历史，再用
 > `compactionUpdate`（`RemoveMessage` 替换模式）写回 channel。见 [dev-agent](../examples/dev-agent/) 的 run-loop
-> 与 `src/app/compaction.ts`（`config.compaction` 控制触发）。
+> 与 `src/libs/compaction.ts`（`config.compaction` 控制触发）。
 
 ---
 
@@ -159,7 +159,7 @@ export function createMyFlow(appConfig?, opts: { checkpointer?: BaseCheckpointSa
 | 条件边循环（评估重试） | [examples/project-manager](../examples/project-manager/)、默认图 `reflect` |
 | 多阶段流水线 + 多轮 HITL + 双层 reflection + 并行调研 + **持续会话** | [examples/deep-research](../examples/deep-research/)（长任务示例：选题确认 → 大纲规划 → Send 并行调研 → 初稿 → 质量评审 → 报告 → **converse↔respond 持续会话回路**，2 确认门 + 2 reflection 循环 + 报告后就同一研究反复改/问，回「结束」定稿） |
 | 长任务硬化（跨重启续跑 + 阶段进度 + 单步护栏） | `createStatefulFlow`（`src/surfaces/stateful-flow.ts`）——deep-research / travel / pm / human-in-loop 全部基于它；持久化默认 `FileCheckpointSaver` |
-| 长任务上下文压缩（摘要 + `RemoveMessage` 替换） | [examples/dev-agent](../examples/dev-agent/) run-loop + `src/app/compaction.ts` |
+| 长任务上下文压缩（摘要 + `RemoveMessage` 替换） | [examples/dev-agent](../examples/dev-agent/) run-loop + `src/libs/compaction.ts` |
 | 条件边路由 + 检索/生成**双自纠正循环**（对齐官方 Adaptive RAG） | [libs/topologies/adaptive-rag](../src/libs/topologies/adaptive-rag/)（app flow `adaptive-knowledge-qa`） |
 | **conversational 多轮对话**（不暴露 `hasStarted` + 稳定 threadId + checkpointer 累积历史 + 图层流式） | `createStatefulFlow`（`conversational: true`）：default / knowledge-qa / adaptive-knowledge-qa / customer-support |
 

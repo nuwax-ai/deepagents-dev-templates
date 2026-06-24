@@ -51,7 +51,7 @@ src/
     topologies/    拓扑积木（adaptive-rag/rag/deep-research/human-in-loop/project-manager/travel-planner；图逻辑单一权威 graph/topology/recipe；scaffold 生成薄封装复用；单向依赖 nodes/+mcp/；react-tools 复用默认图、dev-agent 在 app/topologies/）
     mcp/           stdio MCP 客户端（callResolvedMcpTool/rateLimited；零 src import，自包含）
     deepagents-acp/  vendored ACP SDK（自包含）
-  app/           默认 ReAct 图（★ 可改、开发工作区）：graph.ts + nodes/ + flow-tools/task + state/topology/default-flow/compaction + flows/（注册表+scaffold 薄封装）+ topologies/（app 层拓扑，如 dev-agent stateful-custom）
+  app/           默认 ReAct 图（★ 可改、开发工作区）：graph.ts + nodes/ + flow-tools/task + state/topology/default-flow + flows/（注册表+scaffold 薄封装）+ topologies/（app 层拓扑，如 dev-agent stateful-custom）
   surfaces/      ACP/CLI 适配器（保护）：acp/ cli/ + stateful-flow/map-stream-chunk/...
   index.ts       入口 + 组合根（createFlowRuntime + materializeFlow 桥接 stateful-recipe）
 examples/        参考实现（只读；dedup 后 graph/nodes 多为 re-export shim 指向 libs/topologies）
