@@ -46,15 +46,17 @@ export function resolveApiKey(config: AppConfig): string {
 }
 
 /**
- * Anthropic SDK 的 baseURL 期望含版本段（请求 `{base}/messages`）；而 `ANTHROPIC_BASE_URL`
- * （Claude Code / 环境变量惯例）通常止于网关路径、不含 `/v1`（如 `https://.../anthropic`）。
- * 不补 `/v1` 会让 SDK 请求 `.../anthropic/messages` → 网关 404（实测 mimo anthropic 网关）。
- * 这里自动补齐（已含 `/vN` 版本段则不重复）；不设 baseUrl 时返回 undefined，沿用 SDK 官方默认。
+ * LangChain `ChatAnthropic` → Anthropic SDK 会在 baseURL 后自行拼接 `/v1/messages`。
+ *
+ * `ANTHROPIC_BASE_URL` 通常止于网关前缀（如 `https://.../api/proxy/model`），
+ * SDK 最终请求 `.../model/v1/messages`。
+ *
+ * 若此处再补 `/v1` 会变成 `.../v1/v1/messages` → 404（实测 test-llm-proxy + glm-5.1）。
+ * 用户若已配 `.../model/v1`，去掉尾部 `/vN` 避免双版本段。
  */
 function normalizeAnthropicBaseUrl(baseUrl?: string): string | undefined {
   if (!baseUrl) return undefined;
-  const trimmed = baseUrl.replace(/\/+$/, "");
-  return /\/v\d+$/.test(trimmed) ? trimmed : `${trimmed}/v1`;
+  return baseUrl.replace(/\/+$/, "").replace(/\/v\d+$/, "");
 }
 
 /** Build the model instance/string accepted by deepagents. */

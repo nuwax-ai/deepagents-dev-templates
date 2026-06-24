@@ -38,6 +38,7 @@ import {
   loadPluginOverlay,
   loadFromEnv,
   inferModelProviderIfUnset,
+  logPlatformModelEnvDiagnostics,
 } from "./config-sources.js";
 
 export * from "./config-schema.js";
@@ -134,9 +135,10 @@ export function loadConfig(options: LoadConfigOptions = {}): AppConfig {
     config = mergeConfigLayer(config, pluginOverlay);
   }
 
-  // Layer 5: Environment variables
+  // Layer 5: Environment variables（平台 agent_server.env 占位符此时应已被 Electron 替换）
   const envConfig = loadFromEnv();
   config = mergeConfigLayer(config, envConfig);
+  logPlatformModelEnvDiagnostics();
   config = inferModelProviderIfUnset(config);
 
   // Layer 6: ACP session overrides (highest priority)

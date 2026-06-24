@@ -19,6 +19,7 @@ import { commandExists } from "./lib/tools.mjs";
 const PKG_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 const FORWARD_VARS = [
+  "API_PROTOCOL",
   "ANTHROPIC_API_KEY",
   "ANTHROPIC_AUTH_TOKEN",
   "ANTHROPIC_BASE_URL",

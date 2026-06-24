@@ -2,8 +2,9 @@
  * think 节点 —— bindTools 的模型决定调工具（AIMessage.tool_calls）还是直接回答。
  *
  * 本节点**自管 model 解析 + bindTools**：工厂在创建时解析一次模型并绑定工具，返回的节点函数
- * 闭包持有 boundModel。无凭证 / 解析失败 / 调用失败都降级回显输入（step 标 `think#fallback`），
- * 保证图始终可跑、可测（见 tests/flow.test.ts）。
+ * 闭包持有 boundModel。
+ * - **无凭证**：降级回显输入（保证 CLI 冒烟 / 单测可跑，见 tests/flow.test.ts）。
+ * - **有凭证但解析或调用失败**：抛错，由 ACP/CLI surface 向用户暴露真实失败（不伪装成功）。
  */
 
 import { AIMessage, SystemMessage, type BaseMessage } from "@langchain/core/messages";
@@ -70,6 +71,8 @@ export function createThinkNode(deps: ThinkNodeDeps) {
   const hasCreds = hasModelCredentials(config);
 
   let boundModel: BoundModel | null = null;
+  /** resolveModel/bindTools 失败时保留原因，有凭证时节点内抛出让 surface 处理 */
+  let resolveError: unknown = null;
   if (config && hasCreds) {
     try {
       const raw = resolveModel(config);
@@ -79,6 +82,7 @@ export function createThinkNode(deps: ThinkNodeDeps) {
         boundModel = model.bindTools(allTools);
       }
     } catch (err) {
+      resolveError = err;
       log.warn("resolveModel/bindTools failed", { error: String(err) });
     }
   }
@@ -87,47 +91,43 @@ export function createThinkNode(deps: ThinkNodeDeps) {
     state: FlowState,
     runtimeConfig?: { signal?: AbortSignal }
   ): Promise<Partial<FlowState>> => {
-    if (!boundModel || !hasCreds) {
+    if (!hasCreds) {
       // 无凭证 fallback：直接回显输入为回答（不调工具，保证图始终可跑）
       return {
         messages: [new AIMessage({ content: `(无模型凭证，回显输入)\n${state.input}` })],
         steps: ["think#fallback: no model"],
       };
     }
-    try {
-      const { shortTimeoutMs } = resolveLlmResilience(config);
-      const promptForModel = withSystemPrompt(
-        state.messages,
-        systemPrompt ?? "",
-        config?.model.provider
-      );
-      log.debug("think 注入 systemPrompt", {
-        systemPromptChars: systemPrompt?.trim().length ?? 0,
-        messageCount: promptForModel.length,
-        firstMessageType: promptForModel[0]?._getType?.() ?? "unknown",
-      });
-      const ai = await invokeWithResilience(
-        boundModel,
-        promptForModel,
-        {
-          timeoutMs: shortTimeoutMs,
-          label: "think 调模型",
-          retryLabel: "think LLM",
-          config,
-          signal: runtimeConfig?.signal,
-        }
-      );
-      return {
-        messages: [ai],
-        steps: [`think: ${(ai.tool_calls ?? []).length} tool_calls`],
-      };
-    } catch (err) {
-      // 重试用尽仍失败（限流/网络/超时）→ 降级回显，保证图收敛而非整图抛错
-      log.warn("think invoke failed → fallback", { error: String(err), apiOk: false });
-      return {
-        messages: [new AIMessage({ content: `(模型调用失败，回显输入)\n${state.input}` })],
-        steps: ["think#fallback: invoke error"],
-      };
+    if (!boundModel) {
+      const detail = resolveError ? String(resolveError) : "model instance unavailable";
+      throw new Error(`think: 模型解析失败（已配置凭证）: ${detail}`);
     }
+    const { shortTimeoutMs } = resolveLlmResilience(config);
+    const promptForModel = withSystemPrompt(
+      state.messages,
+      systemPrompt ?? "",
+      config?.model.provider
+    );
+    log.debug("think 注入 systemPrompt", {
+      systemPromptChars: systemPrompt?.trim().length ?? 0,
+      messageCount: promptForModel.length,
+      firstMessageType: promptForModel[0]?._getType?.() ?? "unknown",
+    });
+    // 有凭证时调用失败直接抛错，避免回显输入伪装成功（ACP stopReason=end_turn 误导用户）
+    const ai = await invokeWithResilience(
+      boundModel,
+      promptForModel,
+      {
+        timeoutMs: shortTimeoutMs,
+        label: "think 调模型",
+        retryLabel: "think LLM",
+        config,
+        signal: runtimeConfig?.signal,
+      }
+    );
+    return {
+      messages: [ai],
+      steps: [`think: ${(ai.tool_calls ?? []).length} tool_calls`],
+    };
   };
 }

@@ -1,0 +1,72 @@
+/**
+ * Anthropic baseUrl 归一化：避免 LangChain SDK 打出 /v1/v1/messages。
+ */
+
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { AppConfigSchema } from "../src/runtime/config/config-schema.js";
+import { resolveModel } from "../src/runtime/context/model.js";
+
+describe("resolveModel anthropic baseUrl", () => {
+  const saved = process.env.ANTHROPIC_API_KEY;
+  const fetchUrls: string[] = [];
+
+  beforeEach(() => {
+    process.env.ANTHROPIC_API_KEY = "test-key";
+    fetchUrls.length = 0;
+    vi.stubGlobal(
+      "fetch",
+      async (input: RequestInfo | URL) => {
+        const url = typeof input === "string" ? input : input.toString();
+        fetchUrls.push(url);
+        return new Response(JSON.stringify({ error: { message: "probe" } }), {
+          status: 400,
+          headers: { "content-type": "application/json" },
+        });
+      }
+    );
+  });
+
+  afterEach(() => {
+    if (saved === undefined) delete process.env.ANTHROPIC_API_KEY;
+    else process.env.ANTHROPIC_API_KEY = saved;
+    vi.unstubAllGlobals();
+  });
+
+  it("baseUrl 不含 /v1 时请求 .../model/v1/messages（无双 v1）", async () => {
+    const config = AppConfigSchema.parse({
+      model: {
+        provider: "anthropic",
+        name: "glm-5.1",
+        baseUrl: "https://test-llm-proxy.nuwax.com/api/proxy/model",
+      },
+    });
+    const model = resolveModel(config);
+    if (!model || typeof model === "string") throw new Error("expected instance");
+    try {
+      await model.invoke([{ role: "user", content: "hi" }]);
+    } catch {
+      /* 探针请求，状态码不重要 */
+    }
+    expect(fetchUrls.some((u) => u.includes("/api/proxy/model/v1/messages"))).toBe(true);
+    expect(fetchUrls.some((u) => u.includes("/v1/v1/messages"))).toBe(false);
+  });
+
+  it("baseUrl 已含 /v1 时去掉尾部版本段，避免双 v1", async () => {
+    const config = AppConfigSchema.parse({
+      model: {
+        provider: "anthropic",
+        name: "glm-5.1",
+        baseUrl: "https://test-llm-proxy.nuwax.com/api/proxy/model/v1",
+      },
+    });
+    const model = resolveModel(config);
+    if (!model || typeof model === "string") throw new Error("expected instance");
+    try {
+      await model.invoke([{ role: "user", content: "hi" }]);
+    } catch {
+      /* 探针请求 */
+    }
+    expect(fetchUrls.some((u) => u.includes("/api/proxy/model/v1/messages"))).toBe(true);
+    expect(fetchUrls.some((u) => u.includes("/v1/v1/messages"))).toBe(false);
+  });
+});

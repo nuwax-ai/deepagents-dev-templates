@@ -82,6 +82,7 @@ export const SandboxConfigSchema = z.object({
   deniedWritePaths: z.array(z.string()).default(["src/runtime/", "src/surfaces/"]),
   environment: z.object({
     allowedEnv: z.array(z.string()).default([
+      "API_PROTOCOL",
       "LLM_PROVIDER",
       "OPENAI_MODEL",
       "OPENAI_BASE_URL",
