@@ -53,7 +53,7 @@ export async function dispatchSurfaceEvent(
     case "tool_update":
       await callbacks.onToolCall?.({
         toolCallId: event.id,
-        toolName: event.id,
+        toolName: event.name ?? event.id,
         args: {},
         status: event.status,
         ...(event.status === "completed"

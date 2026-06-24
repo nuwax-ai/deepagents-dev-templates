@@ -14,7 +14,7 @@
  * （接口已对齐 BaseCheckpointSaver）。
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, unlinkSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, unlinkSync, renameSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { homedir } from "node:os";
 import { createHash } from "node:crypto";
@@ -138,6 +138,8 @@ function reviveBytes(_key: string, value: unknown): unknown {
 export class FileCheckpointSaver extends MemorySaver {
   private dir: string;
   private loaded = new Set<string>();
+  /** 加载失败（文件损坏）的 thread：标记后短路，避免每个 graph step 重读 + 刷 warn。 */
+  private corrupted = new Set<string>();
 
   constructor(opts: FileCheckpointOptions) {
     super();
@@ -157,6 +159,8 @@ export class FileCheckpointSaver extends MemorySaver {
   /** 首次访问某 thread 时，从文件懒载入内存（合并进 MemorySaver 的 storage/writes）。 */
   private ensureLoaded(threadId: string): void {
     if (!threadId || this.loaded.has(threadId)) return;
+    // 损坏文件：标记后短路，不再每个 graph step 重读 + 刷 warn（否则 N 步 = N 次读盘 + N 条日志）。
+    if (this.corrupted.has(threadId)) return;
     const file = this.threadFile(threadId);
     if (!existsSync(file)) {
       this.loaded.add(threadId);
@@ -171,8 +175,9 @@ export class FileCheckpointSaver extends MemorySaver {
       this.loaded.add(threadId);
       log.debug("loaded checkpoint from file", { threadId });
     } catch (err) {
-      log.warn("failed to load checkpoint file", { threadId, error: String(err) });
-      // 不加入 loaded —— 下次访问可重试（文件损坏时不永久丢失会话）
+      // 标记损坏：该 thread 视为新开题（无法恢复，但不反复读盘刷日志）。
+      this.corrupted.add(threadId);
+      log.warn("failed to load checkpoint file (will treat as new thread)", { threadId, error: String(err) });
     }
   }
 
@@ -191,17 +196,28 @@ export class FileCheckpointSaver extends MemorySaver {
         /* skip malformed keys */
       }
     }
+    // 原子写：先写 .tmp 再 rename 覆盖（同目录 rename 在 POSIX 上原子）——
+    // 进程在写入中途崩溃（OOM / SIGKILL / 磁盘满）不会把既有 checkpoint 截断成半截 JSON
+    // 而致下次 ensureLoaded 永久损坏（跨重启续跑依赖此文件）。
+    const final = this.threadFile(threadId);
+    const tmp = `${final}.tmp`;
     try {
       writeFileSync(
-        this.threadFile(threadId),
+        tmp,
         JSON.stringify(
           { storage: { [threadId]: threadStorage }, writes: writesForThread },
           replaceBytes,
           2
         )
       );
+      renameSync(tmp, final);
     } catch (err) {
       log.warn("failed to persist checkpoint", { threadId, error: String(err) });
+      try {
+        if (existsSync(tmp)) unlinkSync(tmp);
+      } catch {
+        /* best-effort cleanup of stale .tmp */
+      }
     }
   }
 
@@ -268,6 +284,15 @@ export class FileCheckpointSaver extends MemorySaver {
     }
     const file = this.threadFile(threadId);
     if (existsSync(file)) unlinkSync(file);
+    const tmp = `${file}.tmp`;
+    if (existsSync(tmp)) {
+      try {
+        unlinkSync(tmp);
+      } catch {
+        /* best-effort cleanup of stale .tmp */
+      }
+    }
     this.loaded.delete(threadId);  // 允许同进程内以相同 threadId 重新开题
+    this.corrupted.delete(threadId);
   }
 }

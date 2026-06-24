@@ -78,6 +78,7 @@ export function mapStreamChunk(mode: string, chunk: unknown): SurfaceStreamEvent
         events.push({
           type: "tool_update",
           id,
+          ...(t.name ? { name: t.name } : {}),
           status: t.status,
           ...(t.output !== undefined ? { output: t.output } : {}),
           ...(t.error !== undefined ? { error: t.error } : {}),
@@ -146,6 +147,7 @@ export function mapStreamChunk(mode: string, chunk: unknown): SurfaceStreamEvent
       events.push({
         type: "tool_update",
         id,
+        ...(e.name ? { name: e.name } : {}),
         status,
         ...(content !== undefined ? { output: content } : {}),
       });

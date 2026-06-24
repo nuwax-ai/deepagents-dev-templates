@@ -13,7 +13,8 @@
  */
 
 import { homedir } from "node:os";
-import { resolve, isAbsolute, relative } from "node:path";
+import { existsSync, realpathSync } from "node:fs";
+import { resolve, isAbsolute, relative, dirname, basename, join } from "node:path";
 
 /**
  * 逻辑路径规范化：反斜杠 → 正斜杠。
@@ -128,4 +129,39 @@ export function matchPosixGlob(path: string, glob: string): boolean {
   if (g.endsWith("/**")) return p.startsWith(g.slice(0, -3));
   if (g.endsWith("*")) return p.startsWith(g.slice(0, -1));
   return p === g || p.startsWith(g + "/");
+}
+
+/**
+ * 解析符号链接后的真实绝对路径 —— 写路径沙箱校验用，防 symlink 逃逸写穿。
+ *
+ * `normalizeAbsolutePath` 是纯词法 `resolve`，不跟随符号链接：workspace 内一条
+ * `ln -s ~/.ssh/authorized_keys ./x` 后，词法判定仍在 workspace 内 → 放行，实际写穿到
+ * 任意位置。写校验前必须 realpath。
+ *
+ * 目标已存在 → 直接 realpathSync；尚不存在（写新文件）→ 逐级向上找最近的**存在**祖先目录
+ * realpath 后拼回不存在的尾部段，保证「父链含 symlink 指向 workspace 外」也能被正确校验。
+ * realpath 失败（权限/不可达）回退词法 resolve，不抛错。
+ */
+export function resolveRealPath(absPath: string): string {
+  const normalized = resolve(absPath);
+  if (existsSync(normalized)) {
+    try {
+      return realpathSync(normalized);
+    } catch {
+      return normalized;
+    }
+  }
+  // 目标不存在：realpath 最近存在的祖先目录，再拼回不存在的尾部段。
+  let dir = normalized;
+  const tail: string[] = [];
+  while (dir && dir !== "/" && !/^[A-Za-z]:\\?$/.test(dir) && !existsSync(dir)) {
+    tail.unshift(basename(dir));
+    dir = dirname(dir);
+  }
+  try {
+    const real = realpathSync(dir);
+    return tail.length ? join(real, ...tail) : real;
+  } catch {
+    return normalized;
+  }
 }

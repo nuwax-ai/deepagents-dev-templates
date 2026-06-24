@@ -83,7 +83,7 @@ describe("mapStreamChunk", () => {
       name: "echo",
       output: { kwargs: { content: "echo:hi", status: "success" } },
     });
-    expect(out).toEqual([{ type: "tool_update", id: "c1", status: "completed", output: "echo:hi" }]);
+    expect(out).toEqual([{ type: "tool_update", id: "c1", name: "echo", status: "completed", output: "echo:hi" }]);
   });
 
   it("tools mode on_tool_end error → tool_update failed", () => {
@@ -93,7 +93,7 @@ describe("mapStreamChunk", () => {
       name: "echo",
       output: { kwargs: { content: "boom", status: "error" } },
     });
-    expect(out).toEqual([{ type: "tool_update", id: "c1", status: "failed", output: "boom" }]);
+    expect(out).toEqual([{ type: "tool_update", id: "c1", name: "echo", status: "failed", output: "boom" }]);
   });
 
   it("tools mode 无 event 字段不发事件", () => {

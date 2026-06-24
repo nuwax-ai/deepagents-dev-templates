@@ -12,6 +12,7 @@ import {
   toAbsolutePath,
   matchPosixGlob,
   normalizeAbsolutePath,
+  resolveRealPath,
 } from "./path-utils.js";
 
 export { toAbsolutePath } from "./path-utils.js";
@@ -56,22 +57,36 @@ export function isPathAllowed(
   policy: FlowSandboxPolicy,
   write: boolean
 ): { ok: boolean; reason?: string } {
-  const normalizedAbs = normalizeAbsolutePath(absPath);
-  const normalizedRoot = normalizeAbsolutePath(workspaceRoot);
+  // 读：非 read-only 即放行，但限在 workspace 内（open 除外）。读保持词法校验——
+  // workspace 内的合法符号链接（node_modules / pnpm 软链等）需可读，realpath 会误伤。
+  if (!write) {
+    if (policy.profile === "open") return { ok: true };
+    const rel = relative(normalizeAbsolutePath(workspaceRoot), normalizeAbsolutePath(absPath));
+    if (rel.startsWith("..")) {
+      return { ok: false, reason: `path outside workspace: ${absPath}` };
+    }
+    return { ok: true };
+  }
+
+  // 写：read-only 全拒。
+  if (policy.profile === "read-only") {
+    return { ok: false, reason: "sandbox is read-only" };
+  }
+
+  // 写路径先 realpath 解析符号链接，再做边界 / denied 校验——防 `ln -s ~/.ssh/x ./x` 后
+  // write_file/edit_file 写穿到 workspace 外（normalizeAbsolutePath 是纯词式，不跟随 symlink）。
+  const realAbs = resolveRealPath(absPath);
+  const realRoot = resolveRealPath(workspaceRoot);
 
   if (policy.profile !== "open") {
-    const rel = relative(normalizedRoot, normalizedAbs);
+    const rel = relative(realRoot, realAbs);
     if (rel.startsWith("..")) {
       return { ok: false, reason: `path outside workspace: ${absPath}` };
     }
   }
-  if (!write) return { ok: true };
-  if (policy.profile === "read-only") {
-    return { ok: false, reason: "sandbox is read-only" };
-  }
   for (const denied of policy.deniedWritePaths) {
     const deniedAbs = toAbsolutePath(denied, workspaceRoot);
-    if (matchPosixGlob(normalizedAbs, deniedAbs)) {
+    if (matchPosixGlob(realAbs, resolveRealPath(deniedAbs))) {
       return { ok: false, reason: `path denied by sandbox: ${denied}` };
     }
   }

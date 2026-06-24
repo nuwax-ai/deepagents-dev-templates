@@ -2,7 +2,7 @@
  * 拓扑 recipe 类型（libs 层，零 surface 依赖）。
  *
  * createStatefulFlow（surfaces 层，src/surfaces/stateful-flow.ts）是有状态长任务的统一基座，
- * 但它钉在 surfaces（依赖 app/compaction + surfaces 事件分发 map-stream-chunk/dispatch-surface-event），
+ * 但它钉在 surfaces（依赖 libs/compaction + surfaces 事件分发 map-stream-chunk/dispatch-surface-event），
  * libs / app 都 import 不到（分层：只能 import 左侧）。解决：libs 层只描述「图构造配方」(recipe)，
  * 由组合根 index.ts（root，能 import surfaces）调 createStatefulFlow 把 recipe 物化成 StatefulFlow。
  *

@@ -2,7 +2,7 @@
  * dev-agent 拓扑（app 层，stateful-custom）—— 综合 ReAct + 多轮续接 + 上下文压缩。
  *
  * 与其他拓扑不同：dev-agent 复用**默认 ReAct 图**（src/app/graph.ts）+ 手写 run-loop +
- * applyCompaction，**不经 createStatefulFlow**。因依赖 app/graph + app/compaction，故落 app 层
+ * applyCompaction，**不经 createStatefulFlow**。因依赖 app/graph（默认图），故落 app 层
  * （不能进 libs——libs 不能 import app）。作为 FlowDef 的 `stateful-custom`：createExecutor
  * 直接返回 StatefulFlow，无需组合根 materializeFlow 桥接。
  *
@@ -12,7 +12,7 @@
 import type { FlowRuntime } from "../../runtime/flow-runtime.js";
 import type { StatefulFlow } from "../../core/flow-types.js";
 import { createFlowGraph } from "../graph.js";
-import { applyCompaction } from "../compaction.js";
+import { applyCompaction } from "../../libs/compaction.js";
 import { getFlowTopology } from "../topology.js";
 import type { FlowState } from "../state.js";
 

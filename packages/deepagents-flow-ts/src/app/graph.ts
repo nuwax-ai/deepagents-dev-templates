@@ -84,7 +84,12 @@ export function createFlowGraph(config: CreateFlowGraphConfig = {}) {
   return graph;
 }
 
-/** 单次 invoke 默认图（每次新 thread；多轮续跑经 surface + checkpointer）。 */
+/**
+ * 单次 invoke 默认图（每次新 thread；多轮续跑经 surface + checkpointer）。
+ *
+ * @internal 仅测试 / 便利调用使用；生产路径（CLI / ACP / subagent）走 surface +
+ * createStatefulFlow + checkpointer，勿当推荐入口。
+ */
 export async function executeFlow(
   input: string,
   deps: {

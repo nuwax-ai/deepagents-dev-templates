@@ -31,7 +31,7 @@ import type {
   FlowRunResult,
   FlowCallbacks,
 } from "../core/flow-types.js";
-import { applyCompaction } from "../app/compaction.js";
+import { applyCompaction } from "../libs/compaction.js";
 import { mapStreamChunk } from "./map-stream-chunk.js";
 import { dispatchSurfaceEvent } from "./dispatch-surface-event.js";
 
@@ -81,7 +81,7 @@ export interface StatefulFlowOptions<S = Record<string, unknown>> {
   recursionLimit?: number;
   /**
    * 传入则在「新 query（非 resume）」入口自动压缩 checkpoint 中累积的 `state.messages`
-   * （超阈值摘要 + RemoveMessage 替换，见 app/compaction）。状态无 messages 或未超阈值时 no-op。
+   * （超阈值摘要 + RemoveMessage 替换，见 libs/compaction）。状态无 messages 或未超阈值时 no-op。
    */
   appConfig?: AppConfig;
   /**

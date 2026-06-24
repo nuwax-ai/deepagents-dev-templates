@@ -101,11 +101,13 @@ export function createTaskTool(deps: TaskToolDeps) {
       if ("error" in modelOverride) return `Error: ${modelOverride.error}`;
       const subConfig = modelOverride.config;
 
+      // 流式委派：subagent 的工具调用经 callbacks.onToolCall（带 [subagent] 前缀）实时透出；
+      // LLM token 经 graph.stream messages 模式逐个 onToken；最终 output 取终态（替代原 invoke）。
+      // parentCallbacks 提到 try 外：finally（subagent 结束边界 onStage）也引用它，
+      // const 块作用域否则在 finally 失效（tsc TS2304 + 运行时 ReferenceError）。
+      const parentCallbacks = ((runConfig as { configurable?: Record<string, unknown> } | undefined)
+        ?.configurable ?? {}) as Partial<FlowCallbacks>;
       try {
-        // 流式委派：subagent 的工具调用经 callbacks.onToolCall（带 [subagent] 前缀）实时透出；
-        // LLM token 经 graph.stream messages 模式逐个 onToken；最终 output 取终态（替代原 invoke）。
-        const parentCallbacks = ((runConfig as { configurable?: Record<string, unknown> } | undefined)
-          ?.configurable ?? {}) as Partial<FlowCallbacks>;
         const wrapToolCall: FlowCallbacks["onToolCall"] = async (e) => {
           await parentCallbacks.onToolCall?.({
             ...e,

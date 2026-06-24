@@ -9,7 +9,7 @@
 import { AIMessage, SystemMessage, type BaseMessage } from "@langchain/core/messages";
 import type { StructuredTool } from "@langchain/core/tools";
 import { resolveModel, logger, type AppConfig } from "../../runtime/index.js";
-import { hasModelCredentials } from "../compaction.js";
+import { hasModelCredentials } from "../../libs/compaction.js";
 import {
   invokeWithResilience,
   resolveLlmResilience,
@@ -27,11 +27,32 @@ interface ModelWithTools {
   bindTools(tools: StructuredTool[]): BoundModel;
 }
 
-/** 仅在有 systemPrompt 且 messages 首条非 system 时，前置注入 SystemMessage。 */
-function withSystemPrompt(messages: BaseMessage[], systemPrompt: string): BaseMessage[] {
+/**
+ * 前置注入 SystemMessage（首条已是 system 则跳过）。
+ *
+ * Anthropic 协议：给 system 块打 ephemeral 缓存断点 → 位置式缓存覆盖「tools + system」整块
+ * （最大的稳定前缀，含全部工具 schema），多轮第二轮起命中、显著降 TTFT（对标 nuwaxcode
+ * packages/llm 的 caching-on-by-default）。OpenAI 兼容端点是隐式服务端缓存、无需标记，按原字符串注入。
+ */
+function withSystemPrompt(
+  messages: BaseMessage[],
+  systemPrompt: string,
+  provider?: string
+): BaseMessage[] {
   if (!systemPrompt) return messages;
   if (messages.length > 0 && messages[0]?._getType?.() === "system") return messages;
-  return [new SystemMessage(systemPrompt), ...messages];
+  return [buildSystemMessage(systemPrompt, provider), ...messages];
+}
+
+/** provider 感知地造 SystemMessage：anthropic 带 cache_control 缓存断点，其余裸字符串。 */
+function buildSystemMessage(systemPrompt: string, provider?: string): SystemMessage {
+  if (provider === "anthropic") {
+    // cache_control 不在 core 的 system content 类型里（由 @langchain/anthropic 在 wire 层读取），故整体 cast。
+    return new SystemMessage({
+      content: [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }],
+    } as unknown as ConstructorParameters<typeof SystemMessage>[0]);
+  }
+  return new SystemMessage(systemPrompt);
 }
 
 export interface ThinkNodeDeps {
@@ -75,7 +96,11 @@ export function createThinkNode(deps: ThinkNodeDeps) {
     }
     try {
       const { shortTimeoutMs } = resolveLlmResilience(config);
-      const promptForModel = withSystemPrompt(state.messages, systemPrompt ?? "");
+      const promptForModel = withSystemPrompt(
+        state.messages,
+        systemPrompt ?? "",
+        config?.model.provider
+      );
       log.debug("think 注入 systemPrompt", {
         systemPromptChars: systemPrompt?.trim().length ?? 0,
         messageCount: promptForModel.length,

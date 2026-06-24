@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { HumanMessage, AIMessage, RemoveMessage } from "@langchain/core/messages";
 import { AppConfigSchema, type AppConfig } from "../src/runtime/index.js";
-import { estimateTokens, compactHistory, compactionUpdate } from "../src/app/compaction.js";
+import { estimateTokens, compactHistory, compactionUpdate } from "../src/libs/compaction.js";
 
 describe("estimateTokens", () => {
   it("按 char/4 向上取整", () => {

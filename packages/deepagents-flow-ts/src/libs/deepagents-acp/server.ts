@@ -17,6 +17,7 @@ import {
   type Agent,
   type ContentBlock,
 } from "@agentclientprotocol/sdk";
+import { randomUUID } from "node:crypto";
 
 import {
   createDeepAgent,
@@ -334,6 +335,16 @@ export class DeepAgentsServer {
 
     this.isRunning = false;
     this.connection = null;
+    // 先逐个 closeSession（触发 onSessionClosed hook → host dispose → MCP client.close()），
+    // 再清 Map —— 避免 SIGINT 时 MCP stdio 子进程仅靠 OS 回收、host 的 per-session 清理
+    // （日志 flush / 状态持久化）丢失。单个 session 关闭失败不影响其余。
+    for (const sessionId of [...this.sessions.keys()]) {
+      try {
+        await this.closeSession(sessionId);
+      } catch (err) {
+        this.log("Failed to close session on stop:", sessionId, err);
+      }
+    }
     this.sessions.clear();
     this.log("Server stopped");
 
@@ -451,7 +462,7 @@ export class DeepAgentsServer {
     conn: AgentSideConnection,
   ): Promise<NewSessionResponse> {
     const sessionId = generateSessionId();
-    const threadId = crypto.randomUUID();
+    const threadId = randomUUID();
 
     const configOptions = params.configOptions as
       | Record<string, unknown>
@@ -1112,7 +1123,7 @@ export class DeepAgentsServer {
       }
       case "clear": {
         session.messages = [];
-        session.threadId = crypto.randomUUID();
+        session.threadId = randomUUID();
         this.log("Slash command clear:", session.id);
         await this.sendMessageChunk(session.id, conn, "agent", [
           {

@@ -19,10 +19,11 @@ export type SurfaceStreamEvent =
   | { type: "plan"; entries: SurfacePlanEntry[] }
   /** 工具开始（tools mode 的 ToolNode，或 custom mode 自定义检索）。 */
   | { type: "tool_start"; id: string; name: string; input?: unknown }
-  /** 工具完成/失败。 */
+  /** 工具完成/失败。name 可选：tools mode 的 on_tool_end 通常带工具名；缺失时下游回退 id。 */
   | {
       type: "tool_update";
       id: string;
+      name?: string;
       status: "completed" | "failed";
       output?: unknown;
       error?: string;

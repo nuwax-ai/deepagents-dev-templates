@@ -237,6 +237,51 @@ type InvokeModel = {
 };
 
 /**
+ * 从 invoke 结果（AIMessage）抽取 token 用量 + 缓存命中，用于诊断 TTFT/前缀缓存。
+ *
+ * 优先 LangChain 标准化 `usage_metadata`（`input_token_details.cache_read` = 命中的缓存 token）；
+ * 再兜底刮取 provider 原生 usage 里的非标准字段（deepseek `prompt_cache_hit_tokens` /
+ * openai 兼容 `prompt_tokens_details.cached_tokens`），因为某些兼容端点（如 mimo）未必映射到标准位。
+ * 全部 optional：缺字段就不记（fallback 路径 / 端点不报 usage 时返回空对象）。
+ */
+function extractUsageFields(result: unknown): Record<string, number> {
+  const fields: Record<string, number> = {};
+  if (!result || typeof result !== "object") return fields;
+  const r = result as {
+    usage_metadata?: {
+      input_tokens?: number;
+      output_tokens?: number;
+      input_token_details?: { cache_read?: number; cache_creation?: number };
+    };
+    response_metadata?: {
+      usage?: Record<string, unknown>;
+      tokenUsage?: Record<string, unknown>;
+    };
+  };
+  const um = r.usage_metadata;
+  if (um) {
+    if (typeof um.input_tokens === "number") fields.inputTokens = um.input_tokens;
+    if (typeof um.output_tokens === "number") fields.outputTokens = um.output_tokens;
+    const det = um.input_token_details;
+    if (det) {
+      if (typeof det.cache_read === "number") fields.cachedTokens = det.cache_read;
+      if (typeof det.cache_creation === "number") fields.cacheCreationTokens = det.cache_creation;
+    }
+  }
+  // provider 原生 usage（标准位取不到缓存时的兜底）
+  const raw = r.response_metadata?.usage ?? r.response_metadata?.tokenUsage;
+  if (raw && typeof raw === "object") {
+    for (const k of ["prompt_cache_hit_tokens", "prompt_cache_miss_tokens", "cached_tokens"]) {
+      const v = (raw as Record<string, unknown>)[k];
+      if (typeof v === "number") fields[`raw_${k}`] = v;
+    }
+    const ptd = (raw as { prompt_tokens_details?: { cached_tokens?: number } }).prompt_tokens_details;
+    if (ptd && typeof ptd.cached_tokens === "number") fields.raw_prompt_tokens_details_cached = ptd.cached_tokens;
+  }
+  return fields;
+}
+
+/**
  * 标准 LLM 调用链：可选并发闸门 → 超时 → 重试。
  * 默认图、compaction、长任务示例节点统一经此入口，避免各处复制护栏逻辑。
  */
@@ -272,7 +317,15 @@ export function invokeWithResilience<M extends InvokeModel>(
       }
     )
       .then((result) => {
-        log.debug("LLM invoke done", acpPromptLogFields({ label, durationMs: Date.now() - startedAt }));
+        const durationMs = Date.now() - startedAt;
+        log.debug("LLM invoke done", acpPromptLogFields({ label, durationMs }));
+        // TTFT/缓存诊断（info 级，不依赖 LOG_LEVEL=debug）：记 token 用量 + 缓存命中。
+        // 看 cachedTokens/raw_prompt_cache_hit_tokens 是否 >0 → 端点(mimo)到底缓不缓存；
+        // 看 inputTokens 大小 → 44 工具 schema 在 prefill 里占多少。无该行=端点未报 usage。
+        const usage = extractUsageFields(result);
+        if (Object.keys(usage).length > 0) {
+          log.info("LLM usage", acpPromptLogFields({ label, durationMs, ...usage }));
+        }
         return result;
       })
       .catch((err) => {
