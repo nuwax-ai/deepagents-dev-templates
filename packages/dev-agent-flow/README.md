@@ -21,34 +21,25 @@
 
 ## 文件结构
 
+本包（`dev-agent-flow`）与 `packages/deepagents-flow-ts` **模板源码独立**：技能由**开发 Agent** 在平台侧加载，不会出现在模板仓库目录树中。
+
 ```
-packages/dev-agent-flow/
-├── system-prompt.md              # 系统提示词（XML 分区）
-├── user-prompt.md                # 用户侧默认指令
-├── skills/
-│   ├── flow-builder/
-│   │   ├── SKILL.md                  # L1 入口：路由 + 端到端路径
-│   │   └── references/               # L2 分层详情（按需加载）
-│   │       ├── part1-scaffold.md
-│   │       ├── part2-orchestration.md
-│   │       ├── part3-tools-config.md
-│   │       ├── part4-verify-debug.md
-│   │       └── part5-prompt-design.md
-│   └── agent-dev-config/           # 平台 dev 配置（tools / 提示词保存）
-│       ├── SKILL.md
-│       ├── scripts/
-│       └── references/
-└── README.md
+packages/dev-agent-flow/          # 开发 Agent 提示词 + 技能（非模板一部分）
+├── system-prompt.md
+├── user-prompt.md
+└── skills/
+    ├── flow-builder/             # flow 脚手架 / 编排 / 提示词设计
+    └── dev-engineer-toolkit/     # 开发期平台 API 脚本（搜索、注册、配置读写）
 ```
 
-> 提示词设计在 `flow-builder/references/part5-prompt-design.md`，保存走 `agent-dev-config`。
+> 提示词设计：`flow-builder/references/part5-prompt-design.md`；同步平台：`dev-engineer-toolkit` 脚本。
 
 ## 平台绑定（推荐 2 个 skill）
 
 | 保留 | 职责 |
 |------|------|
 | `flow-builder` | 脚手架、编排、工具、验证、**提示词设计**（L1 + references） |
-| `agent-dev-config` | 平台工具配置、提示词/开场白保存 |
+| `dev-engineer-toolkit` | 平台工具搜索/注册、提示词/开场白读写、技能下载 |
 
 已并入 `flow-builder`、可解绑：`flow-scaffold`、`flow-tools-config`、`flow-prompt-designer`。
 

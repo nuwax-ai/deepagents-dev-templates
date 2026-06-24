@@ -223,6 +223,16 @@ parentGraph.addNode("research", researcher);   // 编译后的子图直接当节
   - **节点内 Command goto**(推荐):`createLlmRouterNode`(上)——LLM 评审 → parse → 返回 Command goto。
   - **外部纯条件边**:`createLlmNode({ parse })` 写 decision + 配纯函数 `routeAfterXxx` + `addConditionalEdges`(见 project-manager `routeAfterEvaluate`)。routeAfterXxx 是 exported 纯函数,可被两种方式复用。
 
+## 自定义 StructuredTool
+
+在 `src/libs/tools/` 用 `tool()` + Zod 定义入参，在 `src/app/flow-tools.ts` 的 `createFlowTools()` → `buildTools()` 中注册；`think` 节点自动 `bindTools`。
+
+- 字段名、类型、必填与工具契约（JSON Schema）对齐；返回值必须是 `string`。
+- 需要运行时依赖时用工厂函数（参照 `platform-api.tool.ts`、`agent-variable.tool.ts`）。
+- 参照 [docs/capabilities.md](capabilities.md) 的工具优先级：MCP → 内置 → 自写。
+
+---
+
 ## 节点级 scaffold(custom 拓扑)
 
 不想套预设拓扑、要按 nodes+edges+state 自由编排时,用 `custom` 拓扑(spec 即契约):

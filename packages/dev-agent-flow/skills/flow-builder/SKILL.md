@@ -1,6 +1,6 @@
 ---
 name: flow-builder
-description: "deepagents-flow-ts flow 开发（分层加载）：Part1 脚手架 / Part2 编排 / Part3 工具MCP / Part4 验证调试 / Part5 目标Agent提示词设计。保存提示词走 agent-dev-config。LangGraph API 用 Context7。"
+description: "deepagents-flow-ts flow 开发（分层加载）：Part1 脚手架 / Part2 编排 / Part3 工具MCP / Part4 验证调试 / Part5 目标Agent提示词设计。保存提示词走 dev-engineer-toolkit。LangGraph API 用 Context7。"
 tags: [flow, scaffold, orchestration, tools, mcp, prompt, stategraph, hitl, debug, deepagents-flow-ts]
 version: "2.2.0"
 ---
@@ -40,7 +40,7 @@ flow-builder/
 需求 → part1 命中？→ 生成 → part4
               └ custom？→ part1 custom → part4
                     └ part2 → part3? → part4
-需 persona？→ part5 设计 → agent-dev-config 保存 → 填入 spec（part1）
+需 persona？→ part5 设计 → dev-engineer-toolkit 保存 → 填入 spec（part1）
 ```
 
 ## 目标项目文档
@@ -51,7 +51,7 @@ flow-builder/
 
 | 技能 | 何时用 |
 |------|--------|
-| `agent-dev-config` | 平台工具搜索/添加；**提示词/开场白保存**（part5 设计完后） |
+| `dev-engineer-toolkit` | 平台工具搜索/注册；**提示词/开场白保存**（part5 设计完后） |
 
 ## L1 铁律
 

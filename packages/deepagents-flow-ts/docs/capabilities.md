@@ -29,7 +29,7 @@ deepagents-flow-ts sessions       # 已持久化的会话
 - **systemPrompt** — `resolveSystemPrompt`：`config.agent.systemPrompt` / `prompts/flow.base.md` > inline fallback。（IDE host 经 ACP session 注入时可临时覆盖，属宿主行为，非平台面板配置。）
 - **mcpServers** — `config/mcp.default.json`（`config.mcp.configPath`）；native 工具经 `@langchain/mcp-adapters`（`MultiServerMCPClient`）由 runtime-context 加载。ACP session 可合并追加（`session-wins`），日常扩展改配置文件即可。
 - **model** — `resolveModel`（env > `config.model` > 默认）。
-- **skills** — `discoverSkills` 发现 `skills/builtin/`、`skills/platform/`、`.agents/*/skills/` 下的 SKILL.md；其 name/description 经 `renderSkillsSection` 注入系统提示词，模型用 `load_skill(name)` 渐进式读完整正文（deepagents progressive disclosure）。
+- **skills** — `discoverSkills` 发现 `skills/builtin/`、`.agents/*/skills/` 及 `config.skills.directories` 下的 SKILL.md；经 `renderSkillsSection` 注入清单，模型用 `load_skill(name)` 渐进式读正文。
 - **subagents** — `discoverSubAgents` 解析 `.agents/agents/<name>/AGENT.md`（frontmatter 可选 `model`/`tools`/`workdir`；`model` 可写模型名或 `openai/<model>` / `anthropic/<model>`）；默认 ReAct 图经 `task({ subagent_type, description })` 委派（子智能体 subagent 复用默认图、独立 prompt/工具/工作目录，默认继承父 cwd）。自定义图也可直接用 subgraph（见 [examples/dev-agent/researcher.ts](../examples/dev-agent/researcher.ts)）。
 - **builtInTools** — `createFlowTools(ctx)`（[src/app/flow-tools.ts](../src/app/flow-tools.ts)）组装 http/json + bash/fs/search/mcp-bridge + `load_skill`/`task` + native MCP + demo，`bindTools` 绑给模型、`ToolNode` 执行。
 - **compaction** — [src/app/compaction.ts](../src/app/compaction.ts)，消费 `config.compaction`。

@@ -8,7 +8,7 @@
  *   flow "<输入>"       命令行跑一次默认 flow（测试用）
  *   flow -i             交互模式
  *   graph               导出默认图拓扑（JSON；加 --mermaid 出 Mermaid 源）
- *   capabilities        输出能力分层 + 可用工具/MCP/skills（无凭证，供开发 Agent 查询）
+ *   capabilities        输出能力分层 + 可用工具/MCP/skills（无凭证，静态查询）
  *   sessions            列出已持久化的会话（thread id）
  *
  * 默认图是标准 LangGraph ReAct（prepare → think ↔ tools → respond）。
@@ -224,7 +224,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  // capabilities / sessions：静态查询（不加载 MCP、不需凭证）——供开发 Agent 查询配置。
+  // capabilities / sessions：静态查询（不加载 MCP、不需凭证）。
   if (args.command === "capabilities") {
     await runCapabilities();
     return;

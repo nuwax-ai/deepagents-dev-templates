@@ -1,7 +1,7 @@
 # Part 5：目标 Agent 提示词设计
 
 > 所属：`flow-builder` L2-E。入口路由见 [SKILL.md](../SKILL.md)。
-> **写什么**在本层；**怎么存**走 `agent-dev-config`（`update-prompt` / `update-opening` + `config` 回读）。
+> **写什么**在本层；**怎么存**走 `dev-engineer-toolkit`（`update-config.sh --system-prompt-file` + `get-config.sh` 回读）。
 
 为基于 `deepagents-flow-ts` 开发的**业务 Agent** 设计系统提示词 / 开场白。产出的是目标 Agent 运行时读取的提示词，不是开发 Agent 自身提示词。
 
@@ -9,10 +9,10 @@
 
 1. **结构化 > 自由发挥** — 覆盖「七要素」，不即兴空写。
 2. **few-shot 是质量分水岭** — 有固定格式/语气/结构时，**必须** ≥1 个「输入 → 期望输出」示例。
-3. **存平台不硬编码** — 经 `agent-dev-config` 保存；禁止写进 `src/runtime/` 或节点代码。
-4. **保存即回读** — `config` 确认 `systemPrompt` 非空且为新值。
-5. **只改一字段就省略另一字段** — 勿传空 `opening`/`systemPrompt` 覆盖原值。
-6. **工具名与配置一致** — 提示词里点名的工具须是 `agent-dev-config` 已 `tool/add` 的同一项。
+3. **存平台不硬编码** — 经 `dev-engineer-toolkit` 保存；禁止写进 `src/runtime/` 或节点代码。
+4. **保存即回读** — `get-config.sh --key systemPrompt` 确认非空且为新值。
+5. **只改一字段就省略另一字段** — 勿传空开场白/系统提示词覆盖原值。
+6. **工具名与配置一致** — 提示词里点名的工具须是 `dev-engineer-toolkit` 已 `add-tool.sh` 注册的同一项。
 
 ## 设计流程（6 步）
 
@@ -22,8 +22,8 @@
 | 2 | 选场景模板（A–D 或通用七要素） |
 | 3 | 填充七要素 + **至少 1 个 few-shot** |
 | 4 | 过 checklist |
-| 5 | `agent-dev-config`：`update-prompt` / `update-opening` |
-| 6 | `config` 回读校验 |
+| 5 | `dev-engineer-toolkit`：`update-config.sh --system-prompt-file` / `--opening-msg-file` |
+| 6 | `get-config.sh` 回读校验 |
 
 与 scaffold 衔接：写好后填入 [part1-scaffold.md](part1-scaffold.md) 的 `systemPrompt`（若该拓扑注入 prompt）。
 
@@ -72,11 +72,11 @@
 - [ ] 能力 3–5 条具体；工具名已配置
 - [ ] ≥1 few-shot（有固定格式时）
 - [ ] 有兜底；无矛盾指令
-- [ ] 已保存并 `config` 回读
+- [ ] 已保存并 `get-config.sh` 回读
 
 ## Anti-patterns
 
 - ❌ 只有空泛角色能力，无工具指引/few-shot/输出规范
 - ❌ 未配置工具名写进提示词
 - ❌ 硬编码进代码；保存不回读
-- ✅ 七要素 + few-shot → `agent-dev-config` 保存 → 回读 → 填 scaffold spec（如需）
+- ✅ 七要素 + few-shot → `dev-engineer-toolkit` 保存 → 回读 → 填 scaffold spec（如需）

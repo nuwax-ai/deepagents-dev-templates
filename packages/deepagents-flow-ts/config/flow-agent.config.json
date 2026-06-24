@@ -57,8 +57,7 @@
   },
   "skills": {
     "directories": [
-      "./skills/builtin/",
-      "./skills/platform/"
+      "./skills/builtin/"
     ],
     "progressiveLoading": true
   },

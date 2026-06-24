@@ -452,7 +452,7 @@ version: "1.2.0"
 | `skills` | 已注册的技能列表（含 `downloadUrl`） | `SkillResultItemDTO[]` |
 | `mcpConfigs` | MCP 配置列表 | `McpResultDTO[]` |
 
-> 更多配置项参考 `references/config-items.md`
+> 更多配置项参考 `references/config-items.md`。
 
 ---
 

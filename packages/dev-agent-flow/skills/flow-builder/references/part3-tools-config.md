@@ -1,13 +1,13 @@
 # Part 3：工具 / MCP / 密钥
 
-> 所属：`flow-builder` L2-C。入口路由见 [SKILL.md](../SKILL.md)。平台工具接入 → `agent-dev-config` skill。
+> 所属：`flow-builder` L2-C。入口路由见 [SKILL.md](../SKILL.md)。平台工具**注册**走 `dev-engineer-toolkit`；`tool()` **代码实现**在目标项目 `src/libs/tools/` + `src/app/flow-tools.ts`（见目标项目 `docs/node-kit.md`）。
 
 需要添加自定义工具、配置 MCP、管理 API key 时读本层。
 
 ## 工具优先级（强制）
 
 ```
-1. 平台 Plugin / Workflow / Knowledge  ← agent-dev-config 搜索并 tool/add（开发期）；运行时经 ACP 下发
+1. 平台 Plugin / Workflow / Knowledge  ← dev-engineer-toolkit 搜索并 add-tool（开发期）；运行时经 ACP 下发
 2. 内置 libs/tools（bash/fs/search/http/json/mcp_tool_bridge）
 3. native MCP（default + ACP session，runtime-context 自动合并）
 4. 自写 src/libs/tools/ + 注册 createFlowTools()

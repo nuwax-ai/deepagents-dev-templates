@@ -1,5 +1,5 @@
 /**
- * flow capabilities —— 输出能力分层 + 可用工具/MCP/skills（供开发 Agent 查询配置）。
+ * flow capabilities —— 输出能力分层 + 可用工具/MCP/skills（静态解析，无凭证）。
  *
  * 静态解析（不加载 MCP server、不需要凭证、不 spawn）：读 config + mcp.default.json
  * + .nuwax-agent/capability-sources.json，输出结构化 JSON。

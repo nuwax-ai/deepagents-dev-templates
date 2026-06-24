@@ -145,5 +145,4 @@ llm | llm-router | approval | approval-finalize | mcp-retrieval | prepare | pass
 
 - **[node-kit.md](node-kit.md)**:各 factory 的完整 API + 用法 snippet(本文件只管选型/分类)。
 - **[flow-patterns.md](flow-patterns.md)**:Send/interrupt/Command/subgraph/checkpointer 的原生细节。
-- **节点级 scaffold**:`custom` topology 的 spec 用本目录的 `type` 编排 nodes+edges+state → 生成图(见 [scripts/scaffold/](../scripts/scaffold/))。
-- **dev-agent-flow**：`flow-builder` + `agent-dev-config` skill 的「节点选型」节 embed 本决策树。
+- **节点级 scaffold**：`custom` topology 的 spec 用本目录的 `type` 编排 nodes+edges+state → 生成图(见 [scripts/scaffold/](../scripts/scaffold/))。
