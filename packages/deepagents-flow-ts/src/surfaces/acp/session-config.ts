@@ -9,6 +9,7 @@
 
 import type { ACPSessionConfig } from "../../runtime/config/config-schema.js";
 import { logger } from "../../runtime/logger.js";
+import { sanitizeMcpServerRecord } from "../../runtime/mcp/sanitize-mcp-name.js";
 
 const log = logger.child("acp-session-config");
 const flowAcpLog = logger.child("flow-acp");
@@ -32,18 +33,30 @@ const PLAIN_SYSTEM_PROMPT_ENV_KEYS = [
 /** ACP session/new 的 mcpServers（数组 [{name,...}] 或 record）→ Record<name, cfg>。 */
 export function acpMcpToRecord(raw: unknown): Record<string, unknown> | undefined {
   if (!raw) return undefined;
+
+  let rec: Record<string, unknown> | undefined;
+
   if (Array.isArray(raw)) {
-    const rec: Record<string, unknown> = {};
+    const built: Record<string, unknown> = {};
     for (const s of raw) {
       if (s && typeof s === "object" && typeof (s as { name?: unknown }).name === "string") {
         const { name, ...rest } = s as { name: string } & Record<string, unknown>;
-        rec[name] = rest;
+        built[name] = rest;
       }
     }
-    return Object.keys(rec).length ? rec : undefined;
+    rec = Object.keys(built).length ? built : undefined;
+  } else if (typeof raw === "object") {
+    rec = raw as Record<string, unknown>;
   }
-  if (typeof raw === "object") return raw as Record<string, unknown>;
-  return undefined;
+
+  if (!rec) return undefined;
+
+  // 规范 server 键名（中文等 → `_`），与 runtime-context 合并逻辑一致。
+  const { servers, renames } = sanitizeMcpServerRecord(rec);
+  if (Object.keys(renames).length > 0) {
+    log.info("ACP mcpServers 名称已规范化", { renames });
+  }
+  return servers;
 }
 
 /** 解析 ACP_SESSION_CONFIG_JSON + 平台常用 SYSTEM_PROMPT 环境变量。 */

@@ -34,9 +34,11 @@ describe("acpMcpToRecord（MCP 形态归一化）", () => {
     expect(acpMcpToRecord([{ command: "x" }, { url: "y" }])).toBeUndefined();
   });
 
-  it("record 形态 → 原样透传（同一引用）", () => {
-    const rec = { ctx7: { command: "npx" } };
-    expect(acpMcpToRecord(rec)).toBe(rec);
+  it("record 形态 → 规范化键名（中文 server 名替换）", () => {
+    const rec = { "A股股票查询": { command: "npx" }, ctx7: { command: "npx" } };
+    const out = acpMcpToRecord(rec);
+    expect(out).toEqual({ A: { command: "npx" }, ctx7: { command: "npx" } });
+    expect(out).not.toBe(rec);
   });
 });
 

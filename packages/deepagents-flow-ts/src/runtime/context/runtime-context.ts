@@ -17,6 +17,11 @@ import { type AppConfig, type ACPSessionConfig } from "../config/config-loader.j
 import { resolvePath } from "../config/config-paths.js";
 import { resolvePackageRoot } from "../package-root.js";
 import { logger } from "../logger.js";
+import {
+  sanitizeMcpServerRecord,
+  sanitizeMcpToolName,
+  MCP_IDENTIFIER_PATTERN,
+} from "../mcp/sanitize-mcp-name.js";
 
 /** stdio 进程退出后自动重启配置（chrome-devtools 等长驻 server 崩溃自愈）。 */
 export interface McpRestartOpts {
@@ -135,6 +140,43 @@ function mergeServers(
 }
 
 /**
+ * 合并后规范化 server 键名（中文 / 空格 → `_`），避免 prefixToolNameWithServerName
+ * 产出非法 LLM function.name。与 nuwaclaw ACP 下发侧规则一致。
+ */
+function mergeAndSanitizeMcpServers(
+  log: ReturnType<typeof logger.child>,
+  ...layers: Record<string, McpServerEntry>[]
+): Record<string, McpServerEntry> {
+  const merged = mergeServers(...layers);
+  const { servers, renames } = sanitizeMcpServerRecord(merged);
+  if (Object.keys(renames).length > 0) {
+    log.info("MCP server 名称已规范化为 LLM 合法标识符", { renames });
+  }
+  return servers;
+}
+
+/** getTools() 后兜底：个别 MCP 工具名自身含非法字符时重命名。 */
+function sanitizeLoadedMcpTools(
+  tools: StructuredTool[],
+  log: ReturnType<typeof logger.child>
+): StructuredTool[] {
+  let renamed = 0;
+  for (const t of tools) {
+    const raw = t.name;
+    if (!raw || MCP_IDENTIFIER_PATTERN.test(raw)) continue;
+    const safe = sanitizeMcpToolName(raw);
+    if (safe !== raw) {
+      t.name = safe;
+      renamed += 1;
+    }
+  }
+  if (renamed > 0) {
+    log.info("MCP 工具名已规范化为 LLM 合法标识符", { renamed });
+  }
+  return tools;
+}
+
+/**
  * 从 config.mcp.servers + configPath/configPaths 指向的文件加载 default MCP servers。
  * 注意:不读 configPath 会丢失 mcp.default.json
  * 里的默认 server（如 context7）。
@@ -247,7 +289,7 @@ export function createRuntimeContext(
   const defaultServers = resolveDefaultMcpServers(config);
   const sessionServers =
     (sessionConfig?.mcpServers as Record<string, McpServerEntry> | undefined) ?? {};
-  const mcpServerConfigs = mergeServers(defaultServers, sessionServers);
+  const mcpServerConfigs = mergeAndSanitizeMcpServers(log, defaultServers, sessionServers);
 
   log.info("Runtime context created", {
     mcpServers: Object.keys(mcpServerConfigs),
@@ -274,7 +316,11 @@ export async function hydrateRuntimeContext(
   const log = logger.child("runtime-context");
 
   const defaultServers = resolveDefaultMcpServers(context.config);
-  context.mcpServerConfigs = mergeServers(defaultServers, context.sessionMcpServers);
+  context.mcpServerConfigs = mergeAndSanitizeMcpServers(
+    log,
+    defaultServers,
+    context.sessionMcpServers
+  );
 
   const connections = toConnections(context.mcpServerConfigs);
   const connNames = Object.keys(connections);
@@ -316,7 +362,7 @@ export async function hydrateRuntimeContext(
       prefixToolNameWithServerName: true,
     } as never);
     context.mcpClient = client;
-    context.mcpTools = await client.getTools();
+    context.mcpTools = sanitizeLoadedMcpTools(await client.getTools(), log);
   } catch (err) {
     // bulk 整体抛（如 Zod 校验失败）→ 逐 server 隔离重试，避免单个非法 server 连累全部。
     log.warn("MCP bulk load failed; retrying per-server", {
@@ -332,7 +378,9 @@ export async function hydrateRuntimeContext(
           onConnectionError,
           prefixToolNameWithServerName: true,
         } as never);
-        tools.push(...(await single.getTools()));
+        tools.push(
+          ...sanitizeLoadedMcpTools(await single.getTools(), log)
+        );
         fallbackClients.push(single); // 保留到 session 结束（工具持有其连接，close 会让工具失效）
       } catch (e) {
         failed.push({
