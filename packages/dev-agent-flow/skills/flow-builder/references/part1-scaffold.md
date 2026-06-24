@@ -4,7 +4,7 @@
 
 把**一句话需求**落地成可跑 flow：**选择题 + 填空**（选拓扑 → 填参数），不要从零写 StateGraph。
 
-> **节点选型**：`docs/node-catalog.md`（决策树 + `type` 词表）。7 预设走生成器；预设外用 `custom` 按 nodes+edges+state 编排（生成真实 `graph.ts`）。
+> **节点选型**：`docs/node-catalog.md`（决策树 + `type` 词表）。8 预设走生成器；预设外用 `custom` 按 nodes+edges+state 编排（生成真实 `graph.ts`）。
 
 ## 生成器
 
@@ -15,9 +15,9 @@
 3. 自动注册 `src/app/flows/index.ts`（`SCAFFOLD-REGISTRY` 区，勿手改）；
 4. 自带门禁：`pnpm typecheck && pnpm graph`。
 
-7 预设图逻辑权威在 `src/libs/topologies/<name>/`（dev-agent 在 `src/app/topologies/`）；**`custom`** 图逻辑渲染进 `src/app/flows/<name>/graph.ts`。
+8 预设图逻辑权威在 `src/libs/topologies/<name>/`（dev-agent 在 `src/app/topologies/`）；**`custom`** 图逻辑渲染进 `src/app/flows/<name>/graph.ts`。
 
-## 8 拓扑目录
+## 9 拓扑目录（8 预设 + `custom`）
 
 | topology | kind | 适用场景 | 节点结构 |
 |------|------|----------|----------|
@@ -26,6 +26,7 @@
 | `project-manager` | stateful-recipe | 规划 + 评审重做 | `plan → estimate → evaluate → approve → finalize` |
 | `travel-planner` | stateful-recipe | 多源调研聚合 | `gather → Send research×N → aggregate → confirm → finalize` |
 | `rag` | oneshot | 检索问答 | `rewrite → retrieve → grade → prepare → generate` |
+| `adaptive-rag` | oneshot | 自适应检索 + 路由自纠正 | `route → retrieve/web-search → grade → transform/generate` |
 | `deep-research` | stateful-recipe | 深度研究 / 长任务 | 多阶段 + Send + 持续会话 |
 | `dev-agent` | stateful-custom | 综合助手 ReAct + 压缩 | 默认 ReAct + 多轮续接 |
 | `custom` ⭐ | stateful-recipe | 预设都不命中 | spec 声明 state/nodes/edges → 生成 `graph.ts` |
@@ -46,14 +47,14 @@
 }
 ```
 
-**rag** 可加 `params.mcpServers`（stdio MCP 语义名 → 配置）。
+**rag** / **adaptive-rag** 可加 `params.mcpServers`（stdio MCP 语义名 → 配置）。
 
 ### systemPrompt 注入
 
 | 拓扑 | 注入 |
 |------|------|
 | react-tools / human-in-loop / project-manager / travel-planner | ✅ 注入主节点 |
-| rag / deep-research / dev-agent | ⚠️ 不注入 |
+| rag / adaptive-rag / deep-research / dev-agent | ⚠️ 不注入 |
 
 > 提示词设计 → [part5-prompt-design.md](part5-prompt-design.md)；本处只把写好的 prompt 填进 spec。
 
@@ -82,7 +83,7 @@ export const getTopology = () => getReviewTopology();
 
 | 场景 | 路径 |
 |------|------|
-| 命中 7 预设或 `custom` | Part 1 生成 |
+| 命中 8 预设或 `custom` | Part 1 生成 |
 | bespoke 图 / 深度定制 State | [part2-orchestration.md](part2-orchestration.md) |
 | 生成后微调 | 手改 `flows/<name>/` 或 `libs/topologies/<name>/` |
 

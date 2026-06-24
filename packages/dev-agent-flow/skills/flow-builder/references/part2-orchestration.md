@@ -13,7 +13,7 @@
 | 类型 | 场景 | seam | 范例 |
 |------|------|------|------|
 | `FlowExecutor` | 问答 / 检索 / 批处理 | `(query, cb) => Promise<FlowResult>` | `examples/rag` |
-| `StatefulFlow` | HITL / 跨重启 | `createStatefulFlow(...)` | travel / pm / review |
+| `StatefulFlow` | HITL / 跨重启 | `createStatefulFlow(...)` | `examples/travel-planner` / `project-manager` / `human-in-loop` |
 
 开发位置：`src/app/graph.ts` + `src/app/nodes/` + `src/app/flow-tools.ts`；factory 来自 `src/libs/nodes/`。**examples/ 只读**。
 

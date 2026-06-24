@@ -45,4 +45,11 @@ deepagents-flow-ts sessions       # 已持久化的会话
 
 ## 给目标 Agent 的工具优先级
 
-需要外部能力时按序判断：① MCP 工具（native，经 mcp-adapters；平台 MCP 经 ACP session 下发）→ ② 内置工具（bash/读写/search/http/json）→ ③ 自写代码（最后）。密钥用环境变量，禁止硬编码。
+需要外部/业务能力时按序判断（详版见 dev-agent-flow `flow-builder` Part 3）：
+
+1. **平台 Plugin / Workflow / Knowledge** — dev-engineer-toolkit 登记 + `src/app/` `tool()` 包装（不经 ACP 下发）
+2. **Native MCP** — `config/mcp.default.json` + ACP session `mcpServers`（经 mcp-adapters）
+3. **内置 libs/tools** — bash / 读写 / search / http / json / load_skill / task / demo
+4. **自写 `src/app/`** — 最后手段，在 `flow-tools.ts` 注册
+
+密钥用环境变量，禁止硬编码。

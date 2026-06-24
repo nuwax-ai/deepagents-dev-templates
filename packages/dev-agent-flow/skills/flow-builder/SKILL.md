@@ -2,7 +2,7 @@
 name: flow-builder
 description: "deepagents-flow-ts flow 开发（分层加载）：Part1 脚手架 / Part2 编排 / Part3 工具MCP / Part4 验证调试 / Part5 目标Agent提示词设计。保存提示词走 dev-engineer-toolkit。LangGraph API 用 Context7。"
 tags: [flow, scaffold, orchestration, tools, mcp, prompt, stategraph, hitl, debug, deepagents-flow-ts]
-version: "2.2.0"
+version: "2.2.4"
 ---
 
 # Flow 开发（deepagents-flow-ts）
@@ -51,10 +51,10 @@ flow-builder/
 
 | 技能 | 何时用 |
 |------|--------|
-| `dev-engineer-toolkit` | 平台工具搜索/注册；**提示词/开场白保存**（part5 设计完后） |
+| `dev-engineer-toolkit` | 平台在线配置读写（systemPrompt / openingChatMsg / tools / skills）；part5 设计完后保存与回读 |
 
 ## L1 铁律
 
 - 图是契约；factory 优先；`examples/` 只读；保护区不改。
-- 有状态用 `createStatefulFlow`。
+- 有状态用 `createStatefulFlow`（`dev-agent` 拓扑 `stateful-custom` 手写 run-loop 为例外，见 part2）。
 - 未跑通 part4 禁止报 done。

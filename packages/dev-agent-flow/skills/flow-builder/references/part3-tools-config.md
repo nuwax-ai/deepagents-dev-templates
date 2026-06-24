@@ -1,19 +1,21 @@
 # Part 3：工具 / MCP / 密钥
 
-> 所属：`flow-builder` L2-C。入口路由见 [SKILL.md](../SKILL.md)。平台工具**注册**走 `dev-engineer-toolkit`；`tool()` **代码实现**在目标项目 `src/libs/tools/` + `src/app/flow-tools.ts`（见目标项目 `docs/node-kit.md`）。
+> 所属：`flow-builder` L2-C。入口路由见 [SKILL.md](../SKILL.md)。平台侧工具**登记**走 `dev-engineer-toolkit`（平台在线配置：tools / skills / mcpConfigs / systemPrompt，读写见该技能）；业务自定义 `tool()` **代码实现**在目标项目 `src/app/`。
 
 需要添加自定义工具、配置 MCP、管理 API key 时读本层。
 
 ## 工具优先级（强制）
 
 ```
-1. 平台 Plugin / Workflow / Knowledge  ← dev-engineer-toolkit 搜索并 add-tool（开发期）；运行时经 ACP 下发
-2. 内置 libs/tools（bash/fs/search/http/json/mcp_tool_bridge）
-3. native MCP（default + ACP session，runtime-context 自动合并）
-4. 自写 src/libs/tools/ + 注册 createFlowTools()
+1. 平台 Plugin / Workflow / Knowledge  ← dev-engineer-toolkit 搜索并 add-tool；在 src/app/ 按返回 schema 手写 tool() 包装 → flow-tools.ts 注册
+2. Native MCP                        ← config/mcp.default.json + ACP session mcpServers（与平台 mcpConfigs 合并）
+3. 内置 libs/tools                   ← bash/fs/search/http/json/load_skill/task/demo（模板内置，勿改 libs）
+4. 自写 src/app/ + flow-tools.ts     ← 最后手段：在 app 层实现并注册 createFlowTools()
 ```
 
-## 创建工具 `src/libs/tools/{name}.tool.ts`
+> 已无 `mcp_tool_bridge` 元工具；MCP 工具由 runtime 原生绑定，直接用 server 暴露的工具名调用。
+
+## 创建自定义工具 `src/app/tools/{name}.tool.ts`
 
 **无状态：**
 ```typescript
@@ -49,7 +51,11 @@ export function createMyTool(ctx: RuntimeContext) {
 
 ### 注册
 
-`src/libs/tools/index.ts` re-export → `src/app/flow-tools.ts` 的 `buildTools()` 数组。think 自动 `bindTools`。
+在 `src/app/flow-tools.ts` 的 `buildTools()` 数组 import 并加入；think 节点自动 `bindTools`。**禁止**改 `src/libs/tools/`（保护区）。
+
+### 内置 `http_request` 安全默认
+
+模板内置 `http_request` 默认拦截私有/loopback/链路本地/云元数据端点（防 SSRF），并限制响应体大小（防 OOM）。目标项目一般无需改；若业务必须访问内网，需开发者明确要求并理解风险后再调整（见目标项目 `docs/capabilities.md`）。
 
 ---
 
@@ -75,21 +81,22 @@ export function createMyTool(ctx: RuntimeContext) {
 | `session-wins` | ACP session 覆盖 default（默认） |
 | `defaults-wins` | 本地 default 优先 |
 
-调试：`pnpm exec tsx src/index.ts capabilities` · `mcp_tool_bridge list_servers`
+调试：`pnpm exec tsx src/index.ts capabilities`（列出 MCP server、内置工具、skills 分层）
 
 ---
 
 ## 密钥与环境变量
 
 - 禁止硬编码密钥；工具内读 `process.env`；MCP server `env` 引用同名变量
-- 平台保存的系统提示词 / MCP 经 **ACP session** 注入运行时，不经 `platform_api` 工具
+- 运行时 **ACP session** 仅回注 `systemPrompt` 与 `mcpServers`（合并进 runtime）；平台 Plugin/Workflow/Knowledge **不经 ACP 下发**，须在 `src/app/` 实现包装器
 
 ---
 
 ## Anti-patterns
 
-- ❌ 不查平台/内置/MCP 就自写工具
+- ❌ 不查平台能力 / 内置 / MCP 就自写工具
 - ❌ 硬编码 API key / 忘记注册 createFlowTools()
-- ❌ 引用已删除的 `platform_api` / `agent_variable` 运行时工具
+- ❌ 引用已删除的 `platform_api` / `agent_variable` / `mcp_tool_bridge`
+- ❌ 在 `src/libs/tools/` 写业务自定义工具（保护区）
 - ❌ Zod 无 `.describe()` / 返回非 string
-- ✅ 平台优先（dev 配置）→ 内置 → MCP → 自写
+- ✅ 平台能力优先（dev-engineer-toolkit）→ native MCP → 内置 → app 层自写
