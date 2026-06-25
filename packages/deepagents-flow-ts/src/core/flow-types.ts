@@ -93,6 +93,16 @@ export type FlowRunResult =
   | { status: "done"; answer: string; footer?: string }
   | { status: "interrupted"; question: string };
 
+/**
+ * 从 checkpointer 读出的 thread 历史（供 session/load 回放、诊断等）。
+ * `messages` 通常为 LangChain `BaseMessage[]`；core 层用 `unknown[]` 避免绑死 langchain。
+ */
+export interface SessionThreadHistory {
+  messages: unknown[];
+  /** 磁盘/内存 checkpointer 中是否存在该 thread 的 checkpoint。 */
+  hasCheckpoint: boolean;
+}
+
 export interface StatefulFlow {
   run(
     input: { query?: string; resume?: string },
@@ -111,6 +121,11 @@ export interface StatefulFlow {
    * 这样进程/IDE 重启后仍准（见 createStatefulFlow）。未实现时 surface 退回内存跟踪。
    */
   hasStarted?(threadId: string): Promise<boolean>;
+  /**
+   * 从持久化 checkpointer 读取可回放消息。可选；未实现时 ACP load 无法跨进程回放 UI 历史。
+   * ACP 场景下 `threadId` 即 `sessionId`（见 surfaces/acp onPrompt）。
+   */
+  getThreadMessages?(threadId: string): Promise<SessionThreadHistory | void>;
 }
 
 /**

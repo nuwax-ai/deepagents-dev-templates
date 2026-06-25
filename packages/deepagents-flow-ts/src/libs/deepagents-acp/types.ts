@@ -188,6 +188,18 @@ export interface DeepAgentsServerHooks {
     sessionId: string;
     agentName: string;
   }): void | Promise<void>;
+
+  /**
+   * `session/load` 后向客户端回放聊天记录。宿主（如 Flow surface）从 FileCheckpointSaver
+   * 等持久层读 messages；返回 `undefined` 或空数组时 server 回退内部 MemorySaver +
+   * `session.messages`（跨进程场景通常仍为空，待宿主实现完整回放）。
+   */
+  getSessionHistory?(ctx: {
+    sessionId: string;
+    threadId: string;
+    phase: "load";
+    params: Record<string, unknown>;
+  }): Promise<unknown[] | void>;
 }
 
 /**

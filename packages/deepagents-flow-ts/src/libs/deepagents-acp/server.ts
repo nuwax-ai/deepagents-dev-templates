@@ -552,7 +552,7 @@ export class DeepAgentsServer {
     // Initialize session: apply host hook, create agent, send commands
     await this.initializeSession(session, conn, "load", params);
 
-    await this.replaySessionHistory(session, conn);
+    await this.replaySessionHistory(session, conn, params);
 
     const response: LoadSessionResponse = {
       modes: {
@@ -1182,24 +1182,42 @@ export class DeepAgentsServer {
   private async replaySessionHistory(
     session: SessionState,
     conn: AgentSideConnection,
+    loadParams?: Record<string, unknown>,
   ): Promise<void> {
     let messages: BaseMessage[] = [];
 
+    // 宿主 hook 优先（Flow 磁盘 checkpointer）；未实现时回退下方 MemorySaver。
     try {
-      const checkpoint = await this.checkpointer.getTuple({
-        configurable: { thread_id: session.threadId },
+      const fromHost = await this.hooks?.getSessionHistory?.({
+        sessionId: session.id,
+        threadId: session.threadId,
+        phase: "load",
+        params: loadParams ?? {},
       });
-      if (checkpoint?.checkpoint?.channel_values) {
-        const channelValues = checkpoint.checkpoint.channel_values as Record<
-          string,
-          unknown
-        >;
-        if (Array.isArray(channelValues.messages)) {
-          messages = channelValues.messages as BaseMessage[];
-        }
+      if (Array.isArray(fromHost) && fromHost.length > 0) {
+        messages = fromHost as BaseMessage[];
       }
     } catch {
-      // Checkpointer may not have data yet
+      // Host hook may not have checkpoint data yet
+    }
+
+    if (messages.length === 0) {
+      try {
+        const checkpoint = await this.checkpointer.getTuple({
+          configurable: { thread_id: session.threadId },
+        });
+        if (checkpoint?.checkpoint?.channel_values) {
+          const channelValues = checkpoint.checkpoint.channel_values as Record<
+            string,
+            unknown
+          >;
+          if (Array.isArray(channelValues.messages)) {
+            messages = channelValues.messages as BaseMessage[];
+          }
+        }
+      } catch {
+        // Checkpointer may not have data yet
+      }
     }
 
     if (messages.length === 0) {

@@ -549,6 +549,10 @@ export function createFlowHooks(options: FlowAcpOptions): DeepAgentsServerHooks 
       fallbackResume.delete(ctx.sessionId);
       log.info("session closed", { sessionId: ctx.sessionId });
     },
+
+    // 跨进程 session/load 历史回放（待实现）：
+    // getSessionHistory → resolveExecutor(sessionId) → flow.getThreadMessages?.(sessionId)
+    // → 返回 messages；见 core/flow-types SessionThreadHistory 与 deepagents-acp getSessionHistory hook。
   };
 }
 

@@ -18,5 +18,6 @@ export type {
   FlowCallbacks,
   FlowExecutor,
   FlowRunResult,
+  SessionThreadHistory,
   StatefulFlow,
 } from "./flow-types.js";
