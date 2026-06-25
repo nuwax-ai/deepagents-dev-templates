@@ -316,14 +316,23 @@ ${lines.join("\n")}`;
 
 /**
  * Render the "Available MCP Servers" prompt section.
- * MCP tools are hydrated natively into bindTools (server__tool prefix); no mcp_tool_bridge.
+ * 仅包含 tools/list 验证成功的 server 及其实际工具名（不做 URL/名称特征推断）。
  */
-export function renderMcpServersSection(serverNames: string[]): string {
-  if (!serverNames.length) return "";
-  const lines = serverNames.map((name) => `- ${name}`);
+export function renderMcpServersSection(
+  serverToolLists: Record<string, string[]>
+): string {
+  const entries = Object.entries(serverToolLists);
+  if (!entries.length) return "";
+  const lines = entries.map(([name, tools]) => {
+    const toolPart =
+      tools.length > 0
+        ? tools.map((t) => `\`${t}\``).join(", ")
+        : "（已连接，tools/list 为空）";
+    return `- **${name}** — ${toolPart}`;
+  });
   return `## Available MCP Servers
 
-本会话已连接的 MCP server（工具经 mcp-adapters 以 \`<server>__<tool>\` 前缀注入 bindTools）：
+本会话经 tools/list 确认已连接的 MCP server（工具经 mcp-adapters 以 \`<server>__<tool>\` 前缀注入 bindTools）：
 ${lines.join("\n")}
 
 用户询问「有哪些 MCP / 可用工具」时，直接根据上表回答，无需加载无关 skill 或全盘搜索文件。`;

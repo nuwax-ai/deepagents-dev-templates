@@ -16,18 +16,23 @@
  * mcp-retrieval 的 opts.timeoutMs、context7 的 CONTEXT7_TIMEOUT_MS）。
  */
 import { MultiServerMCPClient } from "@langchain/mcp-adapters";
+import { inferMcpTransport } from "../../runtime/mcp/infer-mcp-transport.js";
 
-/** 多 transport MCP server 配置（stdio / http / sse）。省略 transport 时按 url/command 推断。 */
+/** 多 transport MCP server 配置（stdio / http / sse）。省略 transport/type 时按 inferMcpTransport 推断。 */
 export interface McpServerConfig {
   command?: string;
   args?: string[];
   url?: string;
   env?: Record<string, string>;
   transport?: "stdio" | "sse" | "http";
+  /** 平台/ACP 惯用字段，与 transport 等价。 */
+  type?: "stdio" | "sse" | "http";
   headers?: Record<string, string>;
   restart?: { enabled: boolean; maxAttempts?: number; delayMs?: number };
   reconnect?: { enabled: boolean; maxAttempts?: number; delayMs?: number };
   defaultToolTimeout?: number;
+  /** Streamable HTTP 失败时回退 SSE（默认 true）。 */
+  automaticSSEFallback?: boolean;
 }
 
 /** MultiServerMCPClient.getClient() 返回的底层 MCP SDK Client（有 callTool / listTools）。 */
@@ -43,25 +48,34 @@ function cleanStringMap(raw: unknown): Record<string, string> | undefined {
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
+const DEFAULT_SSE_RECONNECT = {
+  enabled: true,
+  maxAttempts: 3,
+  delayMs: 1000,
+};
+
 /** 单 server 配置 → mcp-adapters connection（多 transport）。无 url/command 返回 null。 */
 export function toMcpConnection(config: McpServerConfig): Record<string, unknown> | null {
   const headers = cleanStringMap(config.headers);
   const timeout =
     typeof config.defaultToolTimeout === "number" ? config.defaultToolTimeout : undefined;
-  if (config.transport === "sse" && config.url) {
+  const kind = inferMcpTransport(config);
+
+  if (config.url && kind === "sse") {
+    const reconnect = config.reconnect ?? DEFAULT_SSE_RECONNECT;
     return {
       transport: "sse",
       url: config.url,
       ...(headers ? { headers } : {}),
-      ...(config.reconnect ? { reconnect: config.reconnect } : {}),
+      reconnect,
       ...(timeout ? { defaultToolTimeout: timeout } : {}),
     };
   }
   if (config.url) {
-    // Streamable HTTP（官方自动 SSE fallback；给 url 即识别为 http）。
     return {
       transport: "http",
       url: config.url,
+      automaticSSEFallback: config.automaticSSEFallback ?? true,
       ...(headers ? { headers } : {}),
       ...(timeout ? { defaultToolTimeout: timeout } : {}),
     };

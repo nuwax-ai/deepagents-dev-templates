@@ -18,6 +18,8 @@ import { type AppConfig, type ACPSessionConfig } from "../config/config-loader.j
 import { resolvePath } from "../config/config-paths.js";
 import { resolvePackageRoot } from "../package-root.js";
 import { logger } from "../logger.js";
+import { inferMcpTransport } from "../mcp/infer-mcp-transport.js";
+import { verifyMcpServersWithToolList } from "../mcp/verify-mcp-tool-list.js";
 import {
   sanitizeMcpServerRecord,
   sanitizeMcpToolName,
@@ -39,21 +41,28 @@ export interface McpReconnectOpts {
 
 /**
  * MCP server 配置（多 transport：stdio / Streamable HTTP / SSE）。
- * 省略 transport 时按字段推断：有 url→http，有 command→stdio；显式 transport:"sse" 走 SSE。
+ * 省略 transport/type 时按 url 特征与 command 推断（见 infer-mcp-transport.ts）。
  */
 export interface McpServerEntry {
   command?: string;
   args?: string[];
   url?: string;
   env?: Record<string, string>;
-  /** 显式 transport；省略则按 url/command 推断。 */
+  /** 显式 transport；省略则看 `type` 或 URL 特征推断。 */
   transport?: "stdio" | "sse" | "http";
+  /** ACP / 平台 JSON 惯用字段，与 `transport` 等价（`transport` 优先）。 */
+  type?: "stdio" | "sse" | "http";
   /** http/sse 自定义请求头（如 Authorization）。 */
   headers?: Record<string, string>;
   /** stdio 进程退出后自动重启（默认对 stdio 开启，见 toConnections）。 */
   restart?: McpRestartOpts;
   /** sse 断线自动重连。 */
   reconnect?: McpReconnectOpts;
+  /**
+   * Streamable HTTP 连接失败时是否回退 SSE（mcp-adapters 默认 true）。
+   * 未显式 transport:sse 的 url 均先走 http，由适配器在 4xx 时尝试 SSE。
+   */
+  automaticSSEFallback?: boolean;
   /** 该 server 所有工具的默认超时（ms）。 */
   defaultToolTimeout?: number;
 }
@@ -90,6 +99,13 @@ const DEFAULT_STDIO_RESTART: McpRestartOpts = {
   delayMs: 1000,
 };
 
+/** SSE 断线默认重连（平台聚合 SSE 网关长连接）。 */
+const DEFAULT_SSE_RECONNECT: McpReconnectOpts = {
+  enabled: true,
+  maxAttempts: 3,
+  delayMs: 1000,
+};
+
 /**
  * 规范化 headers：只保留 plain object 且值为 string（ACP/session 下发可能是脏数据，
  * 如 array）。与 env 清洗同理——避免单个非法 server 让 mcp-adapters 整体 Zod 失败。
@@ -115,6 +131,8 @@ export interface RuntimeContext {
   mcpServerConfigs: Record<string, McpServerEntry>;
   /** 经 @langchain/mcp-adapters 从已配置 MCP server 加载的 native LangChain 工具（agent 工具来源）。 */
   mcpTools: StructuredTool[];
+  /** tools/list 验证成功的 server → 工具短名（未连上或 list 失败的不含条目）。 */
+  mcpServerToolLists: Record<string, string[]>;
   /** @internal session MCP overrides（session-wins 最高优先级），hydrate 重新合并时用。 */
   sessionMcpServers: Record<string, McpServerEntry>;
   /**
@@ -222,7 +240,8 @@ function resolveDefaultMcpServers(config: AppConfig): Record<string, McpServerEn
 /** 把 server 配置转成 mcp-adapters connection；跳过无 url 且无 command 的无效项。
  *  env 规范化：session/ACP 下发的 env 可能是 array（非法），清洗为 Record<string,string>，
  *  否则单个非法 server 会让 mcp-adapters 整体 Zod 校验失败、连累其余合法 server。 */
-function toConnections(
+/** @internal 单测与诊断用：合并配置 → mcp-adapters connections。 */
+export function toConnections(
   servers: Record<string, McpServerEntry>
 ): Record<string, McpConnection> {
   const out: Record<string, McpConnection> = {};
@@ -230,21 +249,24 @@ function toConnections(
     const headers = cleanHeaders(s.headers);
     const timeout =
       typeof s.defaultToolTimeout === "number" ? s.defaultToolTimeout : undefined;
+    const kind = inferMcpTransport(s);
 
-    if (s.transport === "sse" && s.url) {
-      // 显式 SSE（旧 server 或需强制 SSE）。
+    if (s.url && kind === "sse") {
+      // 平台 SSE 网关（/api/mcp/sse）或显式 transport:sse。
+      const reconnect = s.reconnect ?? DEFAULT_SSE_RECONNECT;
       out[name] = {
         transport: "sse",
         url: s.url,
         ...(headers ? { headers } : {}),
-        ...(s.reconnect ? { reconnect: s.reconnect } : {}),
+        reconnect,
         ...(timeout ? { defaultToolTimeout: timeout } : {}),
       };
     } else if (s.url) {
-      // Streamable HTTP（官方自动 SSE fallback；给 url 即识别为 http）。
+      // 默认 Streamable HTTP；失败时由 mcp-adapters automaticSSEFallback 再试 SSE。
       out[name] = {
         transport: "http",
         url: s.url,
+        automaticSSEFallback: s.automaticSSEFallback ?? true,
         ...(headers ? { headers } : {}),
         ...(timeout ? { defaultToolTimeout: timeout } : {}),
       };
@@ -393,6 +415,7 @@ export function createRuntimeContext(
     config,
     mcpServerConfigs,
     mcpTools: [],
+    mcpServerToolLists: {},
     sessionMcpServers: sessionServers,
     mcpClient: null,
     mcpFallbackClients: [],
@@ -482,6 +505,7 @@ export async function hydrateRuntimeContext(
     failed.length = 0;
     const tools: typeof context.mcpTools = [];
     const fallbackClients: MultiServerMCPClient[] = [];
+    const fallbackServerNames: string[] = [];
     for (const name of connNames) {
       try {
         const single = new MultiServerMCPClient({
@@ -493,6 +517,7 @@ export async function hydrateRuntimeContext(
           ...sanitizeLoadedMcpTools(await single.getTools(), log)
         );
         fallbackClients.push(single); // 保留到 session 结束（工具持有其连接，close 会让工具失效）
+        fallbackServerNames.push(name);
       } catch (e) {
         failed.push({
           server: name,
@@ -503,13 +528,36 @@ export async function hydrateRuntimeContext(
     context.mcpTools = tools;
     context.mcpClient = null;
     context.mcpFallbackClients = fallbackClients;
+
+    // tools/list 确认各 fallback server 是否真正连上
+    const toolLists: Record<string, string[]> = {};
+    for (let i = 0; i < fallbackClients.length; i++) {
+      const name = fallbackServerNames[i]!;
+      const listed = await verifyMcpServersWithToolList(fallbackClients[i]!, [name]);
+      Object.assign(toolLists, listed);
+    }
+    context.mcpServerToolLists = toolLists;
   }
 
-  const connected = connNames.filter((n) => !failed.some((f) => f.server === n));
+  if (context.mcpClient) {
+    context.mcpServerToolLists = await verifyMcpServersWithToolList(
+      context.mcpClient,
+      connNames
+    );
+  }
+
+  const connected = Object.keys(context.mcpServerToolLists);
+  const listFailed = connNames.filter((n) => !context.mcpServerToolLists[n]);
+  const transports = Object.fromEntries(
+    connected.map((n) => [n, connections[n]?.transport ?? "unknown"])
+  );
   log.info("Loaded MCP tools", {
     total: context.mcpTools.length,
     connectedServers: connected,
+    serverToolLists: context.mcpServerToolLists,
+    serverTransports: transports,
     failedServers: failed,
+    toolListFailed: listFailed.filter((n) => !failed.some((f) => f.server === n)),
     mode: context.mcpClient ? "bulk" : "per-server-fallback",
   });
 

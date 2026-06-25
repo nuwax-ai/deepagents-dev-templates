@@ -81,6 +81,7 @@ export function summarizeMcpServerEntry(raw: unknown): Record<string, unknown> {
     ...(args ? { args: args.map(maskSensitiveAssignee) } : {}),
     ...(url ? { url: maskUrlSecret(url) } : {}),
     ...(typeof e.transport === "string" ? { transport: e.transport } : {}),
+    ...(typeof e.type === "string" ? { type: e.type } : {}),
     ...(env ? { envKeys: Object.keys(env) } : {}),
   };
 }

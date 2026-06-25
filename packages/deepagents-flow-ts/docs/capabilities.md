@@ -27,7 +27,7 @@ deepagents-flow-ts sessions       # 已持久化的会话
 `FlowRuntime`（接口 [src/runtime/flow-runtime.ts](../src/runtime/flow-runtime.ts)，装配工厂 `createFlowRuntime` 见 [src/index.ts](../src/index.ts)）在启动时把各层组装成一处，注入图节点：
 
 - **systemPrompt** — `resolveSystemPrompt`：`config.agent.systemPrompt` / `prompts/flow.base.md` > inline fallback。（IDE host 经 ACP session 注入时可临时覆盖，属宿主行为，非平台面板配置。）
-- **mcpServers** — `config/mcp.default.json`（`config.mcp.configPath`）；native 工具经 `@langchain/mcp-adapters`（`MultiServerMCPClient`）由 runtime-context 加载。ACP session 可合并追加（`session-wins`），日常扩展改配置文件即可。
+- **mcpServers** — `config/mcp.default.json`（`config.mcp.configPath`）；native 工具经 `@langchain/mcp-adapters`（`MultiServerMCPClient`）由 runtime-context 加载，支持 **stdio / Streamable HTTP / SSE**（有 url 时默认 Streamable HTTP，`automaticSSEFallback` 失败后再试 SSE；连接成功与否以 **tools/list** 为准，session 结束 `destroyRuntimeContext` 关闭连接）。ACP session 可合并追加（`session-wins`），日常扩展改配置文件即可。
 - **model** — `resolveModel`（env > `config.model` > 默认）。协议优先级：`API_PROTOCOL` > `LLM_PROVIDER` > 凭证启发式 > `config.model.provider`（与平台 `model_provider.api_protocol` 枚举 `anthropic` | `openai` 对齐）。
 - **skills** — `discoverSkills` 发现 `skills/builtin/`、各 `agentsDirectory` 下的 `skills/`（默认含 `.agents/skills/`）及 `config.skills.directories` 下的 SKILL.md；经 `renderSkillsSection` 注入清单，模型用 `load_skill(name)` 渐进式读正文。
 - **subagents** — `discoverSubAgents` 解析 `.agents/agents/<name>/AGENT.md`（frontmatter 可选 `model`/`tools`/`workdir`；`model` 可写模型名或 `openai/<model>` / `anthropic/<model>`）；默认 ReAct 图经 `task({ subagent_type, description })` 委派（子智能体 subagent 复用默认图、独立 prompt/工具/工作目录，默认继承父 cwd）。自定义图也可直接用 subgraph（见 [examples/dev-agent/researcher.ts](../examples/dev-agent/researcher.ts)）。
@@ -48,7 +48,7 @@ deepagents-flow-ts sessions       # 已持久化的会话
 
 需要外部/业务能力时按序判断（详版见 dev-agent-flow `flow-builder` Part 3）：
 
-1. **平台 Plugin / Workflow / Knowledge** — dev-engineer-toolkit 登记 + `src/app/` `tool()` 包装（不经 ACP 下发）
+1. **平台 Plugin / Workflow / Knowledge** — 平台聚合成 **SSE MCP 网关**（ACP 下发名常为 `mcp_server`，工具名 `tool_workflow_*` / `tool_plugin_*`）；nuwaclaw 也可能经 stdio proxy 桥接。运行时 native 加载，session 关闭自动销毁连接。
 2. **Native MCP** — `config/mcp.default.json` + ACP session `mcpServers`（经 mcp-adapters）
 3. **内置 libs/tools** — bash / 读写 / search / http / json / load_skill / task / demo
 4. **自写 `src/app/`** — 最后手段，在 `flow-tools.ts` 注册

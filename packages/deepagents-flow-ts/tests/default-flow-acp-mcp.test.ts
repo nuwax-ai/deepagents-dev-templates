@@ -73,12 +73,16 @@ describe("默认 flow：ACP session mcpServers → 工具集", () => {
     expect(allTools.some((t) => t.name === "mcp_tool_bridge")).toBe(false);
   });
 
-  it("renderMcpServersSection 列出合并后的 server 名", () => {
-    const section = renderMcpServersSection(["context7", "chrome-devtools", "ask-question"]);
+  it("renderMcpServersSection 列出 tools/list 验证成功的 server 及工具", () => {
+    const section = renderMcpServersSection({
+      context7: ["resolve-library-id", "query-docs"],
+      "chrome-devtools": ["new_page"],
+      "ask-question": ["ask_question"],
+    });
     expect(section).toContain("Available MCP Servers");
+    expect(section).toContain("tools/list");
     expect(section).toContain("context7");
-    expect(section).toContain("chrome-devtools");
-    expect(section).toContain("ask-question");
-    expect(renderMcpServersSection([])).toBe("");
+    expect(section).toContain("`resolve-library-id`");
+    expect(renderMcpServersSection({})).toBe("");
   });
 });

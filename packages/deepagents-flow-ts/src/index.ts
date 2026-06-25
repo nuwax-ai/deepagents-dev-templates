@@ -74,7 +74,7 @@ export async function createFlowRuntime(
   // 系统提示词追加「Available Skills」「Subagents」「MCP Servers」清单。
   const baseSystemPrompt = resolveSystemPrompt(appConfig, options.sessionConfig, workspaceRoot);
   const sections = [
-    renderMcpServersSection(Object.keys(ctx.mcpServerConfigs)),
+    renderMcpServersSection(ctx.mcpServerToolLists),
     renderSkillsSection(skills, progressiveSkills),
     renderSubagentsSection(subAgents),
   ].filter(Boolean);
