@@ -512,11 +512,34 @@ export class DeepAgentsServer {
     conn: AgentSideConnection,
   ): Promise<LoadSessionResponse> {
     const sessionId = params.sessionId as string;
-    const session = this.sessions.get(sessionId);
+    let session = this.sessions.get(sessionId);
 
+    // 进程重启后内存 Map 为空，但 FileCheckpointSaver 可能已在 cwd/isolated HOME 落盘。
+    // 为 load 重建 SessionState，让 configureSession(phase=load) 从 checkpointer 恢复上下文。
     if (!session) {
-      this.log("Load session failed: session not found:", sessionId);
-      throw new Error(`Session not found: ${sessionId}`);
+      const configOptions = params.configOptions as
+        | Record<string, unknown>
+        | undefined;
+      const agentName =
+        (configOptions?.agent as string) ?? [...this.agentConfigs.keys()][0];
+
+      if (!agentName || !this.agentConfigs.has(agentName)) {
+        this.log("Load session failed: unknown agent for:", sessionId);
+        throw new Error(`Session not found: ${sessionId}`);
+      }
+
+      session = {
+        id: sessionId,
+        agentName,
+        // Flow 层 checkpoint 以 sessionId 为 thread_id（见 surfaces/acp onPrompt）。
+        threadId: sessionId,
+        messages: [],
+        createdAt: new Date(),
+        lastActivityAt: new Date(),
+        mode: params.mode as string | undefined,
+      };
+      this.sessions.set(sessionId, session);
+      this.log("Hydrated session for load (disk checkpoint):", sessionId);
     }
 
     this.log("Loading session:", {
