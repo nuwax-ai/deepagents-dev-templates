@@ -1,6 +1,6 @@
 {
   "name": "deepagents-flow-ts",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Workflow-orchestration agent template — the agent runs an explicit LangGraph StateGraph (default ReAct: prepare → think ↔ tools → respond) over ACP instead of a dynamic tool loop. Ships 6 reference examples: RAG, travel planner, project manager, human-in-loop, dev agent, and deep research.",
   "engine": "deepagents-flow-ts",
   "source": {
@@ -8,8 +8,8 @@
     "endpoint": "https://s3.nuwax.com:9443",
     "bucket": "nuwax-packages",
     "region": "us-east-1",
-    "prefix": "agent-engines/deepagents-flow-ts/versions/1.0.0",
-    "version": "1.0.0",
+    "prefix": "agent-engines/deepagents-flow-ts/versions/1.1.0",
+    "version": "1.1.0",
     "forcePathStyle": true
   },
   "alternativeSources": [
@@ -17,17 +17,17 @@
       "type": "npm",
       "package": "deepagents-flow-ts",
       "registry": "https://registry.npmjs.org",
-      "version": "1.0.0"
+      "version": "1.1.0"
     },
     {
       "type": "tgz",
-      "path": "./deepagents-flow-ts-1.0.0.tgz",
-      "version": "1.0.0"
+      "path": "./deepagents-flow-ts-1.1.0.tgz",
+      "version": "1.1.0"
     },
     {
       "type": "git",
       "url": "https://github.com/nuwax-ai/deepagents-dev-templates.git",
-      "ref": "v1.0.0"
+      "ref": "v1.1.0"
     },
     {
       "type": "s3-channel",
