@@ -31,6 +31,7 @@ export {
   discoverSkills,
   renderSkillsSection,
   renderSubagentsSection,
+  renderMcpServersSection,
   type DiscoveredSubAgent,
   type DiscoveredSkill,
   type RuntimeContext,

@@ -313,3 +313,18 @@ export function renderSubagentsSection(subAgents: DiscoveredSubAgent[]): string 
 需要专门能力时，调用 \`task({ subagent_type, description })\` 把子任务委派给下列子智能体（subagent，各自独立 prompt/工具/工作目录），拿回结果后继续：
 ${lines.join("\n")}`;
 }
+
+/**
+ * Render the "Available MCP Servers" prompt section.
+ * MCP tools are hydrated natively into bindTools (server__tool prefix); no mcp_tool_bridge.
+ */
+export function renderMcpServersSection(serverNames: string[]): string {
+  if (!serverNames.length) return "";
+  const lines = serverNames.map((name) => `- ${name}`);
+  return `## Available MCP Servers
+
+本会话已连接的 MCP server（工具经 mcp-adapters 以 \`<server>__<tool>\` 前缀注入 bindTools）：
+${lines.join("\n")}
+
+用户询问「有哪些 MCP / 可用工具」时，直接根据上表回答，无需加载无关 skill 或全盘搜索文件。`;
+}

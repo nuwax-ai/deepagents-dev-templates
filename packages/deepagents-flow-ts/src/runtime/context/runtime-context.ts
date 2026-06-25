@@ -12,6 +12,7 @@
 
 import type { StructuredTool } from "@langchain/core/tools";
 import { MultiServerMCPClient } from "@langchain/mcp-adapters";
+import { spawn, type ChildProcess, type SpawnOptions } from "node:child_process";
 import { readFileSync, existsSync } from "node:fs";
 import { type AppConfig, type ACPSessionConfig } from "../config/config-loader.js";
 import { resolvePath } from "../config/config-paths.js";
@@ -275,6 +276,99 @@ function toConnections(
   return out;
 }
 
+/** probeFailedStdioServer 的结果（stdio 连接失败根因诊断）。 */
+interface StdioProbeResult {
+  exitCode: number | null;
+  signal: NodeJS.Signals | null;
+  timedOut: boolean;
+  stderrTail?: string;
+  /** spawn 本身抛错（如 command 解析失败）。 */
+  spawnError?: string;
+}
+
+/**
+ * stdio MCP server 连接失败时复现 spawn，捕获子进程 stderr 末尾 + 退出码 —— 暴露 SDK 默认
+ * stderr:'inherit'（@modelcontextprotocol/sdk client/stdio.js start() 中 stdio 第 3 项默认 inherit）
+ * 吞掉的真因：Windows 下 npx/node 启动失败、目标包 crash、env 缺失等。仅失败路径调用，成功 server 零开销。
+ *
+ * 诊断近似（刻意）：用 node 原生 spawn + shell:true + 完整 process.env，而非复刻正式连接的
+ * cross-spawn + SDK env 白名单 + server env。两点含义：
+ *  - shell:true 让 Windows cmd 解析 npx.cmd（正式连接走 cross-spawn shell:false，行为有差异，
+ *    但 npm/node/包层面的 stderr 真因通常一致）；
+ *  - 全 env 预检若成功、而正式连接（SDK 白名单受限 env）失败 → 坐实"env 受限"是根因；
+ *    全 env 预检也失败 → 是 command/包/网络本身问题，stderr 暴露真因。
+ */
+export async function probeFailedStdioServer(
+  conn: { command: string; args: string[]; env?: Record<string, string> },
+  timeoutMs = 4000
+): Promise<StdioProbeResult> {
+  return new Promise<StdioProbeResult>((resolve) => {
+    let child: ChildProcess;
+    try {
+      child = spawnShell(conn.command, conn.args, {
+        env: { ...process.env, ...(conn.env ?? {}) },
+        stdio: ["pipe", "pipe", "pipe"],
+        windowsHide: true,
+      });
+    } catch (e) {
+      resolve({
+        exitCode: null,
+        signal: null,
+        timedOut: false,
+        spawnError: e instanceof Error ? e.message : String(e),
+      });
+      return;
+    }
+    let stderrBuf = "";
+    let timedOut = false;
+    const MAX = 4096;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      try {
+        child.kill("SIGKILL");
+      } catch {
+        /* ignore */
+      }
+    }, timeoutMs);
+    child.on("error", (err) => {
+      clearTimeout(timer);
+      resolve({ exitCode: null, signal: null, timedOut: false, spawnError: err.message });
+    });
+    child.stderr?.on("data", (chunk: Buffer) => {
+      stderrBuf += chunk.toString("utf8");
+      if (stderrBuf.length > MAX) stderrBuf = stderrBuf.slice(-MAX);
+    });
+    child.on("close", (code, signal) => {
+      clearTimeout(timer);
+      resolve({
+        exitCode: code,
+        signal,
+        timedOut,
+        stderrTail: stderrBuf.trim() || undefined,
+      });
+    });
+  });
+}
+
+/**
+ * 经系统 shell 执行（与 spawn(cmd, args, { shell: true }) 等价，但显式 spawn shell
+ * 可执行文件并把命令作为单参传入，从而不触发 node DEP0190 "args with shell:true" 弃用警告——
+ * 该警告会污染诊断日志、淹没真正的 stderr 根因）。Windows: cmd.exe /d /s /c "<cmd>"；
+ * POSIX: /bin/sh -c "<cmd>"。命令拼接的注入面与 shell:true 同级（command/args 来自平台下发
+ * 的可信 MCP 配置，且预检本即执行它看结果，可接受）。
+ */
+function spawnShell(
+  command: string,
+  args: string[],
+  options: SpawnOptions
+): ChildProcess {
+  const full = [command, ...args].join(" ");
+  if (process.platform === "win32") {
+    return spawn(process.env.ComSpec ?? "cmd.exe", ["/d", "/s", "/c", full], options);
+  }
+  return spawn("/bin/sh", ["-c", full], options);
+}
+
 /**
  * 创建运行时上下文：合并 default + session MCP 配置（session-wins）。
  * native MCP 工具在 hydrateRuntimeContext（async）中加载。
@@ -347,10 +441,27 @@ export async function hydrateRuntimeContext(
     error: unknown;
   }) => {
     const reason = error instanceof Error ? error.message : String(error);
-    if (!failed.some((f) => f.server === serverName)) {
-      failed.push({ server: serverName, reason });
-    }
     log.warn("MCP server 连接失败，已跳过", { server: serverName, error: reason });
+    const firstFailure = !failed.some((f) => f.server === serverName);
+    if (!firstFailure) return;
+    failed.push({ server: serverName, reason });
+
+    // stdio 首次失败 → 预检 spawn 抓 stderr 真因（SDK stderr 默认 inherit，子进程报错被吞，
+    // 日志只剩空泛 "Connection closed"）。fire-and-forget，不阻塞 restart 重试与主流程。
+    const conn = connections[serverName];
+    if (conn && conn.transport === "stdio") {
+      void probeFailedStdioServer({
+        command: conn.command,
+        args: conn.args,
+        env: conn.env,
+      })
+        .then((probe) => {
+          log.warn("MCP stdio 预检（失败根因诊断）", { server: serverName, ...probe });
+        })
+        .catch(() => {
+          /* 预检本身失败不影响主流程 */
+        });
+    }
   };
 
   try {

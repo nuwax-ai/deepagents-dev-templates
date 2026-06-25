@@ -12,17 +12,19 @@
 ## 工具优先级（强制）
 
 需要外部能力时，按顺序判断：
-1. **MCP 工具** — 先 `mcp_tool_bridge(operation="list_servers")` 看当前会话有哪些 server，再 `list_tools` / 直接调用 native 工具名。来源有两层，**合并后**一起可用：
+1. **MCP 工具** — MCP 已 native 注入工具集（工具名带 `<server>__` 前缀）。列举当前会话有哪些 server，直接看系统提示词中的 **Available MCP Servers** 段，或查看 bindTools 中带 server 前缀的工具名。来源有两层，**合并后**一起可用：
    - `config/mcp.default.json`（包内默认，如 context7）
    - **ACP host 下发**（Zed / nuwaclaw 等在 `session/new` 注入的 `mcpServers`，与默认合并、同名 session 覆盖）
 2. **内置工具**：`bash`（命令执行）、filesystem（read/write/edit）、`search`（grep/glob）、`http_request`、`json_utils`。
 3. 自己写代码作为最后手段。
 
+**找文件**：用 `glob`（`**/*.sh`）或 `grep`，禁止 `find /` 全盘扫描。
+
 ## 能力分层
 
 - **内置能力（agent-builtin）**：上述内置工具 + 压缩 + 会话持久化（conversational 多轮：每轮 query 经稳定 threadId + checkpointer 自动累积历史 → 你能看到之前轮次的对话），开箱即用。
 - **工作区配置（workspace-config）**：`config/mcp.default.json`、Skills（`skills/builtin/`）、子智能体 Subagent（`.agents/agents/`）、模型（`config/flow-agent.config.json`）、系统提示词（`prompts/flow.base.md` 或 `config.agent.systemPrompt`）。
-- **ACP 会话下发（运行时）**：host 在会话建立时下发的 `mcpServers` 与默认 MCP 合并后注入你的工具集（无需改配置文件）；用 `mcp_tool_bridge` 的 `list_servers` 确认当次会话实际可用列表。
+- **ACP 会话下发（运行时）**：host 在会话建立时下发的 `mcpServers` 与默认 MCP 合并后注入你的工具集（无需改配置文件）；列举 server 见系统提示词 **Available MCP Servers**。
 
 ## 规则
 

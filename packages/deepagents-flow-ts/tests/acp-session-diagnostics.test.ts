@@ -8,6 +8,7 @@ import {
   mergeAcpSessionConfig,
   predictSystemPromptSource,
   summarizeAcpSessionParams,
+  summarizeMcpServerEntry,
   systemPromptParamSource,
 } from "../src/surfaces/acp/session-diagnostics.js";
 
@@ -104,5 +105,52 @@ describe("predictSystemPromptSource", () => {
         workspaceRoot: "/tmp",
       }).source
     ).toBe("config-inline");
+  });
+});
+
+describe("summarizeMcpServerEntry", () => {
+  it("stdio: command/args 原样，敏感 arg 值脱敏，env 只记键名", () => {
+    expect(
+      summarizeMcpServerEntry({
+        command: "npx",
+        args: ["-y", "@upstash/context7-mcp", "API_KEY=sk-secret"],
+        env: { CONTEXT7_KEY: "x", PATH: "/bin" },
+      })
+    ).toEqual({
+      command: "npx",
+      args: ["-y", "@upstash/context7-mcp", "API_KEY=***"],
+      envKeys: ["CONTEXT7_KEY", "PATH"],
+    });
+  });
+
+  it("url 敏感 query 参数脱敏，其余保留", () => {
+    expect(
+      summarizeMcpServerEntry({
+        url: "https://x.com/mcp?token=secret&keep=1",
+      })
+    ).toEqual({
+      url: "https://x.com/mcp?token=***&keep=1",
+    });
+  });
+
+  it("非敏感 url/arg/transport 原样保留", () => {
+    expect(
+      summarizeMcpServerEntry({
+        command: "node",
+        args: ["server.js", "--port=3000"],
+        url: "https://x.com/mcp",
+        transport: "stdio",
+      })
+    ).toEqual({
+      command: "node",
+      args: ["server.js", "--port=3000"],
+      url: "https://x.com/mcp",
+      transport: "stdio",
+    });
+  });
+
+  it("非对象输入 → kind 标记", () => {
+    expect(summarizeMcpServerEntry(undefined)).toEqual({ kind: "undefined" });
+    expect(summarizeMcpServerEntry("npx")).toEqual({ kind: "string" });
   });
 });

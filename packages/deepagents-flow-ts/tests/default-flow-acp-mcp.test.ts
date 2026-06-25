@@ -16,6 +16,7 @@ import { getFlowSandboxPolicy } from "../src/runtime/fs/sandbox.js";
 import { recipe } from "../src/app/default-flow.js";
 import type { FlowRuntime } from "../src/runtime/flow-runtime.js";
 import { createFileCheckpointer } from "../src/runtime/services/file-checkpoint-saver.js";
+import { renderMcpServersSection } from "../src/runtime/context/discovery.js";
 
 const ALIEN_WORKSPACE = "/tmp/deepagents-flow-ts-default-flow-acp-mcp";
 
@@ -70,5 +71,14 @@ describe("默认 flow：ACP session mcpServers → 工具集", () => {
     expect(graph).toBeDefined();
     // bridge 已移除：allTools 不应再含 mcp_tool_bridge
     expect(allTools.some((t) => t.name === "mcp_tool_bridge")).toBe(false);
+  });
+
+  it("renderMcpServersSection 列出合并后的 server 名", () => {
+    const section = renderMcpServersSection(["context7", "chrome-devtools", "ask-question"]);
+    expect(section).toContain("Available MCP Servers");
+    expect(section).toContain("context7");
+    expect(section).toContain("chrome-devtools");
+    expect(section).toContain("ask-question");
+    expect(renderMcpServersSection([])).toBe("");
   });
 });

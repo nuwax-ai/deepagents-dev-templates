@@ -27,6 +27,7 @@ import {
   discoverSubAgents,
   renderSkillsSection,
   renderSubagentsSection,
+  renderMcpServersSection,
   type AppConfig,
   type ACPSessionConfig,
 } from "./runtime/index.js";
@@ -70,9 +71,10 @@ export async function createFlowRuntime(
     subAgents,
   });
 
-  // 系统提示词追加「Available Skills」「Subagents」清单。
+  // 系统提示词追加「Available Skills」「Subagents」「MCP Servers」清单。
   const baseSystemPrompt = resolveSystemPrompt(appConfig, options.sessionConfig, workspaceRoot);
   const sections = [
+    renderMcpServersSection(Object.keys(ctx.mcpServerConfigs)),
     renderSkillsSection(skills, progressiveSkills),
     renderSubagentsSection(subAgents),
   ].filter(Boolean);

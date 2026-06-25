@@ -32,6 +32,59 @@ export type SystemPromptResolveSource =
 
 const log = logger.child("acp-session-diag");
 
+/** 敏感键名（key/token/secret/password/auth/bearer/credential，词边界匹配）。 */
+const SECRET_KEY_RE = /(?:^|[-_])(key|token|secret|password|passwd|auth|bearer|credential)(?:[-_]|$)/i;
+
+/** `key=value` / `--flag=value` 形态的 value 脱敏（仅敏感键名），其余原样。 */
+function maskSensitiveAssignee(s: string): string {
+  const eq = s.indexOf("=");
+  if (eq <= 0) return s;
+  return SECRET_KEY_RE.test(s.slice(0, eq)) ? `${s.slice(0, eq)}=***` : s;
+}
+
+/** URL query 中敏感参数的值脱敏；非 URL 原样返回。 */
+function maskUrlSecret(url: string): string {
+  try {
+    const u = new URL(url);
+    let masked = false;
+    for (const k of Array.from(u.searchParams.keys())) {
+      if (SECRET_KEY_RE.test(k)) {
+        u.searchParams.set(k, "***");
+        masked = true;
+      }
+    }
+    return masked ? u.toString() : url;
+  } catch {
+    return url;
+  }
+}
+
+/**
+ * 单个 MCP server 配置摘要（诊断用）：command/args/url/transport + env 键名列表。
+ * env 只记键名（值是密钥重灾区）；args/url 的敏感项脱敏。用于排查平台下发命令在
+ * Windows 下 spawn 失败时"实际下发了什么 command/args"（session-diagnostics 此前只记 names）。
+ */
+export function summarizeMcpServerEntry(raw: unknown): Record<string, unknown> {
+  if (!raw || typeof raw !== "object") return { kind: typeof raw };
+  const e = raw as Record<string, unknown>;
+  const command = typeof e.command === "string" ? e.command : undefined;
+  const url = typeof e.url === "string" ? e.url : undefined;
+  const args = Array.isArray(e.args)
+    ? e.args.filter((a): a is string => typeof a === "string")
+    : undefined;
+  const env =
+    e.env && typeof e.env === "object" && !Array.isArray(e.env)
+      ? (e.env as Record<string, unknown>)
+      : undefined;
+  return {
+    ...(command ? { command } : {}),
+    ...(args ? { args: args.map(maskSensitiveAssignee) } : {}),
+    ...(url ? { url: maskUrlSecret(url) } : {}),
+    ...(typeof e.transport === "string" ? { transport: e.transport } : {}),
+    ...(env ? { envKeys: Object.keys(env) } : {}),
+  };
+}
+
 export function summarizeSessionConfig(
   label: string,
   config: ACPSessionConfig | undefined
@@ -45,6 +98,16 @@ export function summarizeSessionConfig(
     cwd: config.cwd,
     model: config.model,
     mcpServerNames: config.mcpServers ? Object.keys(config.mcpServers) : [],
+    // 平台下发的 command/args 快照（env 值不记、敏感项脱敏）：排查 stdio spawn 失败时
+    // 实际下发了什么命令，不再只有 server 名单。
+    mcpServers: config.mcpServers
+      ? Object.fromEntries(
+          Object.entries(config.mcpServers).map(([name, cfg]) => [
+            name,
+            summarizeMcpServerEntry(cfg),
+          ])
+        )
+      : {},
     systemPromptChars: config.systemPrompt?.trim().length ?? 0,
     systemPromptPreview: previewText(config.systemPrompt),
   };
