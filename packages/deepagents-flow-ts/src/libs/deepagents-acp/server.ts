@@ -58,10 +58,12 @@ import {
   extractToolCalls,
   todosToPlanEntries,
   generateSessionId,
-  getToolCallKind,
-  formatToolCallTitle,
-  extractToolCallLocations,
 } from "./adapter.js";
+import {
+  toolInfoFromToolEvent,
+  toolUpdateFromToolResult,
+  buildPermissionToolCall,
+} from "./acp-tool-presentation.js";
 
 // Type definitions for ACP requests/responses (SDK uses generic types)
 type InitializeRequest = Record<string, unknown>;
@@ -1059,13 +1061,12 @@ export class DeepAgentsServer {
     try {
       const result = await conn.requestPermission({
         sessionId: session.id,
-        toolCall: {
-          toolCallId: toolCall.id,
-          title: formatToolCallTitle(toolCall.name, toolCall.args),
-          kind: getToolCallKind(toolCall.name),
-          status: "pending",
-          input: toolCall.args,
-        },
+        toolCall: buildPermissionToolCall(
+          toolCall.id,
+          toolCall.name,
+          toolCall.args,
+          this.workspaceRoot,
+        ),
         options: [
           {
             optionId: "allow-once",
@@ -1300,7 +1301,7 @@ export class DeepAgentsServer {
     conn: AgentSideConnection,
     toolCall: ToolCallInfo,
   ): Promise<void> {
-    const locations = extractToolCallLocations(
+    const info = toolInfoFromToolEvent(
       toolCall.name,
       toolCall.args,
       this.workspaceRoot,
@@ -1311,11 +1312,12 @@ export class DeepAgentsServer {
       update: {
         sessionUpdate: "tool_call",
         toolCallId: toolCall.id,
-        title: formatToolCallTitle(toolCall.name, toolCall.args),
-        kind: getToolCallKind(toolCall.name),
+        title: info.title,
+        kind: info.kind,
         status: toolCall.status,
-        ...(locations ? { locations } : {}),
-        input: toolCall.args,
+        rawInput: toolCall.args,
+        ...(info.locations?.length ? { locations: info.locations } : {}),
+        ...(info.content?.length ? { content: info.content } : {}),
       },
     } as SessionNotification);
   }
@@ -1334,23 +1336,27 @@ export class DeepAgentsServer {
       status: toolCall.status,
     };
 
-    if (toolCall.status === "completed" && toolCall.result) {
-      const resultText =
-        typeof toolCall.result === "string"
-          ? toolCall.result
-          : JSON.stringify(toolCall.result, null, 2);
+    if (toolCall.args && Object.keys(toolCall.args).length > 0) {
+      update.rawInput = toolCall.args;
+    }
 
-      update.content = [
-        {
-          type: "content",
-          content: {
-            type: "text",
-            text: resultText,
+    if (toolCall.status === "completed" && toolCall.result != null) {
+      const presentation = toolUpdateFromToolResult(
+        toolCall.name,
+        toolCall.result,
+        { workspaceRoot: this.workspaceRoot },
+      );
+      update.rawOutput = presentation.rawOutput;
+      if (presentation.content?.length) {
+        update.content = presentation.content;
+      } else if (presentation.displayText) {
+        update.content = [
+          {
+            type: "content",
+            content: { type: "text", text: presentation.displayText },
           },
-        },
-      ];
-
-      update.output = resultText;
+        ];
+      }
     }
 
     await conn.sessionUpdate({

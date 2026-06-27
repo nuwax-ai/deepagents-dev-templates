@@ -75,6 +75,19 @@ export {
   pathToFileUri,
 } from "./adapter.js";
 
+export {
+  markdownEscape,
+  preserveRawOutput,
+  toolInfoFromToolEvent,
+  toolUpdateFromToolResult,
+  buildPermissionToolCall,
+} from "./acp-tool-presentation.js";
+export type {
+  AcpToolCallContent,
+  ToolPresentationInfo,
+  ToolResultPresentation,
+} from "./acp-tool-presentation.js";
+
 // Logger utilities
 export { Logger, createLogger, nullLogger } from "./logger.js";
 export type { LogLevel, LoggerOptions } from "./logger.js";
