@@ -9,7 +9,7 @@
 ```ts
 import {
   createLlmNode, createLlmStreamNode, createToolExecNode,
-  createHumanApprovalNode, createApprovalFinalizeNode, createLlmRouterNode,
+  createHumanApprovalNode, createPermissionApprovalNode, createApprovalFinalizeNode, createLlmRouterNode,
   createPrepareNode, createFanout, createSubgraphNode, createMcpRetrievalNode,
   // 原语(bespoke 节点也可用)
   extractText, parseJson, emitStage, emitPlan, emitTextToken, runTool, isApproval, streamLLMText,
@@ -27,6 +27,7 @@ import {
 | 执行模型 `tool_calls`(ReAct 工具步) | `createToolExecNode` | 默认图 tools |
 | **主动 MCP 检索**(stdio,rateLimited+三态) | `createMcpRetrievalNode` | travel research / rag retrieve |
 | 人审门(前置):`interrupt` 暂停 → 通过/打回 | `createHumanApprovalNode` | review/approve/confirm/clarify |
+| 人审门(同步弹窗):同 turn `onApprovalRequest` | `createPermissionApprovalNode` | 确认发布? / 秒级 yes-no |
 | HITL 后置定稿:按 feedback 短路/LLM 修订 | `createApprovalFinalizeNode` | human-in-loop/travel/pm finalize |
 | input → 首条 HumanMessage | `createPrepareNode` | 默认图 prepare |
 | 并行扇出(Send map-reduce) | `createFanout` | travel/deep-research research |
@@ -145,6 +146,23 @@ const gate = createHumanApprovalNode<MyState>({
 - `write`(简单写回)或 `route`(Command 路由)二选一。
 - 例:[human-in-loop](../examples/human-in-loop/) review、[travel-planner](../examples/travel-planner/) confirm、[project-manager](../examples/project-manager/) approve、[deep-research](../examples/deep-research/) clarify/outlineGate。
 
+## createPermissionApprovalNode —— 同步弹窗审批
+
+```ts
+// 同 turn 弹窗征询确认（ACP request_permission）；不 interrupt、不结束 turn
+const confirmPublish = createPermissionApprovalNode<MyState>({
+  request: (s) => ({ title: "确认发布?", detail: s.draft }),
+  approved: (s) => new Command({ goto: "publish" }),
+  rejected: (s) => new Command({ goto: "revise" }),
+});
+// request 也可简写为字符串 → 作 title
+```
+
+- 经 `configurable.onApprovalRequest`（ACP surface 注入）同步调 `session/request_permission`。
+- 与 `createHumanApprovalNode` 互补:后者**跨 turn** `interrupt` 收用户消息;本 factory **同 turn 弹窗**点选项即决。
+- 未注入回调(CLI / 非 ACP) → 默认 `allow`(graceful)。
+- **工具级审批**(LLM 调副作用工具前弹窗)不走本节点——由 `createToolExecNode` + `permissions.interruptOn` 自动门控。
+
 ## createApprovalFinalizeNode —— HITL 后置定稿
 
 ```ts
@@ -218,6 +236,7 @@ parentGraph.addNode("research", researcher);   // 编译后的子图直接当节
 ## 路由(router)模式
 
 - **HITL 门禁路由**(人审 → 通过/打回):`createHumanApprovalNode({ route })`(返回 Command)。
+- **同步弹窗审批**(秒级 yes/no):`createPermissionApprovalNode`(`onApprovalRequest`)。
 - **规则条件边**(`toolsCondition`、`routeAfterEvaluate` 等):就是普通 `(state) => nodeName` 纯函数,`addConditionalEdges` 连,可单测。
 - **LLM 裁决路由**(反射/评估器),两种方式:
   - **节点内 Command goto**(推荐):`createLlmRouterNode`(上)——LLM 评审 → parse → 返回 Command goto。

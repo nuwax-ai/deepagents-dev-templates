@@ -16,7 +16,7 @@
 
 ---
 
-## ① FACTORY 节点(11 种 type)
+## ① FACTORY 节点(12 种 type)
 
 ### LLM 类
 
@@ -30,10 +30,12 @@
 
 | `type` | factory | 语义 | 何时用 |
 |---|---|---|---|
-| `approval` | `createHumanApprovalNode` | **前置**审批:`interrupt` 暂停 → 收 feedback(通过/打回) | review / approve / confirm / clarify(把结果抛给人) |
+| `approval` | `createHumanApprovalNode` | **前置**审批:`interrupt` 暂停 → 收 feedback(通过/打回) | review / approve / confirm / clarify(把结果抛给人,**跨 turn**) |
+| `permission-approval` 🆕 | `createPermissionApprovalNode` | **同步弹窗**审批:同 turn 调 `onApprovalRequest` → allow/reject | 秒级 yes/no(确认发布?);不 interrupt、不结束 turn |
 | `approval-finalize` 🆕 | `createApprovalFinalizeNode` | **后置**定稿:按已收 feedback 短路(通过→确定性输出)/ 修订(否则 LLM 改) | HITL 流的最后一公里(finalize 节点) |
 
-> `approval`(前置收 feedback)与 `approval-finalize`(后置按 feedback 定稿)**互补**,常配对:approval → … → finalize。
+> `approval`(前置 interrupt 收 feedback)与 `approval-finalize`(后置按 feedback 定稿)**互补**,常配对:approval → … → finalize。
+> **工具级审批**(副作用工具执行前弹窗)不由 factory 节点触发——`createToolExecNode` + `permissions.interruptOn` 自动门控(见 `config/flow-agent.config.json`)。
 
 ### 工具/检索类
 
@@ -92,10 +94,12 @@
 ## 选型决策树(4 问)
 
 ```
-Q1 节点要暂停等人吗?(interrupt)
-  是 → HITL 类
-       ├ 暂停在前(把结果抛给人审)        → approval (createHumanApprovalNode)
-       └ 这是定稿(按已收 feedback 决定输出) → approval-finalize (createApprovalFinalizeNode) 🆕
+Q1 节点要等人审批吗?
+  是 → Q1a 同 turn 弹窗(秒级 yes/no)?
+        是 → permission-approval (createPermissionApprovalNode) 🆕
+        否 → Q1b 定稿(按已收 feedback 决定输出)?
+              是 → approval-finalize (createApprovalFinalizeNode) 🆕
+              否 → approval (createHumanApprovalNode, interrupt 跨 turn)
   否 → Q2
 
 Q2 节点要调 LLM 吗?
@@ -129,7 +133,7 @@ Q4 结构类?
 llm | llm-router | approval | approval-finalize | mcp-retrieval | prepare | passthrough
 ```
 
-**factory 类型但暂未进 custom DSL**(手写图直接用 factory;custom 里生成后手改):`llm-stream`(createLlmStreamNode)、`tool-exec`(createToolExecNode,需 tools)、`subgraph`(createSubgraphNode)。
+**factory 类型但暂未进 custom DSL**(手写图直接用 factory;custom 里生成后手改):`llm-stream`(createLlmStreamNode)、`tool-exec`(createToolExecNode,需 tools)、`permission-approval`(createPermissionApprovalNode)、`subgraph`(createSubgraphNode)。
 注:`fanout` 在 DSL 里是 **edge kind**(`{kind:"fanout"}`),非 node.type。
 
 ---
