@@ -4,7 +4,8 @@
 
 ## 入口
 
-**[development/acp/README.md](./acp/README.md)** — 索引、快速入口、当前状态摘要
+- **[development/README.md](./README.md)** — 开发文档总索引
+- **[development/acp/README.md](./acp/README.md)** — ACP 子索引、快速入口、当前状态摘要
 
 ---
 
