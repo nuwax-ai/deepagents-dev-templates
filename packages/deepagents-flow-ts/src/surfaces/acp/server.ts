@@ -50,10 +50,58 @@ import type {
   ToolCallEvent,
   StageEvent,
   PlanEvent,
+  FlowCallbacks,
+  PermissionDecision,
 } from "../../core/flow-types.js";
 import { emitToolCall, type AcpToolConnection } from "./emit-tool-call.js";
+import { randomUUID } from "node:crypto";
+import { buildPermissionToolCall } from "../../libs/deepagents-acp/index.js";
+import type { PermissionOption, ToolCallUpdate } from "@agentclientprotocol/sdk";
 
 const log = logger.child("flow-acp");
+
+/** 工具审批选项（对齐 Legacy deepagents-acp/server.ts requestToolPermission 的 4 选项）。 */
+const PERMISSION_OPTIONS: PermissionOption[] = [
+  { optionId: "allow-once", name: "Allow once", kind: "allow_once" },
+  { optionId: "allow-always", name: "Always allow", kind: "allow_always" },
+  { optionId: "reject-once", name: "Reject", kind: "reject_once" },
+  { optionId: "reject-always", name: "Always reject", kind: "reject_always" },
+];
+
+/** signal 中止哨兵：审批 await 期间 client cancel → 返回它而非 reject（见 raceWithAbort）。 */
+const ABORTED = Symbol("permission-aborted");
+
+/** buildAcpCallbacks 的审批配置（AppConfig.permissions 子集）。 */
+interface PermissionGateConfig {
+  mode: string;
+  interruptOn: string[];
+}
+
+/**
+ * 跑 fn，但若 signal 已/将 abort 则提前以 ABORTED resolve（放弃等待 client 应答；
+ * 底层 RPC 不主动取消，整图取消由 graph.stream({signal}) 收尾）。
+ */
+async function raceWithAbort<T>(
+  fn: () => Promise<T>,
+  signal?: AbortSignal,
+): Promise<T | typeof ABORTED> {
+  if (!signal) return fn();
+  if (signal.aborted) return ABORTED;
+  return new Promise<T | typeof ABORTED>((resolve, reject) => {
+    const onAbort = () => resolve(ABORTED);
+    signal.addEventListener("abort", onAbort, { once: true });
+    fn().then(
+      (v) => {
+        signal.removeEventListener("abort", onAbort);
+        resolve(v);
+      },
+      (e) => {
+        signal.removeEventListener("abort", onAbort);
+        reject(e);
+      },
+    );
+  });
+}
 
 /** ACP 连接的最小接口：向客户端推 sessionUpdate。 */
 type AcpConnection = AcpToolConnection;
@@ -70,6 +118,103 @@ function createAcpStreamStats(): AcpStreamStats {
 }
 
 /**
+ * 调 ACP `session/request_permission` 弹窗并归一结果（A 工具审批 / B 流程审批共用）。
+ * 含 signal race（中止→cancelled）、outcome 解析、graceful 降级（client 不支持 / RPC 抛错→放行）。
+ * **不在 agent 侧缓存 always**：规则记忆 / strict 校验 / 审计由 client 审批中枢（如 NuwaClaw
+ * `permissionCoordinator`）统一管——agent 每次发请求，对齐 claude-code-acp。
+ */
+async function callAcpPermission(
+  conn: AcpConnection,
+  sessionId: string,
+  toolCall: ToolCallUpdate,
+  signal?: AbortSignal,
+): Promise<PermissionDecision> {
+  if (typeof conn.requestPermission !== "function") return "allow";
+  try {
+    const result = await raceWithAbort(
+      () => conn.requestPermission!({ sessionId, toolCall, options: PERMISSION_OPTIONS }),
+      signal,
+    );
+    if (result === ABORTED) return "cancelled";
+    const outcome = result?.outcome;
+    if (!outcome || outcome.outcome === "cancelled") return "cancelled";
+    // allow_once/allow_always → allow；reject_once/reject_always → reject（always 的"记忆"由 client 管）。
+    return outcome.optionId === "reject-once" || outcome.optionId === "reject-always"
+      ? "reject"
+      : "allow";
+  } catch (err) {
+    // graceful：client 不实现 / RPC 出错 → 放行，避免卡死不支持审批的工作流。
+    log.warn("requestPermission failed; allowing (degraded)", {
+      sessionId,
+      error: String(err),
+    });
+    return "allow";
+  }
+}
+
+/**
+ * 工具审批 handler（ACP）—— 注入 FlowCallbacks.onPermissionRequest。
+ * 判定顺序对齐 Claude SDK canUseTool：mode=yolo / client 不支持 / 非 interruptOn → 放行；
+ * 否则**每次**经 conn.requestPermission 弹窗（always 记忆 / 规则交 client 审批中枢，agent 不缓存）。
+ * signal 中止 → "cancelled"；RPC 抛错 → graceful 放行。export 供单测。
+ */
+export function createAcpPermissionHandler(
+  conn: AcpConnection,
+  sessionId: string,
+  permissions: PermissionGateConfig,
+  workspaceRoot: string,
+  signal?: AbortSignal,
+): NonNullable<FlowCallbacks["onPermissionRequest"]> {
+  return async (e) => {
+    const connSupported = typeof conn.requestPermission === "function";
+    const inList = permissions.interruptOn.includes(e.toolName);
+    if (permissions.mode === "yolo") {
+      log.info("permission 门控放行", { sessionId, toolName: e.toolName, reason: "mode=yolo" });
+      return "allow";
+    }
+    if (!connSupported) {
+      log.info("permission 门控放行", { sessionId, toolName: e.toolName, reason: "conn.requestPermission 未实现（graceful 降级）" });
+      return "allow";
+    }
+    if (!inList) {
+      log.info("permission 门控放行", { sessionId, toolName: e.toolName, reason: `不在 interruptOn [${permissions.interruptOn.join(",")}]` });
+      return "allow";
+    }
+    log.info("permission 门控 → 发 request_permission", { sessionId, toolName: e.toolName, mode: permissions.mode });
+    return callAcpPermission(
+      conn,
+      sessionId,
+      buildPermissionToolCall(e.toolCallId, e.toolName, e.args, workspaceRoot),
+      signal,
+    );
+  };
+}
+
+/**
+ * 流程级审批 handler（ACP）—— 注入 FlowCallbacks.onApprovalRequest（createPermissionApprovalNode 用）。
+ * 与工具审批（A）共用同步弹窗通道，但**无 interruptOn 名单 / 缓存**：图节点显式放的关卡总是弹
+ * （除 mode=yolo）。title 经 buildPermissionToolCall 包成 toolCall 供 client 弹窗展示。
+ */
+export function createAcpApprovalHandler(
+  conn: AcpConnection,
+  sessionId: string,
+  permissions: PermissionGateConfig,
+  workspaceRoot: string,
+  signal?: AbortSignal,
+): NonNullable<FlowCallbacks["onApprovalRequest"]> {
+  return async (e) => {
+    if (permissions.mode === "yolo") return "allow";
+    const toolCall = buildPermissionToolCall(
+      randomUUID(),
+      e.title,
+      e.detail ? { detail: e.detail } : {},
+      workspaceRoot,
+    );
+    return callAcpPermission(conn, sessionId, toolCall, signal);
+  };
+}
+
+/**
  * 组装 ACP onPrompt 的 callbacks：流式推送 + tool trace。
  * 所有调试日志在此层注入，flow 图本身无感知。
  */
@@ -81,6 +226,7 @@ function buildAcpCallbacks(
   emittedToolCallIds: Set<string>,
   completedToolCallIds: Set<string>,
   workspaceRoot: string,
+  permissions: PermissionGateConfig,
   signal?: AbortSignal
 ): ReturnType<typeof traceFlowCallbacks> {
   return traceFlowCallbacks(
@@ -110,6 +256,20 @@ function buildAcpCallbacks(
       },
       onStage: (e) => streamText(conn, sessionId, formatStage(e), "thought"),
       onPlan: (e) => emitPlan(conn, sessionId, e),
+      onPermissionRequest: createAcpPermissionHandler(
+        conn,
+        sessionId,
+        permissions,
+        workspaceRoot,
+        signal,
+      ),
+      onApprovalRequest: createAcpApprovalHandler(
+        conn,
+        sessionId,
+        permissions,
+        workspaceRoot,
+        signal,
+      ),
       ...(signal ? { signal } : {}),
     },
     { sessionId, threadId: sessionId }
@@ -369,6 +529,12 @@ export function createFlowHooks(options: FlowAcpOptions): DeepAgentsServerHooks 
             emittedToolCallIds,
             completedToolCallIds,
             workspaceRoot,
+            {
+              // 防御：手构 appConfig（测试 / 非 loadConfig 路径）可能无 permissions；
+              // 缺失 → 空名单 = 不审批（放行），不破坏未配审批的调用方。
+              mode: options.appConfig.permissions?.mode ?? "ask",
+              interruptOn: options.appConfig.permissions?.interruptOn ?? [],
+            },
             ctx.signal
           );
 

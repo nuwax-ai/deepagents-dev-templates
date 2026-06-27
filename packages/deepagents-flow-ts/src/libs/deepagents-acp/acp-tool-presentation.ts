@@ -7,6 +7,7 @@
  * 维护文档：docs/packages/deepagents-flow-ts/development/acp/roadmap-progress.md
  */
 
+import type { ToolCallUpdate } from "@agentclientprotocol/sdk";
 import {
   extractToolCallLocations,
   formatToolCallTitle,
@@ -177,7 +178,7 @@ export function buildPermissionToolCall(
   toolName: string,
   args: Record<string, unknown>,
   workspaceRoot?: string
-): Record<string, unknown> {
+): ToolCallUpdate {
   const info = toolInfoFromToolEvent(toolName, args, workspaceRoot);
   return {
     toolCallId,

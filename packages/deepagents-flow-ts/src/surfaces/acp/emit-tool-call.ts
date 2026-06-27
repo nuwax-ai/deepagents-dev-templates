@@ -10,6 +10,10 @@
  * completed 也必须带 title（见 ~/.nuwaclaw/logs 中 in_progress 被 delay 后仅 completed 到达 Backend）。
  */
 
+import type {
+  RequestPermissionRequest,
+  RequestPermissionResponse,
+} from "@agentclientprotocol/sdk";
 import {
   toolInfoFromToolEvent,
   toolUpdateFromToolResult,
@@ -26,6 +30,14 @@ export interface AcpToolConnection {
     sessionId: string;
     update: Record<string, unknown>;
   }): Promise<void>;
+  /**
+   * 工具审批 RPC（ACP `session/request_permission`）。**可选** —— client 不实现时为
+   * undefined，审批层降级放行（见 surfaces/acp/server.ts buildAcpCallbacks）。
+   * 返回 outcome：`{outcome:"selected", optionId}` 选中某项 / `{outcome:"cancelled"}` 取消。
+   */
+  requestPermission?(
+    params: RequestPermissionRequest,
+  ): Promise<RequestPermissionResponse>;
 }
 
 /** emitToolCall 可选参数。 */

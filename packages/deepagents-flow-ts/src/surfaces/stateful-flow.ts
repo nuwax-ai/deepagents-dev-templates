@@ -172,6 +172,8 @@ export function createStatefulFlow<S = Record<string, unknown>>(
       onStage: callbacks?.onStage,
       onPlan: callbacks?.onPlan,
       onToken: callbacks?.onToken,
+      onPermissionRequest: callbacks?.onPermissionRequest,
+      onApprovalRequest: callbacks?.onApprovalRequest,
     },
     recursionLimit,
   });
