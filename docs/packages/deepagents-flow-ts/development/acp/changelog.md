@@ -13,3 +13,8 @@
 | 2026-06-27 | **C-dedupe**：`emittedToolCallIds`；二次 in_progress → `tool_call_update` |
 | 2026-06-27 | **ask-question dockpanel**：completed 优先 `structuredContent.input`；`createToolExecNode` 保留 MCP structuredContent |
 | 2026-06-27 | 文档：MCP 标准栈补充 LangGraph + mcp-adapters + typescript-sdk 三层 |
+| 2026-06-22 | 会话配置迁移到 surfaces：`session-config.ts` 解析 `_meta.systemPrompt.append`（nuwaclaw）+ env 管线（1d5b791b） |
+| 2026-06-25 | `session-diagnostics.ts`：MCP server command/args 快照 + 敏感项脱敏；systemPrompt 来源诊断（5dc39c80 / 6bdfbb31） |
+| 2026-06-27 | `emit-tool-call.ts`：terminal `tool_call_update` 携带 `title`/`kind`（Backend 用 title 合成 ASK_QUESTION；NuwaClaw 可能只转发 completed） |
+| 2026-06-27 | **双轨去重双端**：`emittedToolCallIds`（二次 in_progress→`tool_call_update`）+ `completedToolCallIds`（二次 terminal→跳过，防无 rawInput 的 completed 覆盖首包 ask-question.ui）（bf7476a6） |
+| 2026-06-27 | 文档同步：补 terminal title/kind、双轨去重、会话配置解析管线、per-session runtime；修正 `session/load` + `getSessionHistory` 过声称；源码索引/测试表补 session-config/diagnostics 等 4 测试 |

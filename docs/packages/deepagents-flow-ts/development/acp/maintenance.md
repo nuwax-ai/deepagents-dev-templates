@@ -8,9 +8,11 @@
 
 - [ ] `tool_call` 是否包含 **`rawInput`**（不只 `input`）
 - [ ] `tool_call_update` completed 是否 **`rawInput` 回填** + **`rawOutput`** / `content`
+- [ ] terminal `tool_call_update` 是否带 **`title`/`kind`**（Backend 用 title 合成 ASK_QUESTION；NuwaClaw 可能只转发 completed）
+- [ ] 双轨去重：`emittedToolCallIds`（二次 in_progress→update）/ `completedToolCallIds`（二次 terminal→跳过）是否就位
 - [ ] `content` 是否为 `ToolCallContent` 嵌套（`type:"content"` + 内层 `ContentBlock`）
 - [ ] MCP 结果是否经 `normalizeToolResult`（无双重 JSON 字符串）
-- [ ] 跑 `pnpm test` 中 `tests/acp-emit-tool-call.test.ts`、`tests/acp-cancel-and-resume.test.ts`
+- [ ] 跑 `pnpm test` 中 `tests/acp-emit-tool-call.test.ts`、`tests/acp-cancel-and-resume.test.ts`、`tests/acp-session-config.test.ts`
 - [ ] 更新 [field-mapping.md](./field-mapping.md) 与 [roadmap-progress.md](./roadmap-progress.md)（若行为变更）
 
 ---
@@ -40,7 +42,8 @@
 | ACP server 入口、hooks、流式文本/plan | `packages/deepagents-flow-ts/src/surfaces/acp/server.ts` |
 | 工具展示层（Flow + Legacy 共用） | `packages/deepagents-flow-ts/src/libs/deepagents-acp/acp-tool-presentation.ts` |
 | ToolCall → session/update（Flow 出站） | `packages/deepagents-flow-ts/src/surfaces/acp/emit-tool-call.ts` |
-| Session cwd / mcpServers / model 解析 | `packages/deepagents-flow-ts/src/surfaces/acp/session-config.ts` |
+| Session 配置解析（cwd/mcpServers/model/systemPrompt 合并） | `packages/deepagents-flow-ts/src/surfaces/acp/session-config.ts` |
+| Session 诊断日志（systemPrompt 来源、MCP command/args 快照、脱敏） | `packages/deepagents-flow-ts/src/surfaces/acp/session-diagnostics.ts` |
 | LangGraph stream → 内部事件 | `packages/deepagents-flow-ts/src/surfaces/map-stream-chunk.ts` |
 | 内部事件 → FlowCallbacks | `packages/deepagents-flow-ts/src/surfaces/dispatch-surface-event.ts` |
 | 有状态 run-loop + streamMode | `packages/deepagents-flow-ts/src/surfaces/stateful-flow.ts` |
@@ -53,9 +56,13 @@
 
 | 文件 | 覆盖 |
 | --- | --- |
-| `tests/acp-emit-tool-call.test.ts` | rawInput、rawOutput、structuredContent |
+| `tests/acp-emit-tool-call.test.ts` | rawInput、rawOutput、structuredContent、双轨去重 |
 | `tests/acp-tool-presentation.test.ts` | locations、diff、rawOutput、permission |
-| `tests/acp-cancel-and-resume.test.ts` | cancel 时 tool_call_update |
+| `tests/acp-cancel-and-resume.test.ts` | cancel 时 tool_call_update + `failInflightToolsOnCancel` |
+| `tests/acp-session-config.test.ts` | session/new params → ACPSessionConfig、systemPrompt 管线 |
+| `tests/acp-session-diagnostics.test.ts` | MCP server 摘要脱敏、systemPrompt 来源诊断 |
+| `tests/acp-session-merge.test.ts` | env ⊕ params 合并优先级 |
+| `tests/acp-load-session-hydrate.test.ts` | session/load 重建 SessionState + configureSession(phase:load) |
 | `tests/map-stream-chunk.test.ts` | on_tool_end 解析 |
 | `tests/node-kit.test.ts` | createToolExecNode + configurable.onToolCall |
 | `tests/default-flow-acp-mcp.test.ts` | MCP 合并进 runtime |

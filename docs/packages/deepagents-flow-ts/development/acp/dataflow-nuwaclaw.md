@@ -73,6 +73,30 @@ sequenceDiagram
 
 ---
 
+## 会话配置：session/new|load → per-session runtime
+
+`session/new` / `session/load` 经 `configureSession` 钩子把 ACP 下发的 `cwd` / `mcpServers` / `model` / `systemPrompt` 装配成**每会话独立** runtime（ACP 最高优先级），`onSessionClosed` 释放（MCP stdio 子进程）。两层协作：
+
+| 职责 | 文件 | 说明 |
+| --- | --- | --- |
+| 解析 + 合并 | [`surfaces/acp/session-config.ts`](../../../../../packages/deepagents-flow-ts/src/surfaces/acp/session-config.ts) | `resolveAcpSessionConfig` = `loadSessionConfigFromEnv` ⊕ `sessionConfigFromParams`（params 优先）→ `ACPSessionConfig` |
+| 诊断日志 | [`surfaces/acp/session-diagnostics.ts`](../../../../../packages/deepagents-flow-ts/src/surfaces/acp/session-diagnostics.ts) | `logStartupAcpEnvDiagnostics` / `logConfigureSessionDiagnostics`：记 systemPrompt 来源、MCP server command/args 快照（env 值不记、敏感项脱敏） |
+| 装配 / 释放 | [`surfaces/acp/server.ts`](../../../../../packages/deepagents-flow-ts/src/surfaces/acp/server.ts) `createFlowHooks` | `configureSession`→`createExecutor` 建 per-session runtime；`onSessionClosed`→`dispose` |
+
+**systemPrompt 解析管线**（`coalesceSystemPromptValue` 归一为纯文本，按优先级）：
+
+1. params 顶层 `systemPrompt` / `system_prompt`
+2. `params.configOptions.systemPrompt`
+3. `params._meta.systemPrompt` / `_meta.system_prompt` —— **nuwaclaw** 走 `_meta.systemPrompt = { append: "..." }`（`extractFromMeta` 递归 `_meta.sessionConfig` / `_meta.agentConfig` / `_meta.claudeCode.options`）
+4. env `ACP_SESSION_CONFIG_JSON`（JSON）
+5. env `SYSTEM_PROMPT` / `AGENT_SYSTEM_PROMPT` / `PLATFORM_SYSTEM_PROMPT`
+
+> `mcpServers` 数组形态 `[{name,...}]` 经 `acpMcpToRecord` → Record；server 键名经 `sanitizeMcpServerRecord` 规范化（中文等 → `_`），与 runtime-context 合并一致。
+
+**session/load**：重建 `SessionState` + 触发 `configureSession(phase:"load")`（[acp-load-session-hydrate.test.ts](../../../../../packages/deepagents-flow-ts/tests/acp-load-session-hydrate.test.ts) 覆盖）。注意 Flow surface **尚未实现** `getSessionHistory` 消息回放（见 [reference-implementation.md §Agent 方法](./reference-implementation.md#agent-方法session-生命周期)）。
+
+---
+
 ## 工具结果来源（双轨，注意去重）
 
 | 来源 | 文件 | 说明 |
@@ -80,7 +104,7 @@ sequenceDiagram
 | 节点直出 | `libs/nodes/tools.ts` → `configurable.onToolCall` | 推荐；args 完整 |
 | Stream | `map-stream-chunk.ts` → `dispatch-surface-event.ts` | `on_tool_end` 解析；`output===undefined` 的 completed **跳过** |
 
-`buildAcpCallbacks` 用 `inflightTools: Map<toolCallId, ToolCallEvent>` 在 completed 时回填 `rawInput`。
+`buildAcpCallbacks` 用 `inflightTools: Map<toolCallId, ToolCallEvent>` 在 completed 时回填 `rawInput`，并持两个去重集（`emittedToolCallIds` / `completedToolCallIds`）拦双轨重复出站，详见 [field-mapping.md §双轨去重](./field-mapping.md#双轨去重emit-tool-callts)。
 
 ---
 

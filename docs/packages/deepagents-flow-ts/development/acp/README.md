@@ -14,8 +14,6 @@
 | 查官方 schema 版本、SDK 基线 | [spec-and-version.md](./spec-and-version.md) |
 | 理解 Flow vs Legacy 双路径 | [architecture.md](./architecture.md) |
 | 查 `tool_call` / `tool_call_update` 字段怎么发 | [field-mapping.md](./field-mapping.md) |
-| 我要… | 文档 |
-| --- | --- |
 | 查 MCP + LangGraph + ACP 全栈数据流 | [dataflow-nuwaclaw.md](./dataflow-nuwaclaw.md) §MCP 标准栈 |
 | 改代码前核对清单、源码索引 | [maintenance.md](./maintenance.md) |
 | **跟进追赶方案与阶段进度** | [roadmap-progress.md](./roadmap-progress.md) |
@@ -49,11 +47,14 @@ development/acp/
 | 维度 | 状态 |
 | --- | --- |
 | Flow 主路径 `rawInput` / `rawOutput` | ✅ |
+| terminal `tool_call_update` 带 `title`/`kind` | ✅ |
 | `locations` / `diff` / 工具展示层 | ✅ `acp-tool-presentation.ts` |
 | 去掉 `input`/`output` + Legacy 统一 | ✅ 2026-06-27 |
 | 权限 `requestPermission` rawInput | ✅ 2026-06-27 |
 | 流式 `rawInput` 精炼 | ⏸️ 不需要；见 [phase-c-streaming-research.md](./phase-c-streaming-research.md) |
-| 重复 `tool_call` 去重 | ✅ C-dedupe |
+| 双轨去重（in_progress + terminal） | ✅ C-dedupe `emittedToolCallIds` / `completedToolCallIds` |
+| per-session runtime + 会话配置解析 | ✅ `createExecutor` + `session-config.ts` / `session-diagnostics.ts` |
+| `session/load` 消息回放（`getSessionHistory`） | ❌ Flow surface 未实现 |
 | `usage_update` / 模式面 | ⏸️ 暂缓（非当前范围） |
 
 详情见 [roadmap-progress.md](./roadmap-progress.md)。

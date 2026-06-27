@@ -70,7 +70,7 @@ sequenceDiagram
 | --- | --- |
 | LangGraph 是否对同一 `toolCallId` **流式**多次 `on_tool_start` 且 args 递增？ | **否**（当前版本 + 当前图） |
 | 是否需要对齐 `alreadyCached` 做 **rawInput 精炼**？ | **暂不需要** |
-| 是否有重复出站？ | ~~**可能**~~ **已修复**：C-dedupe 二次改 `tool_call_update` |
+| 是否有重复出站？ | ~~**可能**~~ **已修复**：C-dedupe 双端 —— `emittedToolCallIds`（二次 in_progress→`tool_call_update`）+ `completedToolCallIds`（二次 terminal→跳过，防无 `rawInput` 的 completed 覆盖首包）；详见 [field-mapping.md §双轨去重](./field-mapping.md#双轨去重emit-tool-callts) |
 
 ### 建议优先级
 
@@ -83,5 +83,5 @@ sequenceDiagram
 | ID | 任务 | 状态 |
 | --- | --- | --- |
 | C-1 | 调研 LangGraph 重复 `on_tool_start` | ✅ 2026-06-27 |
-| C-2 | `emittedToolCallIds` + 二次 `tool_call_update` | ✅ 见 `emit-tool-call.ts` / `server.ts` |
+| C-2 | `emittedToolCallIds`（in_progress）+ `completedToolCallIds`（terminal）双端去重 | ✅ 见 `emit-tool-call.ts` |
 | C-3 | 流式 args `tool_call_update` 精炼 | ❌ 搁置（think 非流式） |
