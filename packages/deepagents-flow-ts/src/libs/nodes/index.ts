@@ -19,8 +19,10 @@ export { emitStage, emitPlan, emitTextToken, STREAM_TEXT_NODES } from "./emit.js
 export { createPrepareNode, type PrepareNodeOptions } from "./prepare.js";
 export {
   createHumanApprovalNode,
+  createPermissionApprovalNode,
   isApproval,
   type HumanApprovalNodeOptions,
+  type PermissionApprovalNodeOptions,
 } from "./hitl.js";
 export {
   createApprovalFinalizeNode,
