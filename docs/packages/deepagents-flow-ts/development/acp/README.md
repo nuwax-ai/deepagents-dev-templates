@@ -13,6 +13,8 @@
 | --- | --- |
 | 查官方 schema 版本、SDK 基线 | [spec-and-version.md](./spec-and-version.md) |
 | 理解 Flow vs Legacy 双路径 | [architecture.md](./architecture.md) |
+| 理清工具审批 vs 审批节点（HITL 总览） | [human-in-the-loop.md](./human-in-the-loop.md) |
+| 接 ACP 工具审批（`request_permission` 实现细节） | [permission.md](./permission.md) |
 | 查 `tool_call` / `tool_call_update` 字段怎么发 | [field-mapping.md](./field-mapping.md) |
 | 查 MCP + LangGraph + ACP 全栈数据流 | [dataflow-nuwaclaw.md](./dataflow-nuwaclaw.md) §MCP 标准栈 |
 | 改代码前核对清单、源码索引 | [maintenance.md](./maintenance.md) |
@@ -37,6 +39,8 @@ development/acp/
 ├── maintenance.md               ← §6 核对清单 + §7 源码索引
 ├── roadmap-progress.md          ← §8 追赶路线图与进度（持续更新）
 ├── reference-implementation.md  ← §11 claude-code-acp-ts 对照
+├── human-in-the-loop.md         ← HITL 总览：工具审批(A) vs 审批节点(B)
+├── permission.md                ← A 工具审批实现（request_permission）
 └── changelog.md                 ← 变更记录
 ```
 
@@ -51,6 +55,8 @@ development/acp/
 | `locations` / `diff` / 工具展示层 | ✅ `acp-tool-presentation.ts` |
 | 去掉 `input`/`output` + Legacy 统一 | ✅ 2026-06-27 |
 | 权限 `requestPermission` rawInput | ✅ 2026-06-27 |
+| 工具审批门控 A（`onPermissionRequest` / `permissions`） | ✅ 2026-06-27 见 [permission.md](./permission.md) |
+| HITL 审批节点 B（对话式 interrupt + 弹窗式范式2 同步门控） | ✅ 2026-06-27 见 [human-in-the-loop.md](./human-in-the-loop.md) |
 | 流式 `rawInput` 精炼 | ⏸️ 不需要；见 [phase-c-streaming-research.md](./phase-c-streaming-research.md) |
 | 双轨去重（in_progress + terminal） | ✅ C-dedupe `emittedToolCallIds` / `completedToolCallIds` |
 | per-session runtime + 会话配置解析 | ✅ `createExecutor` + `session-config.ts` / `session-diagnostics.ts` |
@@ -65,6 +71,9 @@ development/acp/
 
 | 文档 | 位置 |
 | --- | --- |
+| **开发文档总索引** | [../README.md](../README.md) |
+| ReAct 两阶段分工（think / tools） | [../react-two-phase.md](../react-two-phase.md) |
+| MCP / Skill / Subagent 生命周期 | [../runtime-capabilities-lifecycle.md](../runtime-capabilities-lifecycle.md) |
 | Zed 调试（使用者） | [packages/deepagents-flow-ts/docs/zed-debug.md](../../../../../packages/deepagents-flow-ts/docs/zed-debug.md) |
 | LangGraph surface 收敛 | [../langgraph-native-convergence.md](../langgraph-native-convergence.md) |
 | app-ts ACP 测试方案 | [../../deepagents-app-ts/development/acp-test-plan.md](../../deepagents-app-ts/development/acp-test-plan.md) |
