@@ -46,12 +46,13 @@ pnpm graph                   # 导出拓扑
 - `runtime:flow-graph` — 图调度、边路由
 - `runtime:<flow名>` — flow 生命周期
 - `error` / `warn` / `interrupt` / `onPrompt`
+- `permission 门控` / `requestPermission` — 工具审批放行/弹窗/降级（`flow-acp` 子 logger）
 
 ---
 
 ## 读日志六步（编排 / ACP / HITL）
 
-图跑不通、节点未执行、条件边走错、HITL 不 resume、ACP 无响应时：
+图跑不通、节点未执行、条件边走错、HITL 不 resume、工具 `Permission denied` / 客户端卡转圈、ACP 无响应时：
 
 1. **确认** — env 含 `LOG_DIR`、`LOG_LEVEL`（HITL 用 `debug`）
 2. **复现** — Zed / `pnpm smoke:*` / CLI

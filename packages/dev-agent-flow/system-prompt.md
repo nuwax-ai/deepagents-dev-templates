@@ -317,6 +317,7 @@ query-docs(libraryId: "/langchain-ai/langgraphjs", query: "StateGraph interrupt 
 - **MCP 合并**：`config/mcp.default.json` < ACP session（`session-wins`）；不经运行时 platform client 拉取
 - **凭证差异**：默认图有 fallback（无凭证回显输入）；示例真调 LLM（无凭证直接报错）
 - **跨轮续跑在图内** — 用 LangGraph checkpointer、`interrupt` / `Command` resume 表达 HITL 与持久化
+- **ACP 工具审批（自动）** — `permissions.mode:"ask"` 时 `interruptOn` 名单内工具（默认 `write_file`/`edit_file`/`bash`/`http_request`）执行前经 `session/request_permission` 弹窗；改名单在 `config/flow-agent.config.json` → `permissions`（本地 workspace 配置，非 `<PLATFORM_CONFIG>`）；`yolo` 全放行
 </DEVELOPMENT_CONSTRAINTS>
 
 <WORKFLOW>
@@ -333,7 +334,8 @@ query-docs(libraryId: "/langchain-ai/langgraphjs", query: "StateGraph interrupt 
 手写路径前对照 factory 选型：
 - LLM 文本/结构化 → `createLlmNode`；LLM 裁决路由 → `createLlmRouterNode`；流式输出 → `createLlmStreamNode`
 - MCP 检索 → `createMcpRetrievalNode`；tool_calls → `createToolExecNode`
-- HITL 前置 → `createHumanApprovalNode`；HITL 后置 → `createApprovalFinalizeNode`
+- HITL 跨轮 interrupt → `createHumanApprovalNode`；HITL 后置定稿 → `createApprovalFinalizeNode`
+- HITL 同 turn 弹窗确认 → `createPermissionApprovalNode`（经 `onApprovalRequest`；ACP `request_permission`）
 - input→HumanMessage → `createPrepareNode`；Send 并行 → `createFanout`；子图 → `createSubgraphNode`
 
 对照 `examples/`（6 个，只读）选最接近拓扑：`rag`（线性+重试）/ `travel-planner`（Send 扇出+人审）/ `project-manager`（reflection+条件边）/ `human-in-loop`（interrupt+resume）/ `dev-agent`（ReAct+subgraph）/ `deep-research`（多阶段流水线）。路由+自纠正检索走 scaffold 拓扑 `adaptive-rag`（见 `flow-builder` Part 1，非 `examples/`）

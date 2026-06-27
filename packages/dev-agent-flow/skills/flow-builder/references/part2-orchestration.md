@@ -40,7 +40,17 @@ type MyStateType = typeof MyState.State;
 
 ## Step 3: 节点（factory 优先）
 
-`createLlmNode` / `createLlmRouterNode` / `createMcpRetrievalNode` / `createHumanApprovalNode` / `createApprovalFinalizeNode` / `createToolExecNode` / `createFanout` / `createSubgraphNode` 等；bespoke 才在 `src/app/nodes/` 手写并说明原因。
+`createLlmNode` / `createLlmRouterNode` / `createMcpRetrievalNode` / `createHumanApprovalNode` / `createPermissionApprovalNode` / `createApprovalFinalizeNode` / `createToolExecNode` / `createFanout` / `createSubgraphNode` 等；bespoke 才在 `src/app/nodes/` 手写并说明原因。
+
+### HITL 选型（三种机制，勿混用）
+
+| 场景 | 机制 | Factory / 配置 |
+|------|------|----------------|
+| 副作用工具执行前（写盘 / bash / HTTP…） | ACP 弹窗，**turn 内、可多次** | 自动：`createToolExecNode` + `config/flow-agent.config.json` → `permissions` |
+| 图内跨轮人审（草稿评审、大纲确认） | `interrupt` + 下轮用户消息 resume | `createHumanApprovalNode` → 常配对 `createApprovalFinalizeNode` |
+| 图内秒级 yes/no（确认发布？） | 同步弹窗，**不结束 turn** | `createPermissionApprovalNode`（`onApprovalRequest`） |
+
+> 工具审批由部署者配 `permissions.interruptOn`；流程弹窗由开发者在图里显式放节点。详见 `docs/node-catalog.md` HITL 类。
 
 ```typescript
 async function composeNode(state: MyStateType): Promise<Partial<MyStateType>> {
@@ -94,7 +104,7 @@ function fanoutToResearch(state): Send[] {
 
 | 模式 | 关键 API | 范例 |
 |------|----------|------|
-| ReAct | `toolsCondition` + `bindTools` | 默认图 |
+| ReAct | `toolsCondition` + `bindTools` | 默认图（`think` 只**决策** tool_calls，`tools` 节点才**执行**；见 `docs/flow-orchestration.md`） |
 | 条件重试 | `addConditionalEdges` | `examples/rag` |
 | Send 并行 | `Send` + reducer | `examples/travel-planner` |
 | reflection | `createLlmRouterNode` 或条件边 | pm / deep-research |

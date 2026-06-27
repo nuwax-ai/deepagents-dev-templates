@@ -2,7 +2,7 @@
 name: flow-builder
 description: "deepagents-flow-ts flow 开发（分层加载）：Part1–4 脚手架/编排/工具/验证；Part5 主Agent；Part6 子智能体；Part7 技能（均禁 .agents/ 直写）。LangGraph API 用 Context7。"
 tags: [flow, scaffold, orchestration, tools, mcp, prompt, subagent, stategraph, hitl, debug, deepagents-flow-ts]
-version: "2.2.8"
+version: "2.2.9"
 ---
 
 # Flow 开发（deepagents-flow-ts）
@@ -32,6 +32,7 @@ flow-builder/
 | 手写 StateGraph | [part2-orchestration.md](references/part2-orchestration.md) |
 | 自写工具 / MCP / 变量 | [part3-tools-config.md](references/part3-tools-config.md) |
 | 验证 / 跑不通 / HITL 排查 | [part4-verify-debug.md](references/part4-verify-debug.md) |
+| 工具审批 / `Permission denied` / `permissions` 配置 | [part3-tools-config.md](references/part3-tools-config.md) + [part4-verify-debug.md](references/part4-verify-debug.md) |
 | 设计目标 Agent 系统提示词 / 开场白 | [part5-prompt-design.md](references/part5-prompt-design.md) |
 | 创建/命名目标 Agent（通用智能体） | [part5-prompt-design.md](references/part5-prompt-design.md) + `dev-engineer-toolkit`；**禁止** `AGENT.md` |
 | 子智能体 / subagent / 委派（平台或内置） | [part6-subagent.md](references/part6-subagent.md)；**禁止** `.agents/agents/` |

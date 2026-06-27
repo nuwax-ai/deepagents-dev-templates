@@ -57,6 +57,27 @@ export function createMyTool(ctx: RuntimeContext) {
 
 模板内置 `http_request` 默认拦截私有/loopback/链路本地/云元数据端点（防 SSRF），并限制响应体大小（防 OOM）。目标项目一般无需改；若业务必须访问内网，需开发者明确要求并理解风险后再调整（见目标项目 `docs/capabilities.md`）。
 
+### 工具权限审批（`permissions`）
+
+ACP 下副作用工具执行前可弹 `session/request_permission`。配置在**本地** `config/flow-agent.config.json`（workspace 配置，**非** `<PLATFORM_CONFIG>`）：
+
+```jsonc
+"permissions": {
+  "mode": "ask",   // ask | yolo | plan（plan 本期等同 ask）
+  "interruptOn": ["write_file", "edit_file", "bash", "http_request"]
+}
+```
+
+| 字段 | 说明 |
+|------|------|
+| `mode` | `yolo` = 全放行；`ask` = 仅 `interruptOn` 名单内工具弹窗 |
+| `interruptOn` | 工具**注册名**列表（须与 `flow-tools.ts` 中 `name` 一致，如 `bash` 而非 `execute`） |
+
+- 门控在保护区 `createToolExecNode` 内自动生效，**开发者无需手写**审批节点。
+- 用户拒绝 → 合成 `Permission denied` ToolMessage 喂回 LLM，turn 不中止。
+- CLI / 不支持 `requestPermission` 的 client → graceful 放行；本地调试可设 `mode:"yolo"`。
+- 图内秒级确认（非工具门控）→ `createPermissionApprovalNode`（见 part2 HITL 选型）。
+
 ---
 
 ## MCP 配置
