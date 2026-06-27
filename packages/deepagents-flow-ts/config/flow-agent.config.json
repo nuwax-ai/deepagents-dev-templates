@@ -25,7 +25,8 @@
     "interruptOn": [
       "write_file",
       "edit_file",
-      "execute"
+      "bash",
+      "http_request"
     ],
     "allowedPaths": [
       "src/app/",
