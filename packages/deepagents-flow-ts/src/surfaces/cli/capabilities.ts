@@ -21,7 +21,7 @@ const BUILTIN_TOOLS = [
   { name: "http_request", layer: "agent-builtin", desc: "HTTP 调用" },
   { name: "json_utils", layer: "agent-builtin", desc: "JSON 解析/校验/合并" },
   { name: "load_skill", layer: "agent-builtin", desc: "按需读取已发现 skill 的完整 SKILL.md" },
-  { name: "task", layer: "agent-builtin", desc: "委派任务给已发现的声明式子智能体（agents/builtin 或 .agents/agents）" },
+  { name: "task", layer: "agent-builtin", desc: "委派任务给已发现的声明式子智能体（builtin/agents 或 .agents/agents）" },
   { name: "echo", layer: "agent-builtin", desc: "demo：回显（无凭证 fallback）" },
   { name: "calculate", layer: "agent-builtin", desc: "demo：算术求值" },
   { name: "time", layer: "agent-builtin", desc: "demo：当前时间" },

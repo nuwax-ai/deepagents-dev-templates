@@ -30,8 +30,7 @@
     "allowedPaths": [
       "src/app/",
       "prompts/",
-      "skills/",
-      "agents/",
+      "builtin/",
       "config/",
       "examples/",
       ".agents/"
@@ -46,8 +45,7 @@
     "writablePaths": [
       "src/app/",
       "prompts/",
-      "skills/",
-      "agents/",
+      "builtin/",
       "config/",
       "examples/",
       ".agents/"
@@ -58,17 +56,14 @@
     ]
   },
   "skills": {
-    "directories": [
-      "./skills/builtin/"
-    ],
+    "directories": [],
     "progressiveLoading": true
   },
   "subagents": {
-    "directories": [
-      "./agents/builtin/"
-    ]
+    "directories": []
   },
   "agentsDirectories": [
+    "./builtin",
     "./.agents"
   ],
   "memory": {

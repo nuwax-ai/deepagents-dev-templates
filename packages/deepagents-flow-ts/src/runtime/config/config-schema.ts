@@ -114,9 +114,9 @@ export const SkillsConfigSchema = z.object({
   progressiveLoading: z.boolean().default(true),
 });
 
-/** 项目内置子智能体目录（与 skills/builtin 对称：agents/builtin/<name>/AGENT.md） */
+/** 可选 flat 子智能体根（`<dir>/<name>/AGENT.md`）；默认用 agentsDirectories 的 `<root>/agents/` */
 export const SubagentsConfigSchema = z.object({
-  directories: z.array(z.string()).default(["./agents/builtin/"]),
+  directories: z.array(z.string()).default([]),
 });
 
 export const WorkspaceConfigSchema = z.object({
@@ -218,9 +218,9 @@ export const AppConfigSchema = z.object({
    *   <dir>/skills/<skill-name>/SKILL.md
    *   <dir>/agents/<agent-name>/AGENT.md
    *
-   * Built-in repo subagents live under `config.subagents.directories` (default `./agents/builtin/`).
+   * Built-in repo capabilities: `agentsDirectories` 含 `./builtin` → `builtin/skills/`、`builtin/agents/`。
+   * Optional flat roots: `config.subagents.directories`（高级，默认空）。
    * Skills from agentsDirectories are merged with `config.skills.directories`.
-   * Subagents from agents/ are merged after built-in paths (first name wins).
    *
    * @example ["../examples/thesis-ppt/.agents", "./my-custom-agents"]
    */

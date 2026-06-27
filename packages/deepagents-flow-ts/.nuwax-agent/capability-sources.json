@@ -26,9 +26,9 @@
   "capabilities": {
     "systemPrompt": { "source": "workspace-config", "fallback": "prompts/flow.base.md" },
     "mcpServers": { "source": "workspace-config", "fallback": "config/mcp.default.json" },
-    "skills": { "source": "workspace-config", "fallback": "skills/builtin" },
+    "skills": { "source": "workspace-config", "fallback": "builtin/skills" },
     "model": { "source": "workspace-config", "fallback": "env-builtin" },
-    "subagents": { "source": "workspace-config", "fallback": "agents/builtin" },
+    "subagents": { "source": "workspace-config", "fallback": "builtin/agents" },
     "openaiApiKey": { "source": "env-builtin", "secret": true },
     "anthropicApiKey": { "source": "env-builtin", "secret": true },
     "builtInTools": {

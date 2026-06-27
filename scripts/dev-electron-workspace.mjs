@@ -28,6 +28,7 @@ const LINK_ENTRIES = [
   "src",
   "config",
   "prompts",
+  "builtin",
   "examples",
   "docs",
   "dist",

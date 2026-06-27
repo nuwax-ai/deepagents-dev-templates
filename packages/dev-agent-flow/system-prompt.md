@@ -57,8 +57,8 @@
 |------|--------|
 | 创建/命名智能体、**通用智能体**、「名字叫 X」 | 主 Agent：`config.agent.name` + Part 5 + `<SESSION_CLOSE>` |
 | 只改欢迎语 | `openingChatMsg` |
-| 技能 / skill | **平台** toolkit；或内置 `skills/builtin/<name>/SKILL.md`（Part 7） |
-| 子智能体 / subagent | **平台** UI；或内置 `agents/builtin/<name>/AGENT.md`（Part 6） |
+| 技能 / skill | **平台** toolkit；或 `builtin/skills/<name>/SKILL.md`（Part 7） |
+| 子智能体 / subagent | **平台** UI；或 `builtin/agents/<name>/AGENT.md`（Part 6） |
 | 歧义 | 默认主 Agent |
 
 完成报告：主 Agent **禁止**说成 subagent；技能 **禁止**报告已写入 `.agents/skills/`。
@@ -83,16 +83,14 @@
 
 ### 工作区可写（非 `<PLATFORM_CONFIG>`）
 
-- **项目内置 Skill** — `skills/builtin/<name>/SKILL.md`
-- **项目内置 Subagent** — `agents/builtin/<name>/AGENT.md`
+- **项目内置能力包** — `builtin/skills/<name>/SKILL.md`、`builtin/agents/<name>/AGENT.md`（`agentsDirectories` 含 `./builtin`）
 
-> **禁止开发 Agent 写盘**：`.agents/agents/`、`.agents/skills/`。平台经 toolkit 下载落盘除外。
+> **禁止开发 Agent 写盘**：`.agents/`。平台经 toolkit 下载落盘除外。
 
 ### 开发铁律
 
 - 改 `<PLATFORM_CONFIG>` 所含项 → **必须** `dev-engineer-toolkit`；禁止只改本地不同步（persona 全流程见 `<SESSION_CLOSE>`）
-- 加技能 → **平台** toolkit，或 `skills/builtin/`；**禁止** `.agents/skills/`
-- 加子智能体 → **平台** UI，或 `agents/builtin/`；**禁止** `.agents/agents/`
+- 加技能 / 子智能体 → **平台**，或写 `builtin/`；**禁止** `.agents/`
 </PLATFORM_CONFIG>
 
 <SKILLS_AND_KNOWLEDGE>
@@ -260,7 +258,7 @@ query-docs(libraryId: "/langchain-ai/langgraphjs", query: "StateGraph interrupt 
 - **原因**：修改会破坏 node-kit、工具集、ACP 协议兼容性和 surface seam；core 契约改动需同步 app + surfaces
 
 ### AI 可编辑区（AI-editable）— 自由修改
-- **路径**：`src/app/`、`prompts/`、`skills/builtin/`、`agents/builtin/`
+- **路径**：`src/app/`、`prompts/`、`builtin/`
 - **禁止写盘**：`.agents/`（见 `<AGENT_INTENT_DISAMBIGUATION>`）
 - **⚠️ `examples/` 纯只读参考**：只读学拓扑 → 在 `src/app/` 中实现；禁止在 `examples/` 下创建或修改任何内容
 
@@ -312,7 +310,7 @@ query-docs(libraryId: "/langchain-ai/langgraphjs", query: "StateGraph interrupt 
 6. **禁止在节点函数中 mutate state** — 必须返回新对象（Partial update）
 7. **禁止把外部 I/O 放在条件边函数里** — 边函数必须是纯路由逻辑
 8. **禁止 `require` / `any`** — 必须使用 ES modules + 明确类型声明
-9. **禁止写 `.agents/`** — 子智能体：`agents/builtin/` 或平台；技能：`skills/builtin/` 或平台；**禁止** `.agents/agents/`、`.agents/skills/`
+9. **禁止写 `.agents/`** — 内置能力写 `builtin/skills/`、`builtin/agents/`；或走平台
 
 ## 关键注意
 

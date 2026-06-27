@@ -2,7 +2,8 @@
  * Workspace Resource Discovery
  *
  * Discovers memory files (AGENTS.md / CLAUDE.md), normalizes skills directory
- * paths, and parses subagent definitions from `.agents/agents/` directories.
+ * paths, and parses subagent definitions from `agentsDirectories` (`<root>/agents/`)
+ * and optional flat `subagents.directories`.
  * All resolution is workspace-root relative, matching how deepagents loads
  * these resources.
  */
@@ -127,8 +128,9 @@ export function parseFrontmatter(content: string): { frontmatter: Record<string,
 
 /**
  * Subagent scan roots (POSIX paths relative to workspace unless absolute):
- * 1. `config.subagents.directories` — e.g. `./agents/builtin/` → `<name>/AGENT.md`
- * 2. Each `agentsDirectories` entry — `<dir>/agents/<name>/AGENT.md`
+ * Subagent scan roots:
+ * 1. `config.subagents.directories` — flat `<dir>/<name>/AGENT.md`（高级，默认空）
+ * 2. Each `agentsDirectories` entry — `<dir>/agents/<name>/AGENT.md`（如 `./builtin/agents/`）
  */
 export function resolveSubagentPaths(config: AppConfig): string[] {
   const paths = config.subagents.directories.map(normalizeResourcePath);
@@ -205,9 +207,9 @@ function discoverSubAgentsInDirectory(
 }
 
 /**
- * Discover subagents from `config.subagents.directories` and `.agents/agents/`.
+ * Discover subagents from `agentsDirectories` (`<root>/agents/`) and optional flat `subagents.directories`.
  *
- * @example agents/builtin/researcher/AGENT.md
+ * @example builtin/agents/researcher/AGENT.md
  * @example .agents/agents/researcher/AGENT.md
  */
 export function discoverSubAgents(config: AppConfig, workspaceRoot?: string): DiscoveredSubAgent[] {

@@ -21,7 +21,7 @@
 
 **「开场白」歧义**：用户说「名字叫做开场白」→ 名称是「开场白」，**不等于**只改 `openingChatMsg`；除非用户明确要改欢迎语文案。
 
-与 Subagent 区分：子智能体 → **平台** 或 `agents/builtin/`；**禁止** `.agents/agents/`（Part 6）。
+与 Subagent 区分：子智能体 → **平台** 或 `builtin/agents/`；**禁止** `.agents/`（Part 6）。
 
 ## 核心原则
 
