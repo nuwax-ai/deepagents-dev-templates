@@ -8,7 +8,7 @@
 
 | 路径 | 说明 |
 |------|------|
-| [deepagents-flow-ts/development/](deepagents-flow-ts/development/) | Flow 模板收敛计划、RAG 示例开发计划等 |
+| [deepagents-flow-ts/development/](deepagents-flow-ts/development/) | Flow 模板收敛计划、RAG 示例、**[ACP 协议对齐手册](deepagents-flow-ts/development/acp/README.md)**（[路线图](deepagents-flow-ts/development/acp/roadmap-progress.md) · [schema](https://github.com/agentclientprotocol/agent-client-protocol/tree/main/schema) · [claude-code-acp-ts](https://github.com/nuwax-ai/claude-code-acp-ts)）等 |
 | [deepagents-app-ts/development/](deepagents-app-ts/development/) | V1 计划、能力进度看板、ACP 测试方案、S3 分发 |
 | [deepagents-app-ts/research/](deepagents-app-ts/research/) | 模板深度研究报告（`deepagents-template-report.md`） |
 | [deepagents-app-py/development/](deepagents-app-py/development/) | Python 模板迁移与路线图 |

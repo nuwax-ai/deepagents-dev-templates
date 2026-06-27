@@ -1,19 +1,17 @@
 /**
- * MCP 访问层 —— 基于 @langchain/mcp-adapters 的 MultiServerMCPClient，提供按 server 维度的
- * list/call 能力，多 transport（stdio / Streamable HTTP / SSE）。
+ * MCP 访问层 —— LangGraph 图内「主动检索」节点的补充路径（非 agent 主 ToolNode 链路）。
  *
- * 取代旧的 stdio-client.ts（自研 spawn → initialize → tools/call → kill 的 JSON-RPC）：
- *  - 有状态 server（chrome-devtools）绝不该走「每次 call 新进程再 kill」——server 进程被杀，
- *    其托管的浏览器实例/页面随之终止。有状态 server 经 runtime-context 加载为 native agent
- *    工具（持久连接，session 内复用），不经本访问层。
- *  - 本访问层服务图内「主动检索」节点（context7 / search 等无状态检索）：
- *    ① 优先复用 runtime 注入的持久 client（createAccessorFromClient / resolveAccessor，零额外进程）；
- *    ② 无注入或该 server 在持久 client 中未连上时 fallback 到自管临时 client
- *      （createAccessorFromConfig，官方 MultiServerMCPClient，多 transport，用完 close）。
+ * **Agent 主路径（LangGraph 官方接入）**：`MultiServerMCPClient.getTools()` → `StructuredTool[]`
+ * → think `bindTools` → `createToolExecNode` / `ToolNode`（见 runtime-context）。
  *
- * 超时：accessor 的 callTool 经 SDK RequestOptions{timeout} 强制单次调用超时；createAccessorFromConfig
- * 的连接（getClient）经 withTimeout 兜底。调用方传 timeoutMs（retrieve 的 retrieve.timeout_ms、
- * mcp-retrieval 的 opts.timeoutMs、context7 的 CONTEXT7_TIMEOUT_MS）。
+ * **本模块**：同一 `@langchain/mcp-adapters` client 上的按-server list/call，供 retrieve / context7 等
+ * 主动检索节点；底层 `@modelcontextprotocol/sdk` Client.callTool。
+ *
+ * - 有状态 server（chrome-devtools）必须经 runtime 持久连接，不经「每次 call 新进程」。
+ * - 检索节点优先复用 runtime 注入的 `mcpClient`（`createAccessorFromClient`）；否则 fallback
+ *   自管临时 client（`createAccessorFromConfig`，用完 close）。
+ *
+ * 超时：callTool 经 SDK RequestOptions{timeout}；连接经 withTimeout 兜底。
  */
 import { MultiServerMCPClient } from "@langchain/mcp-adapters";
 import { inferMcpTransport } from "../../runtime/mcp/infer-mcp-transport.js";

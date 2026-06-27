@@ -240,5 +240,5 @@ pnpm test
 - [docs/node-catalog.md](docs/node-catalog.md) — **节点选型入口**（type 目录 + 何时用哪个）
 - [docs/node-kit.md](docs/node-kit.md) — **factory catalog（建 flow 必读）**
 - [docs/flow-patterns.md](docs/flow-patterns.md) — 进阶模式（Send/interrupt/Command/subgraph/checkpointer/长任务硬化）
-- [docs/capabilities.md](docs/capabilities.md) · [docs/zed-debug.md](docs/zed-debug.md) · 各 `examples/*/README.md`
+- [docs/zed-debug.md](docs/zed-debug.md) · 各 `examples/*/README.md`
 - **API 细节看源码**：`FlowRuntime`（[src/runtime/flow-runtime.ts](src/runtime/flow-runtime.ts)）、`FlowCallbacks`（[src/core/flow-types.ts](src/core/flow-types.ts)）、`createFlowRuntime`（[src/index.ts](src/index.ts)）、Surface Seam（[src/surfaces/](src/surfaces/)）、ACP hooks（[src/libs/deepagents-acp/](src/libs/deepagents-acp/)）、`createFlowTools`（[src/app/flow-tools.ts](src/app/flow-tools.ts)）

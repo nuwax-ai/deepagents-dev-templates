@@ -2,9 +2,10 @@
  * Runtime Context —— 装配运行时上下文（native MCP 工具 + 合并后的 MCP 配置）。
  *
  * 设计要点：
- * - MCP：合并 default(含 configPath 文件) + session（ACP 下发）
- *   （session-wins：default < session），用 @langchain/mcp-adapters 的
- *   MultiServerMCPClient.getTools() 加载 native MCP 工具。平台 MCP 经 ACP sessionConfig 下发，运行时不主动拉取。
+ * - MCP（LangGraph 官方接入）：合并 default + session 配置 → `@langchain/mcp-adapters`
+ *   `MultiServerMCPClient.getTools()` → native `StructuredTool[]`（`prefixToolNameWithServerName`），
+ *   经 think `bindTools` + `createToolExecNode`/`ToolNode` 进 LangGraph 图；底层为
+ *   `@modelcontextprotocol/sdk` Client。平台 MCP 经 ACP sessionConfig 下发，运行时不主动拉取。
  * - onConnectionError=per-server handler：单个 server 连不上记录原因并跳过（不炸其余 server），
  *   启动日志列 connected/failed；stdio 默认挂 restart 供长驻 server（chrome-devtools 等）崩溃自愈。
  * - tools 不由本 context 创建（由 app 层 createFlowTools 组装）。
