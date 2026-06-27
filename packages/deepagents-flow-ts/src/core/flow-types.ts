@@ -26,6 +26,31 @@ export interface ToolCallEvent {
   error?: string;
 }
 
+/**
+ * 工具审批请求事件 —— 副作用工具执行前向 surface 申请许可。
+ * surface（ACP）据此调 `conn.requestPermission` 弹窗；节点据返回决定执行 / 合成拒绝。
+ */
+export interface PermissionRequestEvent {
+  toolCallId: string;
+  toolName: string;
+  args: Record<string, unknown>;
+}
+
+/** 审批决定：放行 / 拒绝 / 取消（含 client 取消、signal 中止）。 */
+export type PermissionDecision = "allow" | "reject" | "cancelled";
+
+/**
+ * 流程级审批请求 —— 图节点显式征询用户确认（如"确认发布?"），
+ * 区别于工具级 {@link PermissionRequestEvent}（无 toolName/args，是图编排里的人审关卡）。
+ * 与 onPermissionRequest 共走同步弹窗通道，复用 {@link PermissionDecision} 作返回。
+ */
+export interface ApprovalRequestEvent {
+  /** 弹窗主文案（如"确认发布?"）。 */
+  title: string;
+  /** 可选详情（如待确认内容摘要）。 */
+  detail?: string;
+}
+
 /** ACP Plan 单条条目（与 deepagents-acp PlanEntry 对齐）。 */
 export interface PlanEntry {
   content: string;
@@ -67,6 +92,19 @@ export interface FlowCallbacks {
   onStage?: (e: StageEvent) => void | Promise<void>;
   /** 结构化 Plan 更新（ACP sessionUpdate: plan）。 */
   onPlan?: (e: PlanEvent) => void | Promise<void>;
+  /**
+   * 工具审批（可选）—— 副作用工具执行前征询许可（ACP `session/request_permission`）。
+   * 节点对每个 tool_call 调用一次（要不要弹、按什么名单/模式判定都在实现内，对齐
+   * Claude SDK 的 canUseTool）；返回 "reject"/"cancelled" 时节点合成拒绝 ToolMessage
+   * 并跳过执行。未注入则全放行（CLI / 非 ACP surface 向后兼容）。
+   */
+  onPermissionRequest?: (e: PermissionRequestEvent) => Promise<PermissionDecision>;
+  /**
+   * 流程级审批（可选）—— 图节点显式征询确认（ACP `session/request_permission` 弹窗）。
+   * 与 onPermissionRequest 同走同步弹窗通道，但语义是"图编排里的人审关卡"而非工具门控；
+   * 由 createPermissionApprovalNode 调用。未注入则默认放行（CLI / 非 ACP 向后兼容）。
+   */
+  onApprovalRequest?: (e: ApprovalRequestEvent) => Promise<PermissionDecision>;
   /** 任务取消信号（可选）。被中止时底层图运行 reject，不再继续产出 token。 */
   signal?: AbortSignal;
 }
