@@ -18,7 +18,12 @@
     "pack:flow-ts": "node scripts/pack-template.js flow-ts",
     "pack:py": "node scripts/pack-template.js py",
     "pack:all": "node scripts/pack-template.js all",
-    "pack:release": "node scripts/pack-template.js all --release"
+    "pack:release": "node scripts/pack-template.js all --release",
+    "dev:electron": "node scripts/dev-electron-workspace.mjs",
+    "dev:electron:link": "node scripts/dev-electron-workspace.mjs link",
+    "dev:electron:sync": "node scripts/dev-electron-workspace.mjs sync",
+    "dev:electron:status": "node scripts/dev-electron-workspace.mjs status",
+    "dev:electron:unlink": "node scripts/dev-electron-workspace.mjs unlink"
   },
   "description": "DeepAgents development templates — monorepo for agent template and dev-agent config",
   "license": "MIT"
