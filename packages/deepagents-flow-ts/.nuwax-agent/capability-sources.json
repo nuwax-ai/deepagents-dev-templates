@@ -28,7 +28,7 @@
     "mcpServers": { "source": "workspace-config", "fallback": "config/mcp.default.json" },
     "skills": { "source": "workspace-config", "fallback": "skills/builtin" },
     "model": { "source": "workspace-config", "fallback": "env-builtin" },
-    "subagents": { "source": "workspace-config", "fallback": ".agents/agents" },
+    "subagents": { "source": "workspace-config", "fallback": "agents/builtin" },
     "openaiApiKey": { "source": "env-builtin", "secret": true },
     "anthropicApiKey": { "source": "env-builtin", "secret": true },
     "builtInTools": {

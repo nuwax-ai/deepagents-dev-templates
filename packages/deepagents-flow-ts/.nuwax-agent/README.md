@@ -31,7 +31,7 @@
 - **mcpServers** —— runtime-context 加载 `config/mcp.default.json`；native 工具经 `@langchain/mcp-adapters` 的 `MultiServerMCPClient.getTools()` 加载。ACP session 可合并追加（`session-wins`）。
 - **model** —— `resolveModel(appConfig)` 取自 `config.model`（ACP session / env / config / defaults）。
 - **skills** —— `resolveSkillsPaths(appConfig)` 发现 `skills/builtin/`、`.agents/*/skills/` 及配置中的 `skills.directories`。
-- **subagents** —— `discoverSubAgents(appConfig)` 解析 `.agents/agents/<name>/AGENT.md`。
+- **subagents** —— `resolveSubagentPaths` / `discoverSubAgents` 发现 `agents/builtin/`、`config.subagents.directories` 及 `.agents/agents/`。
 - **sessionStore** —— `FileCheckpointSaver`（继承 `MemorySaver`）持久化到 `config.memory.dir`（默认 `~/.flowagents/sessions/<workspace 散列>/`，可显式 opt-out 回 `./.flow-sessions`）；线程隔离、重启存活、恢复 interrupt/resume。
 - **builtInTools** —— `createFlowTools(ctx)` 组合 bash/fs/search/http/json/mcp-bridge + demo 工具；经 `bindTools` 绑定到模型，由 `ToolNode` 执行。
 

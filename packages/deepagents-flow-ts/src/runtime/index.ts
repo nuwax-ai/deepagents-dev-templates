@@ -27,6 +27,7 @@ export {
   resolveSystemPrompt,
   discoverMemoryFiles,
   resolveSkillsPaths,
+  resolveSubagentPaths,
   discoverSubAgents,
   discoverSkills,
   renderSkillsSection,

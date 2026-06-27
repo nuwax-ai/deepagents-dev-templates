@@ -3,7 +3,25 @@
 > 所属：`flow-builder` L2-E。入口路由见 [SKILL.md](../SKILL.md)。
 > **写什么**在本层；**怎么存**经 `dev-engineer-toolkit`（见下方「保存与同步」）。
 
-为基于 `deepagents-flow-ts` 开发的**业务 Agent** 设计系统提示词 / 开场白。产出的是目标 Agent 运行时读取的提示词，不是开发 Agent 自身提示词。
+为基于 `deepagents-flow-ts` 开发的**业务 Agent（主 Agent / 目标 Agent）** 设计系统提示词 / 开场白。产出的是目标 Agent 运行时读取的提示词，不是开发 Agent 自身提示词，**也不是** `.agents/agents/<name>/AGENT.md` 子智能体。
+
+## 主 Agent 命名与身份（创建 / 通用智能体）
+
+用户说「创建智能体」「通用智能体」「名字叫 X」时走本 Part，**禁止**创建 `AGENT.md`。
+
+| 步 | 动作 | 文件 / 字段 |
+|----|------|-------------|
+| 1 | 确认 `activeFlow: "default"`（通用 ReAct；无需 scaffold） | `config/flow-agent.config.json` |
+| 2 | 写入智能体名称与简述 | `agent.name`、`agent.description` |
+| 3 | Part 5 七要素设计 systemPrompt（标题 `# [Agent 名] — …`） | `prompts/flow.base.md` |
+| 4 | 若用户要欢迎语 → 写开场白源文件 | 如 `prompts/opening.md` |
+| 5 | `<SESSION_CLOSE>` 段 2 同步 | `update-config.sh` → `systemPrompt` / `openingChatMsg` |
+
+**主 Agent 没有 `AGENT.md` 文件。** 名称落在 `config.agent.name` 与 prompt 标题，不是 `.agents/agents/` 目录。
+
+**「开场白」歧义**：用户说「名字叫做开场白」→ 名称是「开场白」，**不等于**只改 `openingChatMsg`；除非用户明确要改欢迎语文案。
+
+与 Subagent 区分：子智能体 → **平台** 或 `agents/builtin/`；**禁止** `.agents/agents/`（Part 6）。
 
 ## 核心原则
 
@@ -86,6 +104,7 @@
 
 ## Anti-patterns
 
+- ❌ 把「创建/命名通用智能体」建成 `.agents/agents/<name>/AGENT.md`（子智能体只走平台，见 Part 6）
 - ❌ 只有空泛角色能力，无工具指引/few-shot/输出规范
 - ❌ 未配置工具名写进提示词
 - ❌ 硬编码进代码；只改本地不同步平台

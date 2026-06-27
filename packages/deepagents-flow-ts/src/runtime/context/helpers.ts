@@ -19,6 +19,7 @@ export { resolveSystemPrompt, resolveCliSystemPrompt, resolveOutputStyle } from 
 export {
   discoverMemoryFiles,
   resolveSkillsPaths,
+  resolveSubagentPaths,
   discoverSubAgents,
   discoverSkills,
   renderSkillsSection,

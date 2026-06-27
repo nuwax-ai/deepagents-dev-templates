@@ -31,6 +31,7 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
 
 export function mergeConfigLayer(config: AppConfig, layer: Partial<AppConfig>): AppConfig {
   const previousSkills = config.skills.directories;
+  const previousSubagents = config.subagents.directories;
   const previousAgents = config.agentsDirectories;
   const previousMcpPaths = config.mcp.configPaths;
   const previousMcpServers = config.mcp.servers;
@@ -39,6 +40,9 @@ export function mergeConfigLayer(config: AppConfig, layer: Partial<AppConfig>): 
 
   if (layer.skills?.directories) {
     merged.skills.directories = concatUnique(previousSkills, layer.skills.directories);
+  }
+  if (layer.subagents?.directories) {
+    merged.subagents.directories = concatUnique(previousSubagents, layer.subagents.directories);
   }
   if (layer.agentsDirectories) {
     merged.agentsDirectories = concatUnique(previousAgents, layer.agentsDirectories);

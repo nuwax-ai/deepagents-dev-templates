@@ -64,7 +64,9 @@ export const PermissionsConfigSchema = z.object({
    * - "plan": Agent presents a plan first, user approves, then executes with HITL.
    */
   mode: z.enum(["yolo", "ask", "plan"]).default("ask"),
-  interruptOn: z.array(z.string()).default(["write_file", "edit_file", "execute"]),
+  interruptOn: z
+    .array(z.string())
+    .default(["write_file", "edit_file", "bash", "http_request"]),
   allowedPaths: z.array(z.string()).default(["src/app/", "prompts/", "skills/", "config/"]),
   deniedPaths: z.array(z.string()).default(["src/runtime/", "src/surfaces/"]),
 });
@@ -110,6 +112,11 @@ export const SkillsConfigSchema = z.object({
     "./skills/",                        // 项目直接 skills 目录
   ]),
   progressiveLoading: z.boolean().default(true),
+});
+
+/** 项目内置子智能体目录（与 skills/builtin 对称：agents/builtin/<name>/AGENT.md） */
+export const SubagentsConfigSchema = z.object({
+  directories: z.array(z.string()).default(["./agents/builtin/"]),
 });
 
 export const WorkspaceConfigSchema = z.object({
@@ -204,14 +211,16 @@ export const AppConfigSchema = z.object({
   permissions: PermissionsConfigSchema.default({}),
   sandbox: SandboxConfigSchema.default({}),
   skills: SkillsConfigSchema.default({}),
+  subagents: SubagentsConfigSchema.default({}),
   /**
    * Paths to `.agents` directories that contain skills/ and agents/ subdirectories.
    * Each entry should point to a directory following the `.agents` convention:
    *   <dir>/skills/<skill-name>/SKILL.md
    *   <dir>/agents/<agent-name>/AGENT.md
    *
-   * Skills from these directories are merged with the built-in skills.
-   * Subagents discovered in agents/ are registered for task delegation.
+   * Built-in repo subagents live under `config.subagents.directories` (default `./agents/builtin/`).
+   * Skills from agentsDirectories are merged with `config.skills.directories`.
+   * Subagents from agents/ are merged after built-in paths (first name wins).
    *
    * @example ["../examples/thesis-ppt/.agents", "./my-custom-agents"]
    */

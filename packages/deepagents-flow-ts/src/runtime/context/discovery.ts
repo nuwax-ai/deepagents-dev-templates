@@ -126,77 +126,98 @@ export function parseFrontmatter(content: string): { frontmatter: Record<string,
 }
 
 /**
- * Discover subagents from configured .agents/agents/ directories.
- *
- * Convention: each subagent is a subdirectory containing an AGENT.md file
- * with YAML frontmatter (name, description) and a body (systemPrompt).
- *
- * @example
- * .agents/agents/researcher/AGENT.md:
- *   ---
- *   name: researcher
- *   description: "Deep research assistant"
- *   ---
- *   You are a research assistant specialized in...
+ * Subagent scan roots (POSIX paths relative to workspace unless absolute):
+ * 1. `config.subagents.directories` — e.g. `./agents/builtin/` → `<name>/AGENT.md`
+ * 2. Each `agentsDirectories` entry — `<dir>/agents/<name>/AGENT.md`
  */
-export function discoverSubAgents(config: AppConfig, workspaceRoot?: string): DiscoveredSubAgent[] {
-  const subagents: DiscoveredSubAgent[] = [];
-  const log = logger.child("subagent-discovery");
-  const root = workspaceRoot || process.cwd();
+export function resolveSubagentPaths(config: AppConfig): string[] {
+  const paths = config.subagents.directories.map(normalizeResourcePath);
 
   for (const agentsDir of config.agentsDirectories) {
     const normalized = normalizeResourcePath(agentsDir);
-    const agentsPath = resolve(root, normalized, "agents");
+    paths.push(`${normalized}/agents`);
+  }
 
-    if (!existsSync(agentsPath)) {
-      log.debug("No agents/ directory found", { path: agentsPath });
+  return Array.from(new Set(paths));
+}
+
+function discoverSubAgentsInDirectory(
+  agentsPath: string,
+  subagents: DiscoveredSubAgent[],
+  seen: Set<string>,
+  log: ReturnType<typeof logger.child>,
+): void {
+  if (!existsSync(agentsPath)) {
+    log.debug("No subagents directory found", { path: agentsPath });
+    return;
+  }
+
+  let entries: string[];
+  try {
+    entries = readdirSync(agentsPath, { withFileTypes: true })
+      .filter((e) => e.isDirectory())
+      .map((e) => e.name);
+  } catch {
+    log.warn("Failed to read subagents directory", { path: agentsPath });
+    return;
+  }
+
+  for (const entry of entries) {
+    const agentMdPath = join(agentsPath, entry, "AGENT.md");
+    if (!existsSync(agentMdPath)) {
+      log.debug("No AGENT.md found in agent directory", { dir: entry });
       continue;
     }
 
-    let entries: string[];
     try {
-      entries = readdirSync(agentsPath, { withFileTypes: true })
-        .filter((e) => e.isDirectory())
-        .map((e) => e.name);
-    } catch {
-      log.warn("Failed to read agents directory", { path: agentsPath });
-      continue;
-    }
+      const content = readFileSync(agentMdPath, "utf-8");
+      const { frontmatter, body } = parseFrontmatter(content);
 
-    for (const entry of entries) {
-      const agentMdPath = join(agentsPath, entry, "AGENT.md");
-      if (!existsSync(agentMdPath)) {
-        log.debug("No AGENT.md found in agent directory", { dir: entry });
+      const name = frontmatter.name || entry;
+      if (seen.has(name)) {
+        log.debug("Skipping duplicate subagent name", { name, path: agentMdPath });
         continue;
       }
 
-      try {
-        const content = readFileSync(agentMdPath, "utf-8");
-        const { frontmatter, body } = parseFrontmatter(content);
+      const description = frontmatter.description || `Subagent: ${name}`;
 
-        const name = frontmatter.name || entry;
-        const description = frontmatter.description || `Subagent: ${name}`;
-
-        if (!body) {
-          log.warn("AGENT.md has no body (systemPrompt)", { path: agentMdPath });
-          continue;
-        }
-
-        const model = frontmatter.model || undefined;
-        const workdir = frontmatter.workdir || undefined;
-        const tools = frontmatter.tools
-          ? frontmatter.tools.split(/[\s,]+/).map((t) => t.trim()).filter(Boolean)
-          : undefined;
-
-        subagents.push({ name, description, systemPrompt: body, model, tools, workdir });
-        log.info("Discovered subagent", { name, source: agentMdPath });
-      } catch (err) {
-        log.warn("Failed to parse AGENT.md", {
-          path: agentMdPath,
-          error: err instanceof Error ? err.message : String(err),
-        });
+      if (!body) {
+        log.warn("AGENT.md has no body (systemPrompt)", { path: agentMdPath });
+        continue;
       }
+
+      const model = frontmatter.model || undefined;
+      const workdir = frontmatter.workdir || undefined;
+      const tools = frontmatter.tools
+        ? frontmatter.tools.split(/[\s,]+/).map((t) => t.trim()).filter(Boolean)
+        : undefined;
+
+      seen.add(name);
+      subagents.push({ name, description, systemPrompt: body, model, tools, workdir });
+      log.info("Discovered subagent", { name, source: agentMdPath });
+    } catch (err) {
+      log.warn("Failed to parse AGENT.md", {
+        path: agentMdPath,
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
+  }
+}
+
+/**
+ * Discover subagents from `config.subagents.directories` and `.agents/agents/`.
+ *
+ * @example agents/builtin/researcher/AGENT.md
+ * @example .agents/agents/researcher/AGENT.md
+ */
+export function discoverSubAgents(config: AppConfig, workspaceRoot?: string): DiscoveredSubAgent[] {
+  const subagents: DiscoveredSubAgent[] = [];
+  const seen = new Set<string>();
+  const log = logger.child("subagent-discovery");
+  const root = workspaceRoot || process.cwd();
+
+  for (const dirPath of resolveSubagentPaths(config)) {
+    discoverSubAgentsInDirectory(resolve(root, dirPath), subagents, seen, log);
   }
 
   return subagents;

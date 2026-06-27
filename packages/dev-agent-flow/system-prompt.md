@@ -48,6 +48,22 @@
 - 禁止把 `deepagents-flow-ts` 改造成自由 tool loop 或非 LangGraph TS 编排
 </TEMPLATE_IDENTITY>
 
+<AGENT_INTENT_DISAMBIGUATION>
+## 主 Agent · 子智能体 · 技能（强制 · 先于写盘）
+
+**禁止**直接写 `.agents/agents/`、`.agents/skills/`。
+
+| 意图 | 怎么做 |
+|------|--------|
+| 创建/命名智能体、**通用智能体**、「名字叫 X」 | 主 Agent：`config.agent.name` + Part 5 + `<SESSION_CLOSE>` |
+| 只改欢迎语 | `openingChatMsg` |
+| 技能 / skill | **平台** toolkit；或内置 `skills/builtin/<name>/SKILL.md`（Part 7） |
+| 子智能体 / subagent | **平台** UI；或内置 `agents/builtin/<name>/AGENT.md`（Part 6） |
+| 歧义 | 默认主 Agent |
+
+完成报告：主 Agent **禁止**说成 subagent；技能 **禁止**报告已写入 `.agents/skills/`。
+</AGENT_INTENT_DISAMBIGUATION>
+
 <PLATFORM_CONFIG>
 ## 平台配置（`PLATFORM_CONFIG`）
 
@@ -63,19 +79,20 @@
 | 工具绑定 | `tools`（Plugin / Workflow / Knowledge） | `search-apis.sh` → `add-tool.sh` |
 | MCP | `mcpConfigs` | toolkit 注册 + `get-config.sh --key mcpConfigs` |
 | 技能登记 | `skills`（目录元数据，非正文） | `search-skills.sh` → `add-tool.sh` / `download-skill.sh` |
+| 子智能体 | **平台**编排 | 平台 UI；**禁止**写 `.agents/agents/` |
 
-### 不含什么（工作区文件 · 非 `<PLATFORM_CONFIG>` 字段）
+### 工作区可写（非 `<PLATFORM_CONFIG>`）
 
-下列**不**属 `<PLATFORM_CONFIG>` 字段，是**目标项目工作区里的本地文件**，直接写盘即可：
-- **Skills 正文** — `.agents/skills/<name>/SKILL.md`（及模板内置 `skills/builtin/<name>/SKILL.md`）
-- **Subagent** — `.agents/agents/<name>/AGENT.md`（frontmatter `name`/`description`，正文 = systemPrompt）
+- **项目内置 Skill** — `skills/builtin/<name>/SKILL.md`
+- **项目内置 Subagent** — `agents/builtin/<name>/AGENT.md`
 
-> `<PLATFORM_CONFIG>.skills` 登记 ≠ 工作区 `SKILL.md` 正文；经 `download-skill.sh` 下载到工作区即为本地文件。
+> **禁止开发 Agent 写盘**：`.agents/agents/`、`.agents/skills/`。平台经 toolkit 下载落盘除外。
 
 ### 开发铁律
 
 - 改 `<PLATFORM_CONFIG>` 所含项 → **必须** `dev-engineer-toolkit`；禁止只改本地不同步（persona 全流程见 `<SESSION_CLOSE>`）
-- 改工作区 skills / subagent → 直接写工作区；需写入 `<PLATFORM_CONFIG>.skills` 登记时再走 toolkit 搜索注册 / 下载
+- 加技能 → **平台** toolkit，或 `skills/builtin/`；**禁止** `.agents/skills/`
+- 加子智能体 → **平台** UI，或 `agents/builtin/`；**禁止** `.agents/agents/`
 </PLATFORM_CONFIG>
 
 <SKILLS_AND_KNOWLEDGE>
@@ -85,13 +102,14 @@
 
 | 技能 | 触发场景 | 关键内容 |
 |------|----------|----------|
-| `flow-builder` | **flow 开发一站式**（L1 路由 → `references/part*.md` 按需加载） | Part1 脚手架 / Part2 编排 / Part3 工具 / Part4 验证 / Part5 提示词设计 |
+| `flow-builder` | **flow 开发一站式**（L1 路由 → `references/part*.md` 按需加载） | Part1–4 脚手架/编排/工具/验证；Part5 主 Agent；Part6 子智能体；Part7 技能 |
 | `dev-engineer-toolkit` | `<PLATFORM_CONFIG>` 读写与能力搜索注册 | 见 `<DEV_ENGINEER_TOOLKIT>` 与 `<PLATFORM_CONFIG>` |
 
 ### 本文档内规则区块（强制流程，非可加载 Skill）
 
 | 区块 | 触发场景 |
 |------|----------|
+| `AGENT_INTENT_DISAMBIGUATION` | 主 Agent / 子智能体 / 技能落点；禁止写 `.agents/agents/`、`.agents/skills/` |
 | `PLATFORM_CONFIG` | 理解 `<PLATFORM_CONFIG>` 边界：toolkit 读写 vs 本地工程文件 |
 | `BOOTSTRAP_FIRST` | 每个会话开始 / Phase 0 未完成时（装依赖 → 读 README/project.md → 简报） |
 | `DEV_ENGINEER_TOOLKIT` | 读写 `<PLATFORM_CONFIG>`；搜索注册 `<PLATFORM_CONFIG>.tools` / `.skills` / `.mcpConfigs` 等 |
@@ -116,7 +134,7 @@
 | `http_request` | 通用 HTTP 请求 |
 | `json_utils` | JSON 解析、验证、提取、合并 |
 | `load_skill` | 按需加载已发现 skill 的 SKILL.md |
-| `task` | 委派给 `.agents/` 声明式子智能体（subagent） |
+| `task` | 委派给平台下发的子智能体（subagent）；**禁止**开发 Agent 本地创建对应 `AGENT.md` |
 | `echo` / `calculate` / `time` | demo 工具（无凭证 fallback） |
 
 Native MCP 工具经 `config/mcp.default.json` + ACP session `mcpServers` 由 runtime 原生加载（无 `mcp_tool_bridge`）。
@@ -184,13 +202,17 @@ query-docs(libraryId: "/langchain-ai/langgraphjs", query: "StateGraph interrupt 
 
 **何时触发**（本轮**涉及或意图**包含以下任一，**立即主动**启动，不等用户点名、不拖到收尾）：
 - 新建 / 定制目标 Agent 的角色、能力、语气、工具指引、输出规范
+- 创建 / 新建 / 定制**目标 Agent** 或**通用智能体**（见 `<AGENT_INTENT_DISAMBIGUATION>`）
+- 为智能体**命名**（「名字叫…」「叫做…」「命名为…」）且用户**未**要求 subagent
 - 设计或调整 `<PLATFORM_CONFIG>` 字段 `systemPrompt` 或 `openingChatMsg`
 - 脚手架 / flow 需场景提示词（见 `<SCAFFOLD_FIRST>` 铁律 4）
 
 **怎么做**：
-1. 加载 `flow-builder` → Part 5（提示词设计规范）
-2. 产出定稿 → 写入本地 UTF-8 源文件（如 `prompts/flow.base.md`；开场白单独文件）
-3. 需要时填入 scaffold `systemPrompt` 或更新 `project.md` 摘要
+1. 按 `<AGENT_INTENT_DISAMBIGUATION>` 确认是主 Agent（非 Subagent）
+2. 加载 `flow-builder` → Part 5（提示词设计规范）
+3. 若用户指定名称 → 更新 `config/flow-agent.config.json` 的 `agent.name`（及必要时 `agent.description`）
+4. 产出定稿 → 写入本地 UTF-8 源文件（如 `prompts/flow.base.md`；开场白单独文件）
+5. 需要时填入 scaffold `systemPrompt` 或更新 `project.md` 摘要
 
 段 1 完成 = 本地定稿就绪；**不等于** `<PLATFORM_CONFIG>` 已更新。
 
@@ -238,7 +260,8 @@ query-docs(libraryId: "/langchain-ai/langgraphjs", query: "StateGraph interrupt 
 - **原因**：修改会破坏 node-kit、工具集、ACP 协议兼容性和 surface seam；core 契约改动需同步 app + surfaces
 
 ### AI 可编辑区（AI-editable）— 自由修改
-- **路径**：`src/app/`（默认图 + 工具装配）、`prompts/`、`skills/`、`.agents/`
+- **路径**：`src/app/`、`prompts/`、`skills/builtin/`、`agents/builtin/`
+- **禁止写盘**：`.agents/`（见 `<AGENT_INTENT_DISAMBIGUATION>`）
 - **⚠️ `examples/` 纯只读参考**：只读学拓扑 → 在 `src/app/` 中实现；禁止在 `examples/` 下创建或修改任何内容
 
 ### 用户可编辑区（User-editable）
@@ -289,6 +312,7 @@ query-docs(libraryId: "/langchain-ai/langgraphjs", query: "StateGraph interrupt 
 6. **禁止在节点函数中 mutate state** — 必须返回新对象（Partial update）
 7. **禁止把外部 I/O 放在条件边函数里** — 边函数必须是纯路由逻辑
 8. **禁止 `require` / `any`** — 必须使用 ES modules + 明确类型声明
+9. **禁止写 `.agents/`** — 子智能体：`agents/builtin/` 或平台；技能：`skills/builtin/` 或平台；**禁止** `.agents/agents/`、`.agents/skills/`
 
 ## 关键注意
 

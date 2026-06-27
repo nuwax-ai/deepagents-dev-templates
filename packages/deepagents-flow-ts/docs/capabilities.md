@@ -30,7 +30,7 @@ deepagents-flow-ts sessions       # 已持久化的会话
 - **mcpServers** — `config/mcp.default.json`（`config.mcp.configPath`）；native 工具经 `@langchain/mcp-adapters`（`MultiServerMCPClient`）由 runtime-context 加载，支持 **stdio / Streamable HTTP / SSE**（有 url 时默认 Streamable HTTP，`automaticSSEFallback` 失败后再试 SSE；连接成功与否以 **tools/list** 为准，session 结束 `destroyRuntimeContext` 关闭连接）。ACP session 可合并追加（`session-wins`），日常扩展改配置文件即可。
 - **model** — `resolveModel`（env > `config.model` > 默认）。协议优先级：`API_PROTOCOL` > `LLM_PROVIDER` > 凭证启发式 > `config.model.provider`（与平台 `model_provider.api_protocol` 枚举 `anthropic` | `openai` 对齐）。
 - **skills** — `discoverSkills` 发现 `skills/builtin/`、各 `agentsDirectory` 下的 `skills/`（默认含 `.agents/skills/`）及 `config.skills.directories` 下的 SKILL.md；经 `renderSkillsSection` 注入清单，模型用 `load_skill(name)` 渐进式读正文。
-- **subagents** — `discoverSubAgents` 解析 `.agents/agents/<name>/AGENT.md`（frontmatter 可选 `model`/`tools`/`workdir`；`model` 可写模型名或 `openai/<model>` / `anthropic/<model>`）；默认 ReAct 图经 `task({ subagent_type, description })` 委派（子智能体 subagent 复用默认图、独立 prompt/工具/工作目录，默认继承父 cwd）。自定义图也可直接用 subgraph（见 [examples/dev-agent/researcher.ts](../examples/dev-agent/researcher.ts)）。
+- **subagents** — `discoverSubAgents` 发现 `agents/builtin/`（`config.subagents.directories`）、各 `agentsDirectory` 下的 `agents/<name>/AGENT.md`；默认 ReAct 图经 `task({ subagent_type, description })` 委派。自定义图可用 subgraph（见 [examples/dev-agent/researcher.ts](../examples/dev-agent/researcher.ts)）。
 - **builtInTools** — `createFlowTools(ctx)`（[src/app/flow-tools.ts](../src/app/flow-tools.ts)）组装 http/json + bash/fs/search + `load_skill`/`task` + native MCP + demo，`bindTools` 绑给模型、`ToolNode` 执行。`http_request` 默认拦截私有/loopback/链路本地/云元数据端点（防 SSRF）+ 响应字节上限（防 OOM）；需访问内网改用 `createHttpRequestTool({ allowPrivateNetwork: true })`。
 - **compaction** — [src/libs/compaction.ts](../src/libs/compaction.ts)，消费 `config.compaction`。
 - **sessionStore** — `FileCheckpointSaver`（继承 `MemorySaver`），默认持久化到 `~/.flowagents/<workspace 散列>/`（`resolveSessionDir` 按 workspace 隔离）；设 `config.memory.dir` 为相对路径可 opt-out 回项目内。CLI：`sessions` 列出、`sessions delete <id>` 删除。
@@ -38,8 +38,16 @@ deepagents-flow-ts sessions       # 已持久化的会话
 ## 扩展（不改源码）
 
 - **加 MCP**：编辑 `config/mcp.default.json`。常用 server 见 [config/mcp.examples.json](../config/mcp.examples.json)（context7 / chrome-devtools / filesystem / bash），复制到 `servers` 即可。
-- **加 Skill**：放 `skills/builtin/<name>/SKILL.md`（YAML frontmatter `name`/`description` + 正文）。自动发现。
-- **加 Subagent**：放 `.agents/agents/<name>/AGENT.md`（frontmatter `name`/`description`，可选 `model`/`tools`/`workdir`；`model` 可写同 provider 模型名，也可写 `openai/<model>` / `anthropic/<model>`；正文=systemPrompt）。默认图自动暴露为 `task` 委派工具；自定义图可用 subgraph（见 [examples/dev-agent/researcher.ts](../examples/dev-agent/researcher.ts)）。
+- **加 Skill**：
+  - **平台开发**：`dev-engineer-toolkit` 登记 / `download-skill.sh`；开发 Agent **禁止**手写 `.agents/skills/`。
+  - **项目内置**：`skills/builtin/<name>/SKILL.md`（随仓库交付）。
+  - 纯本地 CLI 调试也可发现 `.agents/skills/`（运行时能力），但开发 Agent 不写该路径。
+- **加 Subagent**：
+  - **平台开发**：平台 UI 编排；开发 Agent **禁止**写 `.agents/agents/`。
+  - **项目内置**：`agents/builtin/<name>/AGENT.md`（`config.subagents.directories`，与 `skills/builtin/` 对称）。
+  - 运行时仍可发现 `.agents/agents/`（如平台 download）；代码级复用 → subgraph（见 [examples/dev-agent/researcher.ts](../examples/dev-agent/researcher.ts)）。
+  - **平台开发场景**：子智能体由**平台**编排添加，开发 Agent **禁止**在工作区创建 `AGENT.md`；主 Agent 身份在 `config.agent` + `prompts/`。
+  - 纯本地 CLI 调试可参考上述路径；自定义图可用 subgraph（见 [examples/dev-agent/researcher.ts](../examples/dev-agent/researcher.ts)）。
 - **改系统提示词**：编辑 `prompts/flow.base.md`，或设 `config.agent.systemPrompt` / `config.agent.systemPromptPath`。
 - **换模型**：改 `config.model` 或设 `ANTHROPIC_MODEL` / `OPENAI_MODEL`。
 - **换协议**：设 `API_PROTOCOL=anthropic|openai`（平台 `model_provider.api_protocol` 经 agent env 下发），或 `LLM_PROVIDER`（同义别名）。`loadConfig` 会打 `platformModelEnv 已注入` / `resolveModelProvider` 诊断日志（密钥脱敏），未替换的 `{MODEL_PROVIDER_*}` 占位符会 `warn`。
