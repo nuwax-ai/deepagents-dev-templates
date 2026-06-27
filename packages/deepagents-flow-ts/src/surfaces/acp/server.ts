@@ -16,8 +16,6 @@
 
 import {
   DeepAgentsServer,
-  formatToolCallTitle,
-  getToolCallKind,
   type DeepAgentConfig,
   type DeepAgentsServerHooks,
   type StopReason,
@@ -53,84 +51,12 @@ import type {
   StageEvent,
   PlanEvent,
 } from "../../core/flow-types.js";
+import { emitToolCall, type AcpToolConnection } from "./emit-tool-call.js";
 
 const log = logger.child("flow-acp");
 
 /** ACP 连接的最小接口：向客户端推 sessionUpdate。 */
-interface AcpConnection {
-  sessionUpdate(params: {
-    sessionId: string;
-    update:
-      | { sessionUpdate: "agent_message_chunk"; messageId?: string; content: { type: "text"; text: string } }
-      | { sessionUpdate: "agent_thought_chunk"; messageId?: string; content: { type: "text"; text: string } }
-      | {
-          sessionUpdate: "plan";
-          entries: Array<{
-            content: string;
-            priority?: "high" | "medium" | "low";
-            status: "pending" | "in_progress" | "completed" | "skipped";
-          }>;
-        }
-      | {
-          sessionUpdate: "tool_call";
-          toolCallId: string;
-          title: string;
-          kind: string;
-          status: string;
-          input?: unknown;
-        }
-      | {
-          sessionUpdate: "tool_call_update";
-          toolCallId: string;
-          status: string;
-          content?: unknown;
-          output?: string;
-        };
-  }): Promise<void>;
-}
-
-/** 把 FlowExecutor 的 ToolCallEvent 翻译成 ACP tool_call / tool_call_update 推给客户端。 */
-async function emitToolCall(
-  conn: AcpConnection,
-  sessionId: string,
-  e: ToolCallEvent
-): Promise<void> {
-  if (e.status === "in_progress") {
-    await conn.sessionUpdate({
-      sessionId,
-      update: {
-        sessionUpdate: "tool_call",
-        toolCallId: e.toolCallId,
-        title: formatToolCallTitle(e.toolName, e.args),
-        kind: getToolCallKind(e.toolName),
-        status: "in_progress",
-        input: e.args,
-      },
-    });
-    return;
-  }
-  // completed | failed
-  const update: {
-    sessionUpdate: "tool_call_update";
-    toolCallId: string;
-    status: string;
-    content?: unknown;
-    output?: string;
-  } = {
-    sessionUpdate: "tool_call_update",
-    toolCallId: e.toolCallId,
-    status: e.status,
-  };
-  if (e.status === "completed" && e.result != null) {
-    const text =
-      typeof e.result === "string" ? e.result : JSON.stringify(e.result, null, 2);
-    update.content = [{ type: "content", content: { type: "text", text } }];
-    update.output = text;
-  } else if (e.status === "failed" && e.error) {
-    update.content = [{ type: "content", content: { type: "text", text: e.error } }];
-  }
-  await conn.sessionUpdate({ sessionId, update });
-}
+type AcpConnection = AcpToolConnection;
 
 /** ACP 流式回传统计（写入 prompt_end）。 */
 interface AcpStreamStats {
@@ -152,6 +78,9 @@ function buildAcpCallbacks(
   sessionId: string,
   stats: AcpStreamStats,
   inflightTools: Map<string, ToolCallEvent>,
+  emittedToolCallIds: Set<string>,
+  completedToolCallIds: Set<string>,
+  workspaceRoot: string,
   signal?: AbortSignal
 ): ReturnType<typeof traceFlowCallbacks> {
   return traceFlowCallbacks(
@@ -167,7 +96,12 @@ function buildAcpCallbacks(
         return streamText(conn, sessionId, token, "agent", messageId);
       },
       onToolCall: async (e) => {
-        await emitToolCall(conn, sessionId, e);
+        await emitToolCall(conn, sessionId, e, {
+          inflightTools,
+          workspaceRoot,
+          emittedToolCallIds,
+          completedToolCallIds,
+        });
         if (e.status === "in_progress") {
           inflightTools.set(e.toolCallId, e);
         } else {
@@ -195,6 +129,7 @@ async function failInflightToolsOnCancel(
           sessionUpdate: "tool_call_update",
           toolCallId: e.toolCallId,
           status: "failed",
+          ...(e.args && Object.keys(e.args).length > 0 ? { rawInput: e.args } : {}),
           content: [
             {
               type: "content",
@@ -422,11 +357,18 @@ export function createFlowHooks(options: FlowAcpOptions): DeepAgentsServerHooks 
         async () => {
           const stats = createAcpStreamStats();
           const inflightTools = new Map<string, ToolCallEvent>();
+          const emittedToolCallIds = new Set<string>();
+          const completedToolCallIds = new Set<string>();
+          const workspaceRoot =
+            sessionConfigs.get(sessionId)?.workspaceRoot ?? process.cwd();
           const callbacks = buildAcpCallbacks(
             conn,
             sessionId,
             stats,
             inflightTools,
+            emittedToolCallIds,
+            completedToolCallIds,
+            workspaceRoot,
             ctx.signal
           );
 
