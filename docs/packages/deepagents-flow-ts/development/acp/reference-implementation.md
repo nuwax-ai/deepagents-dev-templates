@@ -87,10 +87,10 @@ toolCall: { toolCallId, rawInput: toolInput, ...toolInfoFromToolUse() }
 | 方法 | claude-code-acp-ts | flow-ts |
 | --- | --- | --- |
 | `initialize` | ✅ | ✅ |
-| `session/new` | ✅ | ✅ + `configureSession` |
-| `session/load` | ✅ | ✅ + `getSessionHistory` |
+| `session/new` | ✅ | ✅ + `configureSession(phase:new)` |
+| `session/load` | ✅ | ⚠️ 重建 `SessionState` + `configureSession(phase:load)` ✅；**`getSessionHistory` 消息回放未实现**（Legacy server 调 hook @ `server.ts:1192`，但 Flow surface 的 `createFlowHooks` 未提供，仅 TODO） |
 | `session/prompt` | ✅ | ✅（`onPrompt` → Flow） |
-| `session/cancel` | ✅ | ✅ |
+| `session/cancel` | ✅ | ✅（abort signal 透传进图 + `failInflightToolsOnCancel`） |
 | `session/set_mode` | ✅ | ❌ |
 | `session/set_config_option` | ✅ | ❌ |
 | `session/list` / `delete` / … | 部分 | 依 DeepAgentsServer |

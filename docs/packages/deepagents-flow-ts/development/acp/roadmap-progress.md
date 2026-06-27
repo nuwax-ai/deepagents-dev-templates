@@ -25,7 +25,7 @@ flowchart LR
 | **A** | P1 | ✅ 完成 | `libs/deepagents-acp/acp-tool-presentation.ts` |
 | **B** | P2 | ✅ 完成 | 去掉 `input`/`output`；Legacy 与 Flow 统一 |
 | **C** | P2 | ⏸️ 搁置精炼 | 调研完成：think 非流式，无增量 rawInput；见 [phase-c-streaming-research.md](./phase-c-streaming-research.md) |
-| **C-dedupe** | P3 | ✅ 完成 | `emittedToolCallIds`；二次 in_progress → `tool_call_update` |
+| **C-dedupe** | P3 | ✅ 完成 | `emittedToolCallIds`（二次 in_progress→update）+ `completedToolCallIds`（二次 terminal→跳过） |
 | **D** | P2 | ✅ 完成 | `requestPermission` + `buildPermissionToolCall` |
 | **E** | P3 | ⏸️ 暂缓 | 用量 / 模式面暂不实施；调研见 [phase-e-capabilities-research.md](./phase-e-capabilities-research.md) |
 
@@ -74,12 +74,13 @@ flowchart LR
 - `think` 节点用 `invoke()`，**不流式**输出 `tool_calls` → 无增量 `rawInput`
 - LangGraph `tools` 模式：`on_tool_start` **一次**、参数已完整 JSON
 - **不需要**对齐 claude-code-acp-ts 的 `alreadyCached` 精炼逻辑（除非未来 think 改 stream）
-- **可选**：~~`createToolExecNode` 与 `tools` stream 双轨各发 `in_progress`，可能 **重复 `tool_call`**~~ → ✅ **C-dedupe** 已落地
+- **可选**：~~`createToolExecNode` 与 `tools` stream 双轨各发 `in_progress`，可能 **重复 `tool_call`**~~ → ✅ **C-dedupe** 已落地（双端：`emittedToolCallIds` 拦二次 in_progress、`completedToolCallIds` 拦二次 terminal）
 
 | ID | 任务 | 状态 | 完成日 |
 | --- | --- | --- | --- |
 | C-1 | 调研 LangGraph 重复 `on_tool_start` / 流式 args | ✅ | 2026-06-27 |
-| C-2 | 首包 Set 去重 / 二次改 `tool_call_update` | ✅ | 2026-06-27 |
+| C-2 | `emittedToolCallIds` 二次 in_progress→`tool_call_update` | ✅ | 2026-06-27 |
+| C-2b | `completedToolCallIds` 二次 terminal→跳过（防无 rawInput 的 completed 覆盖首包） | ✅ | 2026-06-27 |
 | C-3 | think 流式 + 增量 rawInput | ❌ 搁置 | |
 
 ---
@@ -113,17 +114,21 @@ flowchart LR
 | 维度 | claude-code-acp-ts | flow-ts |
 | --- | --- | --- |
 | `rawInput` / `rawOutput` 核心 | ✅ | ✅ |
+| terminal `tool_call_update` 带 title/kind | ✅ | ✅ |
 | `locations` / `diff` | ✅ | ✅ |
 | 非官方 `input`/`output` | 从不发 | ✅ 已移除 |
 | 流式 rawInput 精炼 | ✅ | ⏸️ 不需要（架构不同） |
-| 重复 tool_call 去重 | SDK 双次回放 | ✅ C-dedupe |
+| 重复 tool_call 去重 | SDK 双次回放 | ✅ C-dedupe（in_progress + terminal 双端） |
 | 权限 `rawInput` | ✅ | ✅ |
+| per-session runtime（cwd/mcp/model/systemPrompt） | — | ✅ `createExecutor` + `session-config` / `session-diagnostics` |
+| `session/load` 消息回放（`getSessionHistory`） | ✅ | ❌ Flow surface 未实现（重建 + configureSession(load) ✅） |
 | `usage_update` / 模式面 | ✅ | ⏸️ 暂缓（非当前范围） |
 
 ---
 
 ## 下一批建议
 
-1. ~~**C-dedupe**~~ ✅ 已完成  
-2. ~~**阶段 E**（用量 / 模式）~~ ⏸️ 暂缓，不在当前路线图  
-3. **生产验证**：NuwaClaw 上 `read_file` + `ask-question` 工具展示
+1. ~~**C-dedupe**~~ ✅ 已完成（in_progress + terminal 双端）
+2. **`getSessionHistory` 消息回放**：Flow surface 的 `createFlowHooks` 尚未实现（server.ts TODO @ L496）；Legacy 已调 hook。跨进程/IDE 重启后续跑需此回放，否则仅靠 `configureSession(phase:load)` 重建 runtime
+3. ~~**阶段 E**（用量 / 模式）~~ ⏸️ 暂缓，不在当前路线图
+4. **生产验证**：NuwaClaw 上 `read_file` + `ask-question` 工具展示
