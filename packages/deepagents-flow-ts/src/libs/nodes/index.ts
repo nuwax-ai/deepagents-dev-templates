@@ -30,6 +30,13 @@ export { createLlmRouterNode, type LlmRouterNodeOptions } from "./llm-router.js"
 export { createMcpRetrievalNode, type McpRetrievalNodeOptions } from "./mcp-retrieval.js";
 export { createToolExecNode, runTool, type ToolExecNodeOptions } from "./tools.js";
 export {
+  normalizeToolMessageContent,
+  normalizeToolResult,
+  extractToolEndOutput,
+  extractMcpStructuredRawInput,
+  type NormalizedToolResult,
+} from "./tool-result-normalize.js";
+export {
   createLlmNode,
   createLlmStreamNode,
   extractText,

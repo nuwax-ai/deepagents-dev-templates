@@ -8,9 +8,11 @@
 
 import { randomUUID } from "node:crypto";
 import { ToolNode } from "@langchain/langgraph/prebuilt";
+import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import { AIMessage, type BaseMessage, type ToolMessage } from "@langchain/core/messages";
 import type { StructuredTool } from "@langchain/core/tools";
 import type { FlowCallbacks, ToolCallEvent } from "../../core/flow-types.js";
+import { normalizeToolResult } from "./tool-result-normalize.js";
 
 /**
  * 执行一个工具 fn，并把过程经 onToolCall 三态透出。
@@ -69,16 +71,21 @@ export function createToolExecNode<S extends { messages: BaseMessage[] }>(
   const { tools, callbacks, write } = opts;
   const toolNode = new ToolNode(tools);
 
-  return async (state: S): Promise<Partial<S>> => {
+  return async (state: S, config?: LangGraphRunnableConfig): Promise<Partial<S>> => {
+    const onToolCall =
+      (config?.configurable?.onToolCall as FlowCallbacks["onToolCall"]) ??
+      callbacks?.onToolCall;
     const last = state.messages[state.messages.length - 1] as AIMessage;
     const calls = (last?.tool_calls ?? []) as Array<{
       id?: string;
       name: string;
       args: Record<string, unknown>;
     }>;
+    const argsById = new Map<string, Record<string, unknown>>();
     for (const c of calls) {
-      if (callbacks?.onToolCall && c.id) {
-        await callbacks.onToolCall({
+      if (onToolCall && c.id) {
+        argsById.set(c.id, c.args);
+        await onToolCall({
           toolCallId: c.id,
           toolName: c.name,
           args: c.args,
@@ -91,15 +98,25 @@ export function createToolExecNode<S extends { messages: BaseMessage[] }>(
     };
     const toolMsgs = result?.messages ?? [];
     for (const tm of toolMsgs) {
-      if (callbacks?.onToolCall) {
+      if (onToolCall) {
         const failed = tm.status === "error";
-        const text = typeof tm.content === "string" ? tm.content : JSON.stringify(tm.content);
-        await callbacks.onToolCall({
+        const normalized = normalizeToolResult(tm.content);
+        const args = argsById.get(tm.tool_call_id) ?? {};
+        // 保留 MCP structuredContent，供 emitToolCall 提取 ask-question 规范化 rawInput
+        const result =
+          normalized.rawOutput !== undefined
+            ? {
+                type: "text",
+                text: normalized.text,
+                structuredContent: normalized.rawOutput,
+              }
+            : normalized.text;
+        await onToolCall({
           toolCallId: tm.tool_call_id,
           toolName: tm.name ?? "",
-          args: {},
+          args,
           status: failed ? "failed" : "completed",
-          ...(failed ? { error: text } : { result: text }),
+          ...(failed ? { error: normalized.text } : { result }),
         });
       }
     }

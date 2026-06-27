@@ -51,6 +51,10 @@ export async function dispatchSurfaceEvent(
       });
       break;
     case "tool_update":
+      // stream 解析失败时 output 为空；跳过以免发出无内容的 completed 覆盖节点直出结果
+      if (event.status === "completed" && event.output === undefined) {
+        break;
+      }
       await callbacks.onToolCall?.({
         toolCallId: event.id,
         toolName: event.name ?? event.id,

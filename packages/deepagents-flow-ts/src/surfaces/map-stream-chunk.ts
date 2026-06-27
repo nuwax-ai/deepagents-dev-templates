@@ -17,7 +17,7 @@
 
 import { INTERRUPT } from "@langchain/langgraph";
 import type { SurfaceStreamEvent } from "./stream-events.js";
-import { extractText } from "../libs/nodes/index.js";
+import { extractText, extractToolEndOutput } from "../libs/nodes/index.js";
 
 export function mapStreamChunk(mode: string, chunk: unknown): SurfaceStreamEvent[] {
   const events: SurfaceStreamEvent[] = [];
@@ -142,8 +142,7 @@ export function mapStreamChunk(mode: string, chunk: unknown): SurfaceStreamEvent
     } else if (e.event === "on_tool_end") {
       const k = e.output?.kwargs;
       const status: "completed" | "failed" = k?.status === "error" ? "failed" : "completed";
-      // content 多路径取：kwargs.content（序列化标准形态，实测完整 ReAct 正常）+ output.content（兜底）。
-      const content = k?.content ?? e.output?.content;
+      const content = extractToolEndOutput(e.output);
       events.push({
         type: "tool_update",
         id,

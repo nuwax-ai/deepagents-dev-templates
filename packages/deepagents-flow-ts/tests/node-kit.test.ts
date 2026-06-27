@@ -373,6 +373,27 @@ describe("createToolExecNode", () => {
     const out = (await node({ messages: [new AIMessage({ content: "no calls" })] })) as any;
     expect(out.messages).toEqual([]);
   });
+  it("经 configurable.onToolCall 透出（无 build-time callbacks）", async () => {
+    const echo = tool(async ({ x }: { x: string }) => `got:${x}`, {
+      name: "echo",
+      schema: z.object({ x: z.string() }),
+      description: "echo back",
+    });
+    const events: Array<{ status: string; args: Record<string, unknown> }> = [];
+    const node = createToolExecNode<{ messages: BaseMessage[] }>({ tools: [echo] as any });
+    const ai = new AIMessage({
+      content: "",
+      tool_calls: [{ id: "tc2", name: "echo", args: { x: "cfg" } }] as any,
+    });
+    await node(
+      { messages: [ai] },
+      { configurable: { onToolCall: (e) => void events.push({ status: e.status, args: e.args }) } } as any
+    );
+    expect(events.map((e) => e.status)).toContain("in_progress");
+    expect(events.map((e) => e.status)).toContain("completed");
+    const completed = events.find((e) => e.status === "completed");
+    expect(completed?.args).toEqual({ x: "cfg" });
+  });
 });
 
 // ---------- createHumanApprovalNode(纯逻辑部分)----------
