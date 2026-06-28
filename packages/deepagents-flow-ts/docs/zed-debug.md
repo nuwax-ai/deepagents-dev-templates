@@ -221,7 +221,7 @@ node <REPO>/dist/bundle.mjs          # 等价于 pnpm start
 node <INSTALL_ROOT>/dist/bundle.mjs
 ```
 
-复制 [.env.example](../.env.example) → `.env` 并填凭证（生产通常由平台 / 安装器注入）。
+复制 [.env.example](../.env.example) → `.env` 并填凭证（或由部署环境的 env 注入）。
 
 ### 3. 生产 agent_servers（连已安装的包）
 
@@ -257,10 +257,6 @@ node <INSTALL_ROOT>/dist/bundle.mjs
 | `args` | `<REPO>/src/index.ts` | `<INSTALL_ROOT>/dist/bundle.mjs` |
 | 依赖 | 需 `node_modules`（`pnpm install`） | 无（esbuild 自包含） |
 | `LOG_LEVEL` | `debug` | `info` |
-| 凭证来源 | `env` 注入 | `.env` / 平台 / 安装器 |
+| 凭证来源 | `env` 注入 | `.env` 或部署 env |
 
-### 5. 部署到 Nuwax 平台（S3 发布）
-
-[.nuwax-agent/agent-package.json](../.nuwax-agent/agent-package.json) 已声明 S3 source：`s3.nuwax.com:9443` / bucket `nuwax-packages` / prefix `agent-engines/deepagents-flow-ts`。
-
-> ⚠️ flow-ts 的 S3 发布与 `install-from-s3` bootstrap 脚本**尚未实现**（`publish-s3` / `release` / `install-from-s3` 为 planned）。当前支持**本地打包 + 解压安装**；上传到 `nuwax-packages` bucket 的自动化流程待补脚本后启用。
+更多打包命令见 [scripts/README.md](../scripts/README.md)。

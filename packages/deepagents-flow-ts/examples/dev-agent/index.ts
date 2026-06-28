@@ -10,8 +10,8 @@
  *  - Subagent：researcher subgraph（见 ./researcher.ts），框架原生 subgraph 模式
  *
  * 用法：
- *   pnpm example:dev-agent "帮我查 langgraph 的 ToolNode 用法并写个最小示例"
- *   pnpm example:dev-agent -i          # 交互（多轮续接）
+ *   pnpm example dev-agent "帮我查 langgraph 的 ToolNode 用法并写个最小示例"
+ *   pnpm example dev-agent -i          # 交互（多轮续接）
  *
  * 无模型凭证 → 默认图走 fallback（回显输入），仍可验证图闭环。
  * 真实工具调用需配 ANTHROPIC_API_KEY（或 OPENAI_API_KEY）。

@@ -20,10 +20,10 @@
 export ANTHROPIC_API_KEY=...
 
 # 单次
-pnpm example:dev-agent "用 context7 查 langgraph ToolNode 的用法，给我一个最小示例"
+pnpm example dev-agent "用 context7 查 langgraph ToolNode 的用法，给我一个最小示例"
 
 # 交互（多轮续接，同一 threadId → 历史累积 → 触发压缩）
-pnpm example:dev-agent -i
+pnpm example dev-agent -i
 
 # 看持久化的会话
 pnpm flow sessions

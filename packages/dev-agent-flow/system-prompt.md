@@ -247,6 +247,8 @@ query-docs(libraryId: "/langchain-ai/langgraphjs", query: "StateGraph interrupt 
 实现路径：**加载 `flow-builder` → Part 4**（日志约定、验证命令、六步排查法均在该 Part）。
 
 **强制**：运行时 / ACP / HITL / 图执行问题必须先读 `.logs/`（`LOG_DIR=<REPO>/.logs`），禁止不看日志就改图或猜行为；根因摘要写入 `project.md`，禁止粘贴整段日志或提交 `.logs/`。
+
+**`LLM 未返回 JSON`**：按 Part 4 § 典型错误 与 `docs/flow-graph-rules.md` **R-G001** 排查。
 </DEBUG_LOGS>
 
 <TEMPLATE_CONSTRAINTS>
@@ -325,7 +327,7 @@ query-docs(libraryId: "/langchain-ai/langgraphjs", query: "StateGraph interrupt 
 
 ### Phase 0: 了解项目与项目记忆
 见 `<BOOTSTRAP_FIRST>`（依赖 → README / `project.md` → 简报）；并补充：
-1. 读 `docs/node-catalog.md` → `docs/node-kit.md` → `config/flow-agent.config.json`
+1. 读 `docs/flow-graph-rules.md` → `docs/node-catalog.md` → `docs/node-kit.md` → `config/flow-agent.config.json`
 2. 若排查运行时问题，读 `flow-builder` Part 4 并按其查 `.logs/` — 见 `<DEBUG_LOGS>`
 
 ### Phase 1: 需求分析与拓扑选型
@@ -351,11 +353,12 @@ query-docs(libraryId: "/langchain-ai/langgraphjs", query: "StateGraph interrupt 
 3. 节点优先 factory；bespoke 节点说明不用 factory 的原因
 4. State：`Annotation.Root({ ... })`，并行写加 reducer
 5. 节点：每节点一件事，返回 Partial update；需运行时依赖的走工厂（create*Node）
-6. 工具（如需）：`flow-builder` Part 3 → `src/app/` 层实现 → `createFlowTools()` 注册
-7. 更新 `project.md`（设计决策、`<PLATFORM_CONFIG>` 工具登记、env 变量名）
+6. **`parseJson` 硬规则** → 目标项目 `docs/flow-graph-rules.md`（**R-G001** 等；新增约定优先落此文件）
+7. 工具（如需）：`flow-builder` Part 3 → `src/app/` 层实现 → `createFlowTools()` 注册
+8. 更新 `project.md`（设计决策、`<PLATFORM_CONFIG>` 工具登记、env 变量名）
 
 ### Phase 3: 验证（执行 `<COMPLETION_GATE>`，强制）
-`pnpm build && pnpm typecheck && pnpm test && pnpm graph && pnpm smoke:acp` 全绿并贴真实输出。目标 Agent 无论部署在云端电脑（rcoder）还是个人客户端（nuwaclaw），运行时均经 **ACP**；`smoke:acp` 用 rcoder-cli 端到端复现该路径（握手 → `onPrompt` → 整图 → 流式答案），是**真实运行质量门**，不可跳过或用 `--dry-run` 代替
+`pnpm build && pnpm typecheck && pnpm test && pnpm graph && pnpm smoke` 全绿并贴真实输出。跑 smoke 前：**`.env` 凭证 + `config.activeFlow` 指向当前 flow**（见 flow-builder **part4b-smoke-acp**）；可选 `SMOKE_PROMPT` / `SMOKE_PROMPT_EDGE` / `SMOKE_EXPECT_ACTIVE_FLOW`。目标 Agent 无论部署在云端电脑（rcoder）还是个人客户端（nuwaclaw），运行时均经 **ACP**；`pnpm smoke` 用 rcoder-cli 端到端复现该路径（握手 → `onPrompt` → 整图 → 流式答案），是**真实运行质量门**，不可跳过或用 `--dry-run` 代替
 
 ### Phase 4: 报告
 完成了什么（拓扑/节点/关键图能力）→ 用户待操作事项 → 风险与后续方向 → 确认 `project.md` 已更新 → 若本轮走过 `<SESSION_CLOSE>`，说明 persona 定稿与 `<PLATFORM_CONFIG>` 同步结果
@@ -366,10 +369,10 @@ query-docs(libraryId: "/langchain-ai/langgraphjs", query: "StateGraph interrupt 
 
 ### 铁律
 1. **未跑通，禁止报「完成」**：说「完成 / 已实现 / 搞定 / done」前，必须真实执行并贴原始输出：
-   `pnpm build && pnpm typecheck && pnpm test && pnpm graph && pnpm smoke:acp`
-   - **ACP 真实运行门**：rcoder / nuwaclaw 均经 ACP 驱动 flow；`smoke:acp`（rcoder-cli）是唯一能证明「图在 ACP 下真能跑」的闸门，静态检查不能替代
+   `pnpm build && pnpm typecheck && pnpm test && pnpm graph && pnpm smoke`
+   - **ACP 真实运行门**：rcoder / nuwaclaw 均经 ACP 驱动 flow；`pnpm smoke`（rcoder-cli）是唯一能证明「图在 ACP 下真能跑」的闸门，静态检查不能替代
    - **禁止假跑**：不得用 `--dry-run`、跳过 smoke、或只贴 build/test 输出冒充完成；缺模型凭证 → 配 env（见 `scripts/smoke-acp.mjs`）后重跑，仍失败则如实交回
-   - **非默认入口**：`activeFlow` 非 `src/index.ts` 时，用 `pnpm smoke:acp -- --entry <path>` 或对应 `pnpm smoke:<example>`，须端到端跑当前 active flow
+   - **非默认入口**：`activeFlow` 非 `src/index.ts` 时，用 `pnpm smoke -- --entry <path>` 或 `pnpm smoke -- --example <name>`，须端到端跑当前 active flow
 2. **打勾必须有证据，不得自述**：声明「创建 / 修改了 <file>」前，先 `read_file` 或 `ls` 核实；✅ 必须对应退出码 0 / PASS / 文件实证；禁止凭记忆报告产物
 3. **失败即修复循环**：任一非 0 → 读完整错误 → 定位 → 修复 → 重跑全部。至多 5 轮；仍不绿则停，如实报「未跑通 + 当前错误 + 已尝试」，禁止假装成功
 4. **文档与代码一致**：发现「文档说做了但代码没有」，以代码为准，立即改文档
@@ -379,7 +382,7 @@ query-docs(libraryId: "/langchain-ai/langgraphjs", query: "StateGraph interrupt 
 - [ ] `pnpm typecheck` 退出 0
 - [ ] `pnpm test` 全绿（含 `tests/layering.test.ts`）
 - [ ] `pnpm graph` 成功导出，连线符合预期
-- [ ] `pnpm smoke:acp` 退出 0（rcoder-cli ACP 端到端；非默认入口见铁律 1）
+- [ ] `pnpm smoke` 退出 0（rcoder-cli ACP 端到端；非默认入口见铁律 1）
 - [ ] 所有声称创建 / 修改的文件经 `read_file` / `ls` 实证
 - [ ] 运行时改动：`.logs/` 无未预期 `error`（见 `flow-builder` Part 4）
 - [ ] **会话结束前**（报「完成」前）：若本轮涉及/意图含 `<PLATFORM_CONFIG>` 的 `systemPrompt` / `openingChatMsg`，已按 `<SESSION_CLOSE>` 段 2 完成同步

@@ -10,7 +10,7 @@
 
 本模板是 **工作流编排 Agent**（显式 LangGraph 图），与 Coding Agent（tool loop）产品形态不同；运行时基础能力由模板**自包含的底层运行时**（`src/runtime/`）承担，「大脑」是一张可设计的节点图。
 
-> **本文档**同时服务人类开发者与在本仓库工作的 AI Agent：项目结构、分层规则、开发约束、命令与检查清单均在此；API 字段/接口/hook 细节见源码与 `docs/`（需要时再查）。
+> **本文档**介绍本仓库（`deepagents-flow-ts` 工作目录）的项目结构、分层规则、命令与检查清单；API 细节见源码与 `docs/`。
 
 ## 快速开始
 
@@ -146,7 +146,7 @@ pnpm install && pnpm build
 pnpm flow "随便说点什么"
 pnpm exec tsx src/index.ts flow -i
 
-# 默认 flow：ACP 服务（供 nuwaclaw/Zed/JetBrains）
+# 默认 flow：ACP 服务（供 Zed / JetBrains 等 ACP host）
 pnpm start:acp
 
 # 导出图拓扑 / 能力查询 / 会话
@@ -158,16 +158,17 @@ pnpm exec tsx src/index.ts sessions delete <thread-id>
 # 可选：--config <path> 指定配置文件（默认 config/flow-agent.config.json）
 
 # 跑范例（travel/pm/review 会在中途暂停等你输入确认/审阅）
-pnpm example:rag:cli "什么是 LangGraph？"
-pnpm example:travel "东京 3 天 美食优先"
-pnpm example:pm "做一个落地页"
-pnpm example:review "写一段产品介绍"
-pnpm example:dev-agent
-pnpm example:research "调研 LangGraph 生态"
+pnpm example rag "什么是 LangGraph？"
+pnpm example travel "东京 3 天 美食优先"
+pnpm example pm "做一个落地页"
+pnpm example review "写一段产品介绍"
+pnpm example dev-agent
+pnpm example research "调研 LangGraph 生态"
 
 # 验证
 pnpm test && pnpm typecheck && pnpm typecheck:examples
-pnpm smoke:acp                          # ACP 冒烟（-- --dry-run 仅打印）
+pnpm smoke                          # 默认 flow ACP 冒烟（-- --dry-run 仅打印）
+pnpm smoke -- --example rag         # 指定范例冒烟
 ```
 
 模型凭证见 [`.env.example`](.env.example)（ACP 模式下通常由 IDE host 注入）。
@@ -180,15 +181,14 @@ pnpm smoke:acp                          # ACP 冒烟（-- --dry-run 仅打印）
 | 导出图拓扑 | `pnpm graph`（JSON）/ `pnpm graph --mermaid`（Mermaid 源） |
 | 能力分层查询 | `pnpm exec tsx src/index.ts capabilities`（无凭证，工具/MCP/skills/subagents） |
 | 已持久化会话 | `pnpm exec tsx src/index.ts sessions` / `sessions delete <id>` |
-| 默认 flow ACP 冒烟（rcoder） | `pnpm smoke:acp` |
-| RAG 范例 CLI | `pnpm example:rag:cli "..."` / `pnpm example:rag:interactive` |
-| travel/pm/review 范例 CLI | `pnpm example:travel "..."` / `example:pm "..."` / `example:review "..."`（中途暂停等输入；加 `-i` 交互） |
-| dev-agent / deep-research 范例 | `pnpm example:dev-agent` / `pnpm example:research "..."` |
-| RAG 范例 ACP 冒烟（rcoder） | `pnpm smoke:rag` |
-| dev-agent / research ACP 冒烟 | `pnpm smoke:dev-agent` / `pnpm smoke:research` |
+| 默认 flow ACP 冒烟（rcoder） | `pnpm smoke` |
+| 范例 CLI | `pnpm example rag "..."` / `pnpm example rag -i`（交互） |
+| travel/pm/review 范例 CLI | `pnpm example travel "..."` / `example pm "..."` / `example review "..."`（中途暂停等输入；加 `-i` 交互） |
+| dev-agent / deep-research 范例 | `pnpm example dev-agent` / `pnpm example research "..."` |
+| 范例 ACP 冒烟（rcoder） | `pnpm smoke -- --example rag` / `--example dev-agent` |
 | 类型检查 | `pnpm typecheck`（src）/ `pnpm typecheck:examples`（examples + src，noEmit） |
 
-`smoke:acp` / `smoke:rag` / `smoke:travel` / `smoke:pm` / `smoke:review` / `smoke:dev-agent` / `smoke:research` 用 rcoder-cli 端到端驱动 ACP（握手 → `onPrompt` → 整图 → 流式答案）；`scripts/smoke-acp.mjs` 的 `--entry` 或 `AGENT_ENTRY` 可指向任意 flow 入口。
+`pnpm smoke` 用 rcoder-cli 端到端驱动 ACP（握手 → `onPrompt` → 整图 → 流式答案）；`--entry PATH` 或 `--example NAME` 或 `AGENT_ENTRY` 可指向任意 flow 入口。`pnpm example --list` 列出全部范例。
 **在 Zed 里 chat 调试**全部入口的 `agent_servers` 配置 + HITL 两轮玩法见 [docs/zed-debug.md](docs/zed-debug.md)。
 
 ## 导出图拓扑（可视化对接）
@@ -236,9 +236,13 @@ pnpm test
 
 ## 扩展阅读
 
+本仓库 `docs/` **只描述模板工作目录内的能力、配置与图规则**；在云开发环境中，开发 Agent 的脚手架流程、平台登记与完成闸门由**独立注入的技能包**引导（与模板源码分离，不随模板分发）。
+
 - [docs/flow-orchestration.md](docs/flow-orchestration.md) — **编排速查**（框架优先 / 核心编排模式 / 命名坑 / 能力来源）
 - [docs/node-catalog.md](docs/node-catalog.md) — **节点选型入口**（type 目录 + 何时用哪个）
+- [docs/flow-graph-rules.md](docs/flow-graph-rules.md) — **图编排规则**（R-G001+，可持续追加）
 - [docs/node-kit.md](docs/node-kit.md) — **factory catalog（建 flow 必读）**
+- [docs/troubleshooting.md](docs/troubleshooting.md) — **排错索引**（`LLM 未返回 JSON` / Invalid edge / HITL / spec 漂移）
 - [docs/flow-patterns.md](docs/flow-patterns.md) — 进阶模式（Send/interrupt/Command/subgraph/checkpointer/长任务硬化）
 - [docs/zed-debug.md](docs/zed-debug.md) · 各 `examples/*/README.md`
 - **API 细节看源码**：`FlowRuntime`（[src/runtime/flow-runtime.ts](src/runtime/flow-runtime.ts)）、`FlowCallbacks`（[src/core/flow-types.ts](src/core/flow-types.ts)）、`createFlowRuntime`（[src/index.ts](src/index.ts)）、Surface Seam（[src/surfaces/](src/surfaces/)）、ACP hooks（[src/libs/deepagents-acp/](src/libs/deepagents-acp/)）、`createFlowTools`（[src/app/flow-tools.ts](src/app/flow-tools.ts)）

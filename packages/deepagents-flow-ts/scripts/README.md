@@ -27,10 +27,19 @@
 
 | Script | npm 命令 | 说明 |
 |--------|----------|------|
-| `smoke-acp.mjs` | `pnpm run smoke:acp` | 默认 flow（`src/index.ts`） |
-| | `pnpm run smoke:rag` 等 | `--entry examples/...` 指向各示例 |
+| `smoke-acp.mjs` | `pnpm run smoke` | 默认 flow（`src/index.ts`，读 `activeFlow`） |
+| | `pnpm run smoke -- --example rag` 等 | `--example` 指向各范例短名 |
 
-`--entry` 或环境变量 `AGENT_ENTRY` 可指定入口；`--debug --dry-run` 可在无 API key 时检查命令。
+**模型 env**：`scripts/lib/smoke-env.mjs` 从 `.env` + `config/flow-agent.config.json` 解析 provider/model，过滤 `{MODEL_PROVIDER_*}` 占位符后 `-e` 传给 rcoder-cli（避免 400 Invalid model）。
+
+| Env | 说明 |
+|-----|------|
+| `SMOKE_PROMPT` | 主路径用户输入 |
+| `SMOKE_PROMPT_EDGE` | 可选第二条（边界输入，如「你是？」） |
+| `SMOKE_EXPECT_ACTIVE_FLOW` | 与 `activeFlow` 不一致则失败 |
+| `SMOKE_DEBUG=1` | 打印解析后的模型 env |
+
+`--entry` 或 `AGENT_ENTRY` 可指定入口；`--debug --dry-run` 可在无 API key 时检查命令。
 
 ## Windows 打包工具（可选）
 

@@ -51,7 +51,7 @@ pnpm --filter deepagents-flow-ts exec tsx examples/human-in-loop/index.ts
 模板用 sessionId 作 threadId、记录"该 session 在等回复"，所以无需额外协议支持就能多轮闭环。
 
 > **自动化覆盖**：interrupt→resume 闭环由 CLI（`runStatefulCli`）实跑 + 本目录单测保证；
-> `rcoder-cli chat` 是 one-shot（单 prompt），不能脚本化多轮，所以 `smoke:review` 只验 ACP **第一轮**
+> `rcoder-cli chat` 是 one-shot（单 prompt），不能脚本化多轮，所以 `pnpm smoke -- --example review` 只验 ACP **第一轮**
 > （query→interrupt→发问题）。**多轮 resume 请在 Zed 里手测**（第一条发任务、第二条发审阅意见）——
 > ACP 与 CLI 共用同一套 `StatefulFlow` 状态机（`awaitingResume`），逻辑等价。
 

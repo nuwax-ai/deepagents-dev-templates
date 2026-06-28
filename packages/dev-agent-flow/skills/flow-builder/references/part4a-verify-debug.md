@@ -1,4 +1,4 @@
-# Part 4：验证与调试（强制）
+# Part 4a：验证与调试（强制）
 
 > 所属：`flow-builder` L2-D。入口路由见 [SKILL.md](../SKILL.md)。
 > 系统提示词 `<COMPLETION_GATE>` / `<DEBUG_LOGS>` 的**详细执行依据**在本层。
@@ -8,14 +8,16 @@
 报告「完成 / done」前必须在本轮真实执行并贴出原始输出：
 
 ```bash
-pnpm build && pnpm typecheck && pnpm test && pnpm graph && pnpm smoke:acp
+pnpm build && pnpm typecheck && pnpm test && pnpm graph && pnpm smoke
 ```
 
 失败 → 读完整错误 → 修复 → 重跑；至多 5 轮仍不绿则如实交回用户。
 
-**ACP 真实运行门**：目标 Agent 部署在 rcoder（云端）或 nuwaclaw（个人客户端）时，运行时均经 ACP。`smoke:acp` 用 rcoder-cli 端到端复现（握手 → `onPrompt` → 整图 → 流式答案），是生产路径的质量门；静态四连不能替代，禁止 `--dry-run` 冒充通过。非默认入口用 `--entry` 或 `pnpm smoke:<example>`。
+**ACP 真实运行门**：目标 Agent 部署在 rcoder（云端）或 nuwaclaw（个人客户端）时，运行时均经 ACP。`pnpm smoke` 用 rcoder-cli 端到端复现（握手 → `onPrompt` → 整图 → 流式答案），是生产路径的质量门；静态四连不能替代，禁止 `--dry-run` 冒充通过。非默认入口用 `--entry` 或 `pnpm smoke -- --example <name>`。
 
 Scaffold 生成器自带快检（`typecheck && graph`）；**全量闸门仍须上式五连**。
+
+**smoke 细则**（`.env` 模型解析、`activeFlow`、`SMOKE_PROMPT*`、占位符）→ [part4b-smoke-acp.md](part4b-smoke-acp.md)。
 
 ---
 
@@ -26,7 +28,7 @@ pnpm build
 pnpm test                    # 含 tests/layering.test.ts
 pnpm typecheck
 pnpm typecheck:examples      # 改了 examples 时
-pnpm smoke:acp               # 强制：rcoder-cli ACP 端到端（非默认入口可用 smoke:<example> 或 --entry）
+pnpm smoke               # 强制：rcoder-cli ACP 端到端（非默认入口可用 --example 或 --entry）
 pnpm graph                   # 导出拓扑
 ```
 
@@ -65,9 +67,29 @@ pnpm graph                   # 导出拓扑
 
 ---
 
+## 典型错误：`LLM 未返回 JSON`
+
+**规则**：[flow-graph-rules-pointer.md](flow-graph-rules-pointer.md) → 目标项目 **R-G001 / R-G002**。完整六步亦见目标项目 `docs/troubleshooting.md`。
+
+| 步 | 动作 |
+|----|------|
+| 1 | 日志搜 `LLM 未返回 JSON` 或节点 `label`（如 `prepare`） |
+| 2 | 打开 `src/app/flows/<name>/graph.ts` 对应节点，查是否有 `parse: parseJson` |
+| 3 | 查 `write` 是否使用 `r.parsed` — **未使用则删 `parse`** |
+| 4 | 若必须结构化：加强 prompt JSON schema / 加 `fallback` 或换 `createLlmRouterNode` + `routeFallback` |
+| 5 | 若入口节点：改 prompt 支持非预期输入（打招呼、格式错误），不强求 JSON |
+| 6 | **同步** `scripts/scaffold/specs/<name>.flow.json`（手改 graph 后 regenerate 会覆盖修复） |
+
+详表见目标项目 `docs/troubleshooting.md` § `LLM 未返回 JSON`。
+
+**与工具 EXECUTING 的关系**：图在 LLM 节点抛错未走完时，并行调试命令可能长时间显示 EXECUTING；先修图错误再判工具层。
+
+---
+
 ## Anti-patterns
 
 - ❌ 未跑通就声称完成
 - ❌ 不看 `.logs/` 就猜 ACP/HITL 行为
 - ❌ 把 `.log` 全文贴进对话或提交 git
+- ❌ 见 JSON 解析错就加更严 prompt，不检查 `write` 是否真需要 `r.parsed`
 - ✅ 命令退出码 0 + 文件实证 + 日志无未预期 error

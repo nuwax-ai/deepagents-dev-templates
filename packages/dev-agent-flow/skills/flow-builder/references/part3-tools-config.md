@@ -55,7 +55,9 @@ export function createMyTool(ctx: RuntimeContext) {
 
 ### 内置 `http_request` 安全默认
 
-模板内置 `http_request` 默认拦截私有/loopback/链路本地/云元数据端点（防 SSRF），并限制响应体大小（防 OOM）。目标项目一般无需改；若业务必须访问内网，需开发者明确要求并理解风险后再调整（见目标项目 `docs/capabilities.md`）。
+模板内置 `http_request` 默认拦截私有/loopback/链路本地/云元数据端点（防 SSRF），并限制响应体大小（防 OOM）。目标项目一般无需改；若业务必须访问内网，需开发者明确要求并理解风险后再调整（见目标项目 `docs/capabilities.md` § 内置工具）。
+
+> **与目标项目 `docs/capabilities.md` 的分工**：该文档描述**仓库内**能力分层与 `config/` 扩展路径；**平台 Plugin/Workflow/Knowledge 登记**与 **禁止 `.agents/` 直写** 由本 Part + `dev-engineer-toolkit` 规定（开发 Agent 必读）。
 
 ### 工具权限审批（`permissions`）
 

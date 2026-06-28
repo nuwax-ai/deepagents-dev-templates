@@ -1,10 +1,10 @@
 # Part 2：手写编排（bespoke 图）
 
-> 所属：`flow-builder` L2-B。入口路由见 [SKILL.md](../SKILL.md)。验证见 [part4-verify-debug.md](part4-verify-debug.md)。
+> 所属：`flow-builder` L2-B。入口路由见 [SKILL.md](../SKILL.md)。验证见 [part4a-verify-debug.md](part4a-verify-debug.md)。
 
 需要设计或创建工作流图时：状态定义、节点、边、条件路由、并行 Send、interrupt/resume HITL、子图、长任务流水线。
 
-**跑不通 / 节点未执行 / resume 失败** → 直接读 [part4-verify-debug.md](part4-verify-debug.md)。
+**跑不通 / 节点未执行 / resume 失败** → 直接读 [part4a-verify-debug.md](part4a-verify-debug.md)。
 
 ## Step 1: 选型与对照
 
@@ -42,6 +42,19 @@ type MyStateType = typeof MyState.State;
 
 `createLlmNode` / `createLlmRouterNode` / `createMcpRetrievalNode` / `createHumanApprovalNode` / `createPermissionApprovalNode` / `createApprovalFinalizeNode` / `createToolExecNode` / `createFanout` / `createSubgraphNode` 等；bespoke 才在 `src/app/nodes/` 手写并说明原因。
 
+### createLlmNode 与 parseJson
+
+**硬规则见目标项目 `docs/flow-graph-rules.md`**（**R-G001 MUST**、**R-G002 SHOULD**、**R-G003 MUST**）。flow-builder 路由页：[flow-graph-rules-pointer.md](flow-graph-rules-pointer.md)。
+
+摘要：
+
+1. **仅当 `write` 读取 `r.parsed` 时才加 `parse: parseJson`**（R-G001）
+2. **图入口 LLM**：自然语言 + 引导，不强求 JSON（R-G002）
+3. **必须结构化**：prompt 定 JSON schema + few-shot；配 `fallback` 或 `createLlmRouterNode` + `routeFallback`（R-G006）
+4. **手改 `graph.ts` 后必须回写 spec**（R-G003）
+
+custom spec：`write` 含 `r.parsed` 才写 `"parse"`。范例：`_example.interview-agent.flow.json`。
+
 ### HITL 选型（三种机制，勿混用）
 
 | 场景 | 机制 | Factory / 配置 |
@@ -65,7 +78,7 @@ function reviewNode(state: MyStateType): Partial<MyStateType> {
 
 ## Step 4: 连线（graph.ts）
 
-节点名 ≠ state channel 名。
+节点名 ≠ state channel 名（**R-G007**）。
 
 ### 条件边
 ```typescript
@@ -74,7 +87,7 @@ function routeAfterGrade(state): "rewrite" | "generate" {
 }
 .addConditionalEdges("grade", routeAfterGrade, ["rewrite", "generate"])
 ```
-> ⚠️ **condition 返回值必须 ∈ targets**，否则运行时 LangGraph 抛 `Invalid edge`（静态反射 / `pnpm graph` 检不出，需人工核对）。
+> ⚠️ **condition 返回值必须 ∈ targets**（**R-G004**），否则运行时 LangGraph 抛 `Invalid edge`（静态反射 / `pnpm graph` 检不出，需人工核对）。
 > `createLlmRouterNode`（Command goto 路由）的目标须经 `addNode(name, fn, { ends: [...] })` 声明，否则反射会丢这些边；custom DSL 在 spec 的 `params.ends` 填。
 
 ### Send 扇出
@@ -119,4 +132,8 @@ function fanoutToResearch(state): Send[] {
 - ❌ 条件边里做 I/O
 - ❌ mutate state
 - ❌ index.ts 直接 `graph.invoke`
+- ❌ `write` 不用 `r.parsed` 却配 `parse: parseJson`
+- ❌ 图入口 LLM 强制 JSON、无 fallback
+- ❌ 只改 `graph.ts` 不同步 `*.flow.json` spec
 - ✅ 条件边纯函数 + 单测；`durableCheckpointer` 跨重启
+- ✅ 结构化节点：prompt 定 schema + write 读 parsed +（可选）fallback

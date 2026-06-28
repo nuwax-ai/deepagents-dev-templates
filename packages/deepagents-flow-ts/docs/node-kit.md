@@ -58,6 +58,39 @@ graph.addNode("compose", compose);
 - **`write` 可收第三参 `config?`**(LangGraphRunnableConfig)——供 write 内发 `emitPlan(config,…)`/`emitStage(config,…)` 副作用;不用就忽略(默认两参 `(r, s)`)。
 - 例:[human-in-loop](../examples/human-in-loop/) compose、[travel-planner](../examples/travel-planner/) aggregate、[project-manager](../examples/project-manager/) plan/estimate/evaluate、[rag](../examples/rag/) rewrite、[adaptive-rag](../src/libs/topologies/adaptive-rag/) route_question / transform_query（`{ parse }` 结构化裁决 / 查询重写）。
 
+### parse 使用契约（必读）
+
+> **规则 ID**：[R-G001](flow-graph-rules.md#r-g001-parse-仅当-write-消费-rparsed)、[R-G002](flow-graph-rules.md#r-g002-入口-llm-容忍非预期输入)。完整索引见 [flow-graph-rules.md](flow-graph-rules.md)。
+
+`parse`（常用 `parseJson`）**不是** LLM 节点的默认选项——仅当下游逻辑**确实读取** `r.parsed` 时才加（**R-G001 MUST**）。
+
+| 契约 | 说明 |
+|---|---|
+| **1. write 消费 parsed** | `write` 里用到 `r.parsed` 才配 `parse`；只用 `r.content` → **不要** `parse` |
+| **2. 入口节点容忍非预期输入** | `__start__` 后第一个 LLM 优先自然语言 + 引导（打招呼、格式错误），不强求 JSON |
+| **3. 必须结构化时** | prompt 明确 JSON schema + few-shot；非入口节点或配 `fallback` / `routeFallback` |
+| **4. 失败兜底分工** | `createLlmRouterNode`：parse 失败走 `routeFallback`；`createLlmNode`：**无**内置 parse 兜底，需显式 `fallback` 或不加 `parse` |
+
+**正反例**（摘自 `interview-agent` 修复案例，完整 spec 见 `scripts/scaffold/specs/_example.interview-agent.flow.json`）：
+
+```ts
+// ❌ 反例：write 不用 parsed，却 parse → 用户非 JSON 输入即抛「LLM 未返回 JSON」
+write: (_r) => ({ phase: "questioning" }),
+parse: (t) => parseJson(t),
+
+// ✅ 正例：只设 phase，无 parse；prompt 引导非 JD 输入
+write: (_r) => ({ phase: "questioning" }),
+
+// ✅ 正例：evaluate 确实用 parsed
+write: (r, s) => {
+  const p = (r.parsed ?? {}) as { score?: number; feedback?: string };
+  return { scores: [String(p.score ?? 5)], /* ... */ };
+},
+parse: (t) => parseJson(t),
+```
+
+> 排查：`LLM 未返回 JSON` → [troubleshooting.md](troubleshooting.md) § 该症状（**R-G001** / **R-G002**）。
+
 ## createLlmStreamNode —— 流式 LLM
 
 ```ts
@@ -226,7 +259,7 @@ parentGraph.addNode("research", researcher);   // 编译后的子图直接当节
 | 原语 | 用途 |
 |---|---|
 | `extractText(content)` | LLM content(string 或 content block 数组)→ 纯文本 |
-| `parseJson<T>(text)` | 从 LLM 文本抽第一段 JSON(容忍 ```json 围栏) |
+| `parseJson<T>(text)` | 从 LLM 文本抽第一段 JSON(容忍 ```json 围栏)；无 JSON 时抛 `LLM 未返回 JSON`（见 [troubleshooting.md](troubleshooting.md)） |
 | `emitStage(config, e)` / `emitPlan(config, entries)` / `emitTextToken(config, text)` | surface 事件生产端(writer + callback 双发) |
 | `runTool(name, args, fn, onToolCall?)` | 执行一个工具 fn + 三态透出(自定义工具节点用) |
 | `isApproval(feedback, opts?)` | HITL「通过」判定 |
@@ -256,6 +289,6 @@ parentGraph.addNode("research", researcher);   // 编译后的子图直接当节
 
 不想套预设拓扑、要按 nodes+edges+state 自由编排时,用 `custom` 拓扑(spec 即契约):
 spec 声明 `state`(channels + reducer 类型)/ `nodes`(name→type+params)/ `edges`(static/conditional/fanout)/ `input`/`result`,
-`scripts/scaffold/blueprints/custom.mjs` **生成时渲染**真实 `src/app/flows/<name>/graph.ts`(内联本目录 factory,受 tsc 检查;无运行时解释器)。节点 `type` 词表 + 选型见 [node-catalog.md](node-catalog.md);示例见 `scripts/scaffold/specs/_example.*.flow.json`(translate-review / grade-redo / router-gate / multi-aspect-search 等)。
+`scripts/scaffold/blueprints/custom.mjs` **生成时渲染**真实 `src/app/flows/<name>/graph.ts`(内联本目录 factory,受 tsc 检查;无运行时解释器)。节点 `type` 词表 + 选型见 [node-catalog.md](node-catalog.md);示例见 `scripts/scaffold/specs/_example.*.flow.json`(translate-review / grade-redo / router-gate / multi-aspect-search / **interview-agent** 等)。生成后手改 `graph.ts` 须**同步** spec，否则 regenerate 会覆盖修复。
 
 进阶模式(Send/interrupt/Command/subgraph/checkpointer 的原生细节)见 [flow-patterns.md](flow-patterns.md)。

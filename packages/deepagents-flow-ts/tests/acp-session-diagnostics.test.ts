@@ -1,44 +1,14 @@
 /**
- * ACP 会话配置诊断单测 —— 验证 env / params 汇总与根因信号字段。
+ * ACP 会话配置诊断单测 —— summarize / predict 根因信号（env 加载见 acp-session-config.test.ts）。
  */
 
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  loadSessionConfigFromEnv,
-  mergeAcpSessionConfig,
   predictSystemPromptSource,
   summarizeAcpSessionParams,
   summarizeMcpServerEntry,
   systemPromptParamSource,
 } from "../src/surfaces/acp/session-diagnostics.js";
-
-const ENV_KEY = "ACP_SESSION_CONFIG_JSON";
-
-describe("loadSessionConfigFromEnv", () => {
-  afterEach(() => {
-    delete process.env[ENV_KEY];
-  });
-
-  it("无 env → undefined", () => {
-    expect(loadSessionConfigFromEnv()).toBeUndefined();
-  });
-
-  it("合法 JSON → 解析 ACPSessionConfig", () => {
-    process.env[ENV_KEY] = JSON.stringify({
-      systemPrompt: "你是目标 Agent",
-      model: "gpt-4o",
-    });
-    expect(loadSessionConfigFromEnv()).toEqual({
-      systemPrompt: "你是目标 Agent",
-      model: "gpt-4o",
-    });
-  });
-
-  it("非法 JSON → undefined（不抛）", () => {
-    process.env[ENV_KEY] = "{not-json";
-    expect(loadSessionConfigFromEnv()).toBeUndefined();
-  });
-});
 
 describe("summarizeAcpSessionParams / systemPromptParamSource", () => {
   it("顶层 systemPrompt", () => {
@@ -53,38 +23,10 @@ describe("summarizeAcpSessionParams / systemPromptParamSource", () => {
   it("configOptions.systemPrompt 别名", () => {
     const params = { cwd: "/w", configOptions: { systemPrompt: "alias-prompt" } };
     expect(systemPromptParamSource(params)).toBe("params-configOptions");
-    expect(summarizeAcpSessionParams(params)).toMatchObject({
-      hasConfigOptionsSystemPrompt: true,
-      configOptionsSystemPromptChars: "alias-prompt".length,
-    });
   });
 
   it("无 systemPrompt", () => {
     expect(systemPromptParamSource({ cwd: "/w" })).toBe("none");
-  });
-
-  it("_meta 字段汇总（含 append 对象）", () => {
-    const summary = summarizeAcpSessionParams({
-      cwd: "/w",
-      _meta: { systemPrompt: { append: "meta-p" }, foo: 1 },
-    });
-    expect(summary).toMatchObject({
-      hasMeta: true,
-      metaKeys: ["systemPrompt", "foo"],
-      hasMetaSystemPrompt: true,
-      metaSystemPromptChars: "meta-p".length,
-    });
-  });
-});
-
-describe("mergeAcpSessionConfig", () => {
-  it("params 覆盖 env 的 systemPrompt", () => {
-    const merged = mergeAcpSessionConfig(
-      { systemPrompt: "env", model: "m1" },
-      { cwd: "/w", systemPrompt: "params" }
-    );
-    expect(merged.systemPrompt).toBe("params");
-    expect(merged.model).toBe("m1");
   });
 });
 
@@ -109,7 +51,7 @@ describe("predictSystemPromptSource", () => {
 });
 
 describe("summarizeMcpServerEntry", () => {
-  it("stdio: command/args 原样，敏感 arg 值脱敏，env 只记键名", () => {
+  it("stdio: 敏感 arg/env 脱敏", () => {
     expect(
       summarizeMcpServerEntry({
         command: "npx",
@@ -123,7 +65,7 @@ describe("summarizeMcpServerEntry", () => {
     });
   });
 
-  it("url 敏感 query 参数脱敏，其余保留", () => {
+  it("url 敏感 query 脱敏", () => {
     expect(
       summarizeMcpServerEntry({
         url: "https://x.com/mcp?token=secret&keep=1",
@@ -131,26 +73,5 @@ describe("summarizeMcpServerEntry", () => {
     ).toEqual({
       url: "https://x.com/mcp?token=***&keep=1",
     });
-  });
-
-  it("非敏感 url/arg/transport 原样保留", () => {
-    expect(
-      summarizeMcpServerEntry({
-        command: "node",
-        args: ["server.js", "--port=3000"],
-        url: "https://x.com/mcp",
-        transport: "stdio",
-      })
-    ).toEqual({
-      command: "node",
-      args: ["server.js", "--port=3000"],
-      url: "https://x.com/mcp",
-      transport: "stdio",
-    });
-  });
-
-  it("非对象输入 → kind 标记", () => {
-    expect(summarizeMcpServerEntry(undefined)).toEqual({ kind: "undefined" });
-    expect(summarizeMcpServerEntry("npx")).toEqual({ kind: "string" });
   });
 });

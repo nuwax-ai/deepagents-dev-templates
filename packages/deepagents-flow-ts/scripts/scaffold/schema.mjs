@@ -25,7 +25,7 @@ const base = {
     .string()
     .regex(/^[a-z][a-z0-9-]*$/, "name 必须 kebab-case（小写字母开头，仅小写字母/数字/连字符）"),
   description: z.string().default(""),
-  /** 目标 Agent 系统提示词（通常写入 prompts/，或由平台/ACP session 注入）。 */
+  /** flow 系统提示词（写入 prompts/，或由 ACP session 注入覆盖）。 */
   systemPrompt: z.string().default(""),
   tools: z.array(toolRefSchema).default([]),
 };

@@ -46,11 +46,11 @@ await bootstrapFlowAcp({ executor, appConfig });   // 或 runFlowCli(executor, .
 pnpm --filter deepagents-app-ts build
 
 # CLI 单次（需在 .env 或 host 提供模型凭证）
-pnpm --filter deepagents-flow-ts example:rag:cli "什么是 LangGraph？"
+pnpm --filter deepagents-flow-ts example rag "什么是 LangGraph？"
 # 交互
-pnpm --filter deepagents-flow-ts example:rag:interactive
+pnpm --filter deepagents-flow-ts example rag -i
 # ACP 服务
-pnpm --filter deepagents-flow-ts example:rag
+pnpm --filter deepagents-flow-ts example rag
 ```
 
 ## 调试
@@ -60,14 +60,13 @@ RAG 用下面这些入口(都在 `packages/deepagents-flow-ts` 内跑,凭证放 
 
 **CLI 单次**(最快看图执行):
 ```bash
-pnpm example:rag:cli "什么是 LangGraph？"   # 或交互:pnpm example:rag:interactive
+pnpm example rag "什么是 LangGraph？"   # 或交互: pnpm example rag -i
 ```
 
 **rcoder-cli ACP 冒烟**(端到端:握手 → `onPrompt` → 整图 → 流式答案):
 ```bash
-pnpm smoke:rag
-# 等价于: pnpm run smoke:rag
-# 默认 prompt 用 SMOKE_PROMPT 覆盖;smoke:acp(默认 flow)的入口也可经 AGENT_ENTRY 切换
+pnpm smoke -- --example rag
+# 默认 prompt 用 SMOKE_PROMPT 覆盖; 默认 flow 用 pnpm smoke; 也可经 --entry 或 AGENT_ENTRY 切换
 ```
 
 **Zed 聊天调试**:把下面这段贴进 Zed settings 的 `agent_servers`(对齐最早的

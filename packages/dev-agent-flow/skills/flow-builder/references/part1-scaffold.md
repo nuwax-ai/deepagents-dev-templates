@@ -11,9 +11,10 @@
 `node scripts/scaffold/generate.mjs <spec.json>`（在 `deepagents-flow-ts` 项目根）：
 
 1. zod 校验 spec；
-2. blueprint 渲染 → `src/app/flows/<name>/`（薄封装或 custom 含 `graph.ts`）；
-3. 自动注册 `src/app/flows/index.ts`（`SCAFFOLD-REGISTRY` 区，勿手改）；
-4. 自带门禁：`pnpm typecheck && pnpm graph`。
+2. **`lint-graph-rules.mjs` 静态检**（**R-G001** parse/write、**R-G007** 节点名 ≠ channel；失败则中止）；
+3. blueprint 渲染 → `src/app/flows/<name>/`（薄封装或 custom 含 `graph.ts`）；
+4. 自动注册 `src/app/flows/index.ts`（`SCAFFOLD-REGISTRY` 区，勿手改）；
+5. 自带门禁：`pnpm typecheck && pnpm graph`（临时切换 `activeFlow` 反射新 flow）。
 
 8 预设图逻辑权威在 `src/libs/topologies/<name>/`（dev-agent 在 `src/app/topologies/`）；**`custom`** 图逻辑渲染进 `src/app/flows/<name>/graph.ts`。
 
@@ -31,7 +32,14 @@
 | `dev-agent` | stateful-custom | 综合助手 ReAct + 压缩 | 默认 ReAct + 多轮续接 |
 | `custom` ⭐ | stateful-recipe | 预设都不命中 | spec 声明 state/nodes/edges → 生成 `graph.ts` |
 
-**`custom`**：`params` 含 `state`/`nodes`（type 见 node-catalog）/`edges`/`input`/`result`；回调写箭头函数字符串，生成时内联为真实 TS。局限（生成后手改）：llm-stream、tool-exec、subgraph、自定义 reducer。示例：`_example.translate-review`、`_example.grade-redo`、`_example.router-gate`、`_example.multi-aspect-search`。
+**`custom`**：`params` 含 `state`/`nodes`（type 见 node-catalog）/`edges`/`input`/`result`；回调写箭头函数字符串，生成时内联为真实 TS。局限（生成后手改）：llm-stream、tool-exec、subgraph、自定义 reducer。示例：`_example.translate-review`、`_example.grade-redo`、`_example.router-gate`、`_example.multi-aspect-search`、**`_example.interview-agent`**（HITL + custom；`prepare` 无 parse 范例）。
+
+**custom spec 生成后核对**（目标项目 `docs/flow-graph-rules.md`；生成前已由 `lint-graph-rules.mjs` 拦 **R-G001 / R-G007**）：
+
+- 有 `"parse"` 的节点 → `write` 必须引用 `r.parsed`（**R-G001**）
+- 节点名不得与 `state` channel 同名（**R-G007**，如节点 `writeReport` 写 channel `report`）
+- `__start__` 后第一个 `llm` 节点 → 默认不加 `parse`；入口 prompt 须容忍非预期输入（**R-G002**）
+- 手改 `graph.ts` → **同步** `scripts/scaffold/specs/<name>.flow.json`（**R-G003**）
 
 **kind**：`oneshot` | `stateful-recipe` | `stateful-custom`（由 blueprint 自动产出）。
 
@@ -66,7 +74,7 @@
 | 2 | 写 `scripts/scaffold/specs/<name>.flow.json` |
 | 3 | `node scripts/scaffold/generate.mjs scripts/scaffold/specs/<name>.flow.json` |
 | 4 | `config/flow-agent.config.json` → `"activeFlow": "<name>"` |
-| 5 | `pnpm graph` + `pnpm flow` + [part4-verify-debug.md](part4-verify-debug.md) 完整验证 |
+| 5 | `pnpm graph` + `pnpm flow` + [part4a-verify-debug.md](part4a-verify-debug.md) 完整验证；**custom flow 必读** [part4b-smoke-acp.md](part4b-smoke-acp.md)（`activeFlow` + `.env` + `SMOKE_PROMPT`） |
 
 ## 生成物示例（human-in-loop 薄封装）
 
@@ -99,4 +107,6 @@ export const getTopology = () => getReviewTopology();
 - ❌ 手改 `SCAFFOLD-REGISTRY`
 - ❌ 不改 `activeFlow` 就说生效
 - ❌ `libs/topologies/` import `surfaces/`
+- ❌ custom spec 里 `parse` 与 `write` 不匹配（write 不读 `r.parsed`）
+- ❌ 只改生成后的 `graph.ts` 不回写 spec
 - ✅ 命中 → 生成 → activeFlow → 验证

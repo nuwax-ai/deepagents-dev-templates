@@ -344,6 +344,23 @@ describe("emitToolCall", () => {
       kind: "other",
     });
   });
+
+  it("write_file in_progress 含 diff content（presentation 层）", async () => {
+    const { conn, updates } = collectUpdates();
+    await emitToolCall(
+      conn,
+      "sess-1",
+      {
+        toolCallId: "tc-w",
+        toolName: "write_file",
+        args: { path: "a.ts", content: "hello" },
+        status: "in_progress",
+      },
+      { workspaceRoot: "/ws" }
+    );
+    const content = updates[0]?.content as Array<{ type: string; newText: string }>;
+    expect(content?.[0]).toMatchObject({ type: "diff", newText: "hello" });
+  });
 });
 
 describe("normalizeToolResult", () => {

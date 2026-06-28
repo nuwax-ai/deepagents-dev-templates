@@ -332,12 +332,12 @@ pnpm test -- examples/deep-research
 
 ```bash
 pnpm test
-pnpm smoke:acp
-pnpm smoke:rag
-pnpm smoke:travel
-pnpm smoke:pm
-pnpm smoke:review
-pnpm smoke:research
+pnpm smoke
+pnpm smoke -- --example rag
+pnpm smoke -- --example travel
+pnpm smoke -- --example pm
+pnpm smoke -- --example review
+pnpm smoke -- --example research
 pnpm exec tsx src/index.ts flow -i
 ```
 

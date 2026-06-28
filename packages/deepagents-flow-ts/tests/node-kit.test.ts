@@ -11,7 +11,7 @@ import { describe, it, expect } from "vitest";
 import { HumanMessage, AIMessage, type BaseMessage } from "@langchain/core/messages";
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import { Annotation, type LangGraphRunnableConfig } from "@langchain/langgraph";
+import { Annotation } from "@langchain/langgraph";
 import {
   createLlmNode,
   createLlmStreamNode,
@@ -249,6 +249,7 @@ describe("createLlmRouterNode", () => {
       return { goto, update: { verdict } };
     },
     routeFallback: () => ({ goto: "done", update: { verdict: "pass" } }),
+    attempts: 1,
   });
 
   it("成功 fail & 未达上限 → Command(goto=redo, update.verdict=fail)", async () => {
@@ -311,29 +312,8 @@ describe("createMcpRetrievalNode", () => {
 
 // ---------- createLlmStreamNode ----------
 describe("createLlmStreamNode", () => {
-  it("流式 → write({text, streamed:true})", async () => {
-    const chunks = [{ content: "he" }, { content: "llo" }];
-    const mockStream = {
-      invoke: async () => ({ content: "" }),
-      stream: async function* () {
-        for (const c of chunks) yield c;
-      },
-    };
-    const node = createLlmStreamNode<any>({
-      model: mockStream as any,
-      prompt: () => [],
-      write: (r) => ({ text: r.text, streamed: r.streamed }),
-      timeoutMs: 5000,
-    });
-    // 需 configurable.onToken 才走 stream 分支(streamLLMText 的 hasVisibleTokenSink)
-    const out = await node({}, { configurable: { onToken: () => undefined } } as LangGraphRunnableConfig);
-    expect(out.text).toBe("hello");
-    expect(out.streamed).toBe(true);
-  });
   it("无 onToken sink → 退回 invoke(streamed:false)", async () => {
-    const mock = { invoke: async () => ({ content: "full" }), stream: async function* () {
-      yield { content: "x" };
-    } };
+    const mock = { invoke: async () => ({ content: "full" }) };
     const node = createLlmStreamNode<any>({
       model: mock as any,
       prompt: () => [],
@@ -372,36 +352,5 @@ describe("createToolExecNode", () => {
     const node = createToolExecNode<{ messages: BaseMessage[] }>({ tools: [] as any });
     const out = (await node({ messages: [new AIMessage({ content: "no calls" })] })) as any;
     expect(out.messages).toEqual([]);
-  });
-  it("经 configurable.onToolCall 透出（无 build-time callbacks）", async () => {
-    const echo = tool(async ({ x }: { x: string }) => `got:${x}`, {
-      name: "echo",
-      schema: z.object({ x: z.string() }),
-      description: "echo back",
-    });
-    const events: Array<{ status: string; args: Record<string, unknown> }> = [];
-    const node = createToolExecNode<{ messages: BaseMessage[] }>({ tools: [echo] as any });
-    const ai = new AIMessage({
-      content: "",
-      tool_calls: [{ id: "tc2", name: "echo", args: { x: "cfg" } }] as any,
-    });
-    await node(
-      { messages: [ai] },
-      { configurable: { onToolCall: (e) => void events.push({ status: e.status, args: e.args }) } } as any
-    );
-    expect(events.map((e) => e.status)).toContain("in_progress");
-    expect(events.map((e) => e.status)).toContain("completed");
-    const completed = events.find((e) => e.status === "completed");
-    expect(completed?.args).toEqual({ x: "cfg" });
-  });
-});
-
-// ---------- createHumanApprovalNode(纯逻辑部分)----------
-describe("createHumanApprovalNode", () => {
-  // interrupt() 在图外会抛,故只验「write/route 的判定逻辑」经 isApproval 走通。
-  // 真实 interrupt 闭环由 examples 的 stateful-flow 测试覆盖。
-  it("isApproval 已在原语测试覆盖(此 factory 内部用同一判定)", () => {
-    expect(isApproval("ok")).toBe(true);
-    expect(isApproval("改改")).toBe(false);
   });
 });

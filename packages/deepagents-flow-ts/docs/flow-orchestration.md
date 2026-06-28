@@ -1,6 +1,6 @@
 # Flow 编排指南
 
-设计或修改一张工作流图（LangGraph StateGraph）时的**编排速查**。节点选型见 [node-catalog.md](node-catalog.md)、factory API 见 [node-kit.md](node-kit.md)、进阶原生模式见 [flow-patterns.md](flow-patterns.md)——本页只收「框架优先 + 核心编排模式 + 易踩的坑」。
+设计或修改本仓库内一张工作流图（LangGraph StateGraph）时的**编排速查**。节点选型见 [node-catalog.md](node-catalog.md)、factory API 见 [node-kit.md](node-kit.md)、进阶原生模式见 [flow-patterns.md](flow-patterns.md)——本页只收「框架优先 + 核心编排模式 + 易踩的坑」。
 
 ## 框架优先（强制）
 

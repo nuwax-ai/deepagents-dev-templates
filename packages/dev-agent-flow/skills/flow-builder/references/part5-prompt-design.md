@@ -44,6 +44,19 @@
 
 与 scaffold 衔接：写好后填入 [part1-scaffold.md](part1-scaffold.md) 的 `systemPrompt`（若该拓扑注入 prompt）。
 
+## 节点 prompt vs 主 Agent systemPrompt
+
+| 层级 | 用途 | JSON 要求 |
+|------|------|-----------|
+| `prompts/*.md` / 平台 `systemPrompt` | 角色、能力、风格、兜底 | 通常**自然语言** |
+| **图节点** `SystemMessage`（`createLlmNode` 的 `prompt`） | 单步任务契约 | **仅当**该节点有 `parse` 且 `write` 读 `r.parsed` |
+
+**入口 LLM 节点**（`__start__` 后第一个 llm）prompt 建议含兜底句：
+
+> 若输入不符合预期格式，友好说明并引导用户提供正确格式；不要输出 JSON（除非本节点 `write` 依赖 `r.parsed`）。
+
+节点级 `parse` 契约见 `docs/flow-graph-rules.md` **R-G001 / R-G002**；node-kit 有摘要。
+
 ## 保存与同步
 
 经 `dev-engineer-toolkit` 将定稿写入平台在线配置，禁止只改本地不同步：
@@ -108,4 +121,5 @@
 - ❌ 只有空泛角色能力，无工具指引/few-shot/输出规范
 - ❌ 未配置工具名写进提示词
 - ❌ 硬编码进代码；只改本地不同步平台
+- ❌ 所有 LLM 节点 prompt 都写「只输出 JSON」（应仅用于 `write` 读 `r.parsed` 的节点）
 - ✅ 七要素 + few-shot → `dev-engineer-toolkit` 保存 → `<SESSION_CLOSE>` 段 2 同步 → 填 scaffold spec（如需）

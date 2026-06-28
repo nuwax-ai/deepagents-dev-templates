@@ -13,6 +13,7 @@ import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execSync } from "node:child_process";
 import { parseSpec, SUPPORTED_TOPOLOGIES } from "./schema.mjs";
+import { assertGraphRules } from "./lint-graph-rules.mjs";
 import * as reactTools from "./blueprints/react-tools.mjs";
 import * as humanInLoop from "./blueprints/human-in-loop.mjs";
 import * as projectManager from "./blueprints/project-manager.mjs";
@@ -87,6 +88,7 @@ function main() {
   const specPath = resolve(process.cwd(), specArg);
   const raw = JSON.parse(readFileSync(specPath, "utf-8"));
   const spec = parseSpec(raw);
+  assertGraphRules(spec);
 
   const bp = BLUEPRINTS[spec.topology];
   if (!bp) {

@@ -2,7 +2,7 @@
 name: flow-builder
 description: "deepagents-flow-ts flow 开发（分层加载）：Part1–4 脚手架/编排/工具/验证；Part5 主Agent；Part6 子智能体；Part7 技能（均禁 .agents/ 直写）。LangGraph API 用 Context7。"
 tags: [flow, scaffold, orchestration, tools, mcp, prompt, subagent, stategraph, hitl, debug, deepagents-flow-ts]
-version: "2.2.9"
+version: "2.5.0"
 ---
 
 # Flow 开发（deepagents-flow-ts）
@@ -16,7 +16,9 @@ flow-builder/
     ├── part1-scaffold.md
     ├── part2-orchestration.md
     ├── part3-tools-config.md
-    ├── part4-verify-debug.md
+    ├── part4a-verify-debug.md
+    ├── part4b-smoke-acp.md
+    ├── flow-graph-rules-pointer.md
     ├── part5-prompt-design.md
     ├── part6-subagent.md
     └── part7-skill.md
@@ -29,10 +31,12 @@ flow-builder/
 | 场景 | 读取 |
 |------|------|
 | 一句话需求 → 可跑 flow | [part1-scaffold.md](references/part1-scaffold.md) |
-| 手写 StateGraph | [part2-orchestration.md](references/part2-orchestration.md) |
+| 手写 StateGraph | [part2-orchestration.md](references/part2-orchestration.md) + [flow-graph-rules-pointer.md](references/flow-graph-rules-pointer.md) |
 | 自写工具 / MCP / 变量 | [part3-tools-config.md](references/part3-tools-config.md) |
-| 验证 / 跑不通 / HITL 排查 | [part4-verify-debug.md](references/part4-verify-debug.md) |
-| 工具审批 / `Permission denied` / `permissions` 配置 | [part3-tools-config.md](references/part3-tools-config.md) + [part4-verify-debug.md](references/part4-verify-debug.md) |
+| 验证 / 跑不通 / HITL 排查 | [part4a-verify-debug.md](references/part4a-verify-debug.md) |
+| **`pnpm smoke` / rcoder-cli / 模型 env / Invalid model** | **[part4b-smoke-acp.md](references/part4b-smoke-acp.md)**（必读） |
+| `parseJson` / `LLM 未返回 JSON` / 图编排硬规则 | [flow-graph-rules-pointer.md](references/flow-graph-rules-pointer.md) → 目标项目 `docs/flow-graph-rules.md`（R-G001+） |
+| 工具审批 / `Permission denied` / `permissions` 配置 | [part3-tools-config.md](references/part3-tools-config.md) + [part4a-verify-debug.md](references/part4a-verify-debug.md) |
 | 设计目标 Agent 系统提示词 / 开场白 | [part5-prompt-design.md](references/part5-prompt-design.md) |
 | 创建/命名目标 Agent（通用智能体） | [part5-prompt-design.md](references/part5-prompt-design.md) + `dev-engineer-toolkit`；**禁止** `AGENT.md` |
 | 子智能体 / subagent / 委派（平台或内置） | [part6-subagent.md](references/part6-subagent.md)；**禁止** `.agents/agents/` |
@@ -43,18 +47,20 @@ flow-builder/
 ## 推荐路径
 
 ```
-需求 → part1 命中？→ 生成 → part4
-              └ custom？→ part1 custom → part4
-                    └ part2 → part3? → part4
+需求 → part1 命中？→ 生成 → part4a（+ part4b-smoke-acp 配 activeFlow/.env）
+              └ custom？→ part1 custom → part4a + part4b-smoke-acp
+                    └ part2 → part3? → part4a
 创建/命名主 Agent（通用智能体）？→ part5 → dev-engineer-toolkit 保存 → 改 config.agent.name（禁止 AGENT.md）
 需 persona？→ part5 设计 → dev-engineer-toolkit 保存 → 填入 spec（part1）
 要 subagent/委派？→ part6 → 平台 或 builtin/agents/（禁止 .agents/）
 要 skill？→ part7 → 平台 或 builtin/skills/（禁止 .agents/）
 ```
 
-## 目标项目文档
+## 目标项目文档（模板自洽，开发 Agent 按需读取）
 
-`README.md` · `docs/node-catalog.md` · `docs/node-kit.md` · `docs/flow-patterns.md`
+下列路径均在**目标项目** `deepagents-flow-ts` 工作目录内；描述模板能力与配置，**不**包含开发 Agent 工作流（工作流见本技能 Part*）：
+
+`README.md` · `docs/flow-graph-rules.md` · `docs/node-catalog.md` · `docs/node-kit.md` · `docs/flow-patterns.md` · `docs/troubleshooting.md` · `docs/capabilities.md` · `scripts/README.md`
 
 ## 关联技能
 
@@ -64,6 +70,7 @@ flow-builder/
 
 ## L1 铁律
 
+- **文档分工**：图规则 / factory API / 配置路径 → 目标项目 `docs/`；脚手架流程 / 平台登记 / 完成闸门 → 本技能 Part*（见 [README.md](../../../README.md) § 文档分工）。
 - 图是契约；factory 优先；`examples/` 只读；保护区不改。
 - **禁止写 `.agents/`**：内置能力写 `builtin/`（Part 6、Part 7）；平台能力走平台。
 - 有状态用 `createStatefulFlow`（`dev-agent` 拓扑 `stateful-custom` 手写 run-loop 为例外，见 part2）。

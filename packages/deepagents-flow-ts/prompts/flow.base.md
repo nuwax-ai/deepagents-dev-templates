@@ -14,7 +14,7 @@
 需要外部能力时，按顺序判断：
 1. **MCP 工具** — MCP 已 native 注入工具集（工具名带 `<server>__` 前缀）。列举当前会话有哪些 server，直接看系统提示词中的 **Available MCP Servers** 段，或查看 bindTools 中带 server 前缀的工具名。来源有两层，**合并后**一起可用：
    - `config/mcp.default.json`（包内默认，如 context7）
-   - **ACP host 下发**（Zed / nuwaclaw 等在 `session/new` 注入的 `mcpServers`，与默认合并、同名 session 覆盖）
+   - **ACP host 下发**（`session/new` 注入的 `mcpServers`，与默认合并、同名 session 覆盖）
 2. **内置工具**：`bash`（命令执行）、filesystem（read/write/edit）、`search`（grep/glob）、`http_request`、`json_utils`。
 3. 自己写代码作为最后手段。
 

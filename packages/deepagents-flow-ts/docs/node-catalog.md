@@ -22,7 +22,7 @@
 
 | `type` | factory | 语义 | 何时用 |
 |---|---|---|---|
-| `llm` | `createLlmNode` | 一次调 LLM,写回文本或结构化(`parse`) | compose / aggregate / plan / rewrite;大多数 LLM 步骤 |
+| `llm` | `createLlmNode` | 一次调 LLM,写回**纯文本**（默认）或结构化（`write` 读 `r.parsed` 时才加 `parse`） | compose / aggregate / plan / rewrite;大多数 LLM 步骤 |
 | `llm-stream` | `createLlmStreamNode` | **流式**调 LLM,逐 token 给用户 | draft / respond(用户可见大段输出) |
 | `llm-router` 🆕 | `createLlmRouterNode` | LLM 裁决后**返回 Command goto**(节点内路由) | reflection / evaluator:评审 → 重做或放行 |
 
@@ -107,7 +107,9 @@ Q2 节点要调 LLM 吗?
         是 → llm-router (createLlmRouterNode) 🆕
         否 → Q2b 用户可见大段输出 + 模型支持 stream?
                 是 → llm-stream (createLlmStreamNode)
-                否 → llm (createLlmNode,+ parse 做结构化)
+                否 → Q2c write 需要读结构化字段(r.parsed)?
+                        是 → llm + parse（write 读 r.parsed；见 node-kit § parse 契约）
+                        否 → llm（仅 r.content，**不加 parse**）
   否 → Q3
 
 Q3 节点要检索外部知识(MCP)吗?
@@ -122,6 +124,15 @@ Q4 结构类?
   纯数据变换 / 占位                 → passthrough
   都不是                           → bespoke(保留手写,见②)
 ```
+
+---
+
+## 命名注意：`prepare`
+
+| 名称 | 含义 |
+|---|---|
+| `type: "prepare"` | `createPrepareNode`：input → HumanMessage（默认 ReAct 图入口） |
+| 节点**名叫** `prepare` 但 `type: "llm"` | 仍是 LLM 节点，**不要**因名字误加 `parseJson`；是否 `parse` 只看 `write` 是否读 `r.parsed` |
 
 ---
 
@@ -147,6 +158,8 @@ llm | llm-router | approval | approval-finalize | mcp-retrieval | prepare | pass
 
 ## 关系
 
-- **[node-kit.md](node-kit.md)**:各 factory 的完整 API + 用法 snippet(本文件只管选型/分类)。
+- **[flow-graph-rules.md](flow-graph-rules.md)**:图编排硬性规则（R-G001+，**新增约定优先落此**）。
+- **[node-kit.md](node-kit.md)**:各 factory 的完整 API + 用法 snippet(本文件只管选型/分类)；parse 摘要链到 R-G001。
+- **[troubleshooting.md](troubleshooting.md)**:常见运行时错误索引（含 `LLM 未返回 JSON`）。
 - **[flow-patterns.md](flow-patterns.md)**:Send/interrupt/Command/subgraph/checkpointer 的原生细节。
 - **节点级 scaffold**：`custom` topology 的 spec 用本目录的 `type` 编排 nodes+edges+state → 生成图(见 [scripts/scaffold/](../scripts/scaffold/))。

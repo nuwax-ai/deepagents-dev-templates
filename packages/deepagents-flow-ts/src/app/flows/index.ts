@@ -14,6 +14,7 @@ import type { FlowRuntime } from "../../runtime/flow-runtime.js";
 import type { StatefulFlow } from "../../core/flow-types.js";
 import { recipe as defaultRecipe } from "../default-flow.js";
 import { getFlowTopology, type FlowTopology } from "../topology.js";
+import * as interviewAgentFlow from "./interview-agent/index.js";
 import * as routerGateFlow from "./router-gate/index.js";
 import * as gradeRedoFlow from "./grade-redo/index.js";
 import * as multiAspectSearchFlow from "./multi-aspect-search/index.js";
@@ -68,6 +69,7 @@ export const flows: Record<string, FlowDef> = {
     getTopology: () => getFlowTopology(),
   },
   // --- SCAFFOLD-REGISTRY-START (generator 自动维护，勿手改此区) ---
+  "interview-agent": { name: "interview-agent", kind: "stateful-recipe", recipe: interviewAgentFlow.recipe, getTopology: interviewAgentFlow.getTopology },
   "router-gate": { name: "router-gate", kind: "stateful-recipe", recipe: routerGateFlow.recipe, getTopology: routerGateFlow.getTopology },
   "grade-redo": { name: "grade-redo", kind: "stateful-recipe", recipe: gradeRedoFlow.recipe, getTopology: gradeRedoFlow.getTopology },
   "multi-aspect-search": { name: "multi-aspect-search", kind: "stateful-recipe", recipe: multiAspectSearchFlow.recipe, getTopology: multiAspectSearchFlow.getTopology },

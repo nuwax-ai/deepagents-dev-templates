@@ -1,6 +1,6 @@
-// @ts-nocheck — 搬入自维护的 ACP 协议层（deepagents-acp 0.1.3），其内部协议类型
-// 与当前 npm @agentclientprotocol/sdk 0.24.0 有演进差异（SessionNotification/Response 等）。
-// flow 经 onPrompt 短路接管请求路径，不跑此文件的 throwaway/内部协议分支，故跳过类型检查。
+// 搬入自维护的 ACP 协议层（deepagents-acp 0.1.3）。它与 npm @agentclientprotocol/sdk 0.24.0
+// 的协议类型演进差异（SessionNotification / *Response）已收窄为少量带说明的局部
+// `@ts-expect-error`（搜本文件 "演进差异" 即可定位）；不再整文件 @ts-nocheck，恢复类型检查防回归。
 /**
  * DeepAgents ACP Server Implementation
  *
@@ -22,7 +22,6 @@ import { randomUUID } from "node:crypto";
 import {
   createDeepAgent,
   FilesystemBackend,
-  type BackendProtocol,
   type BackendProtocolV2,
   type BackendFactory,
 } from "deepagents";
@@ -358,15 +357,18 @@ export class DeepAgentsServer {
    * Create the Agent handler for ACP
    */
   private createAgentHandler(conn: AgentSideConnection): Agent {
+    // 对象按 Agent 接口检查（params 由接口推断）。仅 initialize/newSession/prompt 的
+    // *Response 类型与 @agentclientprotocol/sdk@0.24 有演进差异，逐个局部抑制。
     return {
-      initialize: (params) =>
-        this.handleInitialize(params as InitializeRequest),
+      // @ts-expect-error vendored *Response 与 @agentclientprotocol/sdk@0.24 协议类型演进差异
+      initialize: (params) => this.handleInitialize(params as InitializeRequest),
       authenticate: (params) =>
         this.handleAuthenticate(params as AuthenticateRequest),
-      newSession: (params) =>
-        this.handleNewSession(params as NewSessionRequest, conn),
+      // @ts-expect-error vendored *Response 与 @agentclientprotocol/sdk@0.24 协议类型演进差异
+      newSession: (params) => this.handleNewSession(params as NewSessionRequest, conn),
       loadSession: (params) =>
         this.handleLoadSession(params as LoadSessionRequest, conn),
+      // @ts-expect-error vendored *Response 与 @agentclientprotocol/sdk@0.24 协议类型演进差异
       prompt: (params) => this.handlePrompt(params as PromptRequest, conn),
       cancel: (params) => this.handleCancel(params as CancelNotification),
       setSessionMode: (params) =>
@@ -609,6 +611,7 @@ export class DeepAgentsServer {
     const customCommands = agentConfig?.commands ?? [];
     const allCommands = [...DEFAULT_COMMANDS, ...customCommands];
     conn
+      // @ts-expect-error vendored SessionNotification 与 @agentclientprotocol/sdk@0.24 协议类型演进差异
       .sessionUpdate({
         sessionId,
         update: {
@@ -748,7 +751,7 @@ export class DeepAgentsServer {
 
     // Abort only the cancelling session's in-flight prompt — not whatever
     // happens to be globally current. No-op if that session has no prompt running.
-    this.promptAbortControllers.get(params.sessionId)?.abort();
+    this.promptAbortControllers.get(params.sessionId as string)?.abort();
   }
 
   /**
@@ -765,7 +768,7 @@ export class DeepAgentsServer {
     }
 
     // SDK 0.24.0: SetSessionModeRequest has modeId (required)
-    const mode = params.modeId;
+    const mode = params.modeId as string;
     session.mode = mode;
     this.log("Set mode for session:", sessionId, "to:", mode);
 
@@ -1290,6 +1293,7 @@ export class DeepAgentsServer {
           : "[non-text]",
     });
 
+    // @ts-expect-error vendored SessionNotification 与 @agentclientprotocol/sdk@0.24 协议类型演进差异
     await conn.sessionUpdate(notification);
   }
 
@@ -1307,6 +1311,7 @@ export class DeepAgentsServer {
       this.workspaceRoot,
     );
 
+    // @ts-expect-error vendored SessionNotification 与 @agentclientprotocol/sdk@0.24 协议类型演进差异
     await conn.sessionUpdate({
       sessionId,
       update: {
@@ -1359,6 +1364,7 @@ export class DeepAgentsServer {
       }
     }
 
+    // @ts-expect-error vendored SessionNotification 与 @agentclientprotocol/sdk@0.24 协议类型演进差异
     await conn.sessionUpdate({
       sessionId,
       update,
@@ -1377,6 +1383,7 @@ export class DeepAgentsServer {
       status: "pending" | "in_progress" | "completed" | "skipped";
     }>,
   ): Promise<void> {
+    // @ts-expect-error vendored SessionNotification 与 @agentclientprotocol/sdk@0.24 协议类型演进差异
     await conn.sessionUpdate({
       sessionId,
       update: {
@@ -1484,7 +1491,7 @@ export class DeepAgentsServer {
       // though ACP does not drive humanInTheLoop interrupts.
       permissions: config.permissions,
       store: config.store,
-      backend: backend as Parameters<typeof createDeepAgent>[0]["backend"],
+      backend: backend as NonNullable<Parameters<typeof createDeepAgent>[0]>["backend"],
       skills: config.skills,
       memory: config.memory,
       checkpointer: this.checkpointer,
@@ -1557,7 +1564,7 @@ export class DeepAgentsServer {
 
     this.log("Writing file via client:", { path, length: content.length });
     try {
-      await this.connection.writeTextFile({ sessionId: "", path, content } as WriteTextFileRequest);
+      await this.connection.writeTextFile({ sessionId: "", path, content });
       this.log("File write successful:", path);
       return true;
     } catch (err) {

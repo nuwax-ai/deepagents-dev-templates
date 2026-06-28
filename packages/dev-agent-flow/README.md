@@ -23,6 +23,15 @@
 
 本包（`dev-agent-flow`）与 `packages/deepagents-flow-ts` **模板源码独立**：技能由**开发 Agent** 在开发环境侧加载，不会出现在模板仓库目录树中。
 
+## 文档分工（必读）
+
+| 层级 | 位置 | 职责 |
+|------|------|------|
+| **模板本体** | `deepagents-flow-ts/` 内 `README.md`、`docs/*`、`config/`、`prompts/` | 描述**本工作目录**内的能力、配置路径、图编排规则（`flow-graph-rules.md` R-G*）、排错索引；**不**承载开发 Agent 工作流 |
+| **开发 Agent 引导** | 本包 `system-prompt.md` + `skills/flow-builder/` + `skills/dev-engineer-toolkit/` | 教开发 Agent **如何**用模板：脚手架、编排、平台配置、验证闸门、提示词设计、禁止项（如 `.agents/` 直写） |
+
+**单一权威原则**：图怎么写、规则 ID、factory API → 读目标项目 `docs/`；开发流程、平台登记、完成闸门 → 读本包 `flow-builder` Part*。技能内 `references/flow-graph-rules-pointer.md` 仅为**路由页**，详表永远在目标项目 `docs/flow-graph-rules.md`。
+
 ```
 packages/dev-agent-flow/          # 开发 Agent 提示词 + 技能（非模板一部分）
 ├── system-prompt.md
