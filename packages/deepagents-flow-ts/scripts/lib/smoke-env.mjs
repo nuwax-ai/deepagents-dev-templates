@@ -1,8 +1,10 @@
 /**
  * smoke:acp 用模型 env 解析 —— 与 runtime config-loader 对齐，并过滤未替换的平台占位符。
  *
- * rcoder-cli 子进程可能继承 `{MODEL_PROVIDER_*}` 占位符，直接转发会导致 400 Invalid model。
- * 本模块从 .env + flow-agent.config.json 解析「真实可用」的 provider/model/baseUrl，再传给 rcoder。
+ * 优先级（smoke-acp 用 dotenv override:true 加载 .env）：.env > 继承的 standard env
+ * （OPENAI_*、ANTHROPIC_*、API_PROTOCOL）> OPENCODE_*（opencode/nuwaxcode 平台下发）>
+ * flow-agent.config.json。rcoder 子进程可能继承 `{MODEL_PROVIDER_*}` 占位符，直接转发会 400；
+ * 本模块解析「真实可用」的 provider/model/baseUrl 并发 standard 键给 rcoder。
  */
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -59,13 +61,44 @@ function inferProviderFromCredentials(env) {
 }
 
 /**
+ * opencode(nuwaxcode) 平台下发的 OPENCODE_* env 兜底到 standard 键。
+ *
+ * standard（OPENAI_*，已含 smoke-acp 的 .env override）优先；未设时用 OPENCODE_* 填充。
+ * forward 仍发 standard 键 → rcoder(flow-ts runtime，只认 OPENAI_*、ANTHROPIC_*) 照常读取，
+ * 故 smoke 能复用 opencode 配置而不破坏 fidelity（smoke 仍 = runtime 看到的标准键）。
+ *
+ * NuWaClaw 给 opencode 注入的键（取自 ~/.nuwaclaw/logs）：OPENCODE_MODEL /
+ * OPENCODE_OPENAI_API_KEY / OPENCODE_OPENAI_API_BASE（注：API_BASE，非 BASE_URL）。
+ * 仅 OpenAI 系，无 ANTHROPIC 变体。
+ */
+function withOpencodeFallback(env) {
+  const merged = { ...env };
+  for (const [std, oc] of [
+    ["OPENAI_API_KEY", "OPENCODE_OPENAI_API_KEY"],
+    ["OPENAI_BASE_URL", "OPENCODE_OPENAI_API_BASE"],
+  ]) {
+    const v = pickEnv(merged, oc);
+    if (v && !pickEnv(merged, std)) merged[std] = v;
+  }
+  // OPENCODE_MODEL 是 provider 无关模型名 → 兜底到 DEFAULT_MODEL（model 解析最低优先级）
+  const ocModel = pickEnv(merged, "OPENCODE_MODEL");
+  if (ocModel && !pickEnv(merged, "DEFAULT_MODEL")) merged.DEFAULT_MODEL = ocModel;
+  return merged;
+}
+
+/**
  * 解析 smoke 应转发给 rcoder 子进程的模型相关 env。
  * @returns {{ provider, modelName, baseUrl, forward, activeFlow, skippedPlaceholderKeys }}
  */
 export function resolveSmokeModelEnv(env, flowConfig) {
+  env = withOpencodeFallback(env);
   const fileProvider = normalizeProvider(flowConfig?.model?.provider);
+  // 与 runtime inferModelProviderIfUnset（config-sources.ts）对齐：
+  // 显式(API_PROTOCOL/LLM_PROVIDER) > 凭证推断 > 文件 provider。
+  // 旧顺序「文件 > 推断」会让「文件=openai 但只有 ANTHROPIC key」时 smoke 选 openai 而崩溃
+  // （runtime 会凭 key 推断成 anthropic 正常跑），smoke 与 runtime 分叉。
   const provider =
-    resolveExplicitProvider(env) ?? fileProvider ?? inferProviderFromCredentials(env) ?? "openai";
+    resolveExplicitProvider(env) ?? inferProviderFromCredentials(env) ?? fileProvider ?? "openai";
 
   const fileModelName =
     typeof flowConfig?.model?.name === "string" ? flowConfig.model.name.trim() : undefined;
@@ -76,15 +109,15 @@ export function resolveSmokeModelEnv(env, flowConfig) {
   const openaiModel = pickEnv(env, "OPENAI_MODEL");
   const anthropicModel = pickEnv(env, "ANTHROPIC_MODEL");
 
-  let modelName = defaultModel;
-  if (!modelName) {
-    modelName = provider === "openai" ? openaiModel ?? fileModelName : anthropicModel ?? fileModelName;
-  }
+  // 与 runtime ENV_MAP 对齐：DEFAULT_MODEL / ANTHROPIC_MODEL / OPENAI_MODEL 都映射到同一
+  // model.name，按插入顺序后写覆盖 → OPENAI_MODEL > ANTHROPIC_MODEL > DEFAULT_MODEL > 文件，
+  // 与 provider 无关。旧实现让 DEFAULT_MODEL 最高优先 + 按 provider 二选一，会与 runtime 分叉。
+  const modelName = openaiModel ?? anthropicModel ?? defaultModel ?? fileModelName;
 
   const openaiBase = pickEnv(env, "OPENAI_BASE_URL");
   const anthropicBase = pickEnv(env, "ANTHROPIC_BASE_URL");
-  const baseUrl =
-    provider === "openai" ? openaiBase ?? fileBaseUrl : anthropicBase ?? fileBaseUrl;
+  // 同 model.name：OPENAI_BASE_URL 后写胜 > ANTHROPIC_BASE_URL > 文件。
+  const baseUrl = openaiBase ?? anthropicBase ?? fileBaseUrl;
 
   const skippedPlaceholderKeys = [];
   for (const key of [
@@ -98,6 +131,9 @@ export function resolveSmokeModelEnv(env, flowConfig) {
     "OPENAI_MODEL",
     "OPENAI_BASE_URL",
     "OPENAI_API_KEY",
+    "OPENCODE_MODEL",
+    "OPENCODE_OPENAI_API_KEY",
+    "OPENCODE_OPENAI_API_BASE",
     "LOG_DIR",
     "LOG_LEVEL",
   ]) {
@@ -142,7 +178,12 @@ export function resolveSmokeModelEnv(env, flowConfig) {
 }
 
 export function hasSmokeCredential(env) {
-  return !!(pickEnv(env, "ANTHROPIC_API_KEY") || pickEnv(env, "ANTHROPIC_AUTH_TOKEN") || pickEnv(env, "OPENAI_API_KEY"));
+  return !!(
+    pickEnv(env, "ANTHROPIC_API_KEY") ||
+    pickEnv(env, "ANTHROPIC_AUTH_TOKEN") ||
+    pickEnv(env, "OPENAI_API_KEY") ||
+    pickEnv(env, "OPENCODE_OPENAI_API_KEY")
+  );
 }
 
 /** 收集要跑的 prompt 列表（主路径 + 可选边界路径） */

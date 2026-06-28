@@ -20,10 +20,12 @@ import {
 
 const PKG_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-function resolveTsx() {
-  const local = path.join(PKG_DIR, "node_modules", ".bin", process.platform === "win32" ? "tsx.cmd" : "tsx");
-  if (existsSync(local)) return local;
-  return "tsx";
+function resolveTsxModule() {
+  // 用 node 直接跑 tsx 的 cli.mjs（等价 tsx shim），而非 spawn node_modules/.bin/tsx.cmd：
+  // Windows 上直接 spawn .cmd 会触发 Node CVE-2024-27980 守卫抛 EINVAL；而 shell:true 又会
+  // 破坏含中文/空格的 query 参数引号。node + cli.mjs 两端都干净。
+  const cli = path.join(PKG_DIR, "node_modules", "tsx", "dist", "cli.mjs");
+  return existsSync(cli) ? cli : null;
 }
 
 function usage() {
@@ -78,12 +80,16 @@ function main() {
   }
 
   const forwardArgs = buildExampleArgv(spec.cli, userArgs);
-  const tsx = resolveTsx();
-  const result = spawnSync(tsx, [entryPath, ...forwardArgs], {
-    cwd: PKG_DIR,
-    stdio: "inherit",
-    env: process.env,
-  });
+  const tsxModule = resolveTsxModule();
+  const spawnOpts = { cwd: PKG_DIR, stdio: "inherit", env: process.env };
+  // 首选本地 tsx cli.mjs（node 跑）；tsx 不在本地 node_modules（罕见）时回退 PATH 上的 tsx
+  // （Windows 需 shell 解析 .cmd）。
+  const result = tsxModule
+    ? spawnSync(process.execPath, [tsxModule, entryPath, ...forwardArgs], spawnOpts)
+    : spawnSync("tsx", [entryPath, ...forwardArgs], {
+        ...spawnOpts,
+        shell: process.platform === "win32",
+      });
 
   process.exit(result.status ?? 1);
 }

@@ -13,18 +13,34 @@
 
 ---
 
+## 模型 env 解析优先级（`smoke-env.mjs`）
+
+smoke 加载 `.env` 时用 `override:true` —— **项目 `.env` 覆盖** NuWaClaw / shell 注入的占位符或旧值；`.env` 未设的键再回落到注入 env。
+
+| 层级 | 规则 |
+|------|------|
+| 凭证 | `OPENAI_API_KEY` / `ANTHROPIC_*` / `OPENCODE_OPENAI_API_KEY`（任一即可） |
+| Provider | `API_PROTOCOL` / `LLM_PROVIDER` > **凭证推断** > `config.model.provider` |
+| Model | `OPENAI_MODEL` > `ANTHROPIC_MODEL` > `DEFAULT_MODEL` > `config.model.name`（与 provider 无关，对齐 runtime `ENV_MAP`） |
+| Base URL | `OPENAI_BASE_URL` > `ANTHROPIC_BASE_URL` > `config.model.baseUrl` |
+| OPENCODE 兜底 | standard 键缺失时，用 `OPENCODE_OPENAI_API_KEY` / `OPENCODE_OPENAI_API_BASE` / `OPENCODE_MODEL`（NuWaClaw opencode 下发）；forward 仍发 standard 键给 rcoder |
+
+**NuWaClaw 内跑 smoke**：若 shell 已有 `OPENCODE_*` 或 `API_PROTOCOL` + 单家族 key，可不建 `.env`；本地开发仍推荐 `cp .env.example .env`。
+
+---
+
 ## 前置：用当前环境生成可用模型（必做）
 
-**不要手猜 `OPENAI_MODEL=...`**。按下面顺序，smoke 脚本会自动解析并 `-e` 传给 rcoder：
+**不要手猜 `OPENAI_MODEL=...`**。按上面优先级，smoke 脚本自动解析并 `-e` 传给 rcoder：
 
-### 1. 复制并填写 `.env`
+### 1. 复制并填写 `.env`（本地开发推荐）
 
 ```bash
 cp .env.example .env
 # 填写 OPENAI_API_KEY + OPENAI_BASE_URL + OPENAI_MODEL（或 Anthropic 族）
 ```
 
-与 `config/flow-agent.config.json` 的 `model.provider` 一致（默认 `openai` + `deepseek-chat`）。
+默认与 `config/flow-agent.config.json` 的 `openai` + `deepseek-chat` 对齐；provider 以解析结果为准（见上表），不必与文件硬绑。
 
 ### 2. 确认 `activeFlow` 指向正在开发的 flow
 
@@ -53,14 +69,16 @@ pnpm build && pnpm typecheck && pnpm test && pnpm graph && pnpm smoke
 
 | 变量 | 作用 |
 |------|------|
-| `OPENAI_API_KEY` / `ANTHROPIC_*` | 凭证（必填其一） |
-| `OPENAI_MODEL` / `ANTHROPIC_MODEL` | **优先**于 config 的 `model.name` |
-| `OPENAI_BASE_URL` | OpenAI 兼容端点 |
-| `API_PROTOCOL` / `LLM_PROVIDER` | 显式 `openai` \| `anthropic` |
+| `OPENAI_API_KEY` / `ANTHROPIC_*` / `OPENCODE_OPENAI_API_KEY` | 凭证（必填其一） |
+| `OPENAI_MODEL` / `ANTHROPIC_MODEL` / `DEFAULT_MODEL` | 模型名（见上表优先级） |
+| `OPENAI_BASE_URL` / `ANTHROPIC_BASE_URL` | 端点（`OPENCODE_OPENAI_API_BASE` 可兜底） |
+| `API_PROTOCOL` / `LLM_PROVIDER` | 显式 `openai` \| `anthropic`（最高优先） |
 | `SMOKE_PROMPT` | 主路径用户输入（默认 React 题） |
 | `SMOKE_PROMPT_EDGE` | **第二条** prompt（如 `你是？`，验入口节点 **R-G002**） |
 | `SMOKE_EXPECT_ACTIVE_FLOW` | 与 `activeFlow` 不一致 → exit 1 |
 | `SMOKE_WARN_ACTIVE_FLOW=0` | 关闭 `activeFlow=default` 警告 |
+| `SMOKE_TIMEOUT` | rcoder 超时秒数（默认 `150`） |
+| `SMOKE_VERBOSE=1` | 传 `-v` 给 rcoder-cli |
 | `SMOKE_DEBUG=1` | 打印解析后的 provider/model/forward env |
 | `SMOKE_DRY_RUN=1` | 只打印 rcoder 命令，不调 API |
 | `AGENT_ENTRY` / `--entry` | 非默认入口（如 `examples/rag/index.ts`） |
@@ -89,9 +107,14 @@ rcoder-cli 子进程可能继承未替换的 `ANTHROPIC_MODEL={MODEL_PROVIDER_MO
 | 命令 | 入口 |
 |------|------|
 | `pnpm smoke` | `src/index.ts`（读 `activeFlow`） |
-| `pnpm smoke -- --example rag` | `examples/rag/index.ts` |
+| `pnpm smoke -- --example rag` | RAG |
+| `pnpm smoke -- --example travel` | 旅行规划（map-reduce + HITL） |
+| `pnpm smoke -- --example pm` | 项目管理 |
 | `pnpm smoke -- --example review` | human-in-loop |
 | `pnpm smoke -- --example dev-agent` | dev-agent |
+| `pnpm smoke -- --example research` | 深度研究 |
+
+完整列表：`pnpm example --list`。本地手测范例用 `pnpm example <name>`（CLI/ACP 模式，见 `scripts/run-example.mjs`）。
 
 ---
 
@@ -105,7 +128,7 @@ rcoder-cli 子进程可能继承未替换的 `ANTHROPIC_MODEL={MODEL_PROVIDER_MO
 
 ## Anti-patterns
 
-- ❌ 不设 `.env` 凭证就报 smoke 完成
+- ❌ 无任何可用模型凭证（`.env` / shell / `OPENCODE_*`）就报 smoke 完成
 - ❌ `activeFlow=default` 却声称 custom flow 已验过 ACP
 - ❌ 手 export 一堆模型 env 覆盖 config，而不改 `.env` / config
 - ❌ 只跑 `build/test/graph`，跳过 smoke

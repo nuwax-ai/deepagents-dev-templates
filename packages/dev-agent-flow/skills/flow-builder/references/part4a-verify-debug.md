@@ -59,7 +59,7 @@ pnpm graph                   # 导出拓扑
 图跑不通、节点未执行、条件边走错、HITL 不 resume、工具 `Permission denied` / 客户端卡转圈、ACP 无响应时：
 
 1. **确认** — env 含 `LOG_DIR`、`LOG_LEVEL`（HITL 用 `debug`）
-2. **复现** — Zed / `pnpm smoke:*` / CLI
+2. **复现** — Zed / `pnpm smoke` / `pnpm example` / CLI
 3. **定位** — `.logs/` 最新 `.log` 或按 sessionId
 4. **过滤** — 对照 graph 顺序、节点名、tool 名、HITL 轮次
 5. **修复验证** — 改后重跑，新日志确认错误消失

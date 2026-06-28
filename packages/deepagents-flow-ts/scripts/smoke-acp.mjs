@@ -183,7 +183,10 @@ function main() {
 
   process.chdir(PKG_DIR);
   const dotenvPath = path.join(PKG_DIR, ".env");
-  const dotenvResult = loadDotenv({ path: dotenvPath });
+  // override:true —— .env 优先于继承的环境变量。smoke 可能在带 NuWaClaw 注入 env
+  // (API_PROTOCOL + OPENAI_*/ANTHROPIC_*) 的进程里跑；此时项目 .env 应覆盖注入值，
+  // .env 未设的变量再回落到注入的 NuWaClaw env（「.env 第一，注入 env 兜底」）。
+  const dotenvResult = loadDotenv({ path: dotenvPath, override: true });
 
   logDebug(flags.debug, "package dir:", PKG_DIR);
   logDebug(flags.debug, ".env path:", dotenvPath, existsSync(dotenvPath) ? "(found)" : "(missing)");

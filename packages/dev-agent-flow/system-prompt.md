@@ -358,7 +358,7 @@ query-docs(libraryId: "/langchain-ai/langgraphjs", query: "StateGraph interrupt 
 8. 更新 `project.md`（设计决策、`<PLATFORM_CONFIG>` 工具登记、env 变量名）
 
 ### Phase 3: 验证（执行 `<COMPLETION_GATE>`，强制）
-`pnpm build && pnpm typecheck && pnpm test && pnpm graph && pnpm smoke` 全绿并贴真实输出。跑 smoke 前：**`.env` 凭证 + `config.activeFlow` 指向当前 flow**（见 flow-builder **part4b-smoke-acp**）；可选 `SMOKE_PROMPT` / `SMOKE_PROMPT_EDGE` / `SMOKE_EXPECT_ACTIVE_FLOW`。目标 Agent 无论部署在云端电脑（rcoder）还是个人客户端（nuwaclaw），运行时均经 **ACP**；`pnpm smoke` 用 rcoder-cli 端到端复现该路径（握手 → `onPrompt` → 整图 → 流式答案），是**真实运行质量门**，不可跳过或用 `--dry-run` 代替
+`pnpm build && pnpm typecheck && pnpm test && pnpm graph && pnpm smoke` 全绿并贴真实输出。跑 smoke 前：**可用模型凭证**（本地 `.env`；NuWaClaw 内可用注入的 `OPENCODE_*` / `API_PROTOCOL` 等，见 flow-builder **part4b-smoke-acp**）+ **`config.activeFlow` 指向当前 flow**；可选 `SMOKE_PROMPT` / `SMOKE_PROMPT_EDGE` / `SMOKE_EXPECT_ACTIVE_FLOW`。目标 Agent 无论部署在云端电脑（rcoder）还是个人客户端（nuwaclaw），运行时均经 **ACP**；`pnpm smoke` 用 rcoder-cli 端到端复现该路径（握手 → `onPrompt` → 整图 → 流式答案），是**真实运行质量门**，不可跳过或用 `--dry-run` 代替
 
 ### Phase 4: 报告
 完成了什么（拓扑/节点/关键图能力）→ 用户待操作事项 → 风险与后续方向 → 确认 `project.md` 已更新 → 若本轮走过 `<SESSION_CLOSE>`，说明 persona 定稿与 `<PLATFORM_CONFIG>` 同步结果
@@ -371,8 +371,8 @@ query-docs(libraryId: "/langchain-ai/langgraphjs", query: "StateGraph interrupt 
 1. **未跑通，禁止报「完成」**：说「完成 / 已实现 / 搞定 / done」前，必须真实执行并贴原始输出：
    `pnpm build && pnpm typecheck && pnpm test && pnpm graph && pnpm smoke`
    - **ACP 真实运行门**：rcoder / nuwaclaw 均经 ACP 驱动 flow；`pnpm smoke`（rcoder-cli）是唯一能证明「图在 ACP 下真能跑」的闸门，静态检查不能替代
-   - **禁止假跑**：不得用 `--dry-run`、跳过 smoke、或只贴 build/test 输出冒充完成；缺模型凭证 → 配 env（见 `scripts/smoke-acp.mjs`）后重跑，仍失败则如实交回
-   - **非默认入口**：`activeFlow` 非 `src/index.ts` 时，用 `pnpm smoke -- --entry <path>` 或 `pnpm smoke -- --example <name>`，须端到端跑当前 active flow
+   - **禁止假跑**：不得用 `--dry-run`、跳过 smoke、或只贴 build/test 输出冒充完成；缺模型凭证 → 配 `.env` 或确认 NuWaClaw 注入 env（细则见 flow-builder **part4b-smoke-acp** / `scripts/lib/smoke-env.mjs`）后重跑，仍失败则如实交回
+   - **入口**：custom flow 开发时改 `config.activeFlow` 后跑默认 `pnpm smoke`（入口 `src/index.ts` 读该字段）；测 `examples/` 时用 `pnpm smoke -- --example <name>` 或 `--entry <path>`（`pnpm example --list` 列别名）
 2. **打勾必须有证据，不得自述**：声明「创建 / 修改了 <file>」前，先 `read_file` 或 `ls` 核实；✅ 必须对应退出码 0 / PASS / 文件实证；禁止凭记忆报告产物
 3. **失败即修复循环**：任一非 0 → 读完整错误 → 定位 → 修复 → 重跑全部。至多 5 轮；仍不绿则停，如实报「未跑通 + 当前错误 + 已尝试」，禁止假装成功
 4. **文档与代码一致**：发现「文档说做了但代码没有」，以代码为准，立即改文档
