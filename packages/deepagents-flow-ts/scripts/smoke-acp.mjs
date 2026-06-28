@@ -115,18 +115,45 @@ function formatCommand(pnpm, args) {
   return [pnpm, ...args].map(quote).join(" ");
 }
 
+// rcoder 在 agent 空答 / Session cancelled 时仍可能 exit 0 —— 仅看退出码会把「agent 没产出答案」漏成通过。
+// 故捕获输出并扫失败特征：rcoder 的 [ERR] 行 + runtime 的 answerChars=0 / outputChars=0。
+const SMOKE_FAIL_SIGNATURES = [
+  { re: /Prompt ended with error/, reason: "rcoder: Prompt ended with error" },
+  { re: /Session cancelled/, reason: "agent 会话被取消（多为空答/异常）" },
+  { re: /\banswerChars=0\b/, reason: "agent 最终答案为空（answerChars=0）" },
+  { re: /\boutputChars=0\b/, reason: "flow 输出为空（outputChars=0）" },
+];
+
 function runPnpm(args, { debug }) {
   const pnpm = resolvePnpm();
   logDebug(debug, "cwd:", PKG_DIR);
   logDebug(debug, "cmd:", formatCommand(pnpm, args));
 
-  const result = spawnSync(pnpm, args, {
-    cwd: PKG_DIR,
-    stdio: "inherit",
-    shell: false,
-    env: process.env,
-  });
-  return result.status ?? 1;
+  let result;
+  try {
+    result = spawnSync(pnpm, args, {
+      cwd: PKG_DIR,
+      stdio: ["inherit", "pipe", "pipe"],
+      shell: false,
+      env: process.env,
+      maxBuffer: 100 * 1024 * 1024,
+    });
+  } catch (err) {
+    // 输出超 maxBuffer 等异常：回退 inherit（仅看退出码，放弃特征扫描）
+    logDebug(debug, "captured run threw, fallback to inherit:", String(err));
+    const r = spawnSync(pnpm, args, { cwd: PKG_DIR, stdio: "inherit", shell: false, env: process.env });
+    return { code: r.status ?? 1, failed: false, reason: "" };
+  }
+  // 回放捕获的输出，保持原 stdio:inherit 的可见性
+  if (result.stdout) process.stdout.write(result.stdout);
+  if (result.stderr) process.stderr.write(result.stderr);
+  const code = result.status ?? 1;
+  // 扫失败特征：即使 rcoder exit 0，命中也算 smoke 失败
+  const combined = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
+  for (const { re, reason } of SMOKE_FAIL_SIGNATURES) {
+    if (re.test(combined)) return { code, failed: true, reason };
+  }
+  return { code, failed: false, reason: "" };
 }
 
 function warnActiveFlow(smokeEnv, { entry, debug }) {
@@ -271,10 +298,11 @@ Debug without credentials:
       continue;
     }
 
-    const code = runPnpm(rcoderArgs, { debug: flags.debug });
-    if (code !== 0) {
-      console.error(`[smoke:acp] failed${label} (exit ${code})`);
-      process.exit(code);
+    const res = runPnpm(rcoderArgs, { debug: flags.debug });
+    if (res.code !== 0 || res.failed) {
+      const reason = res.failed ? ` — ${res.reason}` : "";
+      console.error(`[smoke:acp] failed${label} (exit ${res.code})${reason}`);
+      process.exit(res.code !== 0 ? res.code : 1);
     }
   }
 }
