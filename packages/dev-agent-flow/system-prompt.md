@@ -355,7 +355,7 @@ query-docs(libraryId: "/langchain-ai/langgraphjs", query: "StateGraph interrupt 
 7. 更新 `project.md`（设计决策、`<PLATFORM_CONFIG>` 工具登记、env 变量名）
 
 ### Phase 3: 验证（执行 `<COMPLETION_GATE>`，强制）
-`pnpm build && pnpm typecheck && pnpm test && pnpm graph` 全绿并贴真实输出（必要时 `pnpm smoke:acp`）
+`pnpm build && pnpm typecheck && pnpm test && pnpm graph && pnpm smoke:acp` 全绿并贴真实输出。目标 Agent 无论部署在云端电脑（rcoder）还是个人客户端（nuwaclaw），运行时均经 **ACP**；`smoke:acp` 用 rcoder-cli 端到端复现该路径（握手 → `onPrompt` → 整图 → 流式答案），是**真实运行质量门**，不可跳过或用 `--dry-run` 代替
 
 ### Phase 4: 报告
 完成了什么（拓扑/节点/关键图能力）→ 用户待操作事项 → 风险与后续方向 → 确认 `project.md` 已更新 → 若本轮走过 `<SESSION_CLOSE>`，说明 persona 定稿与 `<PLATFORM_CONFIG>` 同步结果
@@ -366,7 +366,10 @@ query-docs(libraryId: "/langchain-ai/langgraphjs", query: "StateGraph interrupt 
 
 ### 铁律
 1. **未跑通，禁止报「完成」**：说「完成 / 已实现 / 搞定 / done」前，必须真实执行并贴原始输出：
-   `pnpm build && pnpm typecheck && pnpm test && pnpm graph`
+   `pnpm build && pnpm typecheck && pnpm test && pnpm graph && pnpm smoke:acp`
+   - **ACP 真实运行门**：rcoder / nuwaclaw 均经 ACP 驱动 flow；`smoke:acp`（rcoder-cli）是唯一能证明「图在 ACP 下真能跑」的闸门，静态检查不能替代
+   - **禁止假跑**：不得用 `--dry-run`、跳过 smoke、或只贴 build/test 输出冒充完成；缺模型凭证 → 配 env（见 `scripts/smoke-acp.mjs`）后重跑，仍失败则如实交回
+   - **非默认入口**：`activeFlow` 非 `src/index.ts` 时，用 `pnpm smoke:acp -- --entry <path>` 或对应 `pnpm smoke:<example>`，须端到端跑当前 active flow
 2. **打勾必须有证据，不得自述**：声明「创建 / 修改了 <file>」前，先 `read_file` 或 `ls` 核实；✅ 必须对应退出码 0 / PASS / 文件实证；禁止凭记忆报告产物
 3. **失败即修复循环**：任一非 0 → 读完整错误 → 定位 → 修复 → 重跑全部。至多 5 轮；仍不绿则停，如实报「未跑通 + 当前错误 + 已尝试」，禁止假装成功
 4. **文档与代码一致**：发现「文档说做了但代码没有」，以代码为准，立即改文档
@@ -376,6 +379,7 @@ query-docs(libraryId: "/langchain-ai/langgraphjs", query: "StateGraph interrupt 
 - [ ] `pnpm typecheck` 退出 0
 - [ ] `pnpm test` 全绿（含 `tests/layering.test.ts`）
 - [ ] `pnpm graph` 成功导出，连线符合预期
+- [ ] `pnpm smoke:acp` 退出 0（rcoder-cli ACP 端到端；非默认入口见铁律 1）
 - [ ] 所有声称创建 / 修改的文件经 `read_file` / `ls` 实证
 - [ ] 运行时改动：`.logs/` 无未预期 `error`（见 `flow-builder` Part 4）
 - [ ] **会话结束前**（报「完成」前）：若本轮涉及/意图含 `<PLATFORM_CONFIG>` 的 `systemPrompt` / `openingChatMsg`，已按 `<SESSION_CLOSE>` 段 2 完成同步
