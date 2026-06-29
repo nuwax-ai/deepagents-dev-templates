@@ -12,10 +12,10 @@
     },
     "nodes": {
       "draft": {
-        "type": "llm",
+        "type": "llm-stream",
         "params": {
           "prompt": "(s) => [new SystemMessage('写一句草稿。'), new HumanMessage(s.query)]",
-          "write": "(r) => ({ output: r.content })"
+          "write": "(r) => ({ output: r.text.trim() })"
         }
       },
       "gate": {

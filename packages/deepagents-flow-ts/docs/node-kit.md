@@ -20,10 +20,10 @@ import {
 
 | 场景 | factory | 例 |
 |---|---|---|
-| 一次调 LLM,写回文本 | `createLlmNode` | compose/aggregate |
+| 一次调 LLM,写回文本（**中间步骤 / 结构化前置**） | `createLlmNode` | plan/rewrite/grade |
 | 一次调 LLM,写回**结构化** JSON | `createLlmNode({ parse })` | plan/rewrite |
 | LLM 裁决 → **Command goto** 路由(reflection/evaluator) | `createLlmRouterNode` | deep-research outline_review/quality_review |
-| **流式**调 LLM,逐 token 给用户 | `createLlmStreamNode` | draft/respond |
+| **流式**调 LLM,逐 token 给用户 | `createLlmStreamNode` | compose/aggregate/draft/finalize 修订 |
 | 执行模型 `tool_calls`(ReAct 工具步) | `createToolExecNode` | 默认图 tools |
 | **主动 MCP 检索**(stdio,rateLimited+三态) | `createMcpRetrievalNode` | travel research / rag retrieve |
 | 人审门(前置):`interrupt` 暂停 → 通过/打回 | `createHumanApprovalNode` | review/approve/confirm/clarify |
@@ -38,6 +38,8 @@ import {
 ---
 
 ## createLlmNode —— 一次调 LLM
+
+> **流式提示**：用户可见的大段输出（compose / aggregate / 修订稿等）应使用 [`createLlmStreamNode`](#createllmstreamnode--流式-llm)，**不要**用本 factory——否则 ACP/CLI 仅在 turn 结束时整段兜底推送（`streamed=false`），用户感知为「无流式」。
 
 ```ts
 const compose = createLlmNode<MyState>({
@@ -56,7 +58,8 @@ graph.addNode("compose", compose);
 - `r.content` 已是 `extractText` 后的纯文本;`parse` 提供时 `r.parsed = parse(content)`。
 - **结构化**:加 `parse`(常用 `parseJson`),`write` 里读 `r.parsed`。PM 的 plan/evaluate、rag 的 rewrite 都用这个。
 - **`write` 可收第三参 `config?`**(LangGraphRunnableConfig)——供 write 内发 `emitPlan(config,…)`/`emitStage(config,…)` 副作用;不用就忽略(默认两参 `(r, s)`)。
-- 例:[human-in-loop](../examples/human-in-loop/) compose、[travel-planner](../examples/travel-planner/) aggregate、[project-manager](../examples/project-manager/) plan/estimate/evaluate、[rag](../examples/rag/) rewrite、[adaptive-rag](../src/libs/topologies/adaptive-rag/) route_question / transform_query（`{ parse }` 结构化裁决 / 查询重写）。
+- 例:[project-manager](../examples/project-manager/) plan/estimate/evaluate、[rag](../examples/rag/) rewrite、[adaptive-rag](../src/libs/topologies/adaptive-rag/) route_question / transform_query（`{ parse }` 结构化裁决 / 查询重写）。
+- **用户可见初稿/汇总**见 [`createLlmStreamNode`](#createllmstreamnode--流式-llm)（human-in-loop compose、travel aggregate 等已迁移）。
 
 ### parse 使用契约（必读）
 
@@ -104,7 +107,7 @@ const draft = createLlmStreamNode<MyState>({
 ```
 
 - 只用于**用户可见的大段输出**:有 `onToken` sink 且模型支持 stream 时逐 chunk `emitTextToken`,否则退回一次性 invoke(`r.streamed=false`)。
-- 例:[deep-research](../examples/deep-research/) draft(带「失败复用上版草稿」fallback)。
+- 例:[deep-research](../examples/deep-research/) draft、[travel-planner](../src/libs/topologies/travel-planner/graph.ts) aggregate、[human-in-loop](../src/libs/topologies/human-in-loop/graph.ts) compose（带「失败复用上版草稿」fallback）。
 
 ## createLlmRouterNode —— LLM 裁决 → Command goto
 
@@ -201,10 +204,10 @@ const confirmPublish = createPermissionApprovalNode<MyState>({
 ```ts
 const finalize = createApprovalFinalizeNode<MyState>({
   approvedOutput: (s) => ({ output: `✅ 已通过：\n${s.draft}` }),   // 通过 → 确定性输出（不调 LLM）
-  rejectedLlm: {                                                  // 否则 → LLM 按意见修订（复用 createLlmNode 选项）
+  rejectedLlm: {                                                  // 否则 → LLM 按意见修订（createLlmStreamNode，支持流式）
     model: () => requireModel(appConfig, "review"),
     prompt: (s) => [new SystemMessage("按意见改写"), new HumanMessage(`原稿:${s.draft}\n意见:${s.feedback}`)],
-    write: (r) => ({ output: `✏️ ${r.content}` }),
+    write: (r) => ({ output: `✏️ ${r.text}` }),
     config: appConfig, timeoutMs: resolveLlmResilience(appConfig).longTimeoutMs,
   },
   // feedbackField?: "feedback"; isApproved?: 默认 isApproval
@@ -289,6 +292,12 @@ parentGraph.addNode("research", researcher);   // 编译后的子图直接当节
 
 不想套预设拓扑、要按 nodes+edges+state 自由编排时,用 `custom` 拓扑(spec 即契约):
 spec 声明 `state`(channels + reducer 类型)/ `nodes`(name→type+params)/ `edges`(static/conditional/fanout)/ `input`/`result`,
-`scripts/scaffold/blueprints/custom.mjs` **生成时渲染**真实 `src/app/flows/<name>/graph.ts`(内联本目录 factory,受 tsc 检查;无运行时解释器)。节点 `type` 词表 + 选型见 [node-catalog.md](node-catalog.md);示例见 `scripts/scaffold/specs/_example.*.flow.json`(translate-review / grade-redo / router-gate / multi-aspect-search / **interview-agent** 等)。生成后手改 `graph.ts` 须**同步** spec，否则 regenerate 会覆盖修复。
+`scripts/scaffold/blueprints/custom.mjs` **生成时渲染**真实 `src/app/flows/<name>/graph.ts`(内联本目录 factory,受 tsc 检查;无运行时解释器)。节点 `type` 词表 + 选型见 [node-catalog.md](node-catalog.md)。
+
+**custom 范例**（`scripts/scaffold/specs/_example.*.flow.json`）：
+- 流式：`translate-review` / `multi-aspect-search` / `router-gate`（`draft`）/ `interview-agent`（`ask` + `writeReport`）
+- 教学用非流式（勿照抄到生产 flow）：`grade-redo`（`write` 仍 `llm`）、`interview-agent`（`prepare` / `evaluate` 结构化仍 `llm`）
+
+生成后手改 `graph.ts` 须**同步** spec，否则 regenerate 会覆盖修复。
 
 进阶模式(Send/interrupt/Command/subgraph/checkpointer 的原生细节)见 [flow-patterns.md](flow-patterns.md)。

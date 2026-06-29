@@ -26,8 +26,10 @@ import {
   MemorySaver,
   type BaseCheckpointSaver,
 } from "@langchain/langgraph";
+import { HumanMessage } from "@langchain/core/messages";
 import { createStatefulFlow } from "../src/surfaces/stateful-flow.js";
 import { FileCheckpointSaver } from "../src/runtime/services/file-checkpoint-saver.js";
+import { createLlmStreamNode } from "../src/libs/nodes/index.js";
 
 // ── 玩具图：ask(interrupt 暂停) → finish(定稿) ──────────────
 const ToyState = Annotation.Root({
@@ -147,6 +149,52 @@ describe("createStatefulFlow run-loop（无凭证，确定性）", () => {
       "tool:completed:t1",
       "text:hello",
     ]);
+  });
+
+  it("createLlmStreamNode 经 createStatefulFlow 分发 onToken（custom writer 通路）", async () => {
+    const StreamState = Annotation.Root({
+      query: Annotation<string>,
+      output: Annotation<string>,
+    });
+    type StreamStateType = typeof StreamState.State;
+
+    const mockStream = {
+      invoke: async () => ({ content: "" }),
+      stream: async function* () {
+        yield { content: "hel" };
+        yield { content: "lo" };
+      },
+    };
+
+    const answer = createLlmStreamNode<StreamStateType>({
+      model: mockStream as never,
+      prompt: (s) => [new HumanMessage(s.query)],
+      write: (r) => ({ output: r.text }),
+      timeoutMs: 5000,
+    });
+
+    const buildGraph = (cp: BaseCheckpointSaver) =>
+      new StateGraph(StreamState)
+        .addNode("answer", answer)
+        .addEdge(START, "answer")
+        .addEdge("answer", END)
+        .compile({ checkpointer: cp });
+
+    const flow = createStatefulFlow<StreamStateType>({
+      buildGraph,
+      toInput: (query) => ({ query }),
+      toResult: (v) => ({ answer: v.output ?? "" }),
+      checkpointer: new MemorySaver(),
+    });
+
+    const tokens: string[] = [];
+    const res = await flow.run({ query: "hi" }, randomUUID(), {
+      onToken: (t) => tokens.push(t),
+    });
+
+    expect(res.status).toBe("done");
+    if (res.status === "done") expect(res.answer).toBe("hello");
+    expect(tokens.join("")).toBe("hello");
   });
 });
 

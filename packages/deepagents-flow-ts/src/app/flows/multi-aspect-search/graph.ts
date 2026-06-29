@@ -15,7 +15,8 @@ import {
 } from "@langchain/langgraph";
 import { SystemMessage, HumanMessage } from "@langchain/core/messages";
 import type { AppConfig } from "../../../runtime/index.js";
-import { createMcpRetrievalNode, createLlmNode, requireModel, createFanout } from "../../../libs/nodes/index.js";
+import { createMcpRetrievalNode, createLlmStreamNode, requireModel, createFanout } from "../../../libs/nodes/index.js";
+import { resolveLlmResilience } from "../../../runtime/services/llm-resilience.js";
 import { reflectTopology } from "../../../libs/topologies/reflect.js";
 import type { FlowTopology } from "../../../core/flow-types.js";
 
@@ -37,12 +38,13 @@ export function buildGraph(appConfig: AppConfig | undefined, checkpointer: BaseC
       write: (r, s) => ({ findings: [`${s.aspect}：${r.ok ? r.text.slice(0, 120) : '（检索失败）'}`] }),
       label: "research",
     }))
-    .addNode("aggregate", createLlmNode<StateShape>({
+    .addNode("aggregate", createLlmStreamNode<StateShape>({
       model: () => requireModel(appConfig, "aggregate"),
       prompt: (s) => [new SystemMessage('把各维度搜索结果整理成简短摘要，按维度列出。'), new HumanMessage(s.findings.join(' / '))],
-      write: (r) => ({ output: r.content }),
+      write: (r) => ({ output: r.text }),
       config: appConfig,
       label: "aggregate",
+      timeoutMs: resolveLlmResilience(appConfig).longTimeoutMs,
     }))
     .addEdge(START, "gather")
     .addConditionalEdges(

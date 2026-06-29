@@ -15,7 +15,8 @@ import {
 } from "@langchain/langgraph";
 import { SystemMessage, HumanMessage } from "@langchain/core/messages";
 import type { AppConfig } from "../../../runtime/index.js";
-import { createLlmNode, createHumanApprovalNode, createApprovalFinalizeNode, requireModel } from "../../../libs/nodes/index.js";
+import { createLlmStreamNode, createHumanApprovalNode, createApprovalFinalizeNode, requireModel } from "../../../libs/nodes/index.js";
+import { resolveLlmResilience } from "../../../runtime/services/llm-resilience.js";
 import { reflectTopology } from "../../../libs/topologies/reflect.js";
 import type { FlowTopology } from "../../../core/flow-types.js";
 
@@ -30,12 +31,13 @@ export type StateShape = typeof State.State;
 /** 按 spec 构造图（编译后）。被 index.ts 的 recipe.buildGraph 调用。 */
 export function buildGraph(appConfig: AppConfig | undefined, checkpointer: BaseCheckpointSaver = new MemorySaver()) {
   return new StateGraph(State)
-    .addNode("compose", createLlmNode<StateShape>({
+    .addNode("compose", createLlmStreamNode<StateShape>({
       model: () => requireModel(appConfig, "compose"),
       prompt: (s) => [new SystemMessage('你是专业中英互译，只输出译文，不要解释。'), new HumanMessage(s.query)],
-      write: (r) => ({ draft: r.content.trim() }),
+      write: (r) => ({ draft: r.text.trim() }),
       config: appConfig,
       label: "compose",
+      timeoutMs: resolveLlmResilience(appConfig).longTimeoutMs,
     }))
     .addNode("review", createHumanApprovalNode<StateShape>({
       question: (s) => `译文草稿：${s.draft} —— 说修改意见，或回 ok 通过`,
@@ -46,9 +48,10 @@ export function buildGraph(appConfig: AppConfig | undefined, checkpointer: BaseC
       rejectedLlm: {
         model: () => requireModel(appConfig, "finalize"),
         prompt: (s) => [new SystemMessage('按意见改写译文，只输出成稿。'), new HumanMessage(`原译：${s.draft}；修改意见：${s.feedback}`)],
-        write: (r) => ({ output: `✏️ 已按意见修订：${r.content}` }),
+        write: (r) => ({ output: `✏️ 已按意见修订：${r.text}` }),
         config: appConfig,
         label: "finalize",
+        timeoutMs: resolveLlmResilience(appConfig).longTimeoutMs,
       },
     }))
     .addEdge(START, "compose")

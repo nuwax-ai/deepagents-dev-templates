@@ -2,8 +2,21 @@
  * custom spec 图编排规则静态检查（生成前 gate）。
  *
  * 规则权威：docs/flow-graph-rules.md
- * 当前实现：R-G001（parse 仅当 write/route 消费 parsed）、R-G007（节点名 ≠ state channel）
+ * 当前实现：R-G001（parse 仅当 write/route 消费 parsed）、R-G007（节点名 ≠ state channel）、
+ * R-G009（llm-stream / approval-finalize.rejectedLlm 的 write 须用 r.text）
  */
+
+/** write 是否读取流式 LLM 结果（r.text）。 */
+export function writeUsesStreamText(writeSrc) {
+  if (typeof writeSrc !== "string" || !writeSrc.trim()) return false;
+  return /\br\.text\b/.test(writeSrc) || /\br\?\.text\b/.test(writeSrc);
+}
+
+/** write 是否仍读取一次性 LLM 结果（r.content）—— llm-stream 路径禁止。 */
+export function writeUsesLlmContent(writeSrc) {
+  if (typeof writeSrc !== "string" || !writeSrc.trim()) return false;
+  return /\br\.content\b/.test(writeSrc) || /\br\?\.content\b/.test(writeSrc);
+}
 
 /** write 是否读取 LLM 解析结果（r.parsed 或从 r 解构 parsed）。 */
 export function writeConsumesParsed(writeSrc) {
@@ -61,6 +74,25 @@ export function lintGraphRules(spec) {
       }
     }
 
+    if (node.type === "llm-stream") {
+      if (!writeUsesStreamText(p.write)) {
+        errors.push({
+          rule: "R-G009",
+          node: nodeName,
+          message:
+            `节点 "${nodeName}" 为 llm-stream，write 须读取 r.text（createLlmStreamNode 写回签名）。`,
+        });
+      }
+      if (writeUsesLlmContent(p.write)) {
+        errors.push({
+          rule: "R-G009",
+          node: nodeName,
+          message:
+            `节点 "${nodeName}" 为 llm-stream，write 不得使用 r.content；请改为 r.text。`,
+        });
+      }
+    }
+
     if (node.type === "llm-router" && p.parse != null) {
       if (!routeConsumesParsed(p.route)) {
         errors.push({
@@ -73,14 +105,33 @@ export function lintGraphRules(spec) {
       }
     }
 
-    if (node.type === "approval-finalize" && p.rejectedLlm?.parse != null) {
-      if (!writeConsumesParsed(p.rejectedLlm.write)) {
+    if (node.type === "approval-finalize") {
+      const rejected = p.rejectedLlm ?? {};
+      if (rejected.parse != null) {
         errors.push({
-          rule: "R-G001",
+          rule: "R-G009",
           node: nodeName,
           message:
-            `节点 "${nodeName}".rejectedLlm 配置了 parse 但 write 未读取 r.parsed。`,
+            `节点 "${nodeName}".rejectedLlm 走 createLlmStreamNode，不支持 parse；删除 parse 或改用 llm 节点。`,
         });
+      }
+      if (rejected.write != null) {
+        if (!writeUsesStreamText(rejected.write)) {
+          errors.push({
+            rule: "R-G009",
+            node: nodeName,
+            message:
+              `节点 "${nodeName}".rejectedLlm.write 须读取 r.text（createLlmStreamNode 写回签名）。`,
+          });
+        }
+        if (writeUsesLlmContent(rejected.write)) {
+          errors.push({
+            rule: "R-G009",
+            node: nodeName,
+            message:
+              `节点 "${nodeName}".rejectedLlm.write 不得使用 r.content；请改为 r.text。`,
+          });
+        }
       }
     }
   }

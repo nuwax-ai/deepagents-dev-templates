@@ -40,7 +40,36 @@ type MyStateType = typeof MyState.State;
 
 ## Step 3: 节点（factory 优先）
 
-`createLlmNode` / `createLlmRouterNode` / `createMcpRetrievalNode` / `createHumanApprovalNode` / `createPermissionApprovalNode` / `createApprovalFinalizeNode` / `createToolExecNode` / `createFanout` / `createSubgraphNode` 等；bespoke 才在 `src/app/nodes/` 手写并说明原因。
+`createLlmNode` / `createLlmStreamNode` / `createLlmRouterNode` / `createMcpRetrievalNode` / `createHumanApprovalNode` / `createPermissionApprovalNode` / `createApprovalFinalizeNode` / `createToolExecNode` / `createFanout` / `createSubgraphNode` 等；bespoke 才在 `src/app/nodes/` 手写并说明原因。
+
+### 流式输出（用户可见大段 LLM 文本 · 必读）
+
+**铁律**：用户能直接看到的大段生成（`compose` / `aggregate` / `draft` / finalize 修订稿 / 报告正文）→ **`createLlmStreamNode`**，**禁止** `createLlmNode`。
+
+| 对比 | `createLlmNode` | `createLlmStreamNode` |
+|------|-----------------|----------------------|
+| 模型调用 | `invoke()` 一次性 | `stream()` 逐 chunk |
+| token 透出 | ❌ 无（ACP 仅 turn 末整段兜底） | ✅ `emitTextToken` → 客户端 |
+| write 签名 | `r.content` / `r.parsed` | **`r.text`**（+ `r.streamed`） |
+| 适用 | plan / grade / rewrite / 路由裁决 | 初稿、汇总、行程、修订稿 |
+
+```typescript
+const aggregate = createLlmStreamNode<MyStateType>({
+  model: () => requireModel(appConfig, "my-flow"),
+  prompt: (s) => [new SystemMessage("…"), new HumanMessage(material)],
+  write: (r) => ({ output: r.text.trim() }),
+  config: appConfig,
+  label: "aggregate",
+  timeoutMs: resolveLlmResilience(appConfig).longTimeoutMs,  // 必填（长超时）
+});
+```
+
+- **custom spec**：`"type": "llm-stream"`，`write` 用 `r.text`（**R-G009**；`generate.mjs` 生成前静态检）
+- **`createApprovalFinalizeNode`**：`rejectedLlm.write` 同样读 **`r.text`**（框架内置 `createLlmStreamNode`）
+- **ReAct 默认图**：`think` 走 messages 白名单另一条通路；勿与拓扑 aggregate 混淆
+- **降级**：无 `onToken` 或模型无 `.stream()` → 退回 invoke；ACP 终态仍整段兜底（目标项目 README § 流式输出检查清单）
+
+详表 → 目标项目 `docs/node-kit.md` § createLlmStreamNode · **R-G009** · system-prompt `<STREAMING_OUTPUT>`。
 
 ### createLlmNode 与 parseJson
 
@@ -119,10 +148,11 @@ function fanoutToResearch(state): Send[] {
 |------|----------|------|
 | ReAct | `toolsCondition` + `bindTools` | 默认图（`think` 只**决策** tool_calls，`tools` 节点才**执行**；见 `docs/flow-orchestration.md`） |
 | 条件重试 | `addConditionalEdges` | `examples/rag` |
-| Send 并行 | `Send` + reducer | `examples/travel-planner` |
+| Send 并行 | `Send` + reducer | `examples/travel-planner`（**aggregate 用 createLlmStreamNode**；**research 接平台搜索 MCP**） |
 | reflection | `createLlmRouterNode` 或条件边 | pm / deep-research |
-| HITL | `interrupt` + resume | `examples/human-in-loop` |
-| 长任务 | `onStage` + checkpoint | `examples/deep-research` |
+| HITL | `interrupt` + resume | `examples/human-in-loop`（**compose 流式初稿**） |
+| 长任务 | `onStage` + checkpoint | `examples/deep-research`（**draft 流式**） |
+| **流式用户可见输出** | **`createLlmStreamNode`** | travel aggregate / human-in-loop compose / rag generate |
 
 ## Anti-patterns
 
@@ -135,5 +165,6 @@ function fanoutToResearch(state): Send[] {
 - ❌ `write` 不用 `r.parsed` 却配 `parse: parseJson`
 - ❌ 图入口 LLM 强制 JSON、无 fallback
 - ❌ 只改 `graph.ts` 不同步 `*.flow.json` spec
+- ❌ **用户可见大段输出**用 `createLlmNode` 或 spec 写 `r.content`（应 `createLlmStreamNode` + `r.text`，**R-G009**）
 - ✅ 条件边纯函数 + 单测；`durableCheckpointer` 跨重启
 - ✅ 结构化节点：prompt 定 schema + write 读 parsed +（可选）fallback

@@ -82,7 +82,37 @@ pnpm graph                   # 导出拓扑
 
 详表见目标项目 `docs/troubleshooting.md` § `LLM 未返回 JSON`。
 
+---
+
+## 典型错误：无流式 / 回答一次性整段出现
+
+**规则**：[flow-graph-rules-pointer.md](flow-graph-rules-pointer.md) → 目标项目 **R-G009**；Part 2 § 流式输出。
+
+| 步 | 动作 |
+|----|------|
+| 1 | 确认症状：ACP/客户端长时间无字，最后一次性出全文（`streamed=false` 兜底） |
+| 2 | 打开 `src/app/flows/<name>/graph.ts`，查用户可见节点（compose / aggregate / draft / finalize 修订） |
+| 3 | 若用 `createLlmNode` → 改为 **`createLlmStreamNode`**，`write` 从 `r.content` 改为 **`r.text`**，补 `timeoutMs: resolveLlmResilience(appConfig).longTimeoutMs` |
+| 4 | 若来自 scaffold：查 `scripts/scaffold/specs/<name>.flow.json` 是否 `type: "llm-stream"` 且 `write` 用 `r.text` |
+| 5 | **同步** spec 与 graph（**R-G003**）；重跑 `pnpm smoke` 观察逐 token |
+| 6 | 仍不流式：确认模型支持 `.stream()`；查目标项目 README § 流式输出检查清单 L2/L3 降级 |
+
 **与工具 EXECUTING 的关系**：图在 LLM 节点抛错未走完时，并行调试命令可能长时间显示 EXECUTING；先修图错误再判工具层。
+
+---
+
+## 典型错误：联网搜索不生效 / 误用内置 search
+
+**规则**：Part 3 § 联网搜索；system-prompt `<WEB_SEARCH>`。
+
+| 步 | 动作 |
+|----|------|
+| 1 | 确认需求是**互联网/实时**检索，而非工作区内 grep（内置 `search` 仅后者） |
+| 2 | 是否已 `search-apis.sh --kw "搜索"` / `get-config.sh --key mcpConfigs`？未搜平台 → 先补 |
+| 3 | Plugin 命中是否已 `add-tool.sh` 并在 `flow-tools.ts` 注册？MCP 是否对齐 `mcp.default.json`？ |
+| 4 | `travel-planner` / custom `mcp-retrieval`：`searchMcp` 是否传入平台登记的搜索 MCP？未传则 research 优雅降级（无结果） |
+| 5 | 禁止用 `bash`+`curl` / 自写 DDG 替代平台能力；`pnpm exec tsx src/index.ts capabilities` 核对 MCP/工具列表 |
+| 6 | 仍无结果：查 MCP 工具名是否与 `chooseMcpToolName` 匹配；`onToolCall` / 日志是否有检索调用 |
 
 ---
 
@@ -92,4 +122,6 @@ pnpm graph                   # 导出拓扑
 - ❌ 不看 `.logs/` 就猜 ACP/HITL 行为
 - ❌ 把 `.log` 全文贴进对话或提交 git
 - ❌ 见 JSON 解析错就加更严 prompt，不检查 `write` 是否真需要 `r.parsed`
+- ❌ 用户反馈「不流式」却只改 ACP/客户端，不检查节点是否误用 `createLlmNode`
+- ❌ 用户要「联网搜索」却只用内置 `grep`/`search`，或未搜平台就自写搜索 API
 - ✅ 命令退出码 0 + 文件实证 + 日志无未预期 error

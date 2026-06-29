@@ -15,7 +15,14 @@ import {
 } from "@langchain/langgraph";
 import { SystemMessage, HumanMessage } from "@langchain/core/messages";
 import type { AppConfig } from "../../../runtime/index.js";
-import { createLlmNode, createHumanApprovalNode, requireModel, parseJson } from "../../../libs/nodes/index.js";
+import {
+  createLlmNode,
+  createLlmStreamNode,
+  createHumanApprovalNode,
+  requireModel,
+  parseJson,
+} from "../../../libs/nodes/index.js";
+import { resolveLlmResilience } from "../../../runtime/services/llm-resilience.js";
 import { reflectTopology } from "../../../libs/topologies/reflect.js";
 import type { FlowTopology } from "../../../core/flow-types.js";
 
@@ -42,15 +49,16 @@ export function buildGraph(appConfig: AppConfig | undefined, checkpointer: BaseC
       config: appConfig,
       label: "prepare",
     }))
-    .addNode("ask", createLlmNode<StateShape>({
+    .addNode("ask", createLlmStreamNode<StateShape>({
       model: () => requireModel(appConfig, "ask"),
       prompt: (s) => {
   const historyText = (s.questionHistory ?? []).length > 0 ? '\n已完成的问答：\n' + (s.questionHistory ?? []).join('\n---\n') : '\n开始第一轮提问。';
   return [new SystemMessage('你是技术面试官。基于面试策略、已回答的问题，提出下一个技术面试问题。必须遵守以下要求：\n1. 从基础到深入层层递进\n2. 如果上一回答有误则追问相关基础概念\n3. 如果回答正确则提升难度或换新领域\n4. 只输出问题本身，不要序号和评价\n5. 问题要具体且有深度，不要泛泛而问'), new HumanMessage(`面试背景（岗位描述+简历）：${s.query}\n${historyText}\n\n当前是第${(s.questionCount ?? 0) + 1}个问题。请提出下一个技术面试问题。`)];
 },
-      write: (r, s) => ({ currentQuestion: r.content, questionCount: (s.questionCount ?? 0) + 1 }),
+      write: (r, s) => ({ currentQuestion: r.text.trim(), questionCount: (s.questionCount ?? 0) + 1 }),
       config: appConfig,
       label: "ask",
+      timeoutMs: resolveLlmResilience(appConfig).longTimeoutMs,
     }))
     .addNode("wait", createHumanApprovalNode<StateShape>({
       question: (s) => `## 面试官提问（第${s.questionCount}题）\n\n${s.currentQuestion}`,
@@ -77,16 +85,17 @@ export function buildGraph(appConfig: AppConfig | undefined, checkpointer: BaseC
       config: appConfig,
       label: "evaluate",
     }))
-    .addNode("writeReport", createLlmNode<StateShape>({
+    .addNode("writeReport", createLlmStreamNode<StateShape>({
       model: () => requireModel(appConfig, "writeReport"),
       prompt: (s) => {
   const scores = (s.scores ?? []).join(', ');
   const history = (s.questionHistory ?? []).join('\n---\n');
   return [new SystemMessage('你基于面试记录生成详细的能力评估报告。报告必须包括以下结构：\n### 1. 面试概览\n- 考察领域、问题数量、整体表现\n### 2. 各领域能力评分（表格）\n### 3. 优势与待改进项\n### 4. 综合评级：A(卓越)/B(良好)/C(一般)/D(待加强)\n### 5. 录用建议与后续面试建议\n### 6. 技术深度与广度评估'), new HumanMessage(`岗位描述与简历：${s.query}\n\n各题得分：${scores}\n\n面试记录：\n${history}`)];
 },
-      write: (r, _s) => ({ report: r.content, phase: 'complete' }),
+      write: (r, _s) => ({ report: r.text.trim(), phase: 'complete' }),
       config: appConfig,
       label: "writeReport",
+      timeoutMs: resolveLlmResilience(appConfig).longTimeoutMs,
     }))
     .addEdge(START, "prepare")
     .addEdge("prepare", "ask")

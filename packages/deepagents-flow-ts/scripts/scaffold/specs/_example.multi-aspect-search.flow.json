@@ -22,10 +22,10 @@
         }
       },
       "aggregate": {
-        "type": "llm",
+        "type": "llm-stream",
         "params": {
           "prompt": "(s) => [new SystemMessage('把各维度搜索结果整理成简短摘要，按维度列出。'), new HumanMessage(s.findings.join(' / '))]",
-          "write": "(r) => ({ output: r.content })"
+          "write": "(r) => ({ output: r.text })"
         }
       }
     },

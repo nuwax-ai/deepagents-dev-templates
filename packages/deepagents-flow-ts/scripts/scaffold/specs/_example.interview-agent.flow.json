@@ -25,10 +25,10 @@
         }
       },
       "ask": {
-        "type": "llm",
+        "type": "llm-stream",
         "params": {
           "prompt": "(s) => {\n  const historyText = (s.questionHistory ?? []).length > 0 ? '\\n已完成的问答：\\n' + (s.questionHistory ?? []).join('\\n---\\n') : '\\n开始第一轮提问。';\n  return [new SystemMessage('你是技术面试官。基于面试策略、已回答的问题，提出下一个技术面试问题。必须遵守以下要求：\\n1. 从基础到深入层层递进\\n2. 如果上一回答有误则追问相关基础概念\\n3. 如果回答正确则提升难度或换新领域\\n4. 只输出问题本身，不要序号和评价\\n5. 问题要具体且有深度，不要泛泛而问'), new HumanMessage(`面试背景（岗位描述+简历）：${s.query}\\n${historyText}\\n\\n当前是第${(s.questionCount ?? 0) + 1}个问题。请提出下一个技术面试问题。`)];\n}",
-          "write": "(r, s) => ({ currentQuestion: r.content, questionCount: (s.questionCount ?? 0) + 1 })"
+          "write": "(r, s) => ({ currentQuestion: r.text.trim(), questionCount: (s.questionCount ?? 0) + 1 })"
         }
       },
       "wait": {
@@ -47,10 +47,10 @@
         }
       },
       "writeReport": {
-        "type": "llm",
+        "type": "llm-stream",
         "params": {
           "prompt": "(s) => {\n  const scores = (s.scores ?? []).join(', ');\n  const history = (s.questionHistory ?? []).join('\\n---\\n');\n  return [new SystemMessage('你基于面试记录生成详细的能力评估报告。报告必须包括以下结构：\\n### 1. 面试概览\\n- 考察领域、问题数量、整体表现\\n### 2. 各领域能力评分（表格）\\n### 3. 优势与待改进项\\n### 4. 综合评级：A(卓越)/B(良好)/C(一般)/D(待加强)\\n### 5. 录用建议与后续面试建议\\n### 6. 技术深度与广度评估'), new HumanMessage(`岗位描述与简历：${s.query}\\n\\n各题得分：${scores}\\n\\n面试记录：\\n${history}`)];\n}",
-          "write": "(r, _s) => ({ report: r.content, phase: 'complete' })"
+          "write": "(r, _s) => ({ report: r.text.trim(), phase: 'complete' })"
         }
       }
     },

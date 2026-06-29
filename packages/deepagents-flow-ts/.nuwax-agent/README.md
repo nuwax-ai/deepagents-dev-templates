@@ -14,7 +14,7 @@
 | 层 | 示例 | 归属 |
 | --- | --- | --- |
 | 工作区配置 | 系统提示词、MCP 服务、skills、模型、subagent（`config/`、`prompts/`、`builtin/`、`.agents/`） | 项目内配置文件 |
-| Agent 内置 | 运行时工具（bash/fs/search/http/mcp-bridge）、压缩、demo 工具 | 模板包 |
+| Agent 内置 | 运行时工具（bash/fs/grep·glob/http）、压缩、demo 工具 | 模板包 |
 | 环境内置 | API key、base URL、日志路径 | 云计算机 / 本机 / 安装器 |
 | Agent 内置文件 | 会话存储（文件 JSON checkpointer） | 用户目录（`~/.flowagents/<workspace 散列>/`） |
 | 包占位符 | `${INSTALL_ROOT}`、`${PACKAGE_VERSION}` | 构建与安装流水线 |
@@ -33,6 +33,6 @@
 - **skills** —— `resolveSkillsPaths(appConfig)` 发现 `agentsDirectories` 下各 `<root>/skills/`（含 `builtin/skills/`、`.agents/skills/`）及 `config.skills.directories`。
 - **subagents** —— `resolveSubagentPaths` / `discoverSubAgents` 发现 `agentsDirectories` 下各 `<root>/agents/`（含 `builtin/agents/`、`.agents/agents/`）；可选 flat `subagents.directories`。
 - **sessionStore** —— `FileCheckpointSaver`（继承 `MemorySaver`）持久化到 `config.memory.dir`（默认 `~/.flowagents/sessions/<workspace 散列>/`，可显式 opt-out 回 `./.flow-sessions`）；线程隔离、重启存活、恢复 interrupt/resume。
-- **builtInTools** —— `createFlowTools(ctx)` 组合 bash/fs/search/http/json/mcp-bridge + demo 工具；经 `bindTools` 绑定到模型，由 `ToolNode` 执行。
+- **builtInTools** —— `createFlowTools(ctx)` 组合 bash/fs/grep·glob/http/json + demo 工具 + native MCP；经 `bindTools` 绑定到模型，由 `ToolNode` 执行。
 
 运行时查询：`deepagents-flow-ts capabilities`（无需凭证）。

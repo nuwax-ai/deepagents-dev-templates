@@ -22,8 +22,8 @@
 
 | `type` | factory | 语义 | 何时用 |
 |---|---|---|---|
-| `llm` | `createLlmNode` | 一次调 LLM,写回**纯文本**（默认）或结构化（`write` 读 `r.parsed` 时才加 `parse`） | compose / aggregate / plan / rewrite;大多数 LLM 步骤 |
-| `llm-stream` | `createLlmStreamNode` | **流式**调 LLM,逐 token 给用户 | draft / respond(用户可见大段输出) |
+| `llm` | `createLlmNode` | 一次调 LLM,写回**纯文本**（默认）或结构化（`write` 读 `r.parsed` 时才加 `parse`） | plan / rewrite / grade / 路由裁决；**非**用户可见大段终稿 |
+| `llm-stream` | `createLlmStreamNode` | **流式**调 LLM,逐 token 给用户 | compose / aggregate / generate / draft / respond(用户可见大段输出) |
 | `llm-router` 🆕 | `createLlmRouterNode` | LLM 裁决后**返回 Command goto**(节点内路由) | reflection / evaluator:评审 → 重做或放行 |
 
 ### HITL(人审)类
@@ -138,13 +138,13 @@ Q4 结构类?
 
 ## type 词表(节点级 DSL `node.type` 单一权威)
 
-**custom DSL 支持的 7 个 node.type**(`scripts/scaffold/schema.mjs` 的 `custom` enum,`tests/node-catalog.test.ts` 断言一致):
+**custom DSL 支持的 8 个 node.type**(`scripts/scaffold/schema.mjs` 的 `custom` enum,`tests/node-catalog.test.ts` 断言一致):
 
 ```
-llm | llm-router | approval | approval-finalize | mcp-retrieval | prepare | passthrough
+llm | llm-stream | llm-router | approval | approval-finalize | mcp-retrieval | prepare | passthrough
 ```
 
-**factory 类型但暂未进 custom DSL**(手写图直接用 factory;custom 里生成后手改):`llm-stream`(createLlmStreamNode)、`tool-exec`(createToolExecNode,需 tools)、`permission-approval`(createPermissionApprovalNode)、`subgraph`(createSubgraphNode)。
+**factory 类型但暂未进 custom DSL**(手写图直接用 factory;custom 里生成后手改):`tool-exec`(createToolExecNode,需 tools)、`permission-approval`(createPermissionApprovalNode)、`subgraph`(createSubgraphNode)。
 注:`fanout` 在 DSL 里是 **edge kind**(`{kind:"fanout"}`),非 node.type。
 
 ---

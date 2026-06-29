@@ -20,6 +20,7 @@
 | [R-G006](#r-g006-llm-router-须有-routefallback) | llm-router 须有 routeFallback | **MUST** | `createLlmRouterNode` | parse/无模型时死循环 |
 | [R-G007](#r-g007-节点名--state-channel-名) | 节点名 ≠ state channel 名 | **MUST** | 全图 | 状态读写混乱 |
 | [R-G008](#r-g008-节点返回-partial-禁止-mutate) | 节点返回 Partial，禁止 mutate | **MUST** | 全图 | 不可预测状态 |
+| [R-G009](#r-g009-流式-llm-write-须用-rtext) | 流式 LLM write 须用 `r.text` | **MUST** | `llm-stream` / `approval-finalize.rejectedLlm` | 无流式 / 修订输出为空 |
 
 **级别**：`MUST` = 违反即 bug 或运行时错误；`SHOULD` = 强烈建议，违反易在边界输入下失败。
 
@@ -168,12 +169,27 @@
 
 ---
 
+### R-G009：流式 LLM write 须用 `r.text`
+
+| 项 | 内容 |
+|----|------|
+| **级别** | **MUST** |
+| **适用** | custom `llm-stream`；`approval-finalize` 的 `rejectedLlm`（内部 `createLlmStreamNode`） |
+| **规则** | `write` 必须读取 `r.text`（及可选 `r.streamed`），**不得**使用 `r.content`；`rejectedLlm` 不支持 `parse`。 |
+| **原因** | `createLlmStreamNode` 写回 `{ text, streamed }`；spec 若仍写 `r.content` → regenerate 后修订路径输出 `undefined`，且主路径无逐 token。 |
+| **反例** | `type: "llm-stream"` 但 `write: (r) => ({ output: r.content })` |
+| **正例** | `write: (r) => ({ draft: r.text.trim() })`；finalize `rejectedLlm.write` 用 `r.text` |
+| **验证** | `generate.mjs` 生成前静态检 R-G009（`lint-graph-rules.mjs`） |
+| **关联** | [node-kit § createLlmStreamNode](node-kit.md#createllmstreamnode--流式-llm)；[README § 流式输出检查清单](../README.md#流式输出检查清单) |
+
+---
+
 ## 与开发流程的衔接
 
 | 阶段 | 动作 |
 |------|------|
 | 写 spec / graph 前 | 扫规则索引，确认适用 MUST |
-| scaffold 生成后 | 核对 R-G001、R-G003、R-G004 |
+| scaffold 生成后 | 核对 R-G001、R-G003、R-G004、R-G009 |
 | 验证闸门 | `pnpm build && pnpm typecheck && pnpm test && pnpm graph && pnpm smoke`（`.env` 凭证 + `config.activeFlow`；可选 `SMOKE_PROMPT` / `SMOKE_PROMPT_EDGE` — 见 [scripts/README.md](../scripts/README.md) § Smoke tests） |
 | 排错 | [troubleshooting.md](troubleshooting.md) 按症状 → 规则 ID |
 

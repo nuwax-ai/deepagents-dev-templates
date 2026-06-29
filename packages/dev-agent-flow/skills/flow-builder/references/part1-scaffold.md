@@ -11,7 +11,7 @@
 `node scripts/scaffold/generate.mjs <spec.json>`（在 `deepagents-flow-ts` 项目根）：
 
 1. zod 校验 spec；
-2. **`lint-graph-rules.mjs` 静态检**（**R-G001** parse/write、**R-G007** 节点名 ≠ channel；失败则中止）；
+2. **`lint-graph-rules.mjs` 静态检**（**R-G001** parse/write、**R-G007** 节点名 ≠ channel、**R-G009** 流式 write 须 `r.text`；失败则中止）；
 3. blueprint 渲染 → `src/app/flows/<name>/`（薄封装或 custom 含 `graph.ts`）；
 4. 自动注册 `src/app/flows/index.ts`（`SCAFFOLD-REGISTRY` 区，勿手改）；
 5. 自带门禁：`pnpm typecheck && pnpm graph`（临时切换 `activeFlow` 反射新 flow）。
@@ -23,20 +23,21 @@
 | topology | kind | 适用场景 | 节点结构 |
 |------|------|----------|----------|
 | `react-tools` | oneshot | 客服 / 工具型 / 通用问答 | `prepare → think ↔ tools → respond` |
-| `human-in-loop` | stateful-recipe | 审阅 / 审批 / 校对 | `compose → review(interrupt) → finalize` |
+| `human-in-loop` | stateful-recipe | 审阅 / 审批 / 校对 | `compose(流式) → review(interrupt) → finalize` |
 | `project-manager` | stateful-recipe | 规划 + 评审重做 | `plan → estimate → evaluate → approve → finalize` |
-| `travel-planner` | stateful-recipe | 多源调研聚合 | `gather → Send research×N → aggregate → confirm → finalize` |
+| `travel-planner` | stateful-recipe | 多源调研聚合 | `gather → Send research×N → aggregate(流式) → confirm → finalize`（**research 须接平台搜索 MCP**，见 Part 3 § 联网搜索） |
 | `rag` | oneshot | 检索问答 | `rewrite → retrieve → grade → prepare → generate` |
-| `adaptive-rag` | oneshot | 自适应检索 + 路由自纠正 | `route → retrieve/web-search → grade → transform/generate` |
+| `adaptive-rag` | oneshot | 自适应检索 + 路由自纠正 | `route → retrieve/web-search → grade → transform/generate`（**web_search 优先平台 Plugin/MCP**） |
 | `deep-research` | stateful-recipe | 深度研究 / 长任务 | 多阶段 + Send + 持续会话 |
 | `dev-agent` | stateful-custom | 综合助手 ReAct + 压缩 | 默认 ReAct + 多轮续接 |
 | `custom` ⭐ | stateful-recipe | 预设都不命中 | spec 声明 state/nodes/edges → 生成 `graph.ts` |
 
-**`custom`**：`params` 含 `state`/`nodes`（type 见 node-catalog）/`edges`/`input`/`result`；回调写箭头函数字符串，生成时内联为真实 TS。局限（生成后手改）：llm-stream、tool-exec、subgraph、自定义 reducer。示例：`_example.translate-review`、`_example.grade-redo`、`_example.router-gate`、`_example.multi-aspect-search`、**`_example.interview-agent`**（HITL + custom；`prepare` 无 parse 范例）。
+**`custom`**：`params` 含 `state`/`nodes`（type 见 node-catalog，**用户可见输出用 `llm-stream`**）/`edges`/`input`/`result`；回调写箭头函数字符串，生成时内联为真实 TS。局限（生成后手改）：tool-exec、subgraph、自定义 reducer。流式范例：`_example.translate-review`、`_example.multi-aspect-search`、`_example.router-gate`、`_example.interview-agent`（`llm-stream` + `r.text`）；非流式教学：`_example.grade-redo`；`interview-agent` 的 `prepare`/`evaluate` 仍 `llm`（无 `r.text` / 结构化 parse）。
 
-**custom spec 生成后核对**（目标项目 `docs/flow-graph-rules.md`；生成前已由 `lint-graph-rules.mjs` 拦 **R-G001 / R-G007**）：
+**custom spec 生成后核对**（目标项目 `docs/flow-graph-rules.md`；生成前已由 `lint-graph-rules.mjs` 拦 **R-G001 / R-G007 / R-G009**）：
 
 - 有 `"parse"` 的节点 → `write` 必须引用 `r.parsed`（**R-G001**）
+- **`llm-stream` / `approval-finalize.rejectedLlm`** → `write` 必须用 **`r.text`**，禁止 `r.content`（**R-G009**）
 - 节点名不得与 `state` channel 同名（**R-G007**，如节点 `writeReport` 写 channel `report`）
 - `__start__` 后第一个 `llm` 节点 → 默认不加 `parse`；入口 prompt 须容忍非预期输入（**R-G002**）
 - 手改 `graph.ts` → **同步** `scripts/scaffold/specs/<name>.flow.json`（**R-G003**）
@@ -108,5 +109,6 @@ export const getTopology = () => getReviewTopology();
 - ❌ 不改 `activeFlow` 就说生效
 - ❌ `libs/topologies/` import `surfaces/`
 - ❌ custom spec 里 `parse` 与 `write` 不匹配（write 不读 `r.parsed`）
+- ❌ 用户可见节点用 `type: "llm"` 或 `write` 写 `r.content`（应 `llm-stream` + `r.text`，**R-G009**）
 - ❌ 只改生成后的 `graph.ts` 不回写 spec
 - ✅ 命中 → 生成 → activeFlow → 验证

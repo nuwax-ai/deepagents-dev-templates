@@ -8,12 +8,54 @@
 
 ```
 1. 平台 Plugin / Workflow / Knowledge  ← dev-engineer-toolkit 搜索并 add-tool；在 src/app/ 按返回 schema 手写 tool() 包装 → flow-tools.ts 注册
-2. Native MCP                        ← config/mcp.default.json + ACP session mcpServers（与平台 mcpConfigs 合并）
-3. 内置 libs/tools                   ← bash/fs/search/http/json/load_skill/task/demo（模板内置，勿改 libs）
+2. Native MCP                        ← **平台 `mcpConfigs`**（get-config）+ config/mcp.default.json + ACP session mcpServers
+3. 内置 libs/tools                   ← bash/fs/search（**仅工作区 grep/glob**）/http/json/load_skill/task/demo（模板内置，勿改 libs）
 4. 自写 src/app/ + flow-tools.ts     ← 最后手段：在 app 层实现并注册 createFlowTools()
 ```
 
+> **易错**：内置 `search` / `grep` = **仓库内** ripgrep/glob，**不是**联网搜索。
+
 > 已无 `mcp_tool_bridge` 元工具；MCP 工具由 runtime 原生绑定，直接用 server 暴露的工具名调用。
+
+## 联网搜索（互联网 / 实时信息 · 强制）
+
+需求含**查互联网、最新资讯、实时数据、网页检索、多源调研**时，必须优先使用**平台已支持**的搜索能力。
+
+### 选型表
+
+| 优先级 | 来源 | 开发期 | 图内 |
+|--------|------|--------|------|
+| 1 | **平台 Plugin**（搜索 API） | `search-apis.sh --kw "搜索"` / `"联网"` / `"web"` → `add-tool.sh` → `src/app/` `tool()` → `flow-tools.ts` | ReAct / `createToolExecNode` |
+| 2 | **平台 Knowledge** | 同上（领域知识库） | RAG / 检索工具 |
+| 3 | **平台 `mcpConfigs`** | `get-config.sh --key mcpConfigs`；对齐 `config/mcp.default.json` | `createMcpRetrievalNode`（travel / custom `mcp-retrieval`） |
+| 4 | **本地 MCP** | 仅平台无搜索 MCP 时，参考 `config/mcp.examples.json` | 同上 |
+| 5 | **自写 app 工具** | 平台 + MCP 均无 | `flow-tools.ts` |
+
+### 拓扑落点
+
+| 拓扑 | 做法 |
+|------|------|
+| `travel-planner` / `deep-research` | `searchMcp` 接**平台登记**的搜索 MCP → `createMcpRetrievalNode`；未配置则优雅降级 |
+| `adaptive-rag` | 路由 `web_search`；优先平台 Plugin/MCP，模版 `webSearchTool` 仅兜底 |
+| `multi-aspect-search`（custom） | `mcp-retrieval` 节点 + 平台搜索 MCP |
+| `react-tools` / `dev-agent` | 平台搜索 Plugin 注册为 tool → ReAct 调用 |
+
+### 工作流（必须）
+
+1. 加载 `dev-engineer-toolkit`
+2. `search-apis.sh --kw "<关键词> 搜索"`（及 `联网` / `web`）
+3. `get-config.sh --key mcpConfigs`
+4. 命中 → `add-tool.sh` 或同步 MCP 配置 → 图内接线
+5. 记入 `project.md`（targetId、MCP 名、验证命令）
+
+### 禁止
+
+- ❌ 内置 `search`/`grep` 当联网
+- ❌ 未搜平台就 bash+curl、自写 DDG/Google、`http_request` 打搜索站
+- ❌ 硬编码未在平台登记的 `duckduckgo-mcp-server`（不稳定；用平台源）
+- ❌ 在 `src/libs/` 写搜索（保护区）
+
+system-prompt 详版 → `<WEB_SEARCH>`
 
 ## 创建自定义工具 `src/app/tools/{name}.tool.ts`
 
@@ -118,8 +160,9 @@ ACP 下副作用工具执行前可弹 `session/request_permission`。配置在**
 ## Anti-patterns
 
 - ❌ 不查平台能力 / 内置 / MCP 就自写工具
+- ❌ **联网搜索**：未 `search-apis.sh` / 未查 `mcpConfigs` 就 bash+curl 或自写搜索 API；把内置 `search`（grep/glob）当互联网检索
 - ❌ 硬编码 API key / 忘记注册 createFlowTools()
 - ❌ 引用已删除的 `platform_api` / `agent_variable` / `mcp_tool_bridge`
 - ❌ 在 `src/libs/tools/` 写业务自定义工具（保护区）
 - ❌ Zod 无 `.describe()` / 返回非 string
-- ✅ 平台能力优先（dev-engineer-toolkit）→ native MCP → 内置 → app 层自写
+- ✅ 平台能力优先（dev-engineer-toolkit）→ native MCP → 内置 → app 层自写；**联网**另见 § 联网搜索

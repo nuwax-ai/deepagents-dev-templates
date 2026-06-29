@@ -13,10 +13,10 @@
     },
     "nodes": {
       "compose": {
-        "type": "llm",
+        "type": "llm-stream",
         "params": {
           "prompt": "(s) => [new SystemMessage('你是专业中英互译，只输出译文，不要解释。'), new HumanMessage(s.query)]",
-          "write": "(r) => ({ draft: r.content.trim() })"
+          "write": "(r) => ({ draft: r.text.trim() })"
         }
       },
       "review": {
@@ -32,7 +32,7 @@
           "approvedOutput": "(s) => ({ output: `✅ 译文已通过：${s.draft}` })",
           "rejectedLlm": {
             "prompt": "(s) => [new SystemMessage('按意见改写译文，只输出成稿。'), new HumanMessage(`原译：${s.draft}；修改意见：${s.feedback}`)]",
-            "write": "(r) => ({ output: `✏️ 已按意见修订：${r.content}` })"
+            "write": "(r) => ({ output: `✏️ 已按意见修订：${r.text}` })"
           }
         }
       }

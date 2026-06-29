@@ -6,8 +6,8 @@
  * 因此被 tsc 静态检查、可读、可被 inspector 可视化、可手改。生成的 flow 自包含，
  * 不依赖 libs/topologies/custom 运行时解释器（已废弃）。
  *
- * 支持节点 type：llm / llm-router / approval / approval-finalize / mcp-retrieval / prepare / passthrough。
- * 支持边 kind：static / conditional / fanout。llm-stream / tool-exec / subgraph 暂不支持 → 生成后手改。
+ * 支持节点 type：llm / llm-stream / llm-router / approval / approval-finalize / mcp-retrieval / prepare / passthrough。
+ * 支持边 kind：static / conditional / fanout。tool-exec / subgraph 暂不支持 → 生成后手改。
  */
 
 export const kind = "stateful-recipe";
@@ -43,6 +43,15 @@ function renderNode(name, node) {
       config: appConfig,
       label: ${q},
     })`;
+    case "llm-stream":
+      return `createLlmStreamNode<StateShape>({
+      model: ${model},
+      prompt: ${p.prompt},
+      write: ${p.write},
+      config: appConfig,
+      label: ${q},
+      timeoutMs: resolveLlmResilience(appConfig).longTimeoutMs,
+    })`;
     case "llm-router":
       return `createLlmRouterNode<StateShape>({
       model: ${model},
@@ -71,6 +80,7 @@ function renderNode(name, node) {
         write: ${p.rejectedLlm?.write},
         config: appConfig,
         label: ${q},
+        timeoutMs: resolveLlmResilience(appConfig).longTimeoutMs,
       },
     })`;
     case "mcp-retrieval":
@@ -87,7 +97,7 @@ function renderNode(name, node) {
       return `((${p.write ?? "() => ({})"}) as (s: StateShape) => Partial<StateShape>)`;
     default:
       throw new Error(
-        `custom 渲染不支持节点类型 "${node.type}"（llm-stream/tool-exec/subgraph 请生成后手改）`
+        `custom 渲染不支持节点类型 "${node.type}"（tool-exec/subgraph 请生成后手改）`
       );
   }
 }
@@ -120,6 +130,7 @@ function collectImports(params) {
   const nodeTypes = new Set(Object.values(params.nodes).map((n) => n.type));
   const factory = {
     llm: "createLlmNode",
+    "llm-stream": "createLlmStreamNode",
     "llm-router": "createLlmRouterNode",
     approval: "createHumanApprovalNode",
     "approval-finalize": "createApprovalFinalizeNode",
@@ -128,9 +139,10 @@ function collectImports(params) {
   };
   const nodes = new Set();
   for (const t of nodeTypes) if (factory[t]) nodes.add(factory[t]);
-  if ([...nodeTypes].some((t) => ["llm", "llm-router", "approval-finalize"].includes(t))) {
+  if ([...nodeTypes].some((t) => ["llm", "llm-stream", "llm-router", "approval-finalize"].includes(t))) {
     nodes.add("requireModel");
   }
+  const needsLlmResilience = [...nodeTypes].some((t) => ["llm-stream", "approval-finalize"].includes(t));
   if (params.edges.some((e) => e.kind === "fanout")) nodes.add("createFanout");
 
   const text = JSON.stringify(params);
@@ -160,7 +172,7 @@ function collectImports(params) {
   if (/\bHumanMessage\s*\(/.test(text)) msgs.push("HumanMessage");
   if (/\bAIMessage\s*\(/.test(text)) msgs.push("AIMessage");
 
-  return { langgraph: lg, messages: msgs, nodes: [...nodes] };
+  return { langgraph: lg, messages: msgs, nodes: [...nodes], needsLlmResilience };
 }
 
 /** @param {{name:string,description:string,params:{state:object,nodes:object,edges:array,input:object,result:object,recursionLimit?:number}}} spec */
@@ -195,7 +207,7 @@ import {
   type BaseCheckpointSaver,
 } from "@langchain/langgraph";${imp.messages.length ? `\nimport { ${imp.messages.join(", ")} } from "@langchain/core/messages";` : ""}
 import type { AppConfig } from "../../../runtime/index.js";
-${imp.nodes.length ? `import { ${imp.nodes.join(", ")} } from "../../../libs/nodes/index.js";\n` : ""}import { reflectTopology } from "../../../libs/topologies/reflect.js";
+${imp.needsLlmResilience ? `import { resolveLlmResilience } from "../../../runtime/services/llm-resilience.js";\n` : ""}${imp.nodes.length ? `import { ${imp.nodes.join(", ")} } from "../../../libs/nodes/index.js";\n` : ""}import { reflectTopology } from "../../../libs/topologies/reflect.js";
 import type { FlowTopology } from "../../../core/flow-types.js";
 
 const State = Annotation.Root({

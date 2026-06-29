@@ -23,9 +23,13 @@ pnpm start:acp           # 或启动 ACP 服务（供 Zed/JetBrains）
 **拼你自己的 flow** = 组合 `src/libs/nodes/` 的节点 factory + 在 `src/app/graph.ts` 连线：
 
 ```ts
-import { createLlmNode, createHumanApprovalNode } from "./libs/nodes/index.js";
+import { createLlmStreamNode, createHumanApprovalNode } from "./libs/nodes/index.js";
 
-const gen = createLlmNode<S>({ model: () => model, prompt: (s) => [/* msgs */], write: (r) => ({ draft: r.content }) });
+const gen = createLlmStreamNode<S>({
+  model: () => model,
+  prompt: (s) => [/* msgs */],
+  write: (r) => ({ draft: r.text }),
+});
 const review = createHumanApprovalNode<S>({ question: (s) => `草稿:${s.draft},ok?`, write: (fb) => ({ feedback: fb }) });
 
 const graph = new StateGraph(S)
@@ -47,7 +51,7 @@ src/
   runtime/       底层运行时（config/model/logger/mcp/checkpoint/llm-resilience + flow-config/flow-runtime）
   libs/          ★ 可复用构建件（保护、消费不改）
     nodes/         节点 factory + 原语（建 flow 用，见 node-kit.md）+ model-resolver（凭证策略）
-    tools/         内置通用工具（bash/fs/search/demo/http/json/skill；MCP 工具由 runtime 经 @langchain/mcp-adapters 原生注入，非 toolkit 静态导出）
+    tools/         内置通用工具（bash/fs/grep·glob/demo/http/json/skill；MCP 工具由 runtime 经 @langchain/mcp-adapters 原生注入，非 toolkit 静态导出）
     topologies/    拓扑积木（adaptive-rag/rag/deep-research/human-in-loop/project-manager/travel-planner；图逻辑单一权威 graph/topology/recipe；scaffold 生成薄封装复用；单向依赖 nodes/+mcp/；react-tools 复用默认图、dev-agent 在 app/topologies/）
     mcp/           stdio MCP 客户端（callResolvedMcpTool/rateLimited；零 src import，自包含）
     deepagents-acp/  vendored ACP SDK（自包含）
@@ -87,7 +91,7 @@ config/ prompts/ skills/ scripts/ docs/ tests/
 - **先 factory 后手写** — 节点先查 [node-kit.md](docs/node-kit.md)；bespoke 保留并注释「为何不用 factory」。
 - **保护区** — `core`/`runtime`/`libs`/`surfaces` 默认不改；`src/app/` 可改；`examples/` 只读。
 - **有状态用基座** — `createStatefulFlow`，不手写 run-loop。
-- **工具顺序** — native MCP（`config/mcp.default.json` + ACP session 合并）→ `libs/tools` 内置（bash/fs/search/http/json）→ 自写代码。
+- **工具顺序** — native MCP（`config/mcp.default.json` + ACP session 合并）→ `libs/tools` 内置（bash/fs/grep·glob/http/json）→ 自写代码。
 - **密钥** — 环境变量，禁止硬编码。
 - **依赖只在本仓库** — 缺能力 `pnpm install` / 在 `src/runtime/` 扩展 / copy-in，不引仓库外路径。
 
@@ -233,6 +237,27 @@ pnpm test
 - [ ] 无硬编码密钥 · 无 `any` · import 带 `.js` 后缀
 - [ ] 节点名不与 state channel 同名 · 决策函数（条件边路由）有单测
 - [ ] 分层合规（`layering.test.ts` 绿）· runtime 自包含（无仓库外路径）
+
+## 流式输出检查清单
+
+用户可见的大段 LLM 输出（compose / aggregate / draft / finalize 修订等）需满足：
+
+1. **选对 factory**：用 `createLlmStreamNode`（`write` 读 `r.text`），不要用 `createLlmNode`（仅 `invoke`，无逐 token）
+2. **Surface 注入 onToken**：经 `createStatefulFlow` / ACP / CLI 跑图时，`configurable.onToken` 已自动注入；自建 runner 需手动传入 `FlowCallbacks.onToken`
+3. **模型支持 stream**：底层 ChatModel 需实现 `.stream()`；否则 `streamLLMText` 退回一次性 invoke，ACP 再在 turn 末整段兜底
+
+降级链：真流式（L1）→ invoke 一次（L2）→ ACP 整段 `streamText`（L3），保证用户总能看到结果。详见 [docs/node-kit.md](docs/node-kit.md) § createLlmStreamNode。
+
+## 联网 / 外部检索（模版内建能力）
+
+| 能力 | 代码落点 | 说明 |
+|------|----------|------|
+| 工作区检索 | `grep` / `glob` 工具（`createSearchTools`） | **非**联网；ReAct 默认图经 `flow-tools.ts` 注册 |
+| 图内 MCP 检索 | `createMcpRetrievalNode` | `travel-planner` 的 `searchMcp` 参数；`rag` / custom `mcp-retrieval` 的 `mcpServers` |
+| 自适应 RAG 网页搜索 | `libs/tools/web-search.tool.ts` → `webSearchTool` | **仅** `adaptive-rag` 拓扑 `web_search` 节点内 `invoke`；**未**进 `createFlowTools` ReAct 工具 belt |
+| 未配置搜索源 | `travel-planner` research | `searchMcp` 缺省 → 优雅降级（写「未配置搜索源」，不崩） |
+
+云开发环境中平台 Plugin / `mcpConfigs` 登记由**开发 Agent 技能包**引导（见 README § 扩展阅读），不在本模版 `src/` 内实现。
 
 ## 扩展阅读
 

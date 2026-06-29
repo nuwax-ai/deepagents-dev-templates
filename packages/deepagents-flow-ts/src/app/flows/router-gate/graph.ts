@@ -15,7 +15,8 @@ import {
 } from "@langchain/langgraph";
 import { SystemMessage, HumanMessage } from "@langchain/core/messages";
 import type { AppConfig } from "../../../runtime/index.js";
-import { createLlmNode, createLlmRouterNode, requireModel, parseJson } from "../../../libs/nodes/index.js";
+import { createLlmStreamNode, createLlmRouterNode, requireModel, parseJson } from "../../../libs/nodes/index.js";
+import { resolveLlmResilience } from "../../../runtime/services/llm-resilience.js";
 import { reflectTopology } from "../../../libs/topologies/reflect.js";
 import type { FlowTopology } from "../../../core/flow-types.js";
 
@@ -29,12 +30,13 @@ export type StateShape = typeof State.State;
 /** 按 spec 构造图（编译后）。被 index.ts 的 recipe.buildGraph 调用。 */
 export function buildGraph(appConfig: AppConfig | undefined, checkpointer: BaseCheckpointSaver = new MemorySaver()) {
   return new StateGraph(State)
-    .addNode("draft", createLlmNode<StateShape>({
+    .addNode("draft", createLlmStreamNode<StateShape>({
       model: () => requireModel(appConfig, "draft"),
       prompt: (s) => [new SystemMessage('写一句草稿。'), new HumanMessage(s.query)],
-      write: (r) => ({ output: r.content }),
+      write: (r) => ({ output: r.text.trim() }),
       config: appConfig,
       label: "draft",
+      timeoutMs: resolveLlmResilience(appConfig).longTimeoutMs,
     }))
     .addNode("gate", createLlmRouterNode<StateShape>({
       model: () => requireModel(appConfig, "gate"),

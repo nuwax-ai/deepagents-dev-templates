@@ -11,13 +11,13 @@
  *   rejectedLlm: {
  *     model: () => requireModel(appConfig, "review"),
  *     prompt: (s) => [new SystemMessage("按意见改写"), new HumanMessage(`原稿:${s.draft}\n意见:${s.feedback}`)],
- *     write: (r) => ({ output: `✏️ ${r.content}` }),
+ *     write: (r) => ({ output: `✏️ ${r.text}` }),
  *     config: appConfig, timeoutMs: resolveLlmResilience(appConfig).longTimeoutMs,
  *   },
  * });
  */
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
-import { createLlmNode, type LlmNodeOptions } from "./llm.js";
+import { createLlmStreamNode, type LlmStreamNodeOptions } from "./llm.js";
 import { isApproval } from "./hitl.js";
 
 export interface ApprovalFinalizeNodeOptions<S> {
@@ -27,8 +27,8 @@ export interface ApprovalFinalizeNodeOptions<S> {
   isApproved?: (feedback: string) => boolean;
   /** 通过时的确定性输出（不调 LLM，如甘特排期 / 定稿标记）。 */
   approvedOutput: (state: S) => Partial<S>;
-  /** 未通过时的 LLM 修订：复用 createLlmNode 选项（prompt 可读 s.feedback，write 产出修订输出）。 */
-  rejectedLlm: LlmNodeOptions<S>;
+  /** 未通过时的 LLM 修订：复用 createLlmStreamNode 选项（prompt 可读 s.feedback，write 产出修订输出，支持流式）。 */
+  rejectedLlm: LlmStreamNodeOptions<S>;
 }
 
 /**
@@ -40,7 +40,7 @@ export function createApprovalFinalizeNode<S>(
 ): (state: S) => Promise<Partial<S>> {
   const field = opts.feedbackField ?? "feedback";
   const isApproved = opts.isApproved ?? isApproval;
-  const rejected = createLlmNode<S>(opts.rejectedLlm);
+  const rejected = createLlmStreamNode<S>(opts.rejectedLlm);
 
   return async (state: S, config?: LangGraphRunnableConfig): Promise<Partial<S>> => {
     const raw = (state as Record<string, unknown>)[field];

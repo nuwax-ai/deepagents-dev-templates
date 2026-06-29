@@ -6,8 +6,11 @@ import {
   lintGraphRules,
   routeConsumesParsed,
   writeConsumesParsed,
+  writeUsesLlmContent,
+  writeUsesStreamText,
 } from "../scripts/scaffold/lint-graph-rules.mjs";
 import { parseSpec } from "../scripts/scaffold/schema.mjs";
+import * as customBlueprint from "../scripts/scaffold/blueprints/custom.mjs";
 
 const SPECS = resolve(import.meta.dirname, "../scripts/scaffold/specs");
 
@@ -31,6 +34,18 @@ describe("lint-graph-rules R-G001", () => {
 
   it("示例 spec 均通过 R-G001", () => {
     for (const file of ["_example.interview-agent.flow.json", "_example.grade-redo.flow.json", "_example.router-gate.flow.json"]) {
+      const spec = loadSpec(file);
+      expect(lintGraphRules(spec).errors).toEqual([]);
+    }
+  });
+
+  it("流式 custom 示例 spec 通过 R-G009", () => {
+    for (const file of [
+      "_example.translate-review.flow.json",
+      "_example.multi-aspect-search.flow.json",
+      "_example.router-gate.flow.json",
+      "_example.interview-agent.flow.json",
+    ]) {
       const spec = loadSpec(file);
       expect(lintGraphRules(spec).errors).toEqual([]);
     }
@@ -71,5 +86,44 @@ describe("lint-graph-rules R-G001", () => {
     });
     const { errors } = lintGraphRules(bad);
     expect(errors.some((e) => e.rule === "R-G007" && e.node === "report")).toBe(true);
+  });
+});
+
+describe("lint-graph-rules R-G009", () => {
+  it("writeUsesStreamText / writeUsesLlmContent 识别 r.text 与 r.content", () => {
+    expect(writeUsesStreamText("(r) => ({ draft: r.text.trim() })")).toBe(true);
+    expect(writeUsesStreamText("(r) => ({ output: r.content })")).toBe(false);
+    expect(writeUsesLlmContent("(r) => ({ draft: r.content })")).toBe(true);
+    expect(writeUsesLlmContent("(r) => ({ draft: r.text })")).toBe(false);
+  });
+
+  it("llm-stream 使用 r.content → R-G009", () => {
+    const spec = loadSpec("_example.multi-aspect-search.flow.json");
+    const bad = structuredClone(spec);
+    bad.params.nodes.aggregate.params.write = "(r) => ({ output: r.content })";
+    const { errors } = lintGraphRules(bad);
+    expect(errors.some((e) => e.rule === "R-G009" && e.node === "aggregate")).toBe(true);
+  });
+
+  it("approval-finalize.rejectedLlm 使用 r.content → R-G009", () => {
+    const spec = loadSpec("_example.translate-review.flow.json");
+    const bad = structuredClone(spec);
+    bad.params.nodes.finalize.params.rejectedLlm.write =
+      "(r) => ({ output: `✏️ 已按意见修订：${r.content}` })";
+    const { errors } = lintGraphRules(bad);
+    expect(errors.some((e) => e.rule === "R-G009" && e.node === "finalize")).toBe(true);
+  });
+
+  it("custom blueprint 渲染流式 spec 含 createLlmStreamNode 与 r.text", () => {
+    for (const file of ["_example.translate-review.flow.json", "_example.router-gate.flow.json"]) {
+      const spec = loadSpec(file);
+      const files = customBlueprint.render(spec);
+      const graph = files.find((f) => f.path.endsWith("graph.ts"))!.content;
+      expect(graph).toContain("createLlmStreamNode");
+      expect(graph).toContain("resolveLlmResilience");
+      expect(graph).toContain("r.text");
+    }
+    const tr = customBlueprint.render(loadSpec("_example.translate-review.flow.json"));
+    expect(tr.find((f) => f.path.endsWith("graph.ts"))!.content).not.toMatch(/rejectedLlm[\s\S]*r\.content/);
   });
 });

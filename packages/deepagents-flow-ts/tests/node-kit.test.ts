@@ -12,6 +12,7 @@ import { HumanMessage, AIMessage, type BaseMessage } from "@langchain/core/messa
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { Annotation } from "@langchain/langgraph";
+import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import {
   createLlmNode,
   createLlmStreamNode,
@@ -198,6 +199,7 @@ describe("createApprovalFinalizeNode", () => {
         },
         prompt: () => [],
         write: () => ({}),
+        timeoutMs: 5000,
       },
     });
     const res = await node({ draft: "d", feedback: "ok" });
@@ -211,7 +213,8 @@ describe("createApprovalFinalizeNode", () => {
       rejectedLlm: {
         model: mockModel("改写后") as any,
         prompt: (s) => [new HumanMessage(`${s.draft}|${s.feedback}`)],
-        write: (r) => ({ output: `✏️ ${r.content}` }),
+        write: (r) => ({ output: `✏️ ${r.text}` }),
+        timeoutMs: 5000,
       },
     });
     const res = await node({ draft: "d", feedback: "改短一点" });
@@ -227,6 +230,7 @@ describe("createApprovalFinalizeNode", () => {
         model: mockModel("r") as any,
         prompt: () => [],
         write: () => ({ out: "rejected" }),
+        timeoutMs: 5000,
       },
     });
     expect((await node({ v: "Y" })).out).toBe("approved");
@@ -312,6 +316,26 @@ describe("createMcpRetrievalNode", () => {
 
 // ---------- createLlmStreamNode ----------
 describe("createLlmStreamNode", () => {
+  it("有 onToken sink + 模型支持 stream → write({text, streamed:true})", async () => {
+    const chunks = [{ content: "he" }, { content: "llo" }];
+    const mockStream = {
+      invoke: async () => ({ content: "" }),
+      stream: async function* () {
+        for (const c of chunks) yield c;
+      },
+    };
+    const node = createLlmStreamNode<any>({
+      model: mockStream as any,
+      prompt: () => [],
+      write: (r) => ({ text: r.text, streamed: r.streamed }),
+      timeoutMs: 5000,
+    });
+    // 需 configurable.onToken 才走 stream 分支（streamLLMText 的 hasVisibleTokenSink）
+    const out = await node({}, { configurable: { onToken: () => undefined } } as LangGraphRunnableConfig);
+    expect(out.text).toBe("hello");
+    expect(out.streamed).toBe(true);
+  });
+
   it("无 onToken sink → 退回 invoke(streamed:false)", async () => {
     const mock = { invoke: async () => ({ content: "full" }) };
     const node = createLlmStreamNode<any>({

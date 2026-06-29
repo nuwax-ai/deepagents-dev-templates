@@ -200,7 +200,7 @@ export function createPMGraph(
         ];
       },
       write: (r, s) => ({
-        output: `✏️ 已按意见调整（${s.goal}）：${s.feedback}\n${r.content.trim()}`,
+        output: `✏️ 已按意见调整（${s.goal}）：${s.feedback}\n${r.text.trim()}`,
       }),
       config: appConfig,
       label: "pm finalize",

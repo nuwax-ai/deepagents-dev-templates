@@ -7,7 +7,7 @@
 | 能力 | 在哪看 | 框架原生 |
 | --- | --- | --- |
 | 标准 ReAct 图（think ↔ tools） | `createFlowGraph`（复用默认图） | LangGraph `StateGraph` + `toolsCondition` |
-| 真实工具调度 | `runtime.allTools`（bash/读写/search/http/context7 MCP） | `bindTools` + `ToolNode` |
+| 真实工具调度 | `runtime.allTools`（bash/读写/grep·glob/http/context7 MCP） | `bindTools` + `ToolNode` |
 | 会话持久化 / 跨重启续接 | `runtime.checkpointer`（FileCheckpointSaver）+ 同一 threadId | `BaseCheckpointSaver` |
 | 上下文压缩 | [`compactHistory`](../../src/app/compaction.ts)（单测覆盖；图内写回用 RemoveMessage 替换模式） | core `trimMessages` + LLM 摘要 |
 | Subagent | [`researcher.ts`](./researcher.ts)（subgraph） | LangGraph **subgraph** |
@@ -36,7 +36,7 @@ pnpm flow sessions
 ```
 createFlowRuntime(appConfig)
   → ctx (createRuntimeContextAsync): mcpServerConfigs / mcpTools
-  → allTools = libs 通用(http/json) + bash/fs/search/demo/mcp-bridge + native MCP + 可选 load_skill/task
+  → allTools = libs 通用(http/json) + bash/fs/grep·glob/demo + native MCP + 可选 load_skill/task
   → checkpointer = FileCheckpointSaver (← MemorySaver)
 
 createDevAgentFlow(runtime)

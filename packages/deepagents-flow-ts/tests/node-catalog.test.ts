@@ -18,6 +18,7 @@ const catalog = readFileSync(resolve(here, "../docs/node-catalog.md"), "utf-8");
  */
 const CUSTOM_NODE_TYPES = [
   "llm",
+  "llm-stream",
   "llm-router",
   "approval",
   "approval-finalize",
@@ -27,7 +28,7 @@ const CUSTOM_NODE_TYPES = [
 ];
 
 describe("节点类型目录一致性", () => {
-  it("SUPPORTED_TOPOLOGIES 含 custom（节点级编排入口）+ 7 预设", () => {
+  it("SUPPORTED_TOPOLOGIES 含 custom（节点级编排入口）+ 8 预设", () => {
     expect(SUPPORTED_TOPOLOGIES).toContain("custom");
     for (const t of [
       "react-tools",
@@ -35,6 +36,7 @@ describe("节点类型目录一致性", () => {
       "project-manager",
       "travel-planner",
       "rag",
+      "adaptive-rag",
       "deep-research",
       "dev-agent",
     ]) {

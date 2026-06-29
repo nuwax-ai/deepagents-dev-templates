@@ -4,7 +4,7 @@
  *   START → compose → review(interrupt 暂停) → finalize → END
  *                         ▲ 把草稿抛给用户、等回复            └ 按回复定稿
  *
- * 复用框架 factory（src/libs/nodes）：compose=createLlmNode；review=createHumanApprovalNode；
+ * 复用框架 factory（src/libs/nodes）：compose=createLlmStreamNode；review=createHumanApprovalNode；
  * finalize=createApprovalFinalizeNode（isApproval 短路定稿 / 否则 LLM 修订）。
  *
  * systemPrompt 注入：compose 节点的系统提示词优先用传入 systemPrompt（scaffold spec 注入），
@@ -25,7 +25,7 @@ import {
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { type AppConfig } from "../../../runtime/index.js";
 import {
-  createLlmNode,
+  createLlmStreamNode,
   createHumanApprovalNode,
   createApprovalFinalizeNode,
   requireModel,
@@ -55,14 +55,14 @@ export function createReviewGraph(
   checkpointer: BaseCheckpointSaver = new MemorySaver(),
   systemPrompt?: string
 ) {
-  // compose：框架 createLlmNode（真调大模型写初稿）。
-  const compose = createLlmNode<ReviewStateType>({
+  // compose：框架 createLlmStreamNode（真调大模型写初稿，逐 token 流式给用户）。
+  const compose = createLlmStreamNode<ReviewStateType>({
     model: () => requireModel(appConfig, "human-in-loop 拓扑"),
     prompt: (s) => [
       new SystemMessage(systemPrompt?.trim() || DEFAULT_COMPOSE_PROMPT),
       new HumanMessage(s.query),
     ],
-    write: (r) => ({ draft: r.content.trim() }),
+    write: (r) => ({ draft: r.text.trim() }),
     config: appConfig,
     label: "review compose",
     timeoutMs: resolveLlmResilience(appConfig).longTimeoutMs,
@@ -84,7 +84,7 @@ export function createReviewGraph(
         new SystemMessage("根据用户的修改意见改写草稿，只输出改写后的成稿，不要解释。"),
         new HumanMessage(`原稿：\n${s.draft}\n\n修改意见：${s.feedback}`),
       ],
-      write: (r) => ({ output: `✏️ 已按意见修订：\n${r.content.trim()}` }),
+      write: (r) => ({ output: `✏️ 已按意见修订：\n${r.text.trim()}` }),
       config: appConfig,
       label: "review finalize",
       timeoutMs: resolveLlmResilience(appConfig).longTimeoutMs,

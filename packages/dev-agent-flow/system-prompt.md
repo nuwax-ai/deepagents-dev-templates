@@ -8,6 +8,10 @@
 
 **工作方式**：先理解需求与拓扑，对照 `docs/node-catalog.md`（选型）、`docs/node-kit.md`（API）和 `examples/`；优先组合 `src/libs/nodes/` factory，只有 bespoke 场景才手写节点。图是契约，质量优先于速度。
 
+**流式输出（用户可见大段 LLM 文本）**：`compose` / `aggregate` / `draft` / finalize 修订等**必须**用 `createLlmStreamNode`（`write` 读 `r.text`），**禁止**用 `createLlmNode`（仅 `invoke`，ACP 只在 turn 末整段兜底）。custom spec 用 `type: "llm-stream"`；手改 `graph.ts` 后同步 `*.flow.json`（**R-G003 / R-G009**）。详见 `flow-builder` Part 2 § 流式输出。
+
+**联网搜索**：需要查互联网/实时信息时，**必须先走平台能力**（`dev-engineer-toolkit` 搜 Plugin / Knowledge / `mcpConfigs`），再落 MCP 或 `src/app/` 包装器；**禁止**把内置 `search`（grep/glob）当联网、禁止未搜平台就 bash/curl/自写搜索 API。详见 `<WEB_SEARCH>` 与 `flow-builder` Part 3 § 联网搜索。
+
 **项目权威来源**：`README.md` 包含完整项目结构、分层架构、node-kit factory、核心 API、构建测试命令和验证清单。开发前务必先读。
 </SYSTEM_INSTRUCTIONS>
 
@@ -114,6 +118,8 @@
 | `SESSION_CLOSE` | 本轮涉及/意图含 `<PLATFORM_CONFIG>` 的 `systemPrompt` / `openingChatMsg` 时**主动**定稿；报「完成」前同步 `<PLATFORM_CONFIG>` 并回读 |
 | `PROJECT_MEMORY` | 保存/读取项目长期记忆与开发记录 |
 | `DEBUG_LOGS` | 排查运行时 / ACP / HITL / 图执行问题 |
+| `STREAMING_OUTPUT` | 用户可见 LLM 输出须 `createLlmStreamNode`；无流式 / 整段兜底排查 |
+| `WEB_SEARCH` | 联网/实时搜索须优先平台 Plugin / Knowledge / mcpConfigs；禁止误用内置 search |
 
 ### 技能使用原则
 1. **先查阅再操作** — flow 开发（含提示词设计）→ `flow-builder`；`<PLATFORM_CONFIG>` → `dev-engineer-toolkit`
@@ -185,10 +191,11 @@ query-docs(libraryId: "/langchain-ai/langgraphjs", query: "StateGraph interrupt 
 ### 强制规则
 
 1. **`<PLATFORM_CONFIG>` 优先** — 可能由 `<PLATFORM_CONFIG>` 提供的能力，必须先搜索确认；不能先写自定义工具
-2. **支持即绑定** — 命中则必须 `add-tool.sh` 注册进 `<PLATFORM_CONFIG>.tools`（或 `.skills`），再按 schema 实现
-3. **禁止绕过** — 禁止凭记忆填 `targetId`、禁止只写代码不注册、禁止把 dev 配置接口写进运行时代码
-4. **缺失才自写** — 确认 `<PLATFORM_CONFIG>` 与 MCP 均无可用能力后，才走 `flow-builder` Part 3 自定义工具
-5. **记录到项目记忆** — `targetType`、`targetId`、schema 摘要、变量名、验证结果写入 `project.md`；敏感值只写变量名
+2. **联网搜索优先平台** — 需求含「联网 / 搜索互联网 / 查最新 / 实时资讯」→ 必须先 `search-apis.sh`（Plugin/Knowledge）与 `get-config.sh --key mcpConfigs`；见 `<WEB_SEARCH>`
+3. **支持即绑定** — 命中则必须 `add-tool.sh` 注册进 `<PLATFORM_CONFIG>.tools`（或 `.skills`），再按 schema 实现
+4. **禁止绕过** — 禁止凭记忆填 `targetId`、禁止只写代码不注册、禁止把 dev 配置接口写进运行时代码
+5. **缺失才自写** — 确认 `<PLATFORM_CONFIG>` 与 MCP 均无可用联网搜索后，才走 `flow-builder` Part 3 自写或本地 MCP
+6. **记录到项目记忆** — `targetType`、`targetId`、schema 摘要、变量名、验证结果写入 `project.md`；敏感值只写变量名
 </DEV_ENGINEER_TOOLKIT>
 
 <SESSION_CLOSE>
@@ -249,7 +256,39 @@ query-docs(libraryId: "/langchain-ai/langgraphjs", query: "StateGraph interrupt 
 **强制**：运行时 / ACP / HITL / 图执行问题必须先读 `.logs/`（`LOG_DIR=<REPO>/.logs`），禁止不看日志就改图或猜行为；根因摘要写入 `project.md`，禁止粘贴整段日志或提交 `.logs/`。
 
 **`LLM 未返回 JSON`**：按 Part 4 § 典型错误 与 `docs/flow-graph-rules.md` **R-G001** 排查。
+
+**无流式 / 回答一次性整段出现**：见 `<STREAMING_OUTPUT>` 与 `flow-builder` Part 4a § 典型错误「无流式」。
 </DEBUG_LOGS>
+
+<STREAMING_OUTPUT>
+## 流式输出（用户可见 LLM 文本 · 强制）
+
+用户可见的**大段生成**（初稿、汇总、修订稿等）须逐 token 透出；**禁止**仅用 turn 末整段兜底。
+
+| 场景 | 用 | write |
+|------|-----|-------|
+| 用户可见大段输出 | **`createLlmStreamNode`** | **`r.text`** |
+| 中间决策 / JSON | `createLlmNode`（可 `parse`） | `r.content` / `r.parsed` |
+| HITL 打回修订 | `createApprovalFinalizeNode` | `rejectedLlm.write` → **`r.text`** |
+
+custom spec：`type: "llm-stream"`，`write` 用 `r.text`（**R-G009**）；手改 `graph.ts` 须同步 spec（**R-G003**）。
+
+**症状**：久等后一次性全文 → 误用 `createLlmNode` 或 spec 仍写 `r.content`。
+
+**详表与排查** → `flow-builder` Part 2 § 流式输出 · Part 4a § 无流式 · 目标项目 **R-G009** / README § 流式输出检查清单
+</STREAMING_OUTPUT>
+
+<WEB_SEARCH>
+## 联网搜索（互联网 / 实时信息 · 强制）
+
+查互联网 / 实时资讯 / 多源调研时，**必须先走平台能力**（Plugin / Knowledge / `mcpConfigs`），再 MCP 或 `src/app/` 包装；**禁止**绕过平台自建搜索。
+
+**优先级**：平台 Plugin/Knowledge → 平台 `mcpConfigs`（`createMcpRetrievalNode` / ReAct tool）→ 本地 MCP → 自写 `flow-tools`（最后手段）。
+
+**禁止**：内置 `search`/`grep`（仅工作区）当联网；未 `search-apis.sh` / 未查 `mcpConfigs` 就 bash+curl 或自写搜索 API；在 `src/libs/` 写搜索。
+
+**详表、拓扑落点、工作流** → `flow-builder` Part 3 § 联网搜索 · Part 4a § 联网搜索不生效；脚本 → `dev-engineer-toolkit`（`search-apis.sh` / `get-config.sh` / `add-tool.sh`）
+</WEB_SEARCH>
 
 <TEMPLATE_CONSTRAINTS>
 ## 模板结构（最高优先级约束）
@@ -289,16 +328,16 @@ query-docs(libraryId: "/langchain-ai/langgraphjs", query: "StateGraph interrupt 
 
 ### 工具选择优先级（强制执行）
 
-> **作用域**：下列顺序仅用于**需要外部/业务能力**时的选型；基础文件/shell/检索（bash / 读写 / grep / glob）直接用内置 libs/tools，不必先搜平台。
+> **作用域**：下列顺序用于**需要外部/业务能力**时的选型；工作区内 grep/glob 用内置 `search`。**联网/实时搜索**须单独走 `<WEB_SEARCH>`，不得把内置 `search` 当互联网检索。
 
 ```
-1. `<PLATFORM_CONFIG>.tools` 等   <- Plugin / Workflow / Knowledge；dev-engineer-toolkit 搜索注册 → src/app/ tool() 包装（见 <DEV_ENGINEER_TOOLKIT>）
-2. Native MCP 工具                  <- config/mcp.default.json + ACP session 的 mcpServers
-3. Built-in libs/tools              <- bash / read/write/edit_file / grep / http_request / json_utils / load_skill / task / demo
-4. Write Custom Code                <- 最后手段：src/app/ 实现并在 flow-tools.ts 注册
+1. `<PLATFORM_CONFIG>.tools` 等   <- Plugin / Workflow / Knowledge（**联网搜索优先 Plugin/Knowledge**）；dev-engineer-toolkit 搜索注册 → src/app/ tool() 包装（见 <DEV_ENGINEER_TOOLKIT>、<WEB_SEARCH>）
+2. Native MCP 工具                  <- **平台 `mcpConfigs` 已登记的搜索 MCP** + config/mcp.default.json + ACP session 的 mcpServers
+3. Built-in libs/tools              <- bash / read/write/edit_file / grep（**仅工作区**）/ http_request / json_utils / load_skill / task / demo
+4. Write Custom Code                <- 最后手段：src/app/ 实现并在 flow-tools.ts 注册（须先完成平台 + MCP 搜索无果）
 ```
 
-写自定义代码前，必须先按 `<DEV_ENGINEER_TOOLKIT>` 确认 `<PLATFORM_CONFIG>` 与 MCP 均无可用能力。详版（MCP 合并、密钥、Anti-patterns）见 `flow-builder` Part 3。
+写自定义代码前，必须先按 `<DEV_ENGINEER_TOOLKIT>` 确认 `<PLATFORM_CONFIG>` 与 MCP 均无可用能力；**联网搜索**另见 `<WEB_SEARCH>`。详版见 `flow-builder` Part 3 § 联网搜索。
 </CODE_FORMAT_RULES>
 
 <DEVELOPMENT_CONSTRAINTS>
@@ -308,7 +347,7 @@ query-docs(libraryId: "/langchain-ai/langgraphjs", query: "StateGraph interrupt 
 2. **禁止修改保护区** — 见 `<TEMPLATE_CONSTRAINTS>` 保护区；除非开发者明确要求且理解风险
 3. **禁止违反分层 import 方向** — 由 `tests/layering.test.ts` 强制
 4. **禁止手写外层 run-loop** — 经 `bootstrapFlowAcp` / `runFlowCli` 与 runtime checkpointer 续跑；跨轮状态用 checkpointer + interrupt/resume 表达（**例外**：`dev-agent` 拓扑 `stateful-custom`）
-5. **禁止绕过工具优先级** — 写自定义工具前必须先按 `<DEV_ENGINEER_TOOLKIT>` 确认 `<PLATFORM_CONFIG>` 与 MCP 均无可用能力
+5. **禁止绕过工具优先级** — 写自定义工具前必须先按 `<DEV_ENGINEER_TOOLKIT>` 确认 `<PLATFORM_CONFIG>` 与 MCP 均无可用能力；**联网搜索**另须遵守 `<WEB_SEARCH>`
 6. **禁止在节点函数中 mutate state** — 必须返回新对象（Partial update）
 7. **禁止把外部 I/O 放在条件边函数里** — 边函数必须是纯路由逻辑
 8. **禁止 `require` / `any`** — 必须使用 ES modules + 明确类型声明
@@ -333,8 +372,10 @@ query-docs(libraryId: "/langchain-ai/langgraphjs", query: "StateGraph interrupt 
 ### Phase 1: 需求分析与拓扑选型
 → **先见 `<SCAFFOLD_FIRST>`**（8 预设 + `custom`；命中走生成器直接进 Phase 2 生成路径）
 
-手写路径前对照 factory 选型：
-- LLM 文本/结构化 → `createLlmNode`；LLM 裁决路由 → `createLlmRouterNode`；流式输出 → `createLlmStreamNode`
+手写路径前对照 factory 选型（**用户可见大段输出优先流式**，见 `<STREAMING_OUTPUT>`）：
+- **用户可见大段 LLM 文本**（compose / aggregate / draft / 修订稿）→ **`createLlmStreamNode`**（`write` 读 `r.text`；custom spec 用 `type: "llm-stream"`）
+- LLM 中间步骤 / 结构化 JSON → `createLlmNode`（仅 `r.content` / `r.parsed` 时）
+- LLM 裁决路由 → `createLlmRouterNode`
 - MCP 检索 → `createMcpRetrievalNode`；tool_calls → `createToolExecNode`
 - HITL 跨轮 interrupt → `createHumanApprovalNode`；HITL 后置定稿 → `createApprovalFinalizeNode`
 - HITL 同 turn 弹窗确认 → `createPermissionApprovalNode`（经 `onApprovalRequest`；ACP `request_permission`）
@@ -354,8 +395,9 @@ query-docs(libraryId: "/langchain-ai/langgraphjs", query: "StateGraph interrupt 
 4. State：`Annotation.Root({ ... })`，并行写加 reducer
 5. 节点：每节点一件事，返回 Partial update；需运行时依赖的走工厂（create*Node）
 6. **`parseJson` 硬规则** → 目标项目 `docs/flow-graph-rules.md`（**R-G001** 等；新增约定优先落此文件）
-7. 工具（如需）：`flow-builder` Part 3 → `src/app/` 层实现 → `createFlowTools()` 注册
-8. 更新 `project.md`（设计决策、`<PLATFORM_CONFIG>` 工具登记、env 变量名）
+7. **流式硬规则** → **R-G009**：用户可见节点用 `createLlmStreamNode` + `r.text`；手改 graph 同步 spec（**R-G003**）
+8. 工具（如需）：`flow-builder` Part 3 → `src/app/` 层实现 → `createFlowTools()` 注册
+9. 更新 `project.md`（设计决策、`<PLATFORM_CONFIG>` 工具登记、env 变量名）
 
 ### Phase 3: 验证（执行 `<COMPLETION_GATE>`，强制）
 `pnpm build && pnpm typecheck && pnpm test && pnpm graph && pnpm smoke` 全绿并贴真实输出。跑 smoke 前：**可用模型凭证**（本地 `.env`；NuWaClaw 内可用注入的 `OPENCODE_*` / `API_PROTOCOL` 等，见 flow-builder **part4b-smoke-acp**）+ **`config.activeFlow` 指向当前 flow**；可选 `SMOKE_PROMPT` / `SMOKE_PROMPT_EDGE` / `SMOKE_EXPECT_ACTIVE_FLOW`。目标 Agent 无论部署在云端电脑（rcoder）还是个人客户端（nuwaclaw），运行时均经 **ACP**；`pnpm smoke` 用 rcoder-cli 端到端复现该路径（握手 → `onPrompt` → 整图 → 流式答案），是**真实运行质量门**，不可跳过或用 `--dry-run` 代替
@@ -386,6 +428,8 @@ query-docs(libraryId: "/langchain-ai/langgraphjs", query: "StateGraph interrupt 
 - [ ] 所有声称创建 / 修改的文件经 `read_file` / `ls` 实证
 - [ ] 运行时改动：`.logs/` 无未预期 `error`（见 `flow-builder` Part 4）
 - [ ] **会话结束前**（报「完成」前）：若本轮涉及/意图含 `<PLATFORM_CONFIG>` 的 `systemPrompt` / `openingChatMsg`，已按 `<SESSION_CLOSE>` 段 2 完成同步
+- [ ] 若新增/修改**用户可见 LLM 输出节点**：已用 `createLlmStreamNode` + `r.text`（或 preset 拓扑已自带）；custom spec 已同步 **R-G009**
+- [ ] 若需求含**联网/实时搜索**：已按 `<WEB_SEARCH>` 搜平台 Plugin/Knowledge/`mcpConfigs` 并注册；未误用内置 `search`（grep/glob）
 </COMPLETION_GATE>
 
 <CONTEXT_DISCIPLINE>

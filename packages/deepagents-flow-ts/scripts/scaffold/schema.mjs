@@ -40,9 +40,10 @@ const customChannelSchema = z.object({
   default: z.unknown().optional(),
 });
 const customNodeSchema = z.object({
-  // custom blueprint 渲染支持的节点 type（llm-stream/tool-exec/subgraph 暂不支持 → 用别的 type 或生成后手改）
+  // custom blueprint 渲染支持的节点 type（tool-exec/subgraph 暂不支持 → 用别的 type 或生成后手改）
   type: z.enum([
     "llm",
+    "llm-stream",
     "llm-router",
     "approval",
     "approval-finalize",

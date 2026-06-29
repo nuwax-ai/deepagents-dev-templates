@@ -154,8 +154,8 @@ export function createMyFlow(appConfig?, opts: { checkpointer?: BaseCheckpointSa
 
 | 模式 | 可跑示例 |
 |---|---|
-| `Send` 并行 map-reduce + reducer | [examples/travel-planner](../examples/travel-planner/)（并行 research 4 路 + 聚合） |
-| `interrupt` 人审 / HITL | [examples/human-in-loop](../examples/human-in-loop/)、[travel-planner](../examples/travel-planner/)、[project-manager](../examples/project-manager/) |
+| `Send` 并行 map-reduce + reducer | [examples/travel-planner](../examples/travel-planner/)（并行 research 4 路 + **aggregate 用 createLlmStreamNode 流式汇总**） |
+| `interrupt` 人审 / HITL | [examples/human-in-loop](../examples/human-in-loop/)（**compose 流式初稿**）、[travel-planner](../examples/travel-planner/)、[project-manager](../examples/project-manager/) |
 | 条件边循环（评估重试） | [examples/project-manager](../examples/project-manager/)、默认图 `reflect` |
 | 多阶段流水线 + 多轮 HITL + 双层 reflection + 并行调研 + **持续会话** | [examples/deep-research](../examples/deep-research/)（长任务示例：选题确认 → 大纲规划 → Send 并行调研 → 初稿 → 质量评审 → 报告 → **converse↔respond 持续会话回路**，2 确认门 + 2 reflection 循环 + 报告后就同一研究反复改/问，回「结束」定稿） |
 | 长任务硬化（跨重启续跑 + 阶段进度 + 单步护栏） | `createStatefulFlow`（`src/surfaces/stateful-flow.ts`）——deep-research / travel / pm / human-in-loop 全部基于它；持久化默认 `FileCheckpointSaver` |

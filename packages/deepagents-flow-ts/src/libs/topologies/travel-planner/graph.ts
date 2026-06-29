@@ -4,7 +4,7 @@
  *   START → gather → ⟨Send 并行⟩ research × 4（交通/住宿/景点/美食，各发一次真实 DDG 搜索）
  *         → aggregate（LLM 整理成 N 天行程）→ confirm(interrupt) → finalize → END
  *
- * 节点消费框架 factory：aggregate=createLlmNode；confirm=createHumanApprovalNode；
+ * 节点消费框架 factory：aggregate=createLlmStreamNode；confirm=createHumanApprovalNode；
  * fanoutToResearch=createFanout（Send map-reduce 扇出）。保留 bespoke：gather（纯解析）、
  * research（真实 MCP 检索 + rateLimited）、finalize（isApproval 短路）。
  *
@@ -22,7 +22,7 @@ import {
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { logger, type AppConfig } from "../../../runtime/index.js";
 import {
-  createLlmNode,
+  createLlmStreamNode,
   createHumanApprovalNode,
   createApprovalFinalizeNode,
   createMcpRetrievalNode,
@@ -138,8 +138,8 @@ export function createTravelGraph(
     }),
   });
 
-  // aggregate：框架 createLlmNode（把 4 路搜索结果整理成按天行程）。
-  const aggregate = createLlmNode<TravelStateType>({
+  // aggregate：框架 createLlmStreamNode（把 4 路搜索结果整理成按天行程，逐 token 流式给用户）。
+  const aggregate = createLlmStreamNode<TravelStateType>({
     model: () => requireModel(appConfig, "travel-planner 拓扑"),
     prompt: (s) => {
       const ordered = ASPECTS.map((a) => s.findings.find((f) => f.aspect === a)).filter(
@@ -155,7 +155,7 @@ export function createTravelGraph(
         new HumanMessage(`网络搜索素材：\n${material}`),
       ];
     },
-    write: (r) => ({ itinerary: r.content.trim() }),
+    write: (r) => ({ itinerary: r.text.trim() }),
     config: appConfig,
     label: "travel aggregate",
     retryLabel: "travel LLM",
@@ -178,7 +178,7 @@ export function createTravelGraph(
         new SystemMessage("根据用户的调整意见修订行程，只输出修订后的完整行程。"),
         new HumanMessage(`原行程：\n${s.itinerary}\n\n调整意见：${s.feedback}`),
       ],
-      write: (r) => ({ output: `✏️ 已按意见调整：\n${r.content.trim()}` }),
+      write: (r) => ({ output: `✏️ 已按意见调整：\n${r.text.trim()}` }),
       config: appConfig,
       label: "travel finalize",
       retryLabel: "travel LLM",
