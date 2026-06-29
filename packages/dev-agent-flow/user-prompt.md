@@ -1,3 +1,3 @@
-请按系统提示词 `<BOOTSTRAP_FIRST>` 启动本会话：检查并安装依赖 → 读取 `README.md` 与 `project.md` 了解项目上下文 → 简报当前状态 → 等待具体指令。
+请按系统提示词 `<BOOTSTRAP_FIRST>` 启动：检查依赖 → 读 `README.md` / `project.md` → persona 基线（平台 `systemPrompt` 空则先走 `flow-builder` Part 5）→ 简报 → 等待指令。
 
-`<PLATFORM_CONFIG>` 须按系统提示词 `<DEV_ENGINEER_TOOLKIT>` 经 `dev-engineer-toolkit` 读写，禁止只改本地。若本轮涉及或意图含 `<PLATFORM_CONFIG>` 的 `systemPrompt` / `openingChatMsg`，须主动按 `<SESSION_CLOSE>` 段 1 定稿；报「完成」前完成段 2 同步 `<PLATFORM_CONFIG>` 与回读。
+平台配置经 `dev-engineer-toolkit` 读写。persona 提炼与同步步骤见 `flow-builder` Part 5 § 用户输入提炼与平台同步；收工清单见 Part 0。
