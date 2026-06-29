@@ -1,6 +1,6 @@
 # Part 4b：`pnpm smoke`（rcoder-cli 端到端）
 
-> 所属：`flow-builder` L2-D 子文档。完成闸门见 [part4a-verify-debug.md](part4a-verify-debug.md)。
+> 所属：`flow-builder` L2-D 子文档。completion gate（完成闸门）见 [part4a-verify-debug.md](part4a-verify-debug.md)。
 > **模型 env 解析**由目标项目 `scripts/lib/smoke-env.mjs` 实现（与 runtime `config-loader` 对齐）。
 > **通过/失败判定**由 `scripts/lib/smoke-outcome.mjs` 实现（以 session-trace 为准，见下文）。
 
@@ -161,7 +161,7 @@ rcoder-cli 子进程可能继承未替换的 `ANTHROPIC_MODEL={MODEL_PROVIDER_MO
 
 ---
 
-## 与完成闸门的关系
+## 与 completion gate（完成闸门）的关系
 
 - **必须真实跑** `pnpm smoke`（禁止 `--dry-run` 冒充通过）。
 - 开发 **custom / stateful** flow 时：先改 `activeFlow`，再设 `SMOKE_PROMPT`（+ 可选 `SMOKE_PROMPT_EDGE`）。

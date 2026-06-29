@@ -90,7 +90,7 @@
 | **反例** | 只改 `graph.ts` 修 `prepare`，未改 `interview-agent.flow.json` |
 | **正例** | 修 graph 后同步 spec 中对应 `nodes.*.params` |
 | **验证** | `diff` spec 与 graph 中节点 `parse`/`prompt`/`write` 一致 |
-| **关联** | [node-kit § 节点级 scaffold](node-kit.md#节点级-scaffoldcustom-拓扑)；[scripts/README.md](../scripts/README.md)；`scripts/scaffold/generate.mjs` |
+| **关联** | [node-kit § 节点级 scaffold](node-kit.md#节点级-scaffoldcustom-topology)；[scripts/README.md](../scripts/README.md)；`scripts/scaffold/generate.mjs` |
 
 ---
 

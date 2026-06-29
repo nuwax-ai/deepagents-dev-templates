@@ -4,7 +4,7 @@
 
 ## Version sync
 
-以 `package.json` 顶层 `version` 为权威源，同步到发布相关的派生元数据（`.nuwax-agent/agent-package.json`、`config/flow-agent.config.json`），避免手动改一处忘一处导致制品版本错位。**不触碰**依赖版本、引擎要求、框架版本。
+以 `package.json` 顶层 `version` 为权威源，同步到发布相关的派生元数据（`.nuwax-agent/agent-package.json`、`config/flow-agent.config.json`），避免手动改一处忘一处导致压缩包版本错位。**不触碰**依赖版本、引擎要求、框架版本。
 
 | Script | npm 命令 | 说明 |
 |--------|----------|------|
@@ -12,7 +12,7 @@
 | | `pnpm run version:preview` | `--dry-run`，只预览不写 |
 | | `pnpm run version:check` | `--check`，不一致则退出 1（CI 守卫） |
 
-`package` / `package:all` / `package:platforms` 均已在前置串联 `version:check` —— 版本不一致时直接中断，不会产出错版本制品。
+`package` / `package:all` / `package:platforms` 均已在前置串联 `version:check` —— 版本不一致时直接中断，不会产出错版本压缩包。
 
 ## Build & Bundle
 
@@ -21,7 +21,7 @@
 | `lib/bundle.mjs` | `pnpm run bundle` | esbuild 打包为 `dist/bundle.mjs` |
 | `package.mjs` | `pnpm run package` | npm tgz + Nuwax tar/zip |
 | `package-platforms.mjs` | `pnpm run package:platforms` | 按平台归档 + `platforms.json` |
-| `validate-package.mjs` | `pnpm run validate:package` | 校验制品完整性 |
+| `validate-package.mjs` | `pnpm run validate:package` | 校验压缩包完整性 |
 
 ## Smoke tests
 

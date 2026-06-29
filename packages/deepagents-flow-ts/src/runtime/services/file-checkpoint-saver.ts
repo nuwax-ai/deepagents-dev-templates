@@ -69,7 +69,7 @@ export function resolveCheckpointDir(
 
 /**
  * 由 AppConfig 造一个文件后端 checkpointer（跨重启恢复 + interrupt/resume 持久化）。
- * StatefulFlow 默认走这个 → 长任务默认就是持久的，而非内存态。
+ * StatefulFlow 默认走这个 → durable stateful flow 默认落盘，而非仅内存。
  */
 export function createFileCheckpointer(
   appConfig: AppConfig,
@@ -79,7 +79,7 @@ export function createFileCheckpointer(
 }
 
 /**
- * 长任务默认持久化：有 appConfig → FileCheckpointSaver（跨重启续跑）；
+ * Durable stateful flow 默认 checkpointer：有 appConfig → FileCheckpointSaver（cross-restart resume）；
  * 无 appConfig（极少数纯单测）→ MemorySaver。单测可注入自己的 checkpointer 覆盖。
  * 各有状态示例的 createXxxFlow 统一经此决定 checkpointer，避免「示例忘了持久化」回归。
  */

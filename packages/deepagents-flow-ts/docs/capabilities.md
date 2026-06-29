@@ -13,7 +13,7 @@
 | `agent-builtin-file` | 用户级会话目录（文件，无 DB） | sessionStore（默认 `~/.flowagents/sessions/<workspace 散列>/`，可经 `config.memory.dir` opt-out 回 `./.flow-sessions`） | ❌ |
 | `package-placeholder` | 打包/安装时替换 | `${INSTALL_ROOT}`、`${PACKAGE_VERSION}` | ❌ |
 
-完整映射：[.nuwax-agent/capability-sources.json](../.nuwax-agent/capability-sources.json)（制品元数据）。
+完整映射：[.nuwax-agent/capability-sources.json](../.nuwax-agent/capability-sources.json)（压缩包元数据）。
 
 ## 查询
 

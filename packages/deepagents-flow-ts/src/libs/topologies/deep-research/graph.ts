@@ -1,7 +1,7 @@
 /**
- * 深度研究报告生成器 ——【长任务示例：多阶段流水线 + 多轮 HITL + 双层 reflection + 并行调研 + 持续会话】
+ * 深度研究报告生成器 ——【durable stateful flow 示例：多阶段流水线 + 多轮 HITL + 双层 reflection + 并行调研 + 持续会话】
  *
- * 这是模板里最复杂的示例，演示现有 examples 从不覆盖的"长任务编排"维度：
+ * 这是模板里最复杂的示例，演示现有 examples 从不覆盖的"durable stateful flow 编排"维度：
  *  - 多阶段流水线：选题确认 → 大纲规划 → 并行调研 → 初稿生成 → 质量评审 → 报告
  *  - 多轮 HITL：2 个一次性确认门（确认主题、确认大纲）+ 报告后的持续会话回路
  *  - 双层 reflection 循环：大纲评审重试 + 初稿质量评审重试
@@ -29,7 +29,7 @@
  *  - research：Context7 文档检索（duckduckgo-mcp-server 实测不稳定已移除，原双源改单源）
  *  - onToolCall 透出每次搜索；HITL 用 interrupt 暂停。
  *
- * 长任务韧性（防一处抖动掐死整条长流水线）：
+ * durable stateful flow 韧性（防一处抖动掐死整条长流水线）：
  *  - invokeLLM = 重试(指数退避) + 超时；research 搜索/整理失败降级、不崩并行分支；
  *  - outline_review / quality_review 评审解析失败时按「通过」降级放行，而非抛错终止。
  *  - 任一步真抛错时，图状态已落盘（FileCheckpointSaver）→ 用户下一句即从断点 resume 续跑，不重头来。

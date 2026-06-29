@@ -6,7 +6,7 @@
 
 > **优先用 factory**:下面的 Send / interrupt / subgraph 等模式,框架已收成 `src/libs/nodes/` 的 factory
 > (`createFanout` / `createHumanApprovalNode` / `createApprovalFinalizeNode` / `createLlmRouterNode` / `createMcpRetrievalNode` / `createSubgraphNode` 等),选型见 [node-catalog.md](node-catalog.md)、API 见 [node-kit.md](node-kit.md)。
-> 能用 factory 就别手写原生模式;只有 bespoke 节点(多源检索取优、文件交付等,见 node-catalog ②)才回这里看原生 API。
+> 能用 factory 就别手写原生模式；只有定制节点（bespoke）（多源检索取优、文件交付等，见 node-catalog ②）才回这里看原生 API。
 
 > 真实业务里把这些加到 `src/app/graph.ts` 的 `addNode`/`addEdge`/`addConditionalEdges` 即可。
 
@@ -98,10 +98,10 @@ await graph.invoke({ input: "..." }, { configurable: { thread_id: "t1" } });
 > 会把它变成 `{"0":..}` 普通对象、重载即报 `loadsTyped` 错。`FileCheckpointSaver` 用 base64 包装
 > 保真（见该文件 `replaceBytes`/`reviveBytes`）。自定义文件型 saver 时务必处理二进制。
 
-## 6. 长任务硬化:多轮 + 跨重启 + 进度 + 护栏
+## 6. Durable stateful flow（`createStatefulFlow`）
 
-多阶段、多轮 HITL 的**长任务**（如 [deep-research](../examples/deep-research/)）光有 `interrupt` 不够——
-还要解决「跑到一半重启了怎么续」「N 步流水线进度看不见」「reflection 回边/LLM 挂死跑飞」。
+多阶段、多轮 HITL 的 **durable stateful flow**（如 [deep-research](../examples/deep-research/)）光有 `interrupt` 不够——
+还要解决 cross-restart resume、stage visibility、reflection 回边/LLM 挂死跑飞。
 模板把这些收进 **`createStatefulFlow`**（`src/surfaces/stateful-flow.ts`），有状态示例都基于它：
 
 ```ts
@@ -115,21 +115,21 @@ export function createMyFlow(appConfig?, opts: { checkpointer?: BaseCheckpointSa
     toResult: (v) => ({ answer: v.output ?? "" }),       // 终态 → 回答
     checkpointer: durableCheckpointer(appConfig, opts.checkpointer), // 默认 FileCheckpointSaver
     configurable: { appConfig },     // 透传给 Send 并行实例（onToolCall/onStage 基座自动注入）
-    recursionLimit: 50,              // 护栏:防 reflection 回边死循环
+    recursionLimit: 50,              // recursion guard: 防 reflection 回边死循环
   });
 }
 ```
 
-它一处实现了所有有状态示例原本各自重抄的 run-loop，并叠加四个长任务硬化点：
+它一处实现了所有有状态示例原本各自重抄的 run-loop，并叠加四个 durable-stateful-flow 能力点：
 
-| 硬化点 | 怎么做 | 为什么 |
+| Feature | How | Why |
 |---|---|---|
-| **跨重启续跑** | checkpointer 默认 `FileCheckpointSaver`（落盘） | 重启后暂停点不丢 |
-| **一个会话一个主题** | `hasStarted()` 读 `graph.getState()` 是否已有 checkpoint，**非进程内存** | 首条 prompt 开题，之后每条都续跑同一项目（停在 interrupt / 出错 / 已完成皆然）→ 绝不把消息误当「新主题」重头开始；且重启后仍准 |
-| **阶段进度** | 节点 `emitStage(config, { stage, detail })` → `onStage` 回调 | 长流水线每步可见（CLI 打印 `▸`，ACP 发 message chunk） |
-| **单步护栏** | `recursionLimit` + `withTimeout(model.invoke(...), ms)` | 回边/挂死步骤不拖垮整图 |
+| **Cross-restart resume** | checkpointer 默认 `FileCheckpointSaver`（`durableCheckpointer`） | 重启后 interrupt/checkpoint 不丢 |
+| **One session, one topic** | `hasStarted()` 读 `graph.getState()` 是否已有 checkpoint（非进程内存） | 首条开题，之后皆 resume 同一项目；重启后仍准 |
+| **Stage progress** | `emitStage(config, …)` → `onStage` | 多阶段流水线每步可见（CLI `▸`，ACP message chunk） |
+| **Recursion guard** | `recursionLimit` + `withTimeout(model.invoke(...), ms)` | 回边/挂死步骤不拖垮整图 |
 
-> **conversational 模式**（`conversational: true`，区别于上述 HITL 长任务）：
+> **conversational 模式**（`conversational: true`，区别于上述 HITL durable stateful flow）：
 > 默认有状态示例用 `hasStarted` 做「一个会话一个主题」续跑；**对话型 flow**（default /
 > knowledge-qa / adaptive-knowledge-qa / customer-support）传 `conversational: true` →
 > `createStatefulFlow` **不暴露 `hasStarted`**，surface 每轮都走 `query`（配合稳定
@@ -138,13 +138,13 @@ export function createMyFlow(appConfig?, opts: { checkpointer?: BaseCheckpointSa
 > 变成「多轮对话」。压缩仍在新 query 入口触发。见 `src/app/default-flow.ts` 的 `recipe()`
 > 与 `src/surfaces/stateful-flow.ts` 的 `conversational` 选项。
 
-> **长任务上下文压缩**:多轮消息累积超阈值时，`compactHistory` 摘要旧历史，再用
+> **Context compaction**（long-running flows）：多轮消息超阈值时 `compactHistory` 摘要，再经
 > `compactionUpdate`（`RemoveMessage` 替换模式）写回 channel。见 [dev-agent](../examples/dev-agent/) 的 run-loop
 > 与 `src/libs/compaction.ts`（`config.compaction` 控制触发）。
 
 ---
 
-**何时该读这里**:默认图是顺序 ReAct 式(够覆盖大多数编排)。一旦你要 **并行处理多路、需要人审、动态多分支路由、复用整张子图、断点续跑、或做跨重启的长任务** ——回来看对应小节。每段都是最小可抄片段;贴进 `graph.ts` 的连线和节点即可。
+**何时该读这里**：默认图是顺序 ReAct 式（够覆盖大多数编排）。一旦你要并行 fan-out、HITL、动态路由、subgraph、checkpoint resume，或 **cross-restart durable stateful flow** —— 回来看对应小节。
 
 ---
 
@@ -157,12 +157,12 @@ export function createMyFlow(appConfig?, opts: { checkpointer?: BaseCheckpointSa
 | `Send` 并行 map-reduce + reducer | [examples/travel-planner](../examples/travel-planner/)（并行 research 4 路 + **aggregate 用 createLlmStreamNode 流式汇总**） |
 | `interrupt` 人审 / HITL | [examples/human-in-loop](../examples/human-in-loop/)（**compose 流式初稿**）、[travel-planner](../examples/travel-planner/)、[project-manager](../examples/project-manager/) |
 | 条件边循环（评估重试） | [examples/project-manager](../examples/project-manager/)、默认图 `reflect` |
-| 多阶段流水线 + 多轮 HITL + 双层 reflection + 并行调研 + **持续会话** | [examples/deep-research](../examples/deep-research/)（长任务示例：选题确认 → 大纲规划 → Send 并行调研 → 初稿 → 质量评审 → 报告 → **converse↔respond 持续会话回路**，2 确认门 + 2 reflection 循环 + 报告后就同一研究反复改/问，回「结束」定稿） |
-| 长任务硬化（跨重启续跑 + 阶段进度 + 单步护栏） | `createStatefulFlow`（`src/surfaces/stateful-flow.ts`）——deep-research / travel / pm / human-in-loop 全部基于它；持久化默认 `FileCheckpointSaver` |
-| 长任务上下文压缩（摘要 + `RemoveMessage` 替换） | [examples/dev-agent](../examples/dev-agent/) run-loop + `src/libs/compaction.ts` |
+| 多阶段流水线 + 多轮 HITL + 双层 reflection + 并行调研 + **持续会话** | [examples/deep-research](../examples/deep-research/)（durable stateful flow 示例：选题确认 → 大纲 → Send 并行调研 → 初稿 → 质量评审 → converse↔respond 持续会话） |
+| **Durable stateful flow**（cross-restart resume + stage progress + recursion guard） | `createStatefulFlow` + `durableCheckpointer`（`src/surfaces/stateful-flow.ts`）—— deep-research / travel / pm / human-in-loop |
+| **Context compaction**（`RemoveMessage` 替换历史） | [examples/dev-agent](../examples/dev-agent/) + `src/libs/compaction.ts` |
 | 条件边路由 + 检索/生成**双自纠正循环**（对齐官方 Adaptive RAG） | [libs/topologies/adaptive-rag](../src/libs/topologies/adaptive-rag/)（app flow `adaptive-knowledge-qa`） |
 | **conversational 多轮对话**（不暴露 `hasStarted` + 稳定 threadId + checkpointer 累积历史 + 图层流式） | `createStatefulFlow`（`conversational: true`）：default / knowledge-qa / adaptive-knowledge-qa / customer-support |
 
-> `interrupt` 的"采集回复 → resume"已由模板的 **`StatefulFlow`** seam 在 acp/cli surface 接好——
+> `interrupt` 的"采集回复 → resume"已由模板的 **`StatefulFlow`** 接入层（seam）在 acp/cli surface 接好——
 > 不用自己写 host 端恢复逻辑。且续跑状态由 checkpointer 推断（`hasStarted`）——**一个会话一个主题**：
 > 首条开题、之后都续跑同一项目，**进程/IDE 重启后仍能续跑**（见各示例的 `createXxxFlow` 与第 6 节）。

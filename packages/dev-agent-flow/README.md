@@ -4,33 +4,33 @@
 
 本包包含 **开发 Agent（Flow 版）** 的系统提示词和 Skills 配置。开发 Agent 运行在云端开发环境，职责是帮开发者基于 `deepagents-flow-ts` 工作流编排模板创建场景 Agent。
 
-与 `dev-agent`（面向 `deepagents-app-ts`，自由 tool loop）不同，本包面向 **`deepagents-flow-ts`** —— Agent 按显式 LangGraph 工作流图（节点 + 边）运行，而非自由工具循环。
+与 `dev-agent`（面向 `deepagents-app-ts`，自由 tool loop）不同，本包面向 **`deepagents-flow-ts`** —— Agent 按 **preset topology**（预先设计的 node + edge 图）跑 LangGraph，而非自由 tool loop。
 
-**一句话 → 可跑 Agent**：加载 `flow-builder` **Part 1** 脚手架（9 拓扑 = 8 预设 + `custom` spec → 生成薄封装 + 自动注册 + typecheck/graph 自验），命中拓扑优先于 Part 2 手写。
+**一句话 → 可跑 Agent**：加载 `flow-builder` **Part 1** 脚手架（**9 topologies** = **8 presets** + `custom` spec → 生成薄封装 + 自动注册 + typecheck/graph 自验），命中 preset topology 优先于 Part 2 手写。
 
 ## 与 dev-agent 的关系
 
 | | dev-agent | dev-agent-flow |
 |--|-----------|----------------|
 | 面向模板 | `deepagents-app-ts` | `deepagents-flow-ts` |
-| 运行范式 | 自由 tool loop（`createDeepAgent()`） | 显式 StateGraph 工作流图 |
-| 核心抽象 | 工具注册（`createTools()`） | 图编排（graph + nodes + surface seam） |
+| 运行范式 | 自由 tool loop（`createDeepAgent()`） | **preset topology**（LangGraph node + edge 图） |
+| 核心抽象 | 工具注册（`createTools()`） | 图编排（graph + nodes + **surface seam（接入层）**） |
 | 目标 Agent 提示词基准 | `target-agent.base.md` | `flow.base.md`（经 `dev-engineer-toolkit` 同步 `<PLATFORM_CONFIG>`，定义见 `system-prompt.md`） |
 | 配置文件 | `app-agent.config.json` | `flow-agent.config.json` |
 | 语言 | TS + Python | 仅 TS |
 
 ## 文件结构
 
-本包（`dev-agent-flow`）与 `packages/deepagents-flow-ts` **模板源码独立**：技能由**开发 Agent** 在开发环境侧加载，不会出现在模板仓库目录树中。
+本包（`dev-agent-flow`）与 `packages/deepagents-flow-ts` **模板源码独立**：技能由**开发 Agent** 在开发环境侧加载，**不随 Nuwax 平台压缩包下发**，也不会出现在模板仓库目录树中。
 
 ## 文档分工（必读）
 
 | 层级 | 位置 | 职责 |
 |------|------|------|
-| **模板本体** | `deepagents-flow-ts/` 内 `README.md`、`docs/*`、`config/`、`prompts/` | 描述**本工作目录**内的能力、配置路径、图编排规则（`flow-graph-rules.md` R-G*）、排错索引；**不**承载开发 Agent 工作流 |
-| **开发 Agent 引导** | 本包 `system-prompt.md` + `skills/flow-builder/` + `skills/dev-engineer-toolkit/` | 教开发 Agent **如何**用模板：脚手架、编排、平台配置、验证闸门、提示词设计、禁止项（如 `.agents/` 直写） |
+| **模板本体** | `deepagents-flow-ts/` 内 `README.md`、`docs/*`（含 **`docs/glossary.md` 术语表**）、`config/`、`prompts/` | 描述**本工作目录**内的能力、配置路径、图编排规则（`flow-graph-rules.md` R-G*）、排错索引；**不**承载开发 Agent 工作流 |
+| **开发 Agent 引导** | 本包 `system-prompt.md` + `skills/flow-builder/` + `skills/dev-engineer-toolkit/` | 教开发 Agent **如何**用模板：脚手架、编排、平台配置、**completion gate（完成闸门）**、提示词设计、禁止项（如 `.agents/` 直写） |
 
-**单一权威原则**：图怎么写、规则 ID、factory API → 读目标项目 `docs/`；开发流程、平台登记、完成闸门 → 读本包 `flow-builder` Part*。技能内 `references/flow-graph-rules-pointer.md` 仅为**路由页**，详表永远在目标项目 `docs/flow-graph-rules.md`。
+**单一权威原则**：图怎么写、规则 ID、factory API → 读目标项目 `docs/`；开发流程、平台登记、**completion gate（完成闸门）** → 读本包 `flow-builder` Part*。技能内 `references/flow-graph-rules-pointer.md` 仅为**路由页**，详表永远在目标项目 `docs/flow-graph-rules.md`。**术语**（durable stateful flow / topology / 护栏分语境 等）统一以目标项目 `docs/glossary.md` 为准。
 
 ```
 packages/dev-agent-flow/          # 开发 Agent 提示词 + 技能（非模板一部分）

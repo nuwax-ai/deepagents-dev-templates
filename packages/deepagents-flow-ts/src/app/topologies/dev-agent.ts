@@ -19,12 +19,12 @@ import type { FlowState } from "../state.js";
 /**
  * dev-agent StatefulFlow：复用默认 ReAct 图，多轮用同一 threadId 续接。
  * 每轮重新编译图（绑定本轮 callbacks）；checkpointer 持久化，同 threadId 续接历史。
- * 长任务上下文压缩：applyCompaction（多轮累积超阈值时摘要 + RemoveMessage 替换历史）。
+ * durable stateful flow 上下文压缩：applyCompaction（多轮累积超阈值时摘要 + RemoveMessage 替换历史）。
  */
 export function createDevAgentFlow(runtime: FlowRuntime): StatefulFlow {
   return {
     async run(input, threadId, callbacks) {
-      // signal 透传：ACP cancel（callbacks.signal）必须进 graph.invoke 才能中止长任务，
+      // signal 透传：ACP cancel（callbacks.signal）必须进 graph.invoke 才能中止 long-running 执行，
       // 否则用户取消时 dev-agent 仍跑到模型返回（createStatefulFlow 基座已处理，手写 loop 需自补）。
       const config = {
         configurable: { thread_id: threadId },

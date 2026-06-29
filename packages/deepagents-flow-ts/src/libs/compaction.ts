@@ -52,7 +52,7 @@ function messagesToText(messages: BaseMessage[]): string {
 }
 
 /**
- * 把「压缩后的消息列表」转成给 MessagesAnnotation 的**替换更新**（长任务历史落地的关键）。
+ * 把「压缩后的消息列表」转成给 MessagesAnnotation 的**替换更新**（durable stateful flow 历史落地的关键）。
  *
  * MessagesAnnotation 的 reducer 默认是「追加」；要真正用摘要替换旧历史，需先 RemoveMessage 删掉
  * 旧消息（按 id），再写回压缩结果（摘要 + 保留的近期消息）。把这步抽成纯函数便于单测，

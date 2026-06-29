@@ -344,7 +344,7 @@ async function emitPlan(
   });
 }
 
-/** 长任务阶段事件 → thought chunk（不污染主回答区）。 */
+/** durable stateful flow 阶段事件 → thought chunk（不污染主回答区）。 */
 function formatStage(e: StageEvent): string {
   const pos = e.index && e.total ? ` [${e.index}/${e.total}]` : "";
   const detail = e.detail ? ` · ${e.detail}` : "";

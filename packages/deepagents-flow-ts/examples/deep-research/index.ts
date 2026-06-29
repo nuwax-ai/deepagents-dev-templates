@@ -4,7 +4,7 @@
  * 深度研究报告生成器入口 —— 把多阶段 StatefulFlow 插进模板的 surface（acp/cli）。
  *
  * 这是模板里最复杂的示例（多阶段 / 双层 reflection / 并行调研 / 报告后持续会话），
- * 演示真实的长任务编排。
+ * 演示真实的 durable stateful flow 编排。
  *
  * 用法：
  *   tsx examples/deep-research/index.ts research "LangGraph 的架构与适用场景"   # CLI：确认主题→确认大纲→报告→持续会话
@@ -24,7 +24,7 @@ import { createResearchFlow } from "./graph.js";
 const argv = process.argv.slice(2);
 const interactive = argv.includes("-i") || argv.includes("--interactive");
 const debug = argv.includes("--debug");
-// --thread <id>：固定会话 id，长任务可在多次 CLI 调用间续跑（依赖 FileCheckpointSaver 落盘）。
+// --thread <id>：固定会话 id，durable stateful flow 可在多次 CLI 调用间续跑（依赖 FileCheckpointSaver 落盘）。
 const threadFlagIdx = argv.findIndex((a) => a === "--thread");
 const threadId =
   threadFlagIdx >= 0 ? argv[threadFlagIdx + 1] : undefined;

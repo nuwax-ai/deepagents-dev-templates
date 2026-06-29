@@ -1,7 +1,7 @@
 # 示例：人审定稿（human-in-the-loop）
 
 生成内容 → **暂停让人审阅** → 按意见定稿。审批、校对、可控生成都属此类需求。
-这是模板 **`StatefulFlow`** seam 的范例——和 one-shot 示例（RAG / router）不同，它能在图中途
+这是模板 **`StatefulFlow`** 接入层（seam）的范例——和 one-shot 示例（RAG / router）不同，它能在图中途
 `interrupt` 暂停、把问题抛给用户、拿到回复再 `resume`。
 
 对应 LangGraph 官方：**Human-in-the-loop / wait for user input**（`interrupt` + `Command({ resume })` + checkpointer）。
@@ -21,7 +21,7 @@ START → compose → review(interrupt 暂停) → finalize → END
 
 > ⚠️ 节点名不能与 state channel 同名：channel 有 `draft`，所以"写草稿"的节点叫 `compose`。
 
-## 它如何用模板的 HITL seam
+## 它如何用模板的 HITL 接入层（seam）
 
 图 `compile({ checkpointer: new MemorySaver() })`，`createReviewFlow()` 返回一个 **`StatefulFlow`**：
 
@@ -32,7 +32,7 @@ const r2 = await flow.run({ resume: "改短一点" }, threadId);   // → { stat
 ```
 
 `threadId` 让 checkpointer 续接状态（两次 run 之间草稿不丢）；resume 时 `review` 节点从头重跑、
-`interrupt` 直接返回用户回复。surface（acp/cli）只认 `StatefulFlow` 接口，plumbing 完全复用。
+`interrupt` 直接返回用户回复。surface（acp/cli）只认 `StatefulFlow` 接口，接入逻辑完全复用。
 
 ## 运行
 

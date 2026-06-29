@@ -2,7 +2,7 @@
 
 > 所属：`flow-builder` L2-B。入口路由见 [SKILL.md](../SKILL.md)。验证见 [part4a-verify-debug.md](part4a-verify-debug.md)。
 
-需要设计或创建工作流图时：状态定义、节点、边、条件路由、并行 Send、interrupt/resume HITL、子图、长任务流水线。
+需要设计或创建工作流图时：状态定义、节点、边、条件路由、并行 Send、interrupt/resume HITL、子图、long-running pipeline。
 
 **跑不通 / 节点未执行 / resume 失败** → 直接读 [part4a-verify-debug.md](part4a-verify-debug.md)。
 
@@ -10,10 +10,10 @@
 
 > **节点选型**：`docs/node-catalog.md` + `docs/node-kit.md`。
 
-| 类型 | 场景 | seam | 范例 |
+| 类型 | 场景 | seam（接入层） | 范例 |
 |------|------|------|------|
 | `FlowExecutor` | 问答 / 检索 / 批处理 | `(query, cb) => Promise<FlowResult>` | `examples/rag` |
-| `StatefulFlow` | HITL / 跨重启 | `createStatefulFlow(...)` | `examples/travel-planner` / `project-manager` / `human-in-loop` |
+| `StatefulFlow` | HITL / **durable stateful flow** 或 **conversational** | `createStatefulFlow(...)` | `examples/travel-planner` / `project-manager` / `human-in-loop`；default 等为 conversational |
 
 开发位置：`src/app/graph.ts` + `src/app/nodes/` + `src/app/flow-tools.ts`；factory 来自 `src/libs/nodes/`。**examples/ 只读**。
 
@@ -66,7 +66,7 @@ const aggregate = createLlmStreamNode<MyStateType>({
 
 - **custom spec**：`"type": "llm-stream"`，`write` 用 `r.text`（**R-G009**；`generate.mjs` 生成前静态检）
 - **`createApprovalFinalizeNode`**：`rejectedLlm.write` 同样读 **`r.text`**（框架内置 `createLlmStreamNode`）
-- **ReAct 默认图**：`think` 走 messages 白名单另一条通路；勿与拓扑 aggregate 混淆
+- **ReAct 默认图**：`think` 走 messages 白名单另一条通路；勿与 topology 的 aggregate 节点混淆
 - **降级**：无 `onToken` 或模型无 `.stream()` → 退回 invoke；ACP 终态仍整段兜底（目标项目 README § 流式输出检查清单）
 
 详表 → 目标项目 `docs/node-kit.md` § createLlmStreamNode · **R-G009** · system-prompt `<STREAMING_OUTPUT>`。
@@ -134,9 +134,14 @@ function fanoutToResearch(state): Send[] {
 
 ## Step 5: 执行器
 
-**one-shot** → `FlowExecutor`。**HITL** → `createStatefulFlow`（禁止手写 run-loop；dev-agent stateful-custom 例外）。
+**one-shot** → `FlowExecutor`。**有状态** → `createStatefulFlow`（禁止手写 run-loop；dev-agent `stateful-custom` 例外）。
 
-续跑语义：首条开题 → 后续 resume 同一项目（`hasStarted` 从 checkpointer 推断）。
+**两种 StatefulFlow 用法**（详见目标项目 README § 两类 flow）：
+
+| 模式 | 配置 | 行为 |
+|------|------|------|
+| **HITL durable stateful flow**（默认） | 默认 | 暴露 `hasStarted`；首条 `query` 开题 → 后续 `resume` 同一任务（**one session, one topic**）；`durableCheckpointer` 支持 **cross-restart resume** |
+| **conversational** | `conversational: true` | 不暴露 `hasStarted`；surface 每轮 `query` + 稳定 threadId + checkpointer → 多轮记忆；`graph.stream` 真流式（如 default / knowledge-qa） |
 
 ## Step 6: Surface
 
@@ -151,7 +156,7 @@ function fanoutToResearch(state): Send[] {
 | Send 并行 | `Send` + reducer | `examples/travel-planner`（**aggregate 用 createLlmStreamNode**；**research 接平台搜索 MCP**） |
 | reflection | `createLlmRouterNode` 或条件边 | pm / deep-research |
 | HITL | `interrupt` + resume | `examples/human-in-loop`（**compose 流式初稿**） |
-| 长任务 | `onStage` + checkpoint | `examples/deep-research`（**draft 流式**） |
+| **Durable stateful flow** | `onStage` + checkpoint | `examples/deep-research`（**draft 流式**） |
 | **流式用户可见输出** | **`createLlmStreamNode`** | travel aggregate / human-in-loop compose / rag generate |
 
 ## Anti-patterns

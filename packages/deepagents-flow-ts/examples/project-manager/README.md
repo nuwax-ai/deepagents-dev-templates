@@ -24,10 +24,10 @@ START → plan → estimate → evaluate ─(条件边)─ 不完备 & 未达上
 > 评估循环用条件边**回边**实现，`MAX_REPLAN` 封顶防死循环——和默认图的 reflect 循环同构，
 > 但这里 evaluate 评的是"产物是否达标"（evaluator-optimizer），而非"要不要再调工具"。
 
-## 它如何用模板的 seam
+## 它如何用模板的接入层（seam）
 
 `createPMFlow()` 返回 **`StatefulFlow`**（因 approve 的 interrupt）：`run({query})`→评估循环跑到审批
-interrupt、`run({resume})`→finalize。surface（acp/cli）plumbing 完全复用。
+interrupt、`run({resume})`→finalize。surface（acp/cli）接入逻辑完全复用。
 
 ## 运行
 

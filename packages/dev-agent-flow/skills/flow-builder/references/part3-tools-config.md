@@ -31,12 +31,12 @@
 | 4 | **本地 MCP** | 仅平台无搜索 MCP 时，参考 `config/mcp.examples.json` | 同上 |
 | 5 | **自写 app 工具** | 平台 + MCP 均无 | `flow-tools.ts` |
 
-### 拓扑落点
+### Topology wiring
 
-| 拓扑 | 做法 |
+| Topology | 做法 |
 |------|------|
 | `travel-planner` / `deep-research` | `searchMcp` 接**平台登记**的搜索 MCP → `createMcpRetrievalNode`；未配置则优雅降级 |
-| `adaptive-rag` | 路由 `web_search`；优先平台 Plugin/MCP，模版 `webSearchTool` 仅兜底 |
+| `adaptive-rag` | 路由 `web_search`；优先平台 Plugin/MCP，模板 `webSearchTool` 仅兜底 |
 | `multi-aspect-search`（custom） | `mcp-retrieval` 节点 + 平台搜索 MCP |
 | `react-tools` / `dev-agent` | 平台搜索 Plugin 注册为 tool → ReAct 调用 |
 

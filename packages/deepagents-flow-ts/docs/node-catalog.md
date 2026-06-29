@@ -3,7 +3,7 @@
 > **建 flow 先看这里**:有哪些节点类型、何时选哪个、在节点级 scaffold 的 spec 里叫什么 `type`。
 > 各 factory 的**完整 API / 用法**见 [node-kit.md](node-kit.md)(本文件是选型 + 分类,不重复 API 细节)。
 >
-> 心智模型:「与做工作流一样」——先有**节点库**(本目录),再编排成图。8 个拓扑预设是节点组合的范例;
+> 心智模型：「与做工作流一样」——先有**节点库**（本目录），再编排成图。8 个 topology presets 是节点组合的范例；
 > 节点级 `custom` topology(见 [scaffold](../scripts/scaffold/))让你直接用本目录的 type 编排任意图。
 
 ## 三层分类
@@ -57,11 +57,11 @@
 
 ---
 
-## ② BESPOKE 模式(无 factory,手写;节点级 DSL 不支持)
+## ② BESPOKE 模式（无 factory，手写；节点级 DSL 不支持）
 
-| 模式 | 代表 | 为何 bespoke | 出路 |
+| 模式 | 代表 | 为何定制（bespoke） | 出路 |
 |---|---|---|---|
-| **bindTools 的 ReAct think** | 默认图 think | think↔tools 循环里 think 既决策又写 AIMessage,与 ToolNode 耦合 | 用 `react-tools` 拓扑预设,不手写 |
+| **bindTools 的 ReAct think** | 默认图 think | think↔tools 循环里 think 既决策又写 AIMessage,与 ToolNode 耦合 | 用 `react-tools` topology preset,不手写 |
 | **文件交付** | deep-research delivery | interrupt 收路径 + 文件系统写 markdown/html | 手写;生成后改 |
 | **多源检索取优** | deep-research research 子图 | Context7 ∥ DDG 双源 + 启发式评分合并 | 手写 subgraph(mcp-retrieval 仅单源/简单多源) |
 | **自定义 reducer** | deep-research findings 去重 merge | 业务特定聚合逻辑 | DSL 用 `string-array-append` 近似,生成后改 reducer |
@@ -70,7 +70,7 @@
 | **逐项 LLM 评分 + 无凭证退回非破坏默认** | adaptive-rag grade_documents / grade_generation | 逐文档 / 逐生成 LLM 判 yes/no；无凭证 try/catch 退回放行（增强环节不阻塞主流程） | 手写；route_question / transform_query 用 `createLlmNode({ parse })` 即可 |
 | **调原生工具（非 model tool_calls）** | adaptive-rag web_search | 直接 `webSearchTool.invoke()`（DuckDuckGo IA / Tavily） | 手写；非 ToolNode 模式 |
 
-> 「图是契约」:bespoke 节点保留手写是设计选择(见各 example「保留 bespoke」注释),不是遗漏。
+> 「图是契约」：定制节点（bespoke）保留手写是设计选择（见各 example「保留 bespoke」注释），不是遗漏。
 
 ---
 

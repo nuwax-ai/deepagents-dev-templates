@@ -3,7 +3,9 @@
 > 所属：`flow-builder` L2-D。入口路由见 [SKILL.md](../SKILL.md)。
 > 系统提示词 `<COMPLETION_GATE>` / `<DEBUG_LOGS>` 的**详细执行依据**在本层。
 
-## 完成闸门
+## completion gate（完成闸门）
+
+本地 ACP 验证**优先** `pnpm smoke`（rcoder-cli 真实 ACP 会话；与模板 README 快速开始一致）。`pnpm start:acp` 等非 smoke 路径不能替代 completion gate。
 
 报告「完成 / done」前必须在本轮真实执行并贴出原始输出：
 
@@ -15,7 +17,7 @@ pnpm build && pnpm typecheck && pnpm test && pnpm graph && pnpm smoke
 
 **ACP 真实运行门**：目标 Agent 部署在 rcoder（云端）或 nuwaclaw（个人客户端）时，运行时均经 ACP。`pnpm smoke` 用 rcoder-cli 端到端复现（握手 → `onPrompt` → 整图 → 流式答案），是生产路径的质量门；静态四连不能替代，禁止 `--dry-run` 冒充通过。非默认入口用 `--entry` 或 `pnpm smoke -- --example <name>`。
 
-Scaffold 生成器自带快检（`typecheck && graph`）；**全量闸门仍须上式五连**。
+Scaffold 生成器自带快检（`typecheck && graph`）；**全量 completion gate 仍须上式五连**。
 
 **smoke 细则**（`.env` 模型解析、`activeFlow`、`SMOKE_PROMPT*`、占位符）→ [part4b-smoke-acp.md](part4b-smoke-acp.md)。
 
@@ -29,7 +31,7 @@ pnpm test                    # 含 tests/layering.test.ts
 pnpm typecheck
 pnpm typecheck:examples      # 改了 examples 时
 pnpm smoke               # 强制：rcoder-cli ACP 端到端（非默认入口可用 --example 或 --entry）
-pnpm graph                   # 导出拓扑
+pnpm graph                   # export graph topology
 ```
 
 ---

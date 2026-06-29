@@ -11,7 +11,7 @@ import {
   createLlmNode, createLlmStreamNode, createToolExecNode,
   createHumanApprovalNode, createPermissionApprovalNode, createApprovalFinalizeNode, createLlmRouterNode,
   createPrepareNode, createFanout, createSubgraphNode, createMcpRetrievalNode,
-  // 原语(bespoke 节点也可用)
+  // 原语（定制节点 bespoke 也可用）
   extractText, parseJson, emitStage, emitPlan, emitTextToken, runTool, isApproval, streamLLMText,
 } from "../libs/nodes/index.js";
 ```
@@ -33,7 +33,7 @@ import {
 | 并行扇出(Send map-reduce) | `createFanout` | travel/deep-research research |
 | 把一张小图当节点用 | `createSubgraphNode` | dev-agent researcher |
 
-> **bespoke 不要硬塞**:isApproval 短路定稿、LLM 裁决路由、主动 MCP 检索**已有 factory**(见下各节);剩余真正 bespoke(如 deep-research converse 的 interrupt 路由、RAG retrieve 的意图驱动多工具并行、adaptive-rag 的逐项 LLM 评分 grade_documents / grade_generation 与原生 `webSearchTool` 调用、文件交付)才保留手写,见各 example「保留 bespoke」注释。
+> **定制节点（bespoke）不要硬塞**：isApproval 短路定稿、LLM 裁决路由、主动 MCP 检索**已有 factory**（见下各节）；剩余真正 bespoke（如 deep-research converse 的 interrupt 路由、RAG retrieve 的意图驱动多工具并行、adaptive-rag 的逐项 LLM 评分 grade_documents / grade_generation 与原生 `webSearchTool` 调用、文件交付）才保留手写，见各 example「保留 bespoke」注释。
 
 ---
 
@@ -257,7 +257,7 @@ parentGraph.addNode("research", researcher);   // 编译后的子图直接当节
 
 ---
 
-## 原语(bespoke 节点也可直接用)
+## 原语（定制节点 bespoke 也可直接用）
 
 | 原语 | 用途 |
 |---|---|
@@ -288,9 +288,9 @@ parentGraph.addNode("research", researcher);   // 编译后的子图直接当节
 
 ---
 
-## 节点级 scaffold(custom 拓扑)
+## 节点级 scaffold（custom topology）
 
-不想套预设拓扑、要按 nodes+edges+state 自由编排时,用 `custom` 拓扑(spec 即契约):
+不想套 preset topology、要按 nodes+edges+state 自由编排时，用 `custom` topology（spec 即契约）：
 spec 声明 `state`(channels + reducer 类型)/ `nodes`(name→type+params)/ `edges`(static/conditional/fanout)/ `input`/`result`,
 `scripts/scaffold/blueprints/custom.mjs` **生成时渲染**真实 `src/app/flows/<name>/graph.ts`(内联本目录 factory,受 tsc 检查;无运行时解释器)。节点 `type` 词表 + 选型见 [node-catalog.md](node-catalog.md)。
 

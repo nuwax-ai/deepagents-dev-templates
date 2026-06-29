@@ -148,7 +148,7 @@ Windows 用 `tsx.cmd`：`"<REPO>/node_modules/.bin/tsx.cmd"`。
 | travel-planner | 是（调研节点） | 建议有效 key；research 需配置搜索 MCP（DDG 已移除） |
 | project-manager | 是（规划/评估） | 建议有效 key |
 | human-in-loop | 是（生成草稿） | 建议有效 key |
-| Deepresearch | **必须** | 多阶段长任务，耗时长、token 多 |
+| Deepresearch | **必须** | 多阶段流水线，耗时长、token 多 |
 
 ## Anthropic 协议（可选）
 
@@ -186,7 +186,7 @@ travel-planner / project-manager / human-in-loop / deep-research 是 `StatefulFl
 
 ### conversational 对话怎么玩（多轮记忆）
 
-`default` / `knowledge-qa` / `adaptive-knowledge-qa` / `customer-support` 是 **conversational** `StatefulFlow`（`conversational: true`）——与上面 HITL 不同：**每条消息都是独立 `query`**（不暴露 `hasStarted`、不走 `resume`），靠稳定 threadId（= ACP sessionId）+ checkpointer 累积历史 → 多轮记忆。在 Zed 里像普通聊天一样连续问，agent 记得上下文；图层 `graph.stream` 真流式输出。`adaptive-knowledge-qa` 走 adaptive-rag 拓扑（路由检索 + 检索/生成双自纠正），需配检索源 MCP。
+`default` / `knowledge-qa` / `adaptive-knowledge-qa` / `customer-support` 是 **conversational** `StatefulFlow`（`conversational: true`）——与上面 HITL 不同：**每条消息都是独立 `query`**（不暴露 `hasStarted`、不走 `resume`），靠稳定 threadId（= ACP sessionId）+ checkpointer 累积历史 → 多轮记忆。在 Zed 里像普通聊天一样连续问，agent 记得上下文；图层 `graph.stream` 真流式输出。`adaptive-knowledge-qa` 走 adaptive-rag topology（路由检索 + 检索/生成双自纠正），需配检索源 MCP。
 
 ## 看日志
 
@@ -205,7 +205,7 @@ travel-planner / project-manager / human-in-loop / deep-research 是 `StatefulFl
 pnpm install
 pnpm build            # tsc → dist/
 pnpm bundle           # esbuild → dist/bundle.mjs（自包含，可直接 node 运行）
-# 可选：产出可分发制品
+# 可选：产出可分发压缩包
 pnpm package          # → dist-packages/deepagents-flow-ts-1.0.0-{.tgz,nuwax.tar.gz,nuwax.zip}
 ```
 
@@ -217,7 +217,7 @@ pnpm package          # → dist-packages/deepagents-flow-ts-1.0.0-{.tgz,nuwax.t
 # 方式一：直接用本仓库（本地部署）
 node <REPO>/dist/bundle.mjs          # 等价于 pnpm start
 
-# 方式二：用分发的制品 —— 解压 dist-packages/*-nuwax.zip 到 <INSTALL_ROOT>
+# 方式二：用分发的压缩包 —— 解压 dist-packages/*-nuwax.zip 到 <INSTALL_ROOT>
 node <INSTALL_ROOT>/dist/bundle.mjs
 ```
 

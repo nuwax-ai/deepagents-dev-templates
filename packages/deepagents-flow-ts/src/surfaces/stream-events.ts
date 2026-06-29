@@ -28,7 +28,7 @@ export type SurfaceStreamEvent =
       output?: unknown;
       error?: string;
     }
-  /** 长任务阶段进度（custom mode 的 config.writer({type:"stage"})）。 */
+  /** durable stateful flow 阶段进度（custom mode 的 config.writer({type:"stage"})）。 */
   | { type: "stage"; stage: string; index?: number; total?: number; detail?: string }
   /** HITL 暂停（updates mode 的 __interrupt__）。 */
   | { type: "interrupt"; question: string };

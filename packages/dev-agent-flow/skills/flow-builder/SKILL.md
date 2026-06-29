@@ -62,7 +62,7 @@ flow-builder/
 
 下列路径均在**目标项目** `deepagents-flow-ts` 工作目录内；描述模板能力与配置，**不**包含开发 Agent 工作流（工作流见本技能 Part*）：
 
-`README.md` · `docs/flow-graph-rules.md` · `docs/node-catalog.md` · `docs/node-kit.md` · `docs/flow-patterns.md` · `docs/troubleshooting.md` · `docs/capabilities.md` · `scripts/README.md`
+`README.md` · `docs/glossary.md` · `docs/flow-graph-rules.md` · `docs/node-catalog.md` · `docs/node-kit.md` · `docs/flow-patterns.md` · `docs/troubleshooting.md` · `docs/capabilities.md` · `scripts/README.md`
 
 ## 关联技能
 
@@ -72,10 +72,10 @@ flow-builder/
 
 ## L1 铁律
 
-- **文档分工**：图规则 / factory API / 配置路径 → 目标项目 `docs/`；脚手架流程 / 平台登记 / 完成闸门 → 本技能 Part*（见 [README.md](../../../README.md) § 文档分工）。
-- 图是契约；factory 优先；`examples/` 只读；保护区不改。
+- **文档分工**：图规则 / factory API / 配置路径 / **术语** → 目标项目 `docs/`（**术语权威**：`docs/glossary.md`）；脚手架流程 / 平台登记 / **completion gate（完成闸门）** → 本技能 Part*（见 [README.md](../../../README.md) § 文档分工）。
+- 图是契约；factory 优先；**Bespoke nodes** 不硬塞 factory；`examples/` 只读；保护区不改。
 - **用户可见大段 LLM 输出**（compose / aggregate / draft / 修订稿）→ **`createLlmStreamNode`**（`write` 读 `r.text`）；**禁止** `createLlmNode`（仅 invoke，ACP 整段兜底）。custom spec 用 `type: "llm-stream"`；**R-G009**。
 - **联网/实时搜索** → 必须先 `dev-engineer-toolkit` 搜平台 Plugin/Knowledge/`mcpConfigs` 并注册；**禁止**把内置 `grep`/`search` 当联网、禁止未搜平台就 bash/curl/自写搜索 API（见 Part 3 § 联网搜索、`<WEB_SEARCH>`）。
 - **禁止写 `.agents/`**：内置能力写 `builtin/`（Part 6、Part 7）；平台能力走平台。
-- 有状态用 `createStatefulFlow`（`dev-agent` 拓扑 `stateful-custom` 手写 run-loop 为例外，见 part2）。
+- 有状态用 `createStatefulFlow`（**HITL durable stateful flow** 默认；`conversational: true` 为对话型；`dev-agent` **topology** `stateful-custom` 手写 run-loop 为例外，见 part2）。
 - 未跑通 part4 禁止报 done。

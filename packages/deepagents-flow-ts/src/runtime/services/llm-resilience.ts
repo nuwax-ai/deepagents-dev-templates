@@ -1,8 +1,8 @@
 /**
- * LLM 调用韧性 —— 模板级共用（默认 ReAct 图、compaction、长任务示例）。
+ * LLM 调用韧性 —— 模板级共用（默认 ReAct 图、compaction、durable stateful flow 示例）。
  *
  * 从 deep-research 实战反哺的能力：
- *  - 超时护栏：慢模型（如 mimo-v2.5-pro）+ Send 并行时单次 invoke 易 >60s
+ *  - 超时护栏（timeout guard）：慢模型（如 mimo-v2.5-pro）+ Send 并行时单次 invoke 易 >60s
  *  - 指数退避重试：限流 429 / 网络抖动不应直接掐死整条流水线
  *  - 并发闸门：并行扇出时避免 N 路同时打满上游 API（搜索侧 rateLimited，LLM 侧需单独限流）
  *
@@ -287,7 +287,7 @@ function extractUsageFields(result: unknown): Record<string, number> {
 
 /**
  * 标准 LLM 调用链：可选并发闸门 → 超时 → 重试。
- * 默认图、compaction、长任务示例节点统一经此入口，避免各处复制护栏逻辑。
+ * 默认图、compaction、durable stateful flow 示例节点统一经此入口，避免各处复制护栏逻辑。
  */
 export function invokeWithResilience<M extends InvokeModel>(
   model: M,

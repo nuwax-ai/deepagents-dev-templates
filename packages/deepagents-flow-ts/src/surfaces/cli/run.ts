@@ -21,7 +21,7 @@ export interface FlowCliOptions {
   /** 无参时显示的用法提示（默认指向 src/index.ts flow） */
   usage?: string;
   /**
-   * 固定 threadId（仅 StatefulFlow）：长任务可在多次 CLI 调用间续跑。
+   * 固定 threadId（仅 StatefulFlow）：durable stateful flow 可在多次 CLI 调用间续跑。
    * 缺省每次进程随机一个 thread（单次会话内驱动 HITL）。
    */
   threadId?: string;

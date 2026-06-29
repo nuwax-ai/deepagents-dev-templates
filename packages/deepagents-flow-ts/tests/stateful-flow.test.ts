@@ -1,13 +1,11 @@
 /**
- * createStatefulFlow 长任务基座单测 —— 确定性、无凭证（不调模型）。
+ * createStatefulFlow durable stateful flow 单测 —— 确定性、无凭证（不调模型）。
  *
- * 守住「全面长任务硬化」的核心契约：
- *  1. run-loop：interrupt 暂停返回 question；resume 跑到底返回 toResult(answer)。
- *  2. hasStarted 来自 checkpointer（是否已有 checkpoint）：**一个会话一个主题**——
- *     首条开题(false)，之后 interrupt/出错/已完成都 true → 续跑，绝不重头开新主题。
- *  3. **跨实例/重启续跑**：FileCheckpointSaver 落盘 → 新建一个 flow 实例（模拟进程重启，
- *     内存全新）仍能 hasStarted=true 并正确 resume。
- *  4. 对照：MemorySaver 新实例认不得旧会话 —— 这正是迁移前 4 个示例的问题。
+ * Durable stateful flow contract：
+ *  1. run-loop：interrupt → question；resume → toResult(answer)。
+ *  2. hasStarted from checkpointer（one session, one topic）。
+ *  3. Cross-instance/restart resume：FileCheckpointSaver → 新 flow 实例仍能 hasStarted + resume。
+ *  4. MemorySaver 新实例认不得旧会话 —— 迁移前 4 个示例的问题对照。
  */
 
 import { describe, it, expect, afterAll } from "vitest";
@@ -198,7 +196,7 @@ describe("createStatefulFlow run-loop（无凭证，确定性）", () => {
   });
 });
 
-describe("长任务持久化：跨实例/重启续跑（FileCheckpointSaver）", () => {
+describe("durable stateful flow: cross-instance/restart resume (FileCheckpointSaver)", () => {
   it("新建 flow 实例（模拟重启）仍 hasStarted=true 并能 resume 到底", async () => {
     const dir = freshDir();
     const tid = "long-task-1";
@@ -406,7 +404,7 @@ describe("对话型 flow：多轮记忆（conversational）", () => {
   });
 });
 
-describe("长任务韧性：节点抛错 → 续跑不重头（回归用户 bug）", () => {
+describe("durable stateful flow 韧性：节点抛错 → 续跑不重头（回归用户 bug）", () => {
   it("review 抛错后，新实例(同目录)仍 hasStarted=true，resume 续跑到底", async () => {
     const dir = freshDir();
     const tid = "fan-1";

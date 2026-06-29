@@ -1,11 +1,11 @@
 # .nuwax-agent 开发配置
 
-本目录存放 **deepagents-flow-ts** 工作流编排模板的 Nuwax 平台面元数据：开发配置、能力分层、打包契约。
+本目录存放 **deepagents-flow-ts** 工作流编排模板的 Nuwax 平台侧元数据：开发配置、能力分层、打包契约。
 
 它与 `config/` 有意分开：
 
 - `config/` 是运行时应用配置，由 `loadFlowConfig` → 本仓 config-loader 加载（flow-ts 自包含，不依赖 app-ts）。
-- `.nuwax-agent/` 是平台面元数据，供打包流程、`flow capabilities` CLI 使用。
+- `.nuwax-agent/` 是平台侧元数据，供打包流程、`flow capabilities` CLI 使用。
 
 这里不放真实密钥 —— 用占位符如 `${SECRET_OPENAI_API_KEY}`，最终值由 ACP / 环境变量注入。
 
@@ -22,7 +22,7 @@
 ## 文件
 
 - `capability-sources.json` —— 把每项能力映射到其来源层（workspace-config / agent-builtin / env-builtin / agent-builtin-file / package-placeholder）。这是 `flow capabilities` 读取的契约。
-- `package.config.json` —— 声明打包目标、esbuild-bundle 依赖策略、安装时占位符替换、平台矩阵，以及供平台读取的 `include`/`exclude` 元数据。**注意**：实际进入制品的文件由 [`scripts/lib/staging.mjs`](../scripts/lib/staging.mjs) 的 `STAGING_EXCLUDES` 黑名单决定（`package.mjs` 用 `copyPackageTree` 复制整树后排除）；此处 `include`/`exclude` 仅为平台侧元数据，**改它不改变实际打包内容**，二者需手动保持一致。
+- `package.config.json` —— 声明打包目标、esbuild-bundle 依赖策略、安装时占位符替换、平台矩阵，以及供平台读取的 `include`/`exclude` 元数据。**注意**：实际打进压缩包的文件由 [`scripts/lib/staging.mjs`](../scripts/lib/staging.mjs) 的 `STAGING_EXCLUDES` 黑名单决定（`package.mjs` 用 `copyPackageTree` 复制整树后排除）；此处 `include`/`exclude` 仅为平台侧元数据，**改它不改变实际打包内容**，二者需手动保持一致。
 - `placeholders.json` —— 列出打包时与安装时的占位符（OpenAI 兼容与 Anthropic 两套模型 env、安装根路径）。
 
 ## 运行时各层如何被消费

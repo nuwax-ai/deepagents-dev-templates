@@ -2,9 +2,9 @@
 
 > 所属：`flow-builder` L2-A。入口路由见上级 [SKILL.md](../SKILL.md)。
 
-把**一句话需求**落地成可跑 flow：**选择题 + 填空**（选拓扑 → 填参数），不要从零写 StateGraph。
+把**一句话需求**落地成可跑 flow：**选择题 + 填空**（选 **topology** → 填参数），不要从零写 StateGraph。
 
-> **节点选型**：`docs/node-catalog.md`（决策树 + `type` 词表）。8 预设走生成器；预设外用 `custom` 按 nodes+edges+state 编排（生成真实 `graph.ts`）。
+> **节点选型**：`docs/node-catalog.md`（决策树 + `type` 词表）。**8 presets** 走生成器；preset 外用 `custom` 按 nodes+edges+state 编排（生成真实 `graph.ts`）。
 
 ## 生成器
 
@@ -16,9 +16,9 @@
 4. 自动注册 `src/app/flows/index.ts`（`SCAFFOLD-REGISTRY` 区，勿手改）；
 5. 自带门禁：`pnpm typecheck && pnpm graph`（临时切换 `activeFlow` 反射新 flow）。
 
-8 预设图逻辑权威在 `src/libs/topologies/<name>/`（dev-agent 在 `src/app/topologies/`）；**`custom`** 图逻辑渲染进 `src/app/flows/<name>/graph.ts`。
+8 preset 图逻辑权威在 `src/libs/topologies/<name>/`（dev-agent 在 `src/app/topologies/`）；**`custom`** 图逻辑渲染进 `src/app/flows/<name>/graph.ts`。
 
-## 9 拓扑目录（8 预设 + `custom`）
+## 9 topologies（8 presets + `custom`）
 
 | topology | kind | 适用场景 | 节点结构 |
 |------|------|----------|----------|
@@ -28,9 +28,9 @@
 | `travel-planner` | stateful-recipe | 多源调研聚合 | `gather → Send research×N → aggregate(流式) → confirm → finalize`（**research 须接平台搜索 MCP**，见 Part 3 § 联网搜索） |
 | `rag` | oneshot | 检索问答 | `rewrite → retrieve → grade → prepare → generate` |
 | `adaptive-rag` | oneshot | 自适应检索 + 路由自纠正 | `route → retrieve/web-search → grade → transform/generate`（**web_search 优先平台 Plugin/MCP**） |
-| `deep-research` | stateful-recipe | 深度研究 / 长任务 | 多阶段 + Send + 持续会话 |
+| `deep-research` | stateful-recipe | 深度研究 / **durable stateful flow** | 多阶段 + Send + 持续会话 |
 | `dev-agent` | stateful-custom | 综合助手 ReAct + 压缩 | 默认 ReAct + 多轮续接 |
-| `custom` ⭐ | stateful-recipe | 预设都不命中 | spec 声明 state/nodes/edges → 生成 `graph.ts` |
+| `custom` ⭐ | stateful-recipe | 无 preset 命中 | spec 声明 state/nodes/edges → 生成 `graph.ts` |
 
 **`custom`**：`params` 含 `state`/`nodes`（type 见 node-catalog，**用户可见输出用 `llm-stream`**）/`edges`/`input`/`result`；回调写箭头函数字符串，生成时内联为真实 TS。局限（生成后手改）：tool-exec、subgraph、自定义 reducer。流式范例：`_example.translate-review`、`_example.multi-aspect-search`、`_example.router-gate`、`_example.interview-agent`（`llm-stream` + `r.text`）；非流式教学：`_example.grade-redo`；`interview-agent` 的 `prepare`/`evaluate` 仍 `llm`（无 `r.text` / 结构化 parse）。
 
@@ -60,7 +60,7 @@
 
 ### systemPrompt 注入
 
-| 拓扑 | 注入 |
+| Topology | 注入 |
 |------|------|
 | react-tools / human-in-loop / project-manager / travel-planner | ✅ 注入主节点 |
 | rag / adaptive-rag / deep-research / dev-agent | ⚠️ 不注入 |
@@ -71,7 +71,7 @@
 
 | 步 | 动作 |
 |----|------|
-| 1 | 选拓扑；不接近 → `custom`；仍不行 → [part2-orchestration.md](part2-orchestration.md) |
+| 1 | 选 topology；不接近 → `custom`；仍不行 → [part2-orchestration.md](part2-orchestration.md) |
 | 2 | 写 `scripts/scaffold/specs/<name>.flow.json` |
 | 3 | `node scripts/scaffold/generate.mjs scripts/scaffold/specs/<name>.flow.json` |
 | 4 | `config/flow-agent.config.json` → `"activeFlow": "<name>"` |
@@ -92,11 +92,11 @@ export const getTopology = () => getReviewTopology();
 
 | 场景 | 路径 |
 |------|------|
-| 命中 8 预设或 `custom` | Part 1 生成 |
+| 命中 8 presets 或 `custom` | Part 1 生成 |
 | bespoke 图 / 深度定制 State | [part2-orchestration.md](part2-orchestration.md) |
 | 生成后微调 | 手改 `flows/<name>/` 或 `libs/topologies/<name>/` |
 
-## 新增拓扑（进阶）
+## 新增 topology（进阶）
 
 1. `src/libs/topologies/<name>/`（graph + topology + recipe/executor）
 2. `scripts/scaffold/blueprints/<name>.mjs`

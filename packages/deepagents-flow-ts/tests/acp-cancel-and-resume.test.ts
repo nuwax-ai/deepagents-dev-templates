@@ -224,7 +224,7 @@ describe("A. load_session / 上下文恢复", () => {
 
 describe("B. 取消任务（cancel）", () => {
   it("onPrompt 携带 signal，abort 后 flow.run 快速 reject（耗时远小于跑完）", async () => {
-    // 慢假图：stream 里 delay 模拟长任务，每次 yield 前检查 signal（模拟真实 LangGraph 行为）。
+    // 慢假图：stream 里 delay 模拟 long-running 任务，每次 yield 前检查 signal（模拟真实 LangGraph 行为）。
     const FULL_RUN_MS = 500;
     let producedTokens = 0;
     let lastSignal: AbortSignal | undefined;
@@ -316,7 +316,7 @@ describe("B. 取消任务（cancel）", () => {
             "tools",
             { event: "on_tool_start", toolCallId, name: "search", input: '{"q":"x"}' },
           ];
-          // 2) 长任务循环：被 abort 时以 AbortError reject（tool 永远收不到 on_tool_end）
+          // 2) long-running 循环：被 abort 时以 AbortError reject（tool 永远收不到 on_tool_end）
           for (let i = 0; i < 50; i++) {
             if (lastSignal?.aborted) {
               const err = new Error("Aborted");

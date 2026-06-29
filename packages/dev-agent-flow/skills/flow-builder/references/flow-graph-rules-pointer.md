@@ -8,6 +8,7 @@
 
 - 写 / 改 `src/app/flows/**/graph.ts` 或 `scripts/scaffold/specs/*.flow.json`
 - 遇到 `LLM 未返回 JSON`、`Invalid edge`、regenerate 覆盖手修、节点名与 channel 冲突
+- 术语歧义（durable stateful flow / recursion guard / completion gate 等）→ 目标项目 **`docs/glossary.md`**
 - 新增一条「图编排约定」→ 在目标项目 `flow-graph-rules.md` § 新增规则模板 追加 `R-G0XX`（**不要**只改本路由页）
 
 ## 当前规则速览
@@ -33,7 +34,7 @@
 | Part 1 scaffold | R-G003、**R-G009**；`generate.mjs` 生成前跑 R-G001/R-G007/R-G009 lint；流式范例 `_example.translate-review`、`_example.multi-aspect-search` |
 | Part 2 编排 | 工厂用法；**流式输出**见 § 流式输出；硬规则以目标项目 R-G* 为准 |
 | Part 3 工具 | 平台能力登记 → `dev-engineer-toolkit`；**联网搜索**见 § 联网搜索；仓库内分层见目标项目 `docs/capabilities.md` |
-| Part 4 验证 | 完成闸门五连；症状 → 目标项目 `docs/troubleshooting.md` |
+| Part 4 验证 | completion gate 五连；症状 → 目标项目 `docs/troubleshooting.md` |
 | Part 5 提示词 | R-G002；节点 `prompt` vs `systemPrompt`；禁止在入口乱加 `parseJson` |
 
 ## 目标项目 Cursor 规则

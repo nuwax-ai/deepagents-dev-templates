@@ -1,20 +1,18 @@
 /**
- * createStatefulFlow —— 有状态长任务的统一基座（多轮 HITL + 跨重启续跑）。
+ * createStatefulFlow —— durable stateful flow 统一基座（multi-turn HITL + cross-restart resume）。
  *
  * 在此之前，每个有状态示例（deep-research / travel / pm / human-in-loop）都各自手写一份
  * 几乎相同的 run-loop：建 config → `stream(Command resume)` vs `stream(初始 state)` →
  * 扫 chunk 找 `__interrupt__` → 返回 interrupted/done。本 helper 把这段收成一处，示例只需给出
  * 三件「图相关」的事：buildGraph / toInput / toResult。
  *
- * 长任务硬化点（相对手写版的增量）：
- *  1. **持久化默认开**：checkpointer 缺省也建议传 FileCheckpointSaver（见各示例 createFileCheckpointer），
+ * Durable stateful flow features（相对手写 run-loop 的增量）：
+ *  1. **Cross-restart resume**：checkpointer 缺省经 `durableCheckpointer` → `FileCheckpointSaver`，
  *     图状态/interrupt 落盘 → 进程/IDE 重启后仍可 resume。
- *  2. **续跑状态来自 checkpointer**：`hasStarted` 读 `graph.getState()` 是否已有 checkpoint，
- *     而非进程内存 Set → 一个会话只一个主题：首条开题、之后都续跑同一项目（interrupt/出错/已完成
- *     都不重头来），且重启后仍准。
- *  3. **递归护栏**：recursionLimit 防节点循环（reflection 回边）跑飞。
- *  4. **多模式 stream**：`streamMode: ["messages","tools","custom","updates"]` + mapStreamChunk
- *     归一后分发给 onToken/onPlan/onStage/onToolCall；Send 并行实例经 custom writer 也能透出。
+ *  2. **One session, one topic**：`hasStarted` 读 `graph.getState()` 是否已有 checkpoint，
+ *     而非进程内存 Set → 首条开题、之后皆 resume 同一项目；重启后仍准。
+ *  3. **Recursion guard**：`recursionLimit` 防 reflection 回边跑飞。
+ *  4. **Multi-mode stream**：`streamMode` + `mapStreamChunk` → onToken/onPlan/onStage/onToolCall。
  */
 
 import {
@@ -85,7 +83,7 @@ export interface StatefulFlowOptions<S = Record<string, unknown>> {
    */
   appConfig?: AppConfig;
   /**
-   * 对话型 flow（多轮对话，非 HITL 长任务）。
+   * 对话型 flow（`conversational: true`，非 HITL durable stateful flow）。
    * true 时返回的 StatefulFlow **不暴露 hasStarted** → surface（ACP server / CLI run）每轮都走
    * query 分支：配合稳定 threadId（ACP=sessionId）+ checkpointer，历史经 MessagesAnnotation
    * reducer 自动累积 → 多轮记忆。压缩仍在新 query 入口触发（见 appConfig）。

@@ -24,7 +24,7 @@ START → rewrite → retrieve → grade_docs ─(条件边)─┐
 
 ## 它如何复用模板
 
-这正是模板的用法示范——示例**不重写** ACP/CLI plumbing，只：
+这正是模板的用法示范——示例**不重写** ACP/CLI 接入逻辑，只：
 
 1. 写自己的图 + 节点（[graph.ts](graph.ts)、[nodes/](nodes/)）
 2. 包装成 `FlowExecutor`（[index.ts](index.ts)）

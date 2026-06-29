@@ -1,5 +1,5 @@
 /**
- * 安全回归测试 —— 钉死 P0 新增的外部输入护栏（不依赖网络 / 凭证）。
+ * 安全回归测试 —— 钉死 P0 新增的外部输入护栏（input-validation guard；不依赖网络 / 凭证）。
  *
  * - sandbox 写路径符号链接逃逸：resolveRealPath 后越界写被拒；读保持词法校验、不误伤合法软链。
  * - http_request SSRF：默认拦截私有 / loopback / 链路本地 / 元数据端点 / 非 http scheme；

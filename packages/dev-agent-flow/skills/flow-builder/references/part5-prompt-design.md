@@ -42,7 +42,7 @@
 | 4 | 过 checklist |
 | 5 | 按下方「保存与同步」上传；回读见开发 Agent `<SESSION_CLOSE>` 段 2 |
 
-与 scaffold 衔接：写好后填入 [part1-scaffold.md](part1-scaffold.md) 的 `systemPrompt`（若该拓扑注入 prompt）。
+与 scaffold 衔接：写好后填入 [part1-scaffold.md](part1-scaffold.md) 的 `systemPrompt`（若该 topology 注入 prompt）。
 
 ## 节点 prompt vs 主 Agent systemPrompt
 
@@ -64,7 +64,7 @@
 1. **落盘** — 定稿写入本地 UTF-8 源文件（如 `prompts/flow.base.md`；开场白单独文件）
 2. **上传** — `update-config.sh --system-prompt-file` / `--opening-msg-file`（含中文必须用文件，禁止命令行内联）
 3. **单字段更新** — 只改系统提示词或开场白之一时，勿传空值覆盖另一字段
-4. **scaffold 衔接** — 需要时填入 part1 的 `systemPrompt`（若该拓扑注入 prompt）
+4. **scaffold 衔接** — 需要时填入 part1 的 `systemPrompt`（若该 topology 注入 prompt）
 
 回读校验步骤见开发 Agent system-prompt `<SESSION_CLOSE>` 段 2（`get-config.sh` 确认与定稿一致）。
 
