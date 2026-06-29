@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   hasSmokeCredential,
   hasUnresolvedPlaceholder,
+  parseCompatibleModelName,
   pickEnv,
   resolveSmokeModelEnv,
   resolveSmokePrompts,
@@ -175,5 +176,65 @@ describe("smoke-env", () => {
   it("hasSmokeCredential 识别 OPENCODE_OPENAI_API_KEY", () => {
     expect(hasSmokeCredential({ OPENCODE_OPENAI_API_KEY: "ak-test" })).toBe(true);
     expect(hasSmokeCredential({})).toBe(false);
+  });
+
+  // ── openai-compatible/ / anthropic-compatible/ 模型前缀剥离
+
+  it("parseCompatibleModelName 大小写不敏感剥离前缀", () => {
+    expect(parseCompatibleModelName("openai-compatible/deepseek-v4-flash")).toEqual({
+      modelName: "deepseek-v4-flash",
+      providerHint: "openai",
+    });
+    expect(parseCompatibleModelName("OpenAI-Compatible/glm-5.2")).toEqual({
+      modelName: "glm-5.2",
+      providerHint: "openai",
+    });
+    expect(parseCompatibleModelName("anthropic-compatible/claude-3")).toEqual({
+      modelName: "claude-3",
+      providerHint: "anthropic",
+    });
+    expect(parseCompatibleModelName("deepseek-chat")).toEqual({
+      modelName: "deepseek-chat",
+      providerHint: null,
+    });
+  });
+
+  it("ANTHROPIC_MODEL=openai-compatible/... + API_PROTOCOL=Anthropic → 剥离裸名，provider 仍 anthropic", () => {
+    const env = {
+      API_PROTOCOL: "Anthropic",
+      ANTHROPIC_MODEL: "openai-compatible/deepseek-v4-flash",
+      ANTHROPIC_BASE_URL: "https://test-llm-proxy.nuwax.com/api/proxy/model",
+      ANTHROPIC_API_KEY: "ak-test",
+    };
+    const r = resolveSmokeModelEnv(env, { model: { provider: "openai", name: "deepseek-chat" } });
+    expect(r.provider).toBe("anthropic");
+    expect(r.modelName).toBe("deepseek-v4-flash");
+    expect(r.forward.ANTHROPIC_MODEL).toBe("deepseek-v4-flash");
+    expect(r.forward.OPENAI_MODEL).toBeUndefined();
+  });
+
+  it("仅 OPENCODE_MODEL=openai-compatible/... → provider hint 兜底 openai", () => {
+    const env = {
+      OPENCODE_MODEL: "openai-compatible/deepseek-v4-flash",
+      OPENCODE_OPENAI_API_KEY: "ak-test",
+      OPENCODE_OPENAI_API_BASE: "https://test-llm-proxy.nuwax.com/api/proxy/model",
+    };
+    const r = resolveSmokeModelEnv(env, { model: { provider: "openai" } });
+    expect(r.provider).toBe("openai");
+    expect(r.modelName).toBe("deepseek-v4-flash");
+    expect(r.forward.OPENAI_MODEL).toBe("deepseek-v4-flash");
+  });
+
+  it("无 API_PROTOCOL 时 ANTHROPIC_MODEL=openai-compatible/... 不因前缀 hint 误选 openai", () => {
+    const env = {
+      ANTHROPIC_MODEL: "openai-compatible/deepseek-v4-flash",
+      ANTHROPIC_BASE_URL: "https://test-llm-proxy.nuwax.com/api/proxy/model",
+      ANTHROPIC_API_KEY: "ak-test",
+    };
+    const r = resolveSmokeModelEnv(env, { model: { provider: "openai", name: "deepseek-chat" } });
+    expect(r.provider).toBe("anthropic");
+    expect(r.modelName).toBe("deepseek-v4-flash");
+    expect(r.forward.ANTHROPIC_MODEL).toBe("deepseek-v4-flash");
+    expect(r.forward.OPENAI_MODEL).toBeUndefined();
   });
 });

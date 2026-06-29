@@ -31,6 +31,31 @@ export function normalizeProvider(value) {
   return null;
 }
 
+/**
+ * 剥离平台模型名前缀 openai-compatible/ / anthropic-compatible/。
+ * 平台可能下发 ANTHROPIC_MODEL=openai-compatible/deepseek-v4-flash，代理 API 只认裸模型名。
+ *
+ * @returns {{ modelName: string, providerHint: 'openai' | 'anthropic' | null }}
+ */
+export function parseCompatibleModelName(raw) {
+  const v = String(raw ?? "").trim();
+  if (!v) return { modelName: "", providerHint: null };
+  const lower = v.toLowerCase();
+  if (lower.startsWith("openai-compatible/")) {
+    return {
+      modelName: v.slice("openai-compatible/".length).trim(),
+      providerHint: "openai",
+    };
+  }
+  if (lower.startsWith("anthropic-compatible/")) {
+    return {
+      modelName: v.slice("anthropic-compatible/".length).trim(),
+      providerHint: "anthropic",
+    };
+  }
+  return { modelName: v, providerHint: null };
+}
+
 export function loadFlowAgentConfig(pkgDir) {
   const configPath = join(pkgDir, "config/flow-agent.config.json");
   if (!existsSync(configPath)) return null;
@@ -93,12 +118,6 @@ function withOpencodeFallback(env) {
 export function resolveSmokeModelEnv(env, flowConfig) {
   env = withOpencodeFallback(env);
   const fileProvider = normalizeProvider(flowConfig?.model?.provider);
-  // 与 runtime inferModelProviderIfUnset（config-sources.ts）对齐：
-  // 显式(API_PROTOCOL/LLM_PROVIDER) > 凭证推断 > 文件 provider。
-  // 旧顺序「文件 > 推断」会让「文件=openai 但只有 ANTHROPIC key」时 smoke 选 openai 而崩溃
-  // （runtime 会凭 key 推断成 anthropic 正常跑），smoke 与 runtime 分叉。
-  const provider =
-    resolveExplicitProvider(env) ?? inferProviderFromCredentials(env) ?? fileProvider ?? "openai";
 
   const fileModelName =
     typeof flowConfig?.model?.name === "string" ? flowConfig.model.name.trim() : undefined;
@@ -112,7 +131,37 @@ export function resolveSmokeModelEnv(env, flowConfig) {
   // 与 runtime ENV_MAP 对齐：DEFAULT_MODEL / ANTHROPIC_MODEL / OPENAI_MODEL 都映射到同一
   // model.name，按插入顺序后写覆盖 → OPENAI_MODEL > ANTHROPIC_MODEL > DEFAULT_MODEL > 文件，
   // 与 provider 无关。旧实现让 DEFAULT_MODEL 最高优先 + 按 provider 二选一，会与 runtime 分叉。
-  const modelName = openaiModel ?? anthropicModel ?? defaultModel ?? fileModelName;
+  let modelSource = "file";
+  let rawModelName = fileModelName;
+  if (openaiModel) {
+    modelSource = "openai";
+    rawModelName = openaiModel;
+  } else if (anthropicModel) {
+    modelSource = "anthropic";
+    rawModelName = anthropicModel;
+  } else if (defaultModel) {
+    modelSource = "default";
+    rawModelName = defaultModel;
+  }
+
+  const { modelName: strippedModelName, providerHint: modelProviderHint } = parseCompatibleModelName(
+    rawModelName ?? ""
+  );
+  const modelName = strippedModelName || undefined;
+
+  // providerHint 仅当 model 来自 provider 无关源（DEFAULT_MODEL / OPENCODE 兜底）时参与推断。
+  // ANTHROPIC_MODEL=openai-compatible/... 上的前缀是平台路由标记，不代表应切到 openai 族。
+  const providerHintFromModel =
+    modelSource === "default" ? modelProviderHint : null;
+
+  // 与 runtime inferModelProviderIfUnset（config-sources.ts）对齐：
+  // 显式(API_PROTOCOL/LLM_PROVIDER) > 模型前缀 hint（仅 default 源）> 凭证推断 > 文件 provider。
+  const provider =
+    resolveExplicitProvider(env) ??
+    providerHintFromModel ??
+    inferProviderFromCredentials(env) ??
+    fileProvider ??
+    "openai";
 
   const openaiBase = pickEnv(env, "OPENAI_BASE_URL");
   const anthropicBase = pickEnv(env, "ANTHROPIC_BASE_URL");
