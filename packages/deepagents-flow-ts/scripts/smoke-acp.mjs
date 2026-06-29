@@ -25,6 +25,7 @@ import {
   resolveSmokeModelEnv,
   resolveSmokePrompts,
 } from "./lib/smoke-env.mjs";
+import { evaluateSmokeOutput } from "./lib/smoke-outcome.mjs";
 
 const PKG_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -116,13 +117,7 @@ function formatCommand(pnpm, args) {
 }
 
 // rcoder 在 agent 空答 / Session cancelled 时仍可能 exit 0 —— 仅看退出码会把「agent 没产出答案」漏成通过。
-// 故捕获输出并扫失败特征：rcoder 的 [ERR] 行 + runtime 的 answerChars=0 / outputChars=0。
-const SMOKE_FAIL_SIGNATURES = [
-  { re: /Prompt ended with error/, reason: "rcoder: Prompt ended with error" },
-  { re: /Session cancelled/, reason: "agent 会话被取消（多为空答/异常）" },
-  { re: /\banswerChars=0\b/, reason: "agent 最终答案为空（answerChars=0）" },
-  { re: /\boutputChars=0\b/, reason: "flow 输出为空（outputChars=0）" },
-];
+// 判定逻辑见 scripts/lib/smoke-outcome.mjs（session-trace 优先于 rcoder 收尾噪音）。
 
 function runPnpm(args, { debug }) {
   const pnpm = resolvePnpm();
@@ -148,12 +143,12 @@ function runPnpm(args, { debug }) {
   if (result.stdout) process.stdout.write(result.stdout);
   if (result.stderr) process.stderr.write(result.stderr);
   const code = result.status ?? 1;
-  // 扫失败特征：即使 rcoder exit 0，命中也算 smoke 失败
   const combined = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
-  for (const { re, reason } of SMOKE_FAIL_SIGNATURES) {
-    if (re.test(combined)) return { code, failed: true, reason };
-  }
-  return { code, failed: false, reason: "" };
+  const evalResult = evaluateSmokeOutput(combined);
+  if (evalResult.failed) return { code, failed: true, reason: evalResult.reason };
+  if (evalResult.trace) logDebug(debug, "flow trace OK:", JSON.stringify(evalResult.trace));
+  // rcoder 常在 trace 正常时仍 exit 1（Session cancelled 等）；以 trace 为准
+  return { code: evalResult.trace ? 0 : code, failed: false, reason: "" };
 }
 
 function warnActiveFlow(smokeEnv, { entry, debug }) {

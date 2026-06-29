@@ -2,14 +2,57 @@
 
 > 所属：`flow-builder` L2-D 子文档。完成闸门见 [part4a-verify-debug.md](part4a-verify-debug.md)。
 > **模型 env 解析**由目标项目 `scripts/lib/smoke-env.mjs` 实现（与 runtime `config-loader` 对齐）。
+> **通过/失败判定**由 `scripts/lib/smoke-outcome.mjs` 实现（以 session-trace 为准，见下文）。
 
 ## 它验证什么 / 不验证什么
 
 | ✅ 验证 | ❌ 不验证 |
 |---------|-----------|
 | ACP 握手 → `onPrompt` → 当前 `activeFlow` 图跑通 | `parse` 与 `write` 语义（**R-G001**，需静态规则或边界 prompt） |
-| 模型凭证 + provider/model 解析正确 | HITL 多轮 resume（one-shot only） |
+| 模型凭证 + provider/model 解析正确 | HITL **多轮 resume**（one-shot only；首轮 interrupt 见下节） |
 | 子进程未吃到 `{MODEL_PROVIDER_*}` 占位符 | 与平台 `<PLATFORM_CONFIG>` 完全一致（本地用 `.env`） |
+| **HITL 首轮**：`flowStatus=interrupted` 且流式出题 / `questionChars>0` | — |
+
+---
+
+## 通过 / 失败判定（`smoke-outcome.mjs`）
+
+smoke 捕获 rcoder 子进程的 stdout/stderr，**不能**单靠退出码或 rcoder 收尾字符串判成败：
+
+- rcoder 常在 turn 正常结束后仍打 `Session cancelled` / `Prompt ended with error`（exit 0 或 1）
+- 以 **`[runtime:session-trace]`** 里最后一次 `flow.run done` + `prompt_end` 合并字段为准
+
+实现：`scripts/lib/smoke-outcome.mjs`（单测 `tests/smoke-outcome.test.ts`）。
+
+### 解析字段
+
+从日志行 `flow.run done` / `prompt_end` 合并：
+
+`flowStatus`、`outputChars`、`answerChars`、`questionChars`、`streamed`、`streamChars`、`tokenChunks`
+
+### 判为通过
+
+| `flowStatus` | 条件（满足任一） |
+|--------------|------------------|
+| `done` | `outputChars>0` 或 `answerChars>0` |
+| `done` | `streamed=true` 且（`streamChars>0` 或 `tokenChunks>0`） |
+| `interrupted` | `questionChars>0`（HITL 首轮出题） |
+| `interrupted` | `streamed=true` 且（`streamChars>0` 或 `tokenChunks>0`） |
+
+trace 通过后：**忽略** rcoder 的 `Session cancelled` / `Prompt ended with error`，并将退出码视为 0。
+
+典型场景：
+
+- **router-gate**（`llm-stream`）：`done` + `streamed=true` → 绿
+- **interview-agent**（HITL `wait`）：`interrupted` + `streamed=true` + `questionChars>0` → 绿（图在首轮暂停属预期）
+
+### 判为失败
+
+- 无任何 session-trace，且输出含 `Session cancelled` 等（空答 / 真异常）
+- `interrupted` 但无 `questionChars`、无流式指标（`streamed=false` 或 `streamChars/tokenChunks=0`）
+- 其他 `flowStatus` 或无产出
+
+调试：`SMOKE_DEBUG=1 pnpm smoke` 在 trace 通过时打印 `flow trace OK: {...}`。
 
 ---
 
@@ -128,6 +171,7 @@ rcoder-cli 子进程可能继承未替换的 `ANTHROPIC_MODEL={MODEL_PROVIDER_MO
 
 ## Anti-patterns
 
+- ❌ 见 `Session cancelled` / `Prompt ended with error` 就判 smoke 失败（应先查 session-trace；HITL `interrupted` + 流式出题可通过）
 - ❌ 无任何可用模型凭证（`.env` / shell / `OPENCODE_*`）就报 smoke 完成
 - ❌ `activeFlow=default` 却声称 custom flow 已验过 ACP
 - ❌ 手 export 一堆模型 env 覆盖 config，而不改 `.env` / config

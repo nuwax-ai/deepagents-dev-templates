@@ -75,6 +75,8 @@
 
 `--entry` 或 `AGENT_ENTRY` 可指定任意入口；`--debug --dry-run` 可在无 API key 时检查命令与 env 解析。
 
+**通过/失败**：见 `lib/smoke-outcome.mjs` —— 以 session-trace 的 `flowStatus` + 产出/流式指标为准；`interrupted` + `streamed`（HITL 首轮）与 `done` + `streamed` 均算通过；rcoder 的 `Session cancelled` 在 trace 正常时忽略。细则见 part4b-smoke-acp.md § 通过/失败判定。
+
 开发 Agent 工作流细则见 monorepo `packages/dev-agent-flow/skills/flow-builder/references/part4b-smoke-acp.md`。
 
 ## Windows 打包工具（可选）
@@ -98,4 +100,5 @@ pnpm run check:tools   # 检测工具是否就绪
 | `lib/staging.mjs` | staging 复制与归档 |
 | `lib/tools.mjs` | CLI 工具检测 |
 | `lib/smoke-env.mjs` | smoke 模型 env 解析（与 runtime 对齐） |
+| `lib/smoke-outcome.mjs` | smoke 输出解析（session-trace 优先于 rcoder 噪音） |
 | `lib/example-registry.mjs` | 范例别名注册表 |
