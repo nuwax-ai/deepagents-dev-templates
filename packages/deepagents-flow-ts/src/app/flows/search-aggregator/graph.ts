@@ -1,8 +1,10 @@
 /**
- * multi-aspect-search — custom 节点级拓扑（scaffold 生成的真实 TS，可手改）
- * 多维度并行搜索 → 汇总（fanout + mcp-retrieval + array 聚合）
+ * search-aggregator — 四路并行联网检索 → 汇总（custom：fanout + mcp-retrieval + aggregate）
  *
- * **联网搜索**：须到平台查找并添加；见 search-aggregator。默认无 searchMcp → 优雅降级。
+ * 联网检索须经平台 Plugin/MCP 登记；本地开发用 dev-engineer-toolkit 配置后，
+ * 在 index.ts recipe 传入 searchMcp（同 travel-planner）。未配置则 research 优雅降级。
+ *
+ * **联网搜索**：须到平台查找并添加（dev-engineer-toolkit）；模板不硬编码检索源。
  */
 import {
   StateGraph,
@@ -20,7 +22,20 @@ import { reflectTopology } from "../../../libs/topologies/reflect.js";
 import type { FlowTopology } from "../../../core/flow-types.js";
 import type { TravelSearchMcp } from "../../../libs/topologies/travel-planner/graph.js";
 
-const DEMO_ASPECTS = ["overview", "detail", "context"] as const;
+const ASPECTS = ["overview", "news", "analysis", "sources"] as const;
+const ASPECT_LABEL: Record<string, string> = {
+  overview: "概述",
+  news: "最新动态",
+  analysis: "分析",
+  sources: "资料来源",
+};
+/** 各维度 query 后缀（与用户 query 拼接，不含技术库 / 菜谱等硬编码源）。 */
+const ASPECT_SUFFIX: Record<string, string> = {
+  overview: "背景 概述",
+  news: "最新动态 新闻",
+  analysis: "分析 评论 趋势",
+  sources: "资料 来源",
+};
 
 const State = Annotation.Root({
   query: Annotation<string>(),
@@ -30,7 +45,9 @@ const State = Annotation.Root({
 });
 export type StateShape = typeof State.State;
 
-/** 按 spec 构造图（编译后）。被 index.ts 的 recipe.buildGraph 调用。 */
+/**
+ * 按 spec 构造图（编译后）。searchMcp 缺省 → research 不写外网、findings 记降级文案。
+ */
 export function buildGraph(
   appConfig: AppConfig | undefined,
   checkpointer: BaseCheckpointSaver = new MemorySaver(),
@@ -44,17 +61,17 @@ export function buildGraph(
         mcpServers: searchMcp ? { search: searchMcp.config } : {},
         retrieve: (s) => {
           if (!searchMcp) return null;
-          const query = `${s.query} ${s.aspect}`;
+          const query = `${s.query} ${ASPECT_SUFFIX[s.aspect] ?? s.aspect}`;
           return { server: "search", tool: searchMcp.tool, args: { query, count: 5 } };
         },
         write: (r, s) => ({
           findings: [
-            `${s.aspect}：${
+            `${ASPECT_LABEL[s.aspect] ?? s.aspect}：${
               r.ok && r.text
-                ? r.text.slice(0, 120)
+                ? r.text.slice(0, 200)
                 : searchMcp
                   ? "（检索失败）"
-                  : "（未配置：请至平台查找并添加搜索 MCP）"
+                  : "（未配置：请至平台查找并添加搜索 MCP，再配置 searchMcp）"
             }`,
           ],
         }),
@@ -66,7 +83,7 @@ export function buildGraph(
       createLlmStreamNode<StateShape>({
         model: () => requireModel(appConfig, "aggregate"),
         prompt: (s) => [
-          new SystemMessage("把各维度搜索结果整理成简短摘要，按维度列出。"),
+          new SystemMessage("把各维度联网搜索结果整理成简短摘要，按维度列出。"),
           new HumanMessage(s.findings.join(" / ")),
         ],
         write: (r) => ({ output: r.text }),
@@ -78,8 +95,8 @@ export function buildGraph(
     .addEdge(START, "gather")
     .addConditionalEdges(
       "gather",
-      createFanout<(typeof DEMO_ASPECTS)[number], StateShape>({
-        items: () => [...DEMO_ASPECTS],
+      createFanout<(typeof ASPECTS)[number], StateShape>({
+        items: () => [...ASPECTS],
         target: "research",
         input: (item, s) => ({ aspect: item, query: s.query }),
       }),

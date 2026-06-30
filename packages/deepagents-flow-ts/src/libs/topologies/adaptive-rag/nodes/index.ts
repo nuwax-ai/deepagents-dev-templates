@@ -7,7 +7,7 @@
 
 // 本拓扑新增节点
 export { createRouteQuestionNode, routeAfterRouteQuestion } from "./route-question.js";
-export { webSearchNode } from "./web-search.js";
+export { createWebSearchNode } from "./web-search.js";
 export {
   gradeDocumentsNode,
   routeAfterGradeDocuments,

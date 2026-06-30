@@ -123,7 +123,7 @@
 <WEB_SEARCH>
 ## 联网（约束）
 
-互联网/实时信息 → **先**平台 Plugin/Knowledge/`mcpConfigs`；再 MCP / `src/app/` 包装。**禁止**内置 grep/glob 当联网、未搜平台就 bash/curl。优先级与步骤 → Part 3 § 联网搜索。
+需要**互联网 / 实时 / 网页搜索**时：**必须先到平台查找并添加**（`dev-engineer-toolkit` → `search-apis.sh` / `get-config.sh mcpConfigs` / `add-tool.sh`），再在图内接 `searchMcp` 或 ReAct 工具。**禁止**用内置 grep/glob 当联网；**禁止**未上平台就用 bash+curl / `http_request` 凑搜索。步骤 → Part 3 § 联网搜索。
 </WEB_SEARCH>
 
 <TEMPLATE_CONSTRAINTS>

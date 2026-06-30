@@ -132,7 +132,7 @@ export const specSchema = z.discriminatedUnion("topology", [
     topology: z.literal("adaptive-rag"),
     params: z
       .object({
-        /** 检索源 MCP 服务器（语义名 → stdio MCP 配置）；web_search 走原生工具（默认 DuckDuckGo，可切 Tavily）。 */
+        /** 检索源 MCP 服务器（语义名 → stdio MCP 配置）；web_search 走 searchMcp（平台登记）。 */
         mcpServers: z.record(z.string(), z.unknown()).default({}),
       })
       .default({}),

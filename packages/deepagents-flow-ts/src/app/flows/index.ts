@@ -18,6 +18,7 @@ import * as interviewAgentFlow from "./interview-agent/index.js";
 import * as routerGateFlow from "./router-gate/index.js";
 import * as gradeRedoFlow from "./grade-redo/index.js";
 import * as multiAspectSearchFlow from "./multi-aspect-search/index.js";
+import * as searchAggregatorFlow from "./search-aggregator/index.js";
 import * as translateReviewFlow from "./translate-review/index.js";
 import { logger } from "../../runtime/index.js";
 import * as codingAgentFlow from "./coding-agent/index.js";
@@ -73,6 +74,7 @@ export const flows: Record<string, FlowDef> = {
   "router-gate": { name: "router-gate", kind: "stateful-recipe", recipe: routerGateFlow.recipe, getTopology: routerGateFlow.getTopology },
   "grade-redo": { name: "grade-redo", kind: "stateful-recipe", recipe: gradeRedoFlow.recipe, getTopology: gradeRedoFlow.getTopology },
   "multi-aspect-search": { name: "multi-aspect-search", kind: "stateful-recipe", recipe: multiAspectSearchFlow.recipe, getTopology: multiAspectSearchFlow.getTopology },
+  "search-aggregator": { name: "search-aggregator", kind: "stateful-recipe", recipe: searchAggregatorFlow.recipe, getTopology: searchAggregatorFlow.getTopology },
   "translate-review": { name: "translate-review", kind: "stateful-recipe", recipe: translateReviewFlow.recipe, getTopology: translateReviewFlow.getTopology },
   "coding-agent": { name: "coding-agent", kind: "stateful-custom", createExecutor: codingAgentFlow.createExecutor, getTopology: codingAgentFlow.getTopology },
   "research-agent": { name: "research-agent", kind: "stateful-recipe", recipe: researchAgentFlow.recipe, getTopology: researchAgentFlow.getTopology },

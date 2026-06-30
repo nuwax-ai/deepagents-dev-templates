@@ -26,26 +26,17 @@ export interface AdaptiveRAGState extends RAGState {
   answer_grade?: "yes" | "no";
 }
 
-/** Adaptive RAG 配置 —— 在 RAGConfig 基础上新增 web_search 槽位。 */
-export interface AdaptiveRAGConfig extends RAGConfig {
-  webSearch: {
-    /** web_search 每次返回的最大条目数（传给 webSearchTool）。 */
-    maxResults: number;
-  };
-}
+/** Adaptive RAG 配置 —— 与 RAGConfig 相同（web_search 走 searchMcp，见 graph 配置）。 */
+export type AdaptiveRAGConfig = RAGConfig;
 
 /**
- * 默认 Adaptive RAG 配置（复用 DEFAULT_RAG_CONFIG 的 rewrite/retrieve/prepare/agent 段）。
+ * 默认 Adaptive RAG 配置（复用 DEFAULT_RAG_CONFIG）。
  *
  * 收敛上限（retrieve↔transform_query、generate↔grade_gen 循环）为硬编码常量，见
- * grade-documents.ts:MAX_RETRIEVE_ATTEMPTS / grade-generation.ts:MAX_GENERATION_ATTEMPTS
- * （刻意独立、各自可调；不暴露为 config 字段，避免"看似可配实为死配置"的误导）。
+ * grade-documents.ts:MAX_RETRIEVE_ATTEMPTS / grade-generation.ts:MAX_GENERATION_ATTEMPTS。
  */
 export const DEFAULT_ADAPTIVE_RAG_CONFIG: AdaptiveRAGConfig = {
   ...DEFAULT_RAG_CONFIG,
-  webSearch: {
-    maxResults: 3,
-  },
 };
 
 export type { RetrievalResult };

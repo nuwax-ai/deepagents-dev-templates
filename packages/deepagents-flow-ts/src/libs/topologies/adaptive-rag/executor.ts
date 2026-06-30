@@ -21,12 +21,16 @@ import { DEFAULT_ADAPTIVE_RAG_CONFIG } from "./nodes/types.js";
 import { formatSourcesFooter } from "../rag/executor.js";
 import type { RAGResponse } from "../rag/nodes/types.js";
 
+import type { TravelSearchMcp } from "../travel-planner/graph.js";
+
 /** adaptive-rag 检索 MCP 服务器配置（语义名 → server 配置）；scaffold spec.params.mcpServers 提供。 */
 export interface AdaptiveRagExecutorOptions {
-  /** 检索源 MCP 服务器（如 { context7: {...} }）。 */
+  /** 检索源 MCP 服务器（知识库；由平台 mcpConfigs 注入）。 */
   mcpServers?: CreateAdaptiveRAGGraphConfig["mcpServers"];
   /** 显式检索工具名；缺省取 mcpServers 的 key。 */
   retrievalTools?: string[];
+  /** 网页搜索 MCP（route → web_search）；缺省则优雅降级。 */
+  searchMcp?: TravelSearchMcp;
 }
 
 /**
@@ -42,6 +46,7 @@ export function createAdaptiveRagExecutor(
     ...DEFAULT_ADAPTIVE_RAG_CONFIG,
     retrievalTools: opts.retrievalTools ?? Object.keys(mcpServers),
     mcpServers,
+    searchMcp: opts.searchMcp,
     appConfig: runtime.config,
   };
 
@@ -67,6 +72,7 @@ export function createAdaptiveRagRecipe(
     ...DEFAULT_ADAPTIVE_RAG_CONFIG,
     retrievalTools: opts.retrievalTools ?? Object.keys(mcpServers),
     mcpServers,
+    searchMcp: opts.searchMcp,
     appConfig: runtime.config,
   };
   return {

@@ -28,7 +28,7 @@ export {
 export {
   createRouteQuestionNode,
   routeAfterRouteQuestion,
-  webSearchNode,
+  createWebSearchNode,
   gradeDocumentsNode,
   routeAfterGradeDocuments,
   MAX_RETRIEVE_ATTEMPTS,

@@ -246,14 +246,17 @@ pnpm test
 
 降级链：真流式（L1）→ invoke 一次（L2）→ ACP 整段 `streamText`（L3），保证用户总能看到结果。详见 [docs/node-kit.md](docs/node-kit.md) § createLlmStreamNode。
 
-## 联网 / 外部检索（模板内建能力）
+## 联网 / 外部检索
+
+> **需要联网搜索时**：模板**不提供**开箱即用的网页搜索。必须到**平台**查找并添加（开发 Agent 经 `dev-engineer-toolkit`：`search-apis.sh` → `add-tool.sh` / `mcpConfigs`），再在 app 层 `searchMcp` 或 `mcpServers` 接线。禁止用 `bash`+curl / `http_request` 替代平台已登记的搜索能力。
 
 | 能力 | 代码落点 | 说明 |
 |------|----------|------|
 | 工作区检索 | `grep` / `glob` 工具（`createSearchTools`） | **非**联网；ReAct 默认图经 `flow-tools.ts` 注册 |
-| 图内 MCP 检索 | `createMcpRetrievalNode` | `travel-planner` 的 `searchMcp` 参数；`rag` / custom `mcp-retrieval` 的 `mcpServers` |
-| 自适应 RAG 网页搜索 | `libs/tools/web-search.tool.ts` → `webSearchTool` | **仅** `adaptive-rag` topology 的 `web_search` 节点内 `invoke`；**未**进 `createFlowTools` ReAct 默认工具集 |
-| 未配置搜索源 | `travel-planner` research | `searchMcp` 缺省 → 优雅降级（写「未配置搜索源」，不崩） |
+| 图内 MCP 检索 | `createMcpRetrievalNode` | `travel-planner` / `search-aggregator` 的 `searchMcp`；`rag` / custom 的 `mcpServers` |
+| 自适应 RAG 网页搜索 | `adaptive-rag` `createWebSearchNode` + `searchMcp` | 平台登记搜索 MCP 后接入 |
+| 四路并行联网示例 | `src/app/flows/search-aggregator/` | fanout ×4 + `searchMcp` + aggregate |
+| 未配置搜索源 | `travel-planner` / `search-aggregator` research | `searchMcp` 缺省 → 优雅降级（提示去平台添加） |
 
 云开发环境中平台 Plugin / `mcpConfigs` 登记由**开发 Agent 技能包**引导（见 README § 扩展阅读），不在本模板 `src/` 内实现。
 

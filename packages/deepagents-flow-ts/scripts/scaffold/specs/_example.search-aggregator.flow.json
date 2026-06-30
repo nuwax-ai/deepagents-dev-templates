@@ -1,6 +1,6 @@
 {
-  "name": "multi-aspect-search",
-  "description": "多维度并行搜索 → 汇总（fanout + searchMcp mcp-retrieval）。联网须经平台登记；见 search-aggregator 四路并行示例。",
+  "name": "search-aggregator",
+  "description": "四路并行联网检索 → 汇总。联网搜索须到平台查找并添加（dev-engineer-toolkit），再配置 searchMcp。",
   "topology": "custom",
   "systemPrompt": "",
   "tools": [],
@@ -17,14 +17,14 @@
         "type": "mcp-retrieval",
         "params": {
           "mcpServers": {},
-          "retrieve": "(s) => searchMcp ? { server: 'search', tool: searchMcp.tool, args: { query: `${s.query} ${s.aspect}`, count: 5 } } : null",
-          "write": "(r, s) => ({ findings: [`${s.aspect}：${r.ok ? r.text.slice(0, 120) : '（未配置搜索源）'}`] })"
+          "retrieve": "(s) => searchMcp ? { server: 'search', tool: searchMcp.tool, args: { query: `${s.query} ${aspectSuffix[s.aspect]}`, count: 5 } } : null",
+          "write": "(r, s) => ({ findings: [`${s.aspect}：${r.ok ? r.text.slice(0, 200) : '（未配置搜索源）'}`] })"
         }
       },
       "aggregate": {
         "type": "llm-stream",
         "params": {
-          "prompt": "(s) => [new SystemMessage('把各维度搜索结果整理成简短摘要，按维度列出。'), new HumanMessage(s.findings.join(' / '))]",
+          "prompt": "(s) => [new SystemMessage('把各维度联网搜索结果整理成简短摘要，按维度列出。'), new HumanMessage(s.findings.join(' / '))]",
           "write": "(r) => ({ output: r.text })"
         }
       }
@@ -35,7 +35,7 @@
         "kind": "fanout",
         "from": "gather",
         "target": "research",
-        "items": "() => ['overview', 'detail', 'context']",
+        "items": "() => ['overview', 'news', 'analysis', 'sources']",
         "input": "(item, s) => ({ aspect: item, query: s.query })"
       },
       { "kind": "static", "from": "research", "to": "aggregate" },

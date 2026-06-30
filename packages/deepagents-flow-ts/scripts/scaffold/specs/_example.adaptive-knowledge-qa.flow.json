@@ -1,12 +1,10 @@
 {
   "name": "adaptive-knowledge-qa",
-  "description": "自适应知识库问答：路由（知识库/网页）→ 检索评分过滤 → 生成后幻觉/答案自纠正（对齐官方 Adaptive RAG）",
+  "description": "自适应知识库问答。知识库与网页搜索 MCP 须到平台查找并添加；web_search 走 searchMcp。",
   "topology": "adaptive-rag",
   "systemPrompt": "",
   "tools": [],
   "params": {
-    "mcpServers": {
-      "context7": { "command": "npx", "args": ["-y", "@upstash/context7-mcp"] }
-    }
+    "mcpServers": {}
   }
 }

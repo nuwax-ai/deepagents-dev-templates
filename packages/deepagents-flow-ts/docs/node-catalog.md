@@ -68,7 +68,7 @@
 | **跨子图非平凡映射** | subgraph 与父图字段映射 | 共享 channel 映射 bespoke | 手写 |
 | **含 emitPlan/emitStage 副作用** | deep-research planNode | 节点内发结构化事件需访问 config | B.4 已增强（createLlmNode/Stream write 收 config）;用 createLlmNode 在 write 内 emit |
 | **逐项 LLM 评分 + 无凭证退回非破坏默认** | adaptive-rag grade_documents / grade_generation | 逐文档 / 逐生成 LLM 判 yes/no；无凭证 try/catch 退回放行（增强环节不阻塞主流程） | 手写；route_question / transform_query 用 `createLlmNode({ parse })` 即可 |
-| **调原生工具（非 model tool_calls）** | adaptive-rag web_search | 直接 `webSearchTool.invoke()`（DuckDuckGo IA / Tavily） | 手写；非 ToolNode 模式 |
+| **调 MCP 检索（非 model tool_calls）** | adaptive-rag web_search | `createWebSearchNode` + 平台 `searchMcp`（同 travel-planner） | `createMcpRetrievalNode` 封装 |
 
 > 「图是契约」：定制节点（bespoke）保留手写是设计选择（见各 example「保留 bespoke」注释），不是遗漏。
 

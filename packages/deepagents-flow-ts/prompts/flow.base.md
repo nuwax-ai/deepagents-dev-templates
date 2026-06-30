@@ -15,10 +15,12 @@
 1. **MCP 工具** — MCP 已 native 注入工具集（工具名带 `<server>__` 前缀）。列举当前会话有哪些 server，直接看系统提示词中的 **Available MCP Servers** 段，或查看 bindTools 中带 server 前缀的工具名。来源有两层，**合并后**一起可用：
    - `config/mcp.default.json`（包内默认，如 context7）
    - **ACP host 下发**（`session/new` 注入的 `mcpServers`，与默认合并、同名 session 覆盖）
-2. **内置工具**：`bash`（命令执行）、filesystem（read/write/edit）、`grep` / `glob`（工作区内检索）、`http_request`、`json_utils`。
+2. **内置工具**：`bash`（命令执行）、filesystem（read/write/edit）、`grep` / `glob`（**仅工作区内**检索，不是联网）、`http_request`（通用 HTTP，**不是**搜索引擎；联网搜索须到平台查找并添加）、`json_utils`。
 3. 自己写代码作为最后手段。
 
 **找文件**：用 `glob`（`**/*.sh`）或 `grep`，禁止 `find /` 全盘扫描。
+
+**联网搜索**：需要查互联网 / 实时信息时，须引导用户在**平台**查找并添加搜索 Plugin 或 MCP（`config/mcp.default.json` + ACP session `mcpServers`）；不要用 `grep`/`glob`/`http_request`/bash+curl 冒充联网搜索。
 
 ## 能力分层
 

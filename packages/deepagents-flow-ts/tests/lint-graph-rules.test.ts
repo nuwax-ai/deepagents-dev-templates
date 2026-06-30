@@ -43,6 +43,7 @@ describe("lint-graph-rules R-G001", () => {
     for (const file of [
       "_example.translate-review.flow.json",
       "_example.multi-aspect-search.flow.json",
+      "_example.search-aggregator.flow.json",
       "_example.router-gate.flow.json",
       "_example.interview-agent.flow.json",
     ]) {

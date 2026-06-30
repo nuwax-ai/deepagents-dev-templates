@@ -115,7 +115,7 @@ pnpm graph                   # export graph topology
 | 2 | 是否已 `search-apis.sh --kw "搜索"` / `get-config.sh --key mcpConfigs`？未搜平台 → 先补 |
 | 3 | Plugin 命中是否已 `add-tool.sh` 并在 `flow-tools.ts` 注册？MCP 是否对齐 `mcp.default.json`？ |
 | 4 | `travel-planner` / custom `mcp-retrieval`：`searchMcp` 是否传入平台登记的搜索 MCP？未传则 research 优雅降级（无结果） |
-| 5 | 禁止用 `bash`+`curl` / 自写 DDG 替代平台能力；`pnpm exec tsx src/index.ts capabilities` 核对 MCP/工具列表 |
+| 5 | 禁止用 `bash`+`curl` / 自写搜索 API 替代平台能力；`pnpm exec tsx src/index.ts capabilities` 核对 MCP/工具列表 |
 | 6 | 仍无结果：查 MCP 工具名是否与 `chooseMcpToolName` 匹配；`onToolCall` / 日志是否有检索调用 |
 
 ---

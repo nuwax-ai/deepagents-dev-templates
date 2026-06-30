@@ -19,7 +19,9 @@
 
 ## 联网搜索（互联网 / 实时信息 · 强制）
 
-需求含**查互联网、最新资讯、实时数据、网页检索、多源调研**时，必须优先使用**平台已支持**的搜索能力。
+需求含**查互联网、最新资讯、实时数据、网页检索、多源调研**时：**必须先到平台查找并添加**搜索能力，再在代码里接线。模板不提供开箱即用的联网搜索。
+
+**第一步（必做）**：加载 `dev-engineer-toolkit` → `search-apis.sh --kw "搜索"`（及 `联网` / `web`）→ `get-config.sh --key mcpConfigs` → 命中则 `add-tool.sh` 或同步 MCP → 记入 `project.md`。
 
 ### 选型表
 
@@ -36,7 +38,7 @@
 | Topology | 做法 |
 |------|------|
 | `travel-planner` / `deep-research` | `searchMcp` 接**平台登记**的搜索 MCP → `createMcpRetrievalNode`；未配置则优雅降级 |
-| `adaptive-rag` | 路由 `web_search`；优先平台 Plugin/MCP，模板 `webSearchTool` 仅兜底 |
+| `adaptive-rag` | 路由 `web_search`；经平台 `searchMcp`（`createWebSearchNode`） |
 | `multi-aspect-search`（custom） | `mcp-retrieval` 节点 + 平台搜索 MCP |
 | `react-tools` / `dev-agent` | 平台搜索 Plugin 注册为 tool → ReAct 调用 |
 
@@ -51,8 +53,8 @@
 ### 禁止
 
 - ❌ 内置 `search`/`grep` 当联网
-- ❌ 未搜平台就 bash+curl、自写 DDG/Google、`http_request` 打搜索站
-- ❌ 硬编码未在平台登记的 `duckduckgo-mcp-server`（不稳定；用平台源）
+- ❌ 未搜平台就 bash+curl、自写搜索 API、`http_request` 打搜索站
+- ❌ 硬编码未在平台登记的第三方搜索 MCP（用平台源）
 - ❌ 在 `src/libs/` 写搜索（保护区）
 
 system-prompt 详版 → `<WEB_SEARCH>`

@@ -3,6 +3,7 @@
  * 旅行规划：并行搜索交通/住宿/景点/美食 → 整理成行程 → 人审确认（stateful）
  *
  * 图逻辑单一权威在 src/libs/topologies/travel-planner/；本文件只绑 spec。
+ * **联网搜索**：须到平台查找并添加后，在 recipe 传入 searchMcp（见 travel-planner/graph.ts）。
  * systemPrompt 注入 aggregate 节点角色开场。
  */
 import type { FlowRuntime } from "../../../runtime/flow-runtime.js";

@@ -33,7 +33,7 @@ import {
 | 并行扇出(Send map-reduce) | `createFanout` | travel/deep-research research |
 | 把一张小图当节点用 | `createSubgraphNode` | dev-agent researcher |
 
-> **定制节点（bespoke）不要硬塞**：isApproval 短路定稿、LLM 裁决路由、主动 MCP 检索**已有 factory**（见下各节）；剩余真正 bespoke（如 deep-research converse 的 interrupt 路由、RAG retrieve 的意图驱动多工具并行、adaptive-rag 的逐项 LLM 评分 grade_documents / grade_generation 与原生 `webSearchTool` 调用、文件交付）才保留手写，见各 example「保留 bespoke」注释。
+> **定制节点（bespoke）不要硬塞**：isApproval 短路定稿、LLM 裁决路由、主动 MCP 检索**已有 factory**（见下各节）；剩余真正 bespoke（如 deep-research converse 的 interrupt 路由、RAG retrieve 的意图驱动多工具并行、adaptive-rag 的逐项 LLM 评分 grade_documents / grade_generation、文件交付）才保留手写，见各 example「保留 bespoke」注释。
 
 ---
 

@@ -39,7 +39,7 @@ import type {
 import {
   createRouteQuestionNode,
   routeAfterRouteQuestion,
-  webSearchNode,
+  createWebSearchNode,
   gradeDocumentsNode,
   routeAfterGradeDocuments,
   createTransformQueryNode,
@@ -47,6 +47,7 @@ import {
   routeAfterGradeGeneration,
 } from "./nodes/index.js";
 import type { AdaptiveRAGConfig } from "./nodes/types.js";
+import type { TravelSearchMcp } from "../travel-planner/graph.js";
 
 import type { ToolCallEvent } from "../../../core/flow-types.js";
 
@@ -110,6 +111,8 @@ interface MCPServerConfig {
 /** 创建 Adaptive RAG Graph 的配置 */
 export interface CreateAdaptiveRAGGraphConfig extends AdaptiveRAGConfig {
   mcpServers: Record<string, MCPServerConfig>;
+  /** 网页搜索 MCP（route_question → web_search 路径）；缺省则优雅降级。 */
+  searchMcp?: TravelSearchMcp;
   appConfig?: AppConfig;
   callbacks?: {
     onToken?: (token: string) => void | Promise<void>;
@@ -132,6 +135,7 @@ export function createAdaptiveRAGGraph(config: CreateAdaptiveRAGGraphConfig, che
   const rewriteNode = createRewriteNode(config.appConfig);
   const routeQuestionNode = createRouteQuestionNode(config.appConfig);
   const transformQueryNode = createTransformQueryNode(config.appConfig);
+  const webSearch = createWebSearchNode(config.searchMcp);
 
   log.info("Creating Adaptive StateGraph", {
     nodes: [
@@ -152,7 +156,7 @@ export function createAdaptiveRAGGraph(config: CreateAdaptiveRAGGraphConfig, che
     .addNode("rewrite", async (state: AdaptiveRAGStateType) => rewriteNode(state))
     .addNode("route_question", async (state: AdaptiveRAGStateType) => routeQuestionNode(state))
     .addNode("retrieve", async (state: AdaptiveRAGStateType, lgConfig) => retrieveNode(state, retrieveConfig, lgConfig))
-    .addNode("web_search", async (state: AdaptiveRAGStateType) => webSearchNode(state, config))
+    .addNode("web_search", async (state: AdaptiveRAGStateType, lgConfig) => webSearch(state, lgConfig))
     .addNode("grade_documents", async (state: AdaptiveRAGStateType) =>
       gradeDocumentsNode(state, config.appConfig)
     )
