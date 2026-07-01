@@ -8,14 +8,37 @@
 
 ```
 1. 平台 Plugin / Workflow / Knowledge  ← dev-engineer-toolkit 搜索并 add-tool；在 src/app/ 按返回 schema 手写 tool() 包装 → flow-tools.ts 注册
-2. Native MCP                        ← **平台 `mcpConfigs`**（get-config）+ config/mcp.default.json + ACP session mcpServers
+2. Native MCP                        ← **平台 `mcpConfigs`**（开发期登记）+ **ACP `session/new` 下发 `mcpServers`**（运行期注入）+ `config/mcp.default.json`（默认可为空）
 3. 内置 libs/tools                   ← bash/fs/search（**仅工作区 grep/glob**）/http/json/load_skill/task/demo（模板内置，勿改 libs）
 4. 自写 src/app/ + flow-tools.ts     ← 最后手段：在 app 层实现并注册 createFlowTools()
 ```
 
-> **易错**：内置 `search` / `grep` = **仓库内** ripgrep/glob，**不是**联网搜索。
+> **易错**：内置 `search` / `grep` = **仓库内** ripgrep/glob，**不是**联网搜索。联网/文档检索等 **MCP 不由模板内置**，须平台登记 + **ACP 会话下发**。
 
 > 已无 `mcp_tool_bridge` 元工具；MCP 工具由 runtime 原生绑定，直接用 server 暴露的工具名调用。
+
+## ACP MCP 下发（运行期 · 联网 / 文档检索等）
+
+工作区外的 **MCP 能力**（联网搜索、文档检索、`mcp-retrieval` 节点等）遵循 **「开发期登记 → 运行期 ACP 注入」**，模板不在 `mcp.default.json` 内置搜索/文档 server。
+
+```
+开发期（写图前）                         运行期（ACP 会话）
+─────────────────────────────────────────────────────────────
+dev-engineer-toolkit                  ACP session/new
+  search-apis / get-config mcpConfigs     └ mcpServers { ... }
+  add-tool → 平台 mcpConfigs              merge(config/mcp.default.json)
+  图内接线 searchMcp / docMcp             session-wins（默认）
+  或 native MCP 工具名                    runtime → @langchain/mcp-adapters
+                                          createMcpRetrievalNode / ReAct 调 MCP
+```
+
+| 阶段 | 做什么 | 禁止 |
+|------|--------|------|
+| **开发期** | `search-apis` → `get-config mcpConfigs` → `add-tool`；`src/app/` 映射 `searchMcp`/`docMcp` 或依赖 session 下发的 server 名 | 在 `mcp.default.json` 硬编码搜索包；`SEARCH_MCP = undefined` 报完成 |
+| **运行期** | 平台/客户端经 **ACP** 下发 `mcpServers`，与本地 default 合并后进 runtime | 用 bash+curl / `http_request` 冒充已登记的搜索 MCP |
+| **Plugin 类** | `add-tool` + `src/app/` `tool()` 包装 | 指望 ACP 下发 Plugin（**不经 ACP**，仅 MCP server 下发） |
+
+合并策略见下文 § MCP 配置；实现 seam → 目标项目 `src/surfaces/acp/server.ts`（`loadConfig` + `configureSession`）。
 
 ## 平台能力登记（通用 · 强制）
 
@@ -60,13 +83,11 @@
 - ❌ 在 `src/libs/tools/` 写业务工具（保护区）
 - ❌ 把内置 `grep`/`search` 当业务 API 或联网
 
-system-prompt 详版 → `<PLATFORM_CAPABILITIES>`
-
 ## 联网搜索（互联网 / 实时信息 · 常见专项）
 
 > **说明**：联网搜索是 § 平台能力登记 中**最常见的专项**；下列规则在通用登记之上追加，不替代通用流程。
 
-需求含**查互联网、最新资讯、实时数据、网页检索、多源调研**，或图/spec 使用 `mcp-retrieval` / `createMcpRetrievalNode` / `searchMcp` 时：先走上文 **§ 平台能力登记**，并追加搜索关键词与 `mcpConfigs` 检查。模板不提供开箱即用的联网搜索。
+需求含**查互联网、最新资讯、实时数据、网页检索、多源调研**，或图/spec 使用 `mcp-retrieval` / `createMcpRetrievalNode` / `searchMcp` 时：先走上文 **§ 平台能力登记** 与 **§ ACP MCP 下发**，并追加搜索关键词与 `mcpConfigs` 检查。模板不提供开箱即用的联网搜索；**运行期搜索能力经 ACP 以 MCP server 注入**。
 
 ### 自动触发（满足任一即必读本节）
 
@@ -82,17 +103,18 @@ system-prompt 详版 → `<PLATFORM_CAPABILITIES>`
 |--------|------|--------|------|
 | 1 | **平台 Plugin**（搜索 API） | `search-apis.sh --kw "搜索"` / `"联网"` / `"web"` → `add-tool.sh` → `src/app/` `tool()` → `flow-tools.ts` | ReAct / `createToolExecNode` |
 | 2 | **平台 Knowledge** | 同上（领域知识库） | RAG / 检索工具 |
-| 3 | **平台 `mcpConfigs`** | `get-config.sh --key mcpConfigs`；对齐 `config/mcp.default.json` | `createMcpRetrievalNode`（travel / custom `mcp-retrieval`） |
-| 4 | **本地 MCP** | 仅平台无搜索 MCP 时，参考 `config/mcp.examples.json` | 同上 |
+| 3 | **平台 `mcpConfigs`** | `get-config.sh --key mcpConfigs`；对齐接线（勿写入 default 内置包） | `createMcpRetrievalNode`；运行期 **ACP `mcpServers`** 注入 |
+| 4 | **本地 MCP 示例** | 仅平台无搜索 MCP 时，参考 `config/mcp.examples.json`（**不**提交进 default） | 同上；仍建议经 ACP session 下发 |
 | 5 | **自写 app 工具** | 平台 + MCP 均无 | `flow-tools.ts` |
 
 ### Topology wiring
 
 | Topology | 做法 |
 |------|------|
-| `travel-planner` / `deep-research` | `searchMcp` 接**平台登记**的搜索 MCP → `createMcpRetrievalNode` |
-| `search-aggregator`（custom） | 同 travel-planner：`index.ts` 填 `SEARCH_MCP` → `createMcpRetrievalNode` |
-| `adaptive-rag` | 路由 `web_search`；经平台 `searchMcp`（`createWebSearchNode`） |
+| `travel-planner` | `searchMcp` 接**平台登记**的搜索 MCP → `createMcpRetrievalNode`；**运行期** ACP `mcpServers` 注入 |
+| `search-aggregator`（custom） | 同 travel-planner：`index.ts` 填 `SEARCH_MCP` → `createMcpRetrievalNode`；**运行期** ACP `mcpServers` |
+| `deep-research` | `docMcp` 接**平台登记**的文档检索 MCP；**运行期** ACP `mcpServers` 注入 |
+| `adaptive-rag` | 路由 `web_search`；经平台 `searchMcp`（`createWebSearchNode`）；**运行期** ACP `mcpServers` |
 | `multi-aspect-search`（custom） | `mcp-retrieval` 节点 + 平台搜索 MCP |
 | `react-tools` / `dev-agent` | 平台业务 Plugin 注册为 tool → ReAct / `createToolExecNode` |
 | **任意** custom / 手写 | spec 或 `graph.ts` 出现 `mcp-retrieval` / `searchMcp` → 同上行 |
@@ -120,8 +142,6 @@ system-prompt 详版 → `<PLATFORM_CAPABILITIES>`
 - ❌ 未搜平台就写图或报完成（需平台能力的 flow；联网较常见）
 - ❌ 硬编码未在平台登记的第三方搜索 MCP（用平台源）
 - ❌ 在 `src/libs/` 写搜索（保护区）
-
-system-prompt 详版 → `<WEB_SEARCH>`
 
 ## 创建自定义工具 `src/app/tools/{name}.tool.ts`
 
@@ -169,7 +189,7 @@ export function createMyTool(ctx: RuntimeContext) {
 
 ### 工具权限审批（`permissions`）
 
-ACP 下副作用工具执行前可弹 `session/request_permission`。配置在**本地** `config/flow-agent.config.json`（workspace 配置，**非** `<PLATFORM_CONFIG>`）：
+ACP 下副作用工具执行前可弹 `session/request_permission`。配置在**本地** `config/flow-agent.config.json`（workspace 配置，**非**平台在线配置）：
 
 ```jsonc
 "permissions": {
@@ -192,7 +212,7 @@ ACP 下副作用工具执行前可弹 `session/request_permission`。配置在**
 
 ## MCP 配置
 
-默认：`config/mcp.default.json`；ACP `session/new` 的 `mcpServers` 可覆盖（`session-wins`）。
+默认：`config/mcp.default.json`（**空对象**，不内置搜索/文档 server）；**运行期**由 ACP `session/new` 的 `mcpServers` 注入（与 default 合并，默认 `session-wins`）。开发期登记的平台 `mcpConfigs` 须在写图前经 `dev-engineer-toolkit` 对齐。
 
 **Stdio：**
 ```json

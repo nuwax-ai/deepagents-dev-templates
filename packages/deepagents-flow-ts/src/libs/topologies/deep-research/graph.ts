@@ -5,7 +5,7 @@
  *  - 多阶段流水线：选题确认 → 大纲规划 → 并行调研 → 初稿生成 → 质量评审 → 报告
  *  - 多轮 HITL：2 个一次性确认门（确认主题、确认大纲）+ 报告后的持续会话回路
  *  - 双层 reflection 循环：大纲评审重试 + 初稿质量评审重试
- *  - Send 并行扇出：每章节独立调研（Context7 文档 + DDG 网络，plan 产出 libraryHint）
+ *  - Send 并行扇出：每章节独立调研（平台文档 MCP，plan 产出 libraryHint）
  *  - **持续会话（一个会话一份研究）**：报告生成后不收场，用户可反复改/补/问，
  *    每轮复用同一份 findings + 报告上下文，直到「结束」才定稿
  *  - 复杂状态管理：大纲/章节/调研结果/初稿/报告/对话历史跨阶段累积
@@ -22,11 +22,11 @@
  *
  * 对应 LangGraph 官方模式组合：
  *   多轮 HITL(interrupt) + Send map-reduce + Reflection + Command 节点内路由 +
- *   research 子图(每章节 Context7 ∥ DDG 并行取优 + rateLimited 串行错峰)
+ *   research 子图(每章节文档 MCP 检索 + rateLimited 串行错峰)
  *
  * 真实接入（无 demo fallback——未配凭证直接报错）：
  *  - plan / research / draft / outline_review / quality_review / finalize **真调大模型**
- *  - research：Context7 文档检索（duckduckgo-mcp-server 实测不稳定已移除，原双源改单源）
+ *  - research：平台登记的文档 MCP（docMcp）；未配置则优雅降级
  *  - onToolCall 透出每次搜索；HITL 用 interrupt 暂停。
  *
  * durable stateful flow 韧性（防一处抖动掐死整条长流水线）：
@@ -54,7 +54,7 @@ import {
   deliveryNode,
   createDraftNode,
   fanoutToResearch,
-  isDdgErrorText,
+  isMcpErrorBodyText,
   isEndSignal,
   MAX_DRAFT_REVIEW,
   MAX_OUTLINE_REVIEW,
@@ -71,6 +71,7 @@ import {
   routeAfterConverse,
   routeAfterOutlineReview,
   routeAfterQualityReview,
+  type DocRetrievalMcp,
 } from "./nodes/index.js";
 import type {
   ConversationTurn,
@@ -82,7 +83,7 @@ import type {
 export {
   fanoutToResearch,
   createResearchSectionSubgraph,
-  isDdgErrorText,
+  isMcpErrorBodyText,
   mergeResearchSources,
   scoreResearchSource,
   isEndSignal,
@@ -93,6 +94,7 @@ export {
   routeAfterConverse,
   routeAfterOutlineReview,
   routeAfterQualityReview,
+  type DocRetrievalMcp,
 };
 
 // ── 类型 ────────────────────────────────────────────────
@@ -167,7 +169,8 @@ export type ResearchStateType = typeof ResearchState.State;
 
 export function createResearchGraph(
   appConfig?: AppConfig,
-  checkpointer: BaseCheckpointSaver = new MemorySaver()
+  checkpointer: BaseCheckpointSaver = new MemorySaver(),
+  docMcp?: DocRetrievalMcp
 ) {
   const draftNode = createDraftNode(appConfig);
   return new StateGraph(ResearchState)
@@ -180,7 +183,7 @@ export function createResearchGraph(
       return planNode(s, appConfig, c);
     })
     .addNode("outline_gate", outlineGateNode, { ends: ["plan", "research"] })
-    .addNode("research", createResearchSectionSubgraph(appConfig))
+    .addNode("research", createResearchSectionSubgraph(appConfig, docMcp))
     .addNode(
       "outline_review",
       async (s: ResearchStateType, c?: LangGraphRunnableConfig) => {

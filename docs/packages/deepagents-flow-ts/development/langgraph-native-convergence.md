@@ -265,7 +265,7 @@ config.writer({
   type: "tool",
   status: "in_progress",
   id,
-  name: "duckduckgo_search",
+  name: "web_search",
   input: { query },
 });
 ```

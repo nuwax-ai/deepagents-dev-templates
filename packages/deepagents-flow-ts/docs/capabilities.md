@@ -39,7 +39,7 @@ pnpm exec tsx src/index.ts sessions       # 已持久化的会话
 
 ## 扩展（不改 `src/libs/` 保护区）
 
-- **加 MCP**：编辑 `config/mcp.default.json`。常用 server 见 [config/mcp.examples.json](../config/mcp.examples.json)（context7 / chrome-devtools / filesystem / bash），复制到 `servers` 即可。
+- **加 MCP**：默认 `config/mcp.default.json` 为空；开发期经平台 `mcpConfigs` 登记，运行期经 **ACP `session/new` 的 `mcpServers`** 注入。本地调试可参考 [config/mcp.examples.json](../config/mcp.examples.json)（chrome-devtools / filesystem / bash 等），复制到 `servers` 或经 ACP 下发。
 - **加 Skill**：
   - **项目内置（推荐）**：`builtin/skills/<name>/SKILL.md`（`agentsDirectories` 含 `./builtin`）。
   - **工作区扩展**：`.agents/skills/<name>/SKILL.md`，或在 `config.skills.directories` 增加目录。

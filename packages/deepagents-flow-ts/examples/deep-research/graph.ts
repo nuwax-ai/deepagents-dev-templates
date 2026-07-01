@@ -12,6 +12,7 @@ import { durableCheckpointer } from "../../src/runtime/services/file-checkpoint-
 import {
   createResearchGraph,
   type ResearchStateType,
+  type DocRetrievalMcp,
 } from "../../src/libs/topologies/deep-research/graph.js";
 import { formatDeliveryAnswer } from "../../src/libs/topologies/deep-research/nodes/index.js";
 import type { StatefulFlow } from "../../src/core/flow-types.js";
@@ -24,13 +25,14 @@ export * from "../../src/libs/topologies/deep-research/graph.js";
 /**
  * 包装成模板 StatefulFlow：多轮 HITL + 持续会话（clarify/outline_gate 审 → 报告 → converse 回路）。
  * configurable.appConfig 供 Send 并行 research 实例取模型；recursionLimit 防 reflection 回边。
+ * @param opts.docMcp 文档检索 MCP（平台登记后注入）；缺省则 research 优雅降级
  */
 export function createResearchFlow(
   appConfig?: AppConfig,
-  opts: { checkpointer?: BaseCheckpointSaver } = {}
+  opts: { checkpointer?: BaseCheckpointSaver; docMcp?: DocRetrievalMcp } = {}
 ): StatefulFlow {
   return createStatefulFlow<ResearchStateType>({
-    buildGraph: (cp) => createResearchGraph(appConfig, cp),
+    buildGraph: (cp) => createResearchGraph(appConfig, cp, opts.docMcp),
     toInput: (query) => ({
       topic: query,
       outlineAttempts: 0,

@@ -20,7 +20,7 @@ import { createFileCheckpointer } from "../src/runtime/services/file-checkpoint-
 const ALIEN_WORKSPACE = "/tmp/deepagents-flow-ts-default-flow-acp-mcp";
 
 describe("默认 flow：ACP session mcpServers → 工具集", () => {
-  it("mcpServerConfigs 合并 default context7 + ACP 下发 server；工具集不再含 mcp_tool_bridge", () => {
+  it("mcpServerConfigs 合并空 default + ACP 下发 server；工具集不再含 mcp_tool_bridge", () => {
     const { appConfig } = loadFlowConfig({ workspaceRoot: ALIEN_WORKSPACE });
     const ctx = createRuntimeContext(appConfig, {
       cwd: ALIEN_WORKSPACE,
@@ -28,10 +28,8 @@ describe("默认 flow：ACP session mcpServers → 工具集", () => {
         time: { command: "npx", args: ["-y", "@modelcontextprotocol/server-time"] },
       },
     });
-    // 合并后的 server 配置：default(context7) + ACP session(time)
     const serverNames = Object.keys(ctx.mcpServerConfigs);
-    expect(serverNames).toContain("context7");
-    expect(serverNames).toContain("time");
+    expect(serverNames).toEqual(["time"]);
 
     const policy = getFlowSandboxPolicy(appConfig);
     const allTools = createFlowTools(ctx, {

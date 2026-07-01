@@ -1,9 +1,9 @@
 /**
- * research 子图 —— 单章节调研（Context7 检索 + LLM 摘要）。
+ * research 子图 —— 单章节调研（平台文档 MCP + LLM 摘要）。
  *
- *   START → prepare → search(Context7 文档检索) → summarize → END
+ *   START → prepare → search(文档 MCP) → summarize → END
  *
- * 每章节固定搜一次。⚠️ duckduckgo-mcp-server 实测不稳定已移除，现仅 Context7 单源。
+ * docMcp 缺省 → 降级文案；mergeResearchSources 保留多源合并能力供扩展。
  */
 
 import {
@@ -21,7 +21,7 @@ import { emitPlan, emitStage, extractText, runTool } from "../../../../nodes/ind
 import type { OutlineSection, ResearchFinding } from "../types.js";
 import { invokeLLM, langClause } from "../helpers.js";
 import { outlineToPlanEntries } from "../planning.js";
-import { invokeContext7Search } from "./context7.js";
+import { invokeDocRetrieval, type DocRetrievalMcp } from "./doc-retrieval.js";
 import { mergeResearchSources, type ResearchSourceResult } from "./merge.js";
 
 const log = logger.child("deep-research");
@@ -34,7 +34,7 @@ const ResearchSectionState = Annotation.Root({
   outline: Annotation<OutlineSection[]>,
   rawMaterial: Annotation<string>,
   findings: Annotation<ResearchFinding[]>({
-    reducer: (a, b) => [...a, ...b],
+    reducer: (a, b) => [...(a ?? []), ...(b ?? [])],
     default: () => [],
   }),
 });
@@ -54,33 +54,28 @@ function createPrepareNode() {
   };
 }
 
-/**
- * 拉 Context7 文档（libraryHint 来自 plan 大纲，优先用于 resolve-library-id），写入 rawMaterial。
- */
-async function fetchContext7(
+async function fetchDocSources(
+  docMcp: DocRetrievalMcp | undefined,
   query: string,
   libraryHint: string | undefined,
   onToolCall: FlowCallbacks["onToolCall"] | undefined
 ): Promise<ResearchSourceResult[]> {
-  let c7Meta: { ok: boolean; libraryId?: string } = { ok: false };
-  const c7Args = libraryHint ? { query, libraryHint } : { query };
-  const c7 = await runTool(
-    "context7_query",
-    c7Args,
+  let meta: { ok: boolean; libraryId?: string } = { ok: false };
+  const args = libraryHint ? { query, libraryHint } : { query };
+  const doc = await runTool(
+    "doc_retrieval",
+    args,
     async () => {
-      const r = await invokeContext7Search(query, libraryHint);
-      c7Meta = { ok: r.ok, libraryId: r.libraryId };
+      const r = await invokeDocRetrieval(docMcp, query, libraryHint);
+      meta = { ok: r.ok, libraryId: r.libraryId };
       return r.text;
     },
     onToolCall
   );
-  return [
-    { source: "context7", text: c7.result, ok: c7Meta.ok, libraryId: c7Meta.libraryId },
-  ];
+  return [{ source: "docs", text: doc.result, ok: meta.ok, libraryId: meta.libraryId }];
 }
 
-/** search：Context7 检索 + 合并（单源，mergeResearchSources 兼容）。 */
-function createSearchNode() {
+function createSearchNode(docMcp?: DocRetrievalMcp) {
   return async (
     state: SectionState,
     config?: LangGraphRunnableConfig
@@ -92,7 +87,7 @@ function createSearchNode() {
     const query = section.query;
     const libraryHint = section.libraryHint;
 
-    const sources = await fetchContext7(query, libraryHint, onToolCall);
+    const sources = await fetchDocSources(docMcp, query, libraryHint, onToolCall);
     const rawMaterial = mergeResearchSources(sources, query);
 
     if (!sources.some((s) => s.ok)) {
@@ -152,11 +147,14 @@ function createSummarizeNode(appConfig?: AppConfig) {
   };
 }
 
-/** 编译单章节调研子图；父图 `.addNode("research", createResearchSectionSubgraph(appConfig))`。 */
-export function createResearchSectionSubgraph(appConfig?: AppConfig) {
+/** 编译单章节调研子图；父图 `.addNode("research", createResearchSectionSubgraph(appConfig, docMcp))`。 */
+export function createResearchSectionSubgraph(
+  appConfig?: AppConfig,
+  docMcp?: DocRetrievalMcp
+) {
   return new StateGraph(ResearchSectionState)
     .addNode("prepare", createPrepareNode())
-    .addNode("search", createSearchNode())
+    .addNode("search", createSearchNode(docMcp))
     .addNode("summarize", createSummarizeNode(appConfig))
     .addEdge(START, "prepare")
     .addEdge("prepare", "search")

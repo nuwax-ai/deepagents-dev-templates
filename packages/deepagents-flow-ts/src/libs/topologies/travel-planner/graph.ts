@@ -1,7 +1,7 @@
 /**
  * travel-planner 拓扑图 —— Map-reduce（Send 扇出）+ HITL（自 examples/travel-planner 提升）。
  *
- *   START → gather → ⟨Send 并行⟩ research × 4（交通/住宿/景点/美食，各发一次真实 DDG 搜索）
+ *   START → gather → ⟨Send 并行⟩ research × 4（交通/住宿/景点/美食，各发一次平台搜索 MCP）
  *         → aggregate（LLM 整理成 N 天行程）→ confirm(interrupt) → finalize → END
  *
  * 节点消费框架 factory：aggregate=createLlmStreamNode；confirm=createHumanApprovalNode；
@@ -36,8 +36,7 @@ const log = logger.child("travel");
 
 /**
  * 搜索 MCP 源（createTravelGraph 的 searchMcp 参数传入）。
- * ⚠️ duckduckgo-mcp-server 实测不稳定，已不再作为默认。传入可用的搜索 MCP（如自建 stdio 搜索 server），
- *    或改用 http_request 工具调搜索 API；未传则 research 节点优雅降级（写「未配置搜索源」）。
+ * 须经平台登记后注入（dev-engineer-toolkit → search-apis / add-tool）；未传则 research 优雅降级。
  */
 export interface TravelSearchMcp {
   config: McpServerConfig;

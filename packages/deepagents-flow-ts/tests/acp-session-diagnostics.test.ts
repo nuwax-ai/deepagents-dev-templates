@@ -55,13 +55,13 @@ describe("summarizeMcpServerEntry", () => {
     expect(
       summarizeMcpServerEntry({
         command: "npx",
-        args: ["-y", "@upstash/context7-mcp", "API_KEY=sk-secret"],
-        env: { CONTEXT7_KEY: "x", PATH: "/bin" },
+        args: ["-y", "@example/doc-mcp", "API_KEY=sk-secret"],
+        env: { DOC_MCP_KEY: "x", PATH: "/bin" },
       })
     ).toEqual({
       command: "npx",
-      args: ["-y", "@upstash/context7-mcp", "API_KEY=***"],
-      envKeys: ["CONTEXT7_KEY", "PATH"],
+      args: ["-y", "@example/doc-mcp", "API_KEY=***"],
+      envKeys: ["DOC_MCP_KEY", "PATH"],
     });
   });
 

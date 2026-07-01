@@ -1,19 +1,19 @@
 # Part 0：端到端开发流程
 
 > 所属：`flow-builder` L2-A（总流程）。入口路由见 [SKILL.md](../SKILL.md)。
-> system-prompt 的 `<WORKFLOW>`、`<BOOTSTRAP_FIRST>` Phase 0、`<SCAFFOLD_FIRST>`、`<COMPLETION_GATE>` **逐步实现**在本层及各 Part；system-prompt 只保留铁律与约束。
+> 本技能承载会话启动、topology 选型、脚手架、completion gate 等**逐步实现**流程；各 Part 分工见 [SKILL.md](../SKILL.md) 路由表。
 
 ## 会话启动（先于一切开发）
 
 | 步 | 动作 | 细节 |
 |----|------|------|
 | 0 | 装依赖 | `package.json` 且无 `node_modules`/lock 变更 → `pnpm install`；`pyproject.toml` 且无 `.venv` → `uv sync --group dev` |
-| 1 | 读上下文 | `README.md`、`project.md`（无则创建，见 system-prompt `<PROJECT_MEMORY>`） |
+| 1 | 读上下文 | `README.md`、`project.md`（无则创建，记录项目记忆与关键决策） |
 | 2 | 系统提示词基线 | `dev-engineer-toolkit` → `get-config.sh --key systemPrompt`（及 `openingChatMsg`）。若平台 **空/占位** 且用户已描述 Agent → **先于写图**走 [part5-prompt-design.md](part5-prompt-design.md) § 用户输入提炼 |
 | 3 | 读模板文档 | `docs/glossary.md` → `flow-graph-rules.md` → `node-catalog.md` → `node-kit.md` → `config/flow-agent.config.json` |
 | 4 | 简报 | 项目状态 + 待办，再处理用户指令 |
 
-**平台配置**：读写 `<PLATFORM_CONFIG>` 一律经 `dev-engineer-toolkit`（禁止只改本地）。
+**平台配置**：读写平台在线配置（`systemPrompt` / `tools` / `mcpConfigs` / `skills` 等）一律经 `dev-engineer-toolkit`（禁止只改本地）。
 
 ---
 
@@ -46,7 +46,7 @@
 | 5 | 平台确无命中 → 记录关键词与输出，**然后**方可走优先级 4 自写 app 工具 |
 | 6 | **然后**写 spec / `graph.ts` |
 
-> **禁止**：先写占位工具 / `SEARCH_MCP = undefined` / 空 `flow-tools.ts` 再 smoke 报完成，把平台登记甩给「用户待操作」。**联网搜索**是高频场景，同样不得跳过登记。
+> **禁止**：先写占位工具 / `SEARCH_MCP = undefined` / 空 `flow-tools.ts` 再 smoke 报完成，把平台登记甩给「用户待操作」。**联网搜索**是高频场景，同样不得跳过登记；**运行期搜索 MCP 经 ACP `mcpServers` 下发**，模板不内置。
 
 ### Factory 速查（手写路径）
 
@@ -117,7 +117,7 @@ pnpm build && pnpm typecheck && pnpm test && pnpm graph && pnpm smoke
 1. 完成了什么（topology / 节点 / 关键图能力）
 2. 用户待操作事项、风险与后续（**不含**开发 Agent 可代劳的平台工具/MCP/技能登记）
 3. `project.md` 已更新（含已登记 targetId、MCP 名、工具名）
-4. **`<PLATFORM_CONFIG>.systemPrompt` 非空且已回读**（`openingChatMsg` 若涉及）
+4. **平台 `systemPrompt` 非空且已回读**（`openingChatMsg` 若涉及）
 5. 提示词提炼来源（用户哪些输入 → 哪一字段）
 6. **需平台能力时**：`search-apis` / `search-skills` / `get-config` 结果摘要（或「已搜索、无命中」+ 关键词）；自写工具须说明平台无命中依据（**联网搜索较常见**，须单独列出搜索/MCP 关键词）
 
@@ -136,15 +136,10 @@ pnpm build && pnpm typecheck && pnpm test && pnpm graph && pnpm smoke
 
 ---
 
-## Context7（LangGraph TS API）
+## LangGraph 文档（TS API）
 
-```
-resolve-library-id(libraryName: "langgraph", query: "langgraph javascript typescript StateGraph interrupt")
-query-docs(libraryId: "/langchain-ai/langgraphjs", query: "StateGraph interrupt Command resume")
-```
-
-- 只用 TS 版；每问题 ≤3 次；query 带 `javascript`/`typescript`
 - 参考：<https://docs.langchain.com/oss/javascript/langgraph/overview>
+- 查 API 时 query 带 `javascript` / `typescript`；优先官方文档，勿依赖模板内置文档 MCP（须经平台登记 + ACP 下发）
 
 ---
 

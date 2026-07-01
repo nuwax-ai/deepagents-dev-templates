@@ -1,6 +1,6 @@
 {
   "name": "knowledge-qa",
-  "description": "知识库问答：重写查询 → MCP 检索 → 评级重试 → 生成带来源的回答。检索源须经平台 mcpConfigs 登记（模板不硬编码 context7）。",
+  "description": "知识库问答：重写查询 → MCP 检索 → 评级重试 → 生成带来源的回答。检索源须经平台 mcpConfigs 登记并经 ACP 注入。",
   "topology": "rag",
   "systemPrompt": "",
   "tools": [],

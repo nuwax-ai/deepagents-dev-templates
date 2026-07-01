@@ -3,7 +3,7 @@
  *  - 纯函数（无凭证、确定性）：routeAfterOutlineReview / routeAfterQualityReview / fanoutToResearch
  *    —— 守住双层 reflection 条件边 + MAX_* 封顶（防死循环）+ Send 扇出拓扑。
  *  - 真实接入（skipIf 无凭证）：plan / research / draft / outline_review / quality_review / finalize
- *    真调 LLM + duckduckgo 搜索 MCP，验证完整的多阶段 + 多轮 HITL 闭环。
+ *    真调 LLM + 平台登记文档 MCP 检索，验证完整的多阶段 + 多轮 HITL 闭环。
  *  - durable stateful flow（无凭证）：clarify interrupt 跨 flow 实例（模拟重启）仍能 resume。
  */
 
@@ -24,7 +24,7 @@ import {
   isEndSignal,
   fanoutToResearch,
   outlineToPlanEntries,
-  isDdgErrorText,
+  isMcpErrorBodyText,
   mergeResearchSources,
   scoreResearchSource,
   normalizeOutlineSections,
@@ -184,32 +184,32 @@ describe("normalizeOutlineSections (大纲规范化, 纯函数, 无凭证)", () 
 describe("mergeResearchSources (双源取优, 纯函数, 无凭证)", () => {
   const c7Docs =
     "LangGraph StateGraph API. Use Annotation.Root for state. Version 1.4 supports Command routing.";
-  const ddgFail =
-    "（搜索失败：DDG detected an anomaly in the request, you are likely making requests too quickly.）";
+  const webFail =
+    "（搜索失败：Error: rate limit detected, you are likely making requests too quickly.）";
 
-  it("Context7 成功 + DDG 失败 → 以 Context7 为主源", () => {
+  it("docs 源成功 + web 源失败 → 以文档库为主源", () => {
     const merged = mergeResearchSources(
       [
-        { source: "context7", text: c7Docs, ok: true, libraryId: "/langchain-ai/langgraph" },
-        { source: "duckduckgo", text: ddgFail, ok: false },
+        { source: "docs", text: c7Docs, ok: true, libraryId: "/langchain-ai/langgraph" },
+        { source: "web", text: webFail, ok: false },
       ],
       "langgraph StateGraph Command"
     );
-    expect(merged).toContain("Context7");
+    expect(merged).toContain("文档库");
     expect(merged).toContain("StateGraph");
-    expect(merged).not.toContain("DDG detected");
+    expect(merged).not.toContain("rate limit detected");
   });
 
   it("两路成功 → 高分为主、次高分为补充", () => {
     const merged = mergeResearchSources(
       [
         {
-          source: "duckduckgo",
+          source: "web",
           text: "Short web snippet about langgraph.",
           ok: true,
         },
         {
-          source: "context7",
+          source: "docs",
           text: c7Docs,
           ok: true,
           libraryId: "/langchain-ai/langgraph",
@@ -218,34 +218,34 @@ describe("mergeResearchSources (双源取优, 纯函数, 无凭证)", () => {
       "langgraph StateGraph"
     );
     expect(merged).toContain("主源");
-    expect(merged).toContain("Context7");
-    expect(scoreResearchSource("context7", c7Docs, true, "langgraph StateGraph", {
+    expect(merged).toContain("文档库");
+    expect(scoreResearchSource("docs", c7Docs, true, "langgraph StateGraph", {
       libraryId: "/langchain-ai/langgraph",
     })).toBeGreaterThan(
-      scoreResearchSource("duckduckgo", "Short web snippet about langgraph.", true, "langgraph StateGraph")
+      scoreResearchSource("web", "Short web snippet about langgraph.", true, "langgraph StateGraph")
     );
   });
 
   it("两路均失败 → 降级文案", () => {
     const merged = mergeResearchSources(
       [
-        { source: "context7", text: "（Context7 检索失败：timeout）", ok: false },
-        { source: "duckduckgo", text: ddgFail, ok: false },
+        { source: "docs", text: "（文档检索失败：timeout）", ok: false },
+        { source: "web", text: webFail, ok: false },
       ],
       "langgraph"
     );
-    expect(merged).toMatch(/检索失败|Context7|搜索失败/);
+    expect(merged).toMatch(/检索失败|文档检索|搜索失败/);
   });
 });
 
-describe("isDdgErrorText (DDG 限流正文检测, 纯函数, 无凭证)", () => {
-  it("识别 DDG anomaly / too quickly 类错误正文", () => {
+describe("isMcpErrorBodyText (MCP 限流正文检测, 纯函数, 无凭证)", () => {
+  it("识别 Error / rate limit / too quickly 类错误正文", () => {
     expect(
-      isDdgErrorText(
-        "Error: DDG detected an anomaly in the request, you are likely making requests too quickly."
+      isMcpErrorBodyText(
+        "Error: rate limit detected, you are likely making requests too quickly."
       )
     ).toBe(true);
-    expect(isDdgErrorText("正常搜索结果 snippet")).toBe(false);
+    expect(isMcpErrorBodyText("正常搜索结果 snippet")).toBe(false);
   });
 });
 

@@ -1,13 +1,14 @@
-/** 并行调研：research 子图（Context7 检索）+ Send 扇出。 */
+/** 并行调研：research 子图（平台文档 MCP）+ Send 扇出。 */
 
 export { createResearchSectionSubgraph } from "./research/subgraph.js";
-export { isDdgErrorText } from "./research/tools.js";
+export { isMcpErrorBodyText } from "./research/tools.js";
 export {
-  invokeContext7Search,
+  invokeDocRetrieval,
   extractBestLibraryId,
-  CONTEXT7_MCP,
-  CONTEXT7_TIMEOUT_MS,
-} from "./research/context7.js";
+  DOC_RETRIEVAL_TIMEOUT_MS,
+  type DocRetrievalMcp,
+  type DocRetrievalResult,
+} from "./research/doc-retrieval.js";
 export {
   mergeResearchSources,
   scoreResearchSource,

@@ -84,7 +84,7 @@ export async function planNode(
   const res = await invokeLLM(model, [
     new SystemMessage(
       `你是资深研究分析师。为给定主题制定一份研究报告大纲，包含 3-5 个章节（Section）。` +
-        `每章节含：title（标题）、query（检索关键词，英文优先）、libraryHint（可选，Context7 文档库名，如 langgraph、react、typescript；` +
+        `每章节含：title（标题）、query（检索关键词，英文优先）、libraryHint（可选，文档 MCP 库名提示，如 langgraph、react、typescript；` +
         `涉及具体框架/SDK/API 的章节应填写，纯概念/行业综述章节可省略或留空字符串）。` +
         `只输出 JSON 数组：[{"title":"...","query":"...","libraryHint":"..."}]，不要解释。` +
         (isReplan ? `\n上一轮评审意见（据此改进大纲）：${state.outlineCritique}` : "") +

@@ -3,6 +3,7 @@
  *
  * **联网搜索（强制）**：须到**平台**查找并添加搜索能力，再接入下方 SEARCH_MCP：
  *   dev-engineer-toolkit → search-apis.sh / get-config.sh mcpConfigs → 登记后填入 searchMcp
+ * **运行期**：搜索 MCP 经 ACP session/new 的 mcpServers 下发（合并 mcp.default.json，session-wins）。
  * 图逻辑见 ./graph.ts。
  */
 import type { FlowRuntime } from "../../../runtime/flow-runtime.js";

@@ -77,7 +77,7 @@
     },
     {
       "name": "DEEPAGENTS_DEFAULT_MCP",
-      "description": "Set to \"disabled\" to turn off the default MCP (e.g. context7).",
+      "description": "Set to \"disabled\" to turn off MCP loading.",
       "requiredAt": "runtime"
     },
     {

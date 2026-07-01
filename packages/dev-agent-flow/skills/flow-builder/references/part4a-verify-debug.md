@@ -1,7 +1,7 @@
 # Part 4a：验证与调试（强制）
 
 > 所属：`flow-builder` L2-D。入口路由见 [SKILL.md](../SKILL.md)。
-> 系统提示词 `<COMPLETION_GATE>` / `<DEBUG_LOGS>` 的**详细执行依据**在本层。
+> completion gate（完成闸门）与读日志排错的**详细执行依据**在本层；总清单见 [part0-workflow.md](part0-workflow.md) § completion gate 收尾清单。
 
 ## completion gate（完成闸门）
 
@@ -107,7 +107,7 @@ pnpm graph                   # export graph topology
 
 ## 典型错误：平台能力未登记 / 误用内置工具 / 未搜平台就报完成
 
-**规则**：Part 3 § 平台能力登记（**联网搜索较常见**，见 § 联网搜索）；system-prompt `<PLATFORM_CAPABILITIES>`、`<COMPLETION_GATE>`。
+**规则**：Part 3 § 平台能力登记 · § **ACP MCP 下发**（**联网搜索较常见**，见 § 联网搜索）；收工举证见 Part 0 § completion gate 收尾清单。
 
 ### completion gate 判定（需平台能力时 · 通用）
 
@@ -133,7 +133,7 @@ pnpm graph                   # export graph topology
 | 1 | 确认需**工作区外**能力（非仅 `grep`/`glob`） |
 | 2 | 是否已 `search-apis.sh --kw "<能力词>"` / `search-skills.sh` / `get-config.sh --key tools|mcpConfigs|skills`？ |
 | 3 | 命中是否已 `add-tool.sh` 并注册 `flow-tools.ts` 或 MCP 接线？ |
-| 4 | **联网**：另查 `mcpConfigs`、`searchMcp`；禁止 bash+curl 自写搜索 API |
+| 4 | **联网**：另查 `mcpConfigs`、`searchMcp`；运行期须经 **ACP `mcpServers`** 注入；禁止 bash+curl 自写搜索 API；禁止 `mcp.default.json` 内置搜索 server |
 | 5 | `pnpm exec tsx src/index.ts capabilities` 核对工具/MCP 列表 |
 | 6 | 仍不生效：查工具名、`.logs/` 中 `onToolCall` |
 

@@ -1,10 +1,10 @@
 /**
- * 双源检索结果合并 —— Context7 + DuckDuckGo 并行后取优（deep-research 示例专用）。
+ * 多源检索结果合并 —— 文档库 + 可选 web 源并行后取优（deep-research 示例专用）。
  */
 
-import { isDdgErrorText } from "./tools.js";
+import { isMcpErrorBodyText } from "./tools.js";
 
-export type ResearchSourceKind = "context7" | "duckduckgo";
+export type ResearchSourceKind = "docs" | "web";
 
 /** 单路检索结果（score 可由 mergeResearchSources 计算）。 */
 export interface ResearchSourceResult {
@@ -15,16 +15,16 @@ export interface ResearchSourceResult {
   libraryId?: string;
 }
 
-/** 判定检索正文是否为失败/空结果（含 DDG Error 正文）。 */
+/** 判定检索正文是否为失败/空结果（含 MCP Error 正文）。 */
 export function isSourceFailureText(text: string): boolean {
   const t = text.trim();
   if (!t) return true;
-  if (isDdgErrorText(t)) return true;
-  return /^（搜索失败|搜索无结果|Context7/i.test(t);
+  if (isMcpErrorBodyText(t)) return true;
+  return /^（搜索失败|搜索无结果|文档检索/i.test(t);
 }
 
 /**
- * 启发式打分（0–100）：用于双源取优，不调 LLM。
+ * 启发式打分（0–100）：用于多源取优，不调 LLM。
  */
 export function scoreResearchSource(
   source: ResearchSourceKind,
@@ -36,7 +36,7 @@ export function scoreResearchSource(
   if (!ok || isSourceFailureText(text)) return 0;
 
   let score = 0;
-  if (source === "context7" && opts.libraryId) score += 40;
+  if (source === "docs" && opts.libraryId) score += 40;
 
   const len = text.length;
   if (len >= 200 && len <= 2000) score += 20;
@@ -58,8 +58,8 @@ export function scoreResearchSource(
 }
 
 const SOURCE_LABEL: Record<ResearchSourceKind, string> = {
-  context7: "Context7 文档",
-  duckduckgo: "DuckDuckGo 网络",
+  docs: "文档库",
+  web: "网络检索",
 };
 
 /**

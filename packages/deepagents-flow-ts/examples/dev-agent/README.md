@@ -7,7 +7,7 @@
 | 能力 | 在哪看 | 框架原生 |
 | --- | --- | --- |
 | 标准 ReAct 图（think ↔ tools） | `createFlowGraph`（复用默认图） | LangGraph `StateGraph` + `toolsCondition` |
-| 真实工具调度 | `runtime.allTools`（bash/读写/grep·glob/http/context7 MCP） | `bindTools` + `ToolNode` |
+| 真实工具调度 | `runtime.allTools`（bash/读写/grep·glob/http + ACP 注入的 native MCP） | `bindTools` + `ToolNode` |
 | 会话持久化 / 跨重启续接 | `runtime.checkpointer`（FileCheckpointSaver）+ 同一 threadId | `BaseCheckpointSaver` |
 | 上下文压缩 | [`compactHistory`](../../src/app/compaction.ts)（单测覆盖；图内写回用 RemoveMessage 替换模式） | core `trimMessages` + LLM 摘要 |
 | Subagent | [`researcher.ts`](./researcher.ts)（subgraph） | LangGraph **subgraph** |
@@ -20,7 +20,7 @@
 export ANTHROPIC_API_KEY=...
 
 # 单次
-pnpm example dev-agent "用 context7 查 langgraph ToolNode 的用法，给我一个最小示例"
+pnpm example dev-agent "用已登记的文档 MCP 查 langgraph ToolNode 用法，给我一个最小示例"
 
 # 交互（多轮续接，同一 threadId → 历史累积 → 触发压缩）
 pnpm example dev-agent -i

@@ -14,9 +14,10 @@ export { fanoutToResearch } from "./fanout.js";
 
 export {
   createResearchSectionSubgraph,
-  isDdgErrorText,
+  isMcpErrorBodyText,
   mergeResearchSources,
   scoreResearchSource,
+  type DocRetrievalMcp,
 } from "./research.js";
 
 export {

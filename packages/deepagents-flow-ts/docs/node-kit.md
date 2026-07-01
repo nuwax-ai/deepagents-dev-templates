@@ -148,15 +148,15 @@ const tools = createToolExecNode<MyState>({
 
 ```ts
 const research = createMcpRetrievalNode<MyState>({
-  mcpServers: { context7: { command: "npx", args: ["-y", "@upstash/context7-mcp"] } },
-  retrieve: (s) => ({ server: "context7", tool: "query-docs", args: { libraryId: "/langchain-ai/langgraph", query: s.currentAspect } }),
+  mcpServers: { search: { command: "npx", args: ["-y", "@platform/search-mcp"] } },
+  retrieve: (s) => ({ server: "search", tool: "search", args: { query: s.currentAspect } }),
   write: (r, s) => ({ findings: [{ aspect: s.currentAspect, suggestion: r.ok ? r.text.slice(0, 800) : `（失败：${r.text}）` }] }),
   // rateLimited?: true（默认;Send 扇出必备）;timeoutMs?: 20000
 });
 ```
 
 - 与 createToolExecNode 互补:后者执行模型 tool_calls(ToolNode 模式);本 factory 是**主动检索**——节点自己决定调哪个 MCP server 的哪个 tool(RAG/调研)。内部 `rateLimited` 节流 + `runTool` 三态透出。
-- 多源并行取优(如 deep-research Context7 ∥ DDG + 启发式合并)**不收口**——保留 bespoke subgraph。
+- 多源并行取优(如 deep-research docs + web 启发式合并)**不收口**——保留 bespoke subgraph。
 - 例:[travel-planner research](../src/libs/topologies/travel-planner/graph.ts)。
 
 ## createHumanApprovalNode —— HITL 人审

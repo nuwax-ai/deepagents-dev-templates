@@ -4,7 +4,7 @@
  * **Agent 主路径（LangGraph 官方接入）**：`MultiServerMCPClient.getTools()` → `StructuredTool[]`
  * → think `bindTools` → `createToolExecNode` / `ToolNode`（见 runtime-context）。
  *
- * **本模块**：同一 `@langchain/mcp-adapters` client 上的按-server list/call，供 retrieve / context7 等
+ * **本模块**：同一 `@langchain/mcp-adapters` client 上的按-server list/call，供 retrieve / doc-retrieval 等
  * 主动检索节点；底层 `@modelcontextprotocol/sdk` Client.callTool。
  *
  * - 有状态 server（chrome-devtools）必须经 runtime 持久连接，不经「每次 call 新进程」。
@@ -284,7 +284,7 @@ export async function resolveAccessor(opts: {
 
 /**
  * 先 resolve 工具名再调用（单次自管临时 client 内 list→选名→call）。
- * context7.ts 等独立示例节点用；honors options.timeoutMs（SDK RequestOptions）。
+ * 独立文档检索节点用；honors options.timeoutMs（SDK RequestOptions）。
  */
 export async function callResolvedMcpTool(
   config: McpServerConfig,
@@ -302,7 +302,7 @@ export async function callResolvedMcpTool(
 
 /**
  * 全局节流：把并发调用串行化，每次之间至少间隔 minGapMs。
- * 接有 rate limit 的免费 API（如 DDG 1/秒）必备——图并行，但外部请求错峰执行。
+ * 接有 rate limit 的外部 API 时必备——图并行，但外部请求错峰执行。
  * 注：gate 是模块级全局，跨 server/session 共享串行（沿用旧实现；如需 per-server 节流另行改造）。
  */
 let gate: Promise<unknown> = Promise.resolve();

@@ -16,7 +16,7 @@ import { DEFAULT_RAG_CONFIG, type RAGResponse } from "./nodes/types.js";
 
 /** rag 检索 MCP 服务器配置（语义名 → server 配置）；scaffold spec.params.mcpServers 提供。 */
 export interface RagExecutorOptions {
-  /** 检索源 MCP 服务器（如 { context7: {...}, "duckduckgo": {...} }）。 */
+  /** 检索源 MCP 服务器（平台登记名 → 连接配置；运行期可经 ACP mcpServers 注入）。 */
   mcpServers?: CreateRAGGraphConfig["mcpServers"];
   /** 显式检索工具名；缺省取 mcpServers 的 key。 */
   retrievalTools?: string[];

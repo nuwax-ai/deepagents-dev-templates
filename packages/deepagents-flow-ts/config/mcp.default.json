@@ -1,10 +1,4 @@
 {
-  "_comment": "默认 MCP servers。更多示例（chrome-devtools 浏览抓取 / filesystem / bash）见 mcp.examples.json，复制到 servers 即可启用。",
-  "servers": {
-    "context7": {
-      "command": "npx",
-      "args": ["-y", "@upstash/context7-mcp"],
-      "description": "文档知识检索（library/framework/SDK 文档查询）—— 基础能力，默认启用"
-    }
-  }
+  "_comment": "默认 MCP servers（空）。联网搜索 / 文档检索等不由模板内置：开发期登记 mcpConfigs，运行期由 ACP session/new 的 mcpServers 下发并合并本文件（session-wins）。可选示例见 mcp.examples.json。",
+  "servers": {}
 }

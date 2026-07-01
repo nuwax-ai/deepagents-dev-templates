@@ -1,7 +1,7 @@
 /**
  * 旅行规划 flow 测试。
  *  - 纯函数（无凭证、确定性）：gather 解析 / fanout 扇出 —— 守住 map-reduce 的图拓扑。
- *  - 真实接入（skipIf 无凭证）：DuckDuckGo MCP 搜索 + LLM 整理 + HITL interrupt/resume 闭环。
+ *  - 真实接入（skipIf 无凭证）：平台搜索 MCP + LLM 整理 + HITL interrupt/resume 闭环。
  */
 
 import { config as loadDotenv } from "dotenv";
@@ -60,7 +60,7 @@ describe("travel gather / fanout (纯函数, 无凭证)", () => {
   });
 });
 
-// 真实接入：免 key 的 DuckDuckGo MCP 网络搜索 + LLM 整理。需凭证 + 网络。
+// 真实接入：平台搜索 MCP + LLM 整理。需凭证 + 已配置 searchMcp。
 describe.skipIf(!runIntegration)(
   "travel-planner flow (真实 MCP 搜索 + LLM, map-reduce + HITL)",
   () => {

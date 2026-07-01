@@ -14,16 +14,11 @@
   },
   "rag": {
     "enabled": true,
-    "retrievalTools": ["context7", "howtocook-mcp"],
+    "retrievalTools": ["howtocook-mcp"],
     "mcpServers": {
       "howtocook-mcp": {
         "command": "npx",
         "args": ["-y", "howtocook-mcp"],
-        "enabled": true
-      },
-      "context7": {
-        "command": "npx",
-        "args": ["-y", "@upstash/context7-mcp"],
         "enabled": true
       }
     },

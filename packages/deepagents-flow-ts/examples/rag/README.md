@@ -15,7 +15,7 @@ START → rewrite → retrieve → grade_docs ─(条件边)─┐
 | 节点 | 职责 |
 |---|---|
 | `rewrite` | 意图识别 + 查询重写 + 选检索源（[nodes/rewrite.ts](nodes/rewrite.ts)） |
-| `retrieve` | 调检索源（示例用 MCP：context7 / howtocook）（[nodes/retrieve.ts](nodes/retrieve.ts)） |
+| `retrieve` | 调检索源（示例用 MCP：howtocook；文档类 MCP 须经平台登记）（[nodes/retrieve.ts](nodes/retrieve.ts)） |
 | `grade_docs` + 条件边 | 编排核心：检索不足回 rewrite 重试，`MAX_RETRIEVE_ATTEMPTS` 封顶（[nodes/grade.ts](nodes/grade.ts)） |
 | `prepare` | 合并/去重/排序/截断上下文（[nodes/prepare.ts](nodes/prepare.ts)） |
 | `generate` | 基于上下文生成带 `[来源X]` 引用的回答（[nodes/generate.ts](nodes/generate.ts)） |

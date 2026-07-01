@@ -1,12 +1,12 @@
 /**
  * blueprint: travel-planner —— Map-reduce（Send 扇出）+ HITL。
  *
- *   gather → ⟨Send 并行⟩ research × 4（DDG 搜索）→ aggregate → confirm(interrupt) → finalize
+ *   gather → ⟨Send 并行⟩ research × 4（平台搜索 MCP）→ aggregate → confirm(interrupt) → finalize
  * 适合：多源信息聚合 + 人审确认的规划类任务（旅行、活动、采购方案）。
  * 图逻辑单一权威在 src/libs/topologies/travel-planner/；本 blueprint 只生成薄封装绑 spec。
  *
  * systemPrompt 注入主节点 aggregate（角色开场）；research/confirm/finalize 领域默认。
- * ⚠️ research 需传入可用搜索 MCP（searchMcp；duckduckgo 实测不稳定已移除），未传则优雅降级。
+ * research 需传入平台登记的搜索 MCP（searchMcp）；未传则优雅降级。
  */
 
 /** 拓扑 kind。 */

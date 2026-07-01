@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- deepagents-flow-ts：移除 duckduckgo-mcp-server 残留引用；联网搜索统一走平台 MCP 登记
+
 ### Fixed
 - CI workflow references `packages/template` → `packages/deepagents-app-ts`
 - Unified package manager to pnpm (added pnpm-lock.yaml, updated CI)

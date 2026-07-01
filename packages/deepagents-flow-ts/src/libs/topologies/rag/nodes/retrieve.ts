@@ -9,6 +9,8 @@
  * MCP 调用走 libs/mcp/mcp-access（基于 @langchain/mcp-adapters）：
  * 优先级 toolInvoker（agent 已加载工具回调）> 注入 mcpClient（持久，复用连接）>
  * 自管临时 client（createAccessorFromConfig，多 transport，用完 close）。不再自管 spawn→kill。
+ *
+ * 文档类 MCP（resolve-library-id + query-docs）按工具能力探测，不硬编码 server 名。
  */
 
 import { randomUUID } from "node:crypto";
@@ -19,6 +21,7 @@ import { logger } from "../../../../runtime/index.js";
 import type { ToolCallEvent } from "../../../../core/flow-types.js";
 import {
   resolveAccessor,
+  type McpAccessor,
   type McpServerConfig,
 } from "../../../mcp/mcp-access.js";
 
@@ -30,7 +33,7 @@ type RagServerConfig = McpServerConfig & { enabled?: boolean };
 
 /**
  * 通过 agent 框架已加载的 MCP 工具执行调用的回调。
- * toolName 是完整工具名（如 mcp__context7__query-docs），args 是参数对象。
+ * toolName 是完整工具名（如 mcp__docs__query-docs），args 是参数对象。
  * 有此回调时优先使用，避免 retrieve node 重复 spawn MCP 进程。
  */
 export type McpToolInvoker = (
@@ -58,9 +61,98 @@ export interface RetrieveNodeConfig {
   onToolCall?: (e: ToolCallEvent) => void | Promise<void>;
 }
 
+/** 从 resolve-library-id 类工具返回文本解析 library ID（取最高分或首个匹配）。 */
+function extractLibraryIdFromResolveText(text: string): string | null {
+  const blockPattern =
+    /(?:library ID|Library ID):\s*(\S+)[\s\S]*?(?:Benchmark Score|score):\s*([\d.]+)/gi;
+  let best: { id: string; score: number } | null = null;
+
+  let match: RegExpExecArray | null;
+  while ((match = blockPattern.exec(text)) !== null) {
+    const id = match[1]!;
+    const score = parseFloat(match[2]!);
+    if (!best || score > best.score) {
+      best = { id, score };
+    }
+  }
+  if (best) return best.id;
+
+  const labeled = text.match(/(?:library ID|Library ID):\s*(\S+)/i);
+  if (labeled?.[1]) return labeled[1];
+
+  const pathLike = text.match(/^\s*(\/[\w.-]+\/[\w.-]+)/m);
+  return pathLike?.[1] ?? null;
+}
+
+function toolNameIncludes(tools: string[], ...needles: string[]): string | undefined {
+  const lower = needles.map((n) => n.toLowerCase());
+  return tools.find((t) => lower.some((n) => t.toLowerCase().includes(n)));
+}
+
+/** 文档库 MCP：resolve-library-id → query-docs（工具名按 server 探测）。 */
+async function callDocLibraryViaInvoker(
+  serverName: string,
+  query: string,
+  invoker: McpToolInvoker,
+  keywords?: string[]
+): Promise<RetrievalResult | null> {
+  const resolveName = `mcp__${serverName}__resolve-library-id`;
+  const queryName = `mcp__${serverName}__query-docs`;
+  const libraryName = keywords?.[0] ?? query.split(/\s+/)[0] ?? query;
+
+  try {
+    const resolveText = await invoker(resolveName, { libraryName, query });
+    const libraryId = extractLibraryIdFromResolveText(resolveText);
+    if (libraryId) {
+      const docsText = await invoker(queryName, { libraryId, query });
+      return {
+        tool: serverName,
+        content: docsText,
+        metadata: { server: serverName, libraryId, query },
+      };
+    }
+    return {
+      tool: serverName,
+      content: resolveText,
+      metadata: { server: serverName, query },
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function callDocLibraryViaAccessor(
+  serverName: string,
+  query: string,
+  accessor: McpAccessor,
+  keywords?: string[]
+): Promise<RetrievalResult | null> {
+  const tools = await accessor.listTools();
+  const resolveTool = toolNameIncludes(tools, "resolve-library-id", "resolve_library_id");
+  const queryTool = toolNameIncludes(tools, "query-docs", "query_docs");
+  if (!resolveTool || !queryTool) return null;
+
+  const libraryName = keywords?.[0] ?? query.split(/\s+/)[0] ?? query;
+  const resolveText = await accessor.callTool(resolveTool, { libraryName, query });
+  const libraryId = extractLibraryIdFromResolveText(resolveText);
+
+  if (libraryId) {
+    const docsText = await accessor.callTool(queryTool, { libraryId, query });
+    return {
+      tool: serverName,
+      content: docsText,
+      metadata: { server: serverName, libraryId, query },
+    };
+  }
+  return {
+    tool: serverName,
+    content: resolveText,
+    metadata: { server: serverName, query },
+  };
+}
+
 /**
  * 通过 agent 框架 toolInvoker 调用 MCP 工具（避免 spawn 进程）。
- * 工具名称映射：toolName 是语义名（如 "context7"），invoker 使用完整工具名（如 "mcp__context7__query-docs"）。
  */
 async function callRetrievalToolViaInvoker(
   toolName: string,
@@ -69,17 +161,6 @@ async function callRetrievalToolViaInvoker(
   keywords?: string[]
 ): Promise<RetrievalResult> {
   const invoker = config.toolInvoker!;
-
-  if (toolName === "context7") {
-    const libraryName = keywords?.[0] ?? query.split(/\s+/)[0];
-    const resolveText = await invoker("mcp__context7__resolve-library-id", { libraryName, query });
-    const libraryId = extractBestLibraryId(resolveText);
-    if (libraryId) {
-      const docsText = await invoker("mcp__context7__query-docs", { libraryId, query });
-      return { tool: toolName, content: docsText, metadata: { server: toolName, libraryId, query } };
-    }
-    return { tool: toolName, content: resolveText, metadata: { server: toolName, query } };
-  }
 
   if (toolName === "howtocook-mcp") {
     const dishName = keywords?.[0] ?? query.split(/\s+/)[0];
@@ -91,7 +172,9 @@ async function callRetrievalToolViaInvoker(
     };
   }
 
-  // 通用 fallback：尝试以工具语义名直接调用
+  const docResult = await callDocLibraryViaInvoker(toolName, query, invoker, keywords);
+  if (docResult) return docResult;
+
   const raw = await invoker(toolName, { query });
   return { tool: toolName, content: raw, metadata: { server: toolName, query } };
 }
@@ -104,24 +187,20 @@ function selectTools(
   intent?: string,
   mcpHint?: string
 ): string[] {
-  // 如果有明确的 hint，优先使用
   if (mcpHint && availableTools.includes(mcpHint)) {
     return [mcpHint];
   }
 
-  // 根据意图选择工具（how_to 不预设 context7，技术类由 mcp_hint 驱动）
-  const intentToolMap: Record<string, string[]> = {
-    latest: ["context7"],
-    factual: ["context7"],
-    how_to: ["howtocook-mcp"],
-    comparison: ["context7"],
-    explain: ["context7"],
-  };
+  if (intent === "how_to" && availableTools.includes("howtocook-mcp")) {
+    return ["howtocook-mcp"];
+  }
 
-  const preferredTools = intentToolMap[intent || "factual"] || [];
-  const selected = preferredTools.filter((t) => availableTools.includes(t));
+  const nonCook = availableTools.filter((t) => t !== "howtocook-mcp");
+  if (nonCook.length > 0) {
+    return nonCook.slice(0, 3);
+  }
 
-  return selected.length > 0 ? selected : availableTools.slice(0, 3);
+  return availableTools.slice(0, 3);
 }
 
 /**
@@ -134,7 +213,6 @@ export async function retrieveNode(
 ): Promise<Partial<RAGState>> {
   const { rewritten_query, intent, mcp_hint, keywords } = state;
   const query = rewritten_query || state.query;
-  // 每执行一次检索就 +1，供 grade 的条件边判断是否还能重试（见 grade.ts）
   const attempts = (state.attempts ?? 0) + 1;
 
   if (!config.retrievalTools || config.retrievalTools.length === 0) {
@@ -143,12 +221,10 @@ export async function retrieveNode(
   }
 
   try {
-    // 根据意图和 mcp_hint 选择工具
     const toolsToUse = selectTools(config.retrievalTools, intent, mcp_hint);
 
     log.info("Using retrieval tools", { tools: toolsToUse, intent });
 
-    // 运行时 configurable 透传：onToolCall（工具调用过程回调）+ mcpClient（持久 MCP 连接）。
     const onToolCall =
       (lgConfig?.configurable?.onToolCall as RetrieveNodeConfig["onToolCall"]) ??
       config.onToolCall;
@@ -157,7 +233,6 @@ export async function retrieveNode(
       config.mcpClient;
     const effConfig: RetrieveNodeConfig = mcpClient ? { ...config, mcpClient } : config;
 
-    // 并行调用工具；每个工具发一次 tool_call 事件（供 surface 展示「工具调用过程」）。
     const results = await Promise.allSettled(
       toolsToUse.map(async (toolName) => {
         const toolCallId = onToolCall ? randomUUID() : "";
@@ -192,7 +267,6 @@ export async function retrieveNode(
       })
     );
 
-    // 收集成功的结果
     const raw_results: RetrievalResult[] = [];
     results.forEach((result, index) => {
       if (result.status === "fulfilled" && result.value) {
@@ -212,39 +286,13 @@ export async function retrieveNode(
   }
 }
 
-/**
- * 从 resolve-library-id 返回的文本中解析 Context7-compatible library ID。
- * 取 Benchmark Score 最高的那一条；如果无法解析则返回 null。
- *
- * 返回格式示例: "/langchain-ai/langgraph"
- */
-function extractBestLibraryId(text: string): string | null {
-  const blockPattern = /Context7-compatible library ID:\s*(\S+)[\s\S]*?Benchmark Score:\s*([\d.]+)/g;
-  let best: { id: string; score: number } | null = null;
-
-  let match: RegExpExecArray | null;
-  while ((match = blockPattern.exec(text)) !== null) {
-    const id = match[1];
-    const score = parseFloat(match[2]);
-    if (!best || score > best.score) {
-      best = { id, score };
-    }
-  }
-
-  if (best) return best.id;
-
-  // Fallback: 取第一个出现的 ID
-  const fallback = text.match(/Context7-compatible library ID:\s*(\S+)/);
-  return fallback ? fallback[1] : null;
-}
-
-/**
- * 解析 howtocook-mcp 返回的 JSON 内容，提取可读的菜谱文本。
- * 工具返回格式: '{"name":"...","description":"# 菜名\n..."}' 或 JSON 数组
- */
 function extractHowtocookContent(text: string): string {
   const tryParse = (s: string) => {
-    try { return JSON.parse(s); } catch { return null; }
+    try {
+      return JSON.parse(s);
+    } catch {
+      return null;
+    }
   };
   const data = tryParse(text);
   if (!data) return text;
@@ -263,9 +311,31 @@ function extractHowtocookContent(text: string): string {
   return text;
 }
 
+async function callHowtocookViaAccessor(
+  serverName: string,
+  query: string,
+  keywords: string[] | undefined,
+  accessor: McpAccessor
+): Promise<RetrievalResult> {
+  const tools = await accessor.listTools();
+  const recipeById = tools.find((n) => n.includes("getRecipeById"));
+  const byCategory = tools.find((n) => n.includes("ByCategory"));
+  const targetTool =
+    recipeById ?? byCategory ?? tools[0] ?? "mcp_howtocook_getRecipeById";
+
+  const dishName = keywords?.[0] ?? query.split(/\s+/)[0] ?? query;
+  const toolArgs = recipeById ? { query: dishName } : { query };
+
+  const result = await accessor.callTool(targetTool, toolArgs);
+  return {
+    tool: serverName,
+    content: extractHowtocookContent(result),
+    metadata: { server: serverName, tool: targetTool, query: dishName },
+  };
+}
+
 /**
  * 调用检索工具。优先级：toolInvoker > 注入 mcpClient > 自管临时 client（mcp-access）。
- * accessor.callTool 已返回提取后的纯文本（extractMcpText 内置），无需再 extract。
  */
 async function callRetrievalTool(
   toolName: string,
@@ -290,13 +360,10 @@ async function callRetrievalTool(
     viaClient: !!config.mcpClient,
   });
 
-  // 有 toolInvoker 时直接复用 agent 框架已加载的工具，避免任何额外 client。
   if (config.toolInvoker) {
     return callRetrievalToolViaInvoker(toolName, query, config, keywords);
   }
 
-  // 构造 accessor：注入持久 mcpClient 优先（该 server 已连则复用）；否则自管临时 client。
-  // resolveAccessor 处理「注入 client 中该 server 未连」的 fallback，并透传 timeout_ms。
   const { accessor, dispose } = await resolveAccessor({
     client: config.mcpClient,
     server: toolName,
@@ -304,55 +371,21 @@ async function callRetrievalTool(
     timeoutMs: config.retrieve.timeout_ms,
   });
   try {
-    if (toolName === "context7") {
-      // libraryName 用 keywords[0]（rewrite 提取的技术名词），query 用于相关性排序
-      const libraryName = keywords?.[0] ?? query.split(/\s+/)[0];
-      const resolveText = await accessor.callTool("resolve-library-id", { libraryName, query });
-      const libraryId = extractBestLibraryId(resolveText);
-
-      if (libraryId) {
-        const docsText = await accessor.callTool("query-docs", { libraryId, query });
-        return {
-          tool: toolName,
-          content: docsText,
-          metadata: { server: toolName, libraryId, query },
-        };
-      }
-      // resolve 没拿到 ID，把 resolve 文本作为上下文返回
-      return {
-        tool: toolName,
-        content: resolveText,
-        metadata: { server: toolName, query },
-      };
-    } else if (toolName === "howtocook-mcp") {
-      // 优先 getRecipeById（模糊匹配菜名），其次按分类，fallback 到第一个工具
-      const tools = await accessor.listTools();
-      const recipeById = tools.find((n) => n.includes("getRecipeById"));
-      const byCategory = tools.find((n) => n.includes("ByCategory"));
-      const targetTool =
-        recipeById ?? byCategory ?? tools[0] ?? "mcp_howtocook_getRecipeById";
-
-      // getRecipeById 用菜名关键词（keywords[0]）效果最好；其他工具回退到完整 query
-      const dishName = keywords?.[0] ?? query.split(/\s+/)[0];
-      const toolArgs = recipeById ? { query: dishName } : { query };
-
-      const result = await accessor.callTool(targetTool, toolArgs);
-      return {
-        tool: toolName,
-        content: extractHowtocookContent(result),
-        metadata: { server: toolName, tool: targetTool, query: dishName },
-      };
-    } else {
-      // 通用：使用第一个可用工具
-      const tools = await accessor.listTools();
-      const targetTool = tools[0] ?? "query";
-      const result = await accessor.callTool(targetTool, { query });
-      return {
-        tool: toolName,
-        content: result,
-        metadata: { server: toolName, tool: targetTool, query },
-      };
+    if (toolName === "howtocook-mcp") {
+      return callHowtocookViaAccessor(toolName, query, keywords, accessor);
     }
+
+    const docResult = await callDocLibraryViaAccessor(toolName, query, accessor, keywords);
+    if (docResult) return docResult;
+
+    const tools = await accessor.listTools();
+    const targetTool = tools[0] ?? "query";
+    const result = await accessor.callTool(targetTool, { query });
+    return {
+      tool: toolName,
+      content: result,
+      metadata: { server: toolName, tool: targetTool, query },
+    };
   } catch (error) {
     console.error(`[Retrieve] Error calling ${toolName}:`, error);
     throw error;

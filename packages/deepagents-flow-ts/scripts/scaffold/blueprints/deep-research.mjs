@@ -7,7 +7,7 @@
  *
  * spec.systemPrompt 不注入：deep-research 是多阶段领域 prompt（clarify/plan/research/draft/converse），
  * 通用 persona 不适配多阶段研究范式。
- * ⚠️ research 真实联网（Context7 MCP），需 npx + 网络 + 模型凭证。
+ * ⚠️ research 真实检索须平台登记 docMcp / searchMcp + 模型凭证。
  */
 
 /** 拓扑 kind。 */

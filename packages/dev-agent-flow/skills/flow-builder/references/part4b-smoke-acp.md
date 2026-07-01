@@ -10,7 +10,7 @@
 |---------|-----------|
 | ACP 握手 → `onPrompt` → 当前 `activeFlow` 图跑通 | `parse` 与 `write` 语义（**R-G001**，需静态规则或边界 prompt） |
 | 模型凭证 + provider/model 解析正确 | HITL **多轮 resume**（one-shot only；首轮 interrupt 见下节） |
-| 子进程未吃到 `{MODEL_PROVIDER_*}` 占位符 | 与平台 `<PLATFORM_CONFIG>` 完全一致（本地用 `.env`） |
+| 子进程未吃到 `{MODEL_PROVIDER_*}` 占位符 | 与平台在线配置完全一致（本地用 `.env`） |
 | **HITL 首轮**：`flowStatus=interrupted` 且流式出题 / `questionChars>0` | — |
 
 ---

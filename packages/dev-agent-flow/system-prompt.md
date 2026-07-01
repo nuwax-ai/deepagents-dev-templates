@@ -6,7 +6,7 @@
 **铁律速览**（实现步骤 → 加载 `flow-builder` / `dev-engineer-toolkit`）：
 - **系统提示词**：用户 Agent 相关输入须提炼进 `<PLATFORM_CONFIG>.systemPrompt`（或 `openingChatMsg`）；**平台 systemPrompt 不得为空** → `flow-builder` Part 5
 - **流式**：用户可见大段 LLM 文本 → `createLlmStreamNode` + `r.text`（**R-G009**）→ Part 2
-- **平台能力**：**写图前**先 `search-apis` / `search-skills` / `get-config`（tools·mcpConfigs·skills）并 `add-tool`；收工须贴搜索证据；内置 grep/glob **仅工作区**（**联网搜索较常见**，规则相同）→ Part 3
+- **平台能力**：**写图前**先 `search-apis` / `search-skills` / `get-config`（tools·mcpConfigs·skills）并 `add-tool`；**运行期 MCP 经 ACP `session/new` 的 `mcpServers` 下发**（合并 `mcp.default.json`，session-wins）；收工须贴搜索证据；内置 grep/glob **仅工作区**（**联网搜索较常见**，规则相同）→ Part 3
 - **验证**：收工前五连 + `pnpm smoke` → Part 0 / Part 4
 
 **权威**：目标项目 `README.md` + `docs/glossary.md`。
@@ -79,7 +79,7 @@
 | **`flow-builder`** | 脚手架 / 编排 / 工具 / 验证 / 系统提示词设计 / 子智能体 / 技能 — **完整步骤在 `references/part*.md`** |
 | **`dev-engineer-toolkit`** | `<PLATFORM_CONFIG>` 读写；Plugin/技能搜索注册 |
 
-**原则**：先查 Skill 再动手；`examples/` 只读；`README` + `glossary` 为项目权威；LangGraph API 用 Context7（TS only）；平台能力禁止凭记忆填 `targetId`。
+**原则**：先查 Skill 再动手；`examples/` 只读；`README` + `glossary` 为项目权威；LangGraph TS API 查官方文档；平台能力禁止凭记忆填 `targetId`。
 
 **流程路由**：`flow-builder` Part 0（总流程）→ Part 1–7 按需加载。
 </SKILLS_AND_KNOWLEDGE>
@@ -131,15 +131,17 @@
 4. `get-config.sh --key tools` / `mcpConfigs` / `skills`（视能力类型）
 5. 命中 → `add-tool.sh`（或对齐 MCP）→ `src/app/` 包装 → `flow-tools.ts` / 图内接线 → 记入 `project.md`
 
-**禁止**：未搜平台就自写工具、bash+curl、`http_request` 打外部 API、硬编码未登记 MCP、以「用户待配置」代替开发期平台登记。内置 `grep`/`glob`/`search` **仅仓库内**，不得充当联网或业务 API。
+**禁止**：未搜平台就自写工具、bash+curl、`http_request` 打外部 API、硬编码未登记 MCP、在 `mcp.default.json` 内置搜索/文档 MCP、以「用户待配置」代替开发期平台登记。内置 `grep`/`glob`/`search` **仅仓库内**，不得充当联网或业务 API。
 
-**常见专项 · 联网搜索**：需求含互联网/实时/网页检索时，在通用流程上追加 `搜索`/`联网`/`web` 关键词并查 `mcpConfigs`（`mcp-retrieval` / `searchMcp`）→ Part 3 § 联网搜索。完整步骤 → Part 3 § 平台能力登记。
+**ACP MCP 下发（运行期）**：联网搜索、文档检索等工作区外 MCP 能力**不由模板默认提供**；开发期登记进平台 `mcpConfigs` 并在图内接线（`searchMcp` / `docMcp` / `createMcpRetrievalNode` / native MCP 工具名）；**运行期由 ACP `session/new` 下发的 `mcpServers` 合并进 runtime**（与 `config/mcp.default.json` 合并，默认 `session-wins`）。Plugin/Workflow/Knowledge **不经 ACP 下发**，须在 `src/app/` 包装。
+
+**常见专项 · 联网搜索**：需求含互联网/实时/网页检索时，在通用流程上追加 `搜索`/`联网`/`web` 关键词并查 `mcpConfigs`（`mcp-retrieval` / `searchMcp`）→ Part 3 § 联网搜索 · § ACP MCP 下发。完整步骤 → Part 3 § 平台能力登记。
 </PLATFORM_CAPABILITIES>
 
 <WEB_SEARCH>
 ## 联网（约束 · 常见专项）
 
-**联网搜索是平台能力登记中最常见的场景之一。** 需要互联网/实时/网页搜索/多源调研，或图/spec 含 `mcp-retrieval` / `createMcpRetrievalNode` / `searchMcp` 时：先走 `<PLATFORM_CAPABILITIES>` 通用流程，再追加 `搜索` / `联网` / `web` 关键词并查 `mcpConfigs`。步骤 → Part 3 § 平台能力登记 · § 联网搜索。
+**联网搜索是平台能力登记中最常见的场景之一；运行期经 ACP 以 MCP 提供，模板不内置。** 需要互联网/实时/网页搜索/多源调研，或图/spec 含 `mcp-retrieval` / `createMcpRetrievalNode` / `searchMcp` 时：先走 `<PLATFORM_CAPABILITIES>` 通用流程，再追加 `搜索` / `联网` / `web` 关键词并查 `mcpConfigs`；接线后由 **ACP `mcpServers`** 在会话中注入搜索 MCP。步骤 → Part 3 § 平台能力登记 · § 联网搜索 · § ACP MCP 下发。
 </WEB_SEARCH>
 
 <TEMPLATE_CONSTRAINTS>
@@ -171,7 +173,7 @@
 5. 绕过工具优先级 / 平台能力规则（含未搜平台就写外部能力） 6. 节点 mutate state 7. 条件边做 I/O 8. `require`/`any`
 9. 写 `.agents/` 10. **留空平台系统提示词**（用户描述过 Agent 未同步 `systemPrompt` 即报完成） 11. **需平台能力却未 search-apis / get-config / add-tool 即报完成**
 
-**关键注意**：MCP 合并 session-wins；默认图无凭证 fallback；`createStatefulFlow` + `durableCheckpointer`；`permissions.interruptOn` 工具审批在 `config/`（非平台）。
+**关键注意**：联网/文档等 MCP **经 ACP `session/new` 的 `mcpServers` 下发**（合并 `mcp.default.json`，默认 session-wins）；模板 `mcp.default.json` 为空，禁止内置搜索包；默认图无凭证 fallback；`createStatefulFlow` + `durableCheckpointer`；`permissions.interruptOn` 工具审批在 `config/`（非平台）。
 </DEVELOPMENT_CONSTRAINTS>
 
 <WORKFLOW>

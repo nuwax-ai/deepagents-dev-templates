@@ -33,7 +33,7 @@
 |------|------|
 | Part 1 scaffold | R-G003、**R-G009**；`generate.mjs` 生成前跑 R-G001/R-G007/R-G009 lint；流式范例 `_example.translate-review`、`_example.multi-aspect-search` |
 | Part 2 编排 | 工厂用法；**流式输出**见 § 流式输出；硬规则以目标项目 R-G* 为准 |
-| Part 3 工具 | 平台能力登记 → `dev-engineer-toolkit`；**联网搜索**见 § 联网搜索；仓库内分层见目标项目 `docs/capabilities.md` |
+| Part 3 工具 | 平台能力登记 → `dev-engineer-toolkit`；**ACP MCP 下发**；**联网搜索**见 § 联网搜索；仓库内分层见目标项目 `docs/capabilities.md` |
 | Part 4 验证 | completion gate 五连；症状 → 目标项目 `docs/troubleshooting.md` |
 | Part 5 提示词 | R-G002；节点 `prompt` vs `systemPrompt`；禁止在入口乱加 `parseJson` |
 

@@ -4,7 +4,7 @@
  *
  * 把模板的全部能力串成一个可跑的 Agent（图逻辑已提升至 src/app/topologies/dev-agent.ts）：
  *  - 标准 LangGraph ReAct（prepare → think ↔ tools → respond），think 用 bindTools
- *  - 真实工具：bash / 文件读写 / search / http / context7 MCP（经 FlowRuntime.allTools）
+ *  - 真实工具：bash / 文件读写 / search / http / native MCP（经 FlowRuntime.allTools；ACP 下发）
  *  - 会话持久化：FileCheckpointSaver，多轮用同一 threadId → 跨重启续接历史
  *  - 上下文压缩：src/app/compaction.ts（单测覆盖）；图内写回需 RemoveMessage 替换模式
  *  - Subagent：researcher subgraph（见 ./researcher.ts），框架原生 subgraph 模式

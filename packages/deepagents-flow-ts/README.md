@@ -112,7 +112,7 @@ START → prepare → think(model.bindTools) ──(toolsCondition)──┐
 | `respond` | 取回答流式输出（onToken） | — |
 
 状态用标准消息流（`MessagesAnnotation`），自动进 `FileCheckpointSaver`（跨重启恢复 + interrupt/resume）。
-工具集来自 `FlowRuntime.allTools`（[src/app/flow-tools.ts](src/app/flow-tools.ts)）：bash / 文件读写 / grep·glob / http / json + **native MCP**（context7 等，经 `@langchain/mcp-adapters` 加载；`config/mcp.default.json` + ACP session `mcpServers` 合并）+ demo(echo/calculate/time) + 可选 `load_skill` / `task`（子智能体 subagent 委派，流式透出 token 与 `[subagent] tool` 调用）。
+工具集来自 `FlowRuntime.allTools`（[src/app/flow-tools.ts](src/app/flow-tools.ts)）：bash / 文件读写 / grep·glob / http / json + **native MCP**（经 `@langchain/mcp-adapters` 加载；**开发期**平台 `mcpConfigs` 登记 + **运行期** ACP session `mcpServers` 合并 `config/mcp.default.json`，默认 session-wins；**模板 default 为空，不内置搜索/文档 server**）+ demo(echo/calculate/time) + 可选 `load_skill` / `task`（子智能体 subagent 委派，流式透出 token 与 `[subagent] tool` 调用）。
 无模型凭证时 think 走 fallback（回显输入），图始终可跑、可测。见 [src/app/graph.ts](src/app/graph.ts)。
 
 **进阶模式**（并行 fan-out、HITL `interrupt`、subgraph 子智能体（subagent）、压缩、**durable stateful flow**：cross-restart resume / stage progress / recursion guard）见 [docs/flow-patterns.md](docs/flow-patterns.md)；
@@ -248,15 +248,16 @@ pnpm test
 
 ## 联网 / 外部检索
 
-> **需要联网搜索时**：模板**不提供**开箱即用的网页搜索。必须到**平台**查找并添加（开发 Agent 经 `dev-engineer-toolkit`：`search-apis.sh` → `add-tool.sh` / `mcpConfigs`），再在 app 层 `searchMcp` 或 `mcpServers` 接线。禁止用 `bash`+curl / `http_request` 替代平台已登记的搜索能力。
+> **需要联网搜索时**：模板**不提供**开箱即用的网页搜索。必须到**平台**查找并添加（开发 Agent 经 `dev-engineer-toolkit`：`search-apis.sh` → `add-tool.sh` / `mcpConfigs`），再在 app 层 `searchMcp` 或图内 `createMcpRetrievalNode` 接线。**运行期**搜索等 MCP 能力由 **ACP `session/new` 下发的 `mcpServers`** 注入 runtime（与 `config/mcp.default.json` 合并，默认 session-wins）。禁止用 `bash`+curl / `http_request` 替代平台已登记的搜索能力；禁止在 `mcp.default.json` 内置搜索 server。
 
 | 能力 | 代码落点 | 说明 |
 |------|----------|------|
 | 工作区检索 | `grep` / `glob` 工具（`createSearchTools`） | **非**联网；ReAct 默认图经 `flow-tools.ts` 注册 |
-| 图内 MCP 检索 | `createMcpRetrievalNode` | `travel-planner` / `search-aggregator` 的 `searchMcp`；`rag` / custom 的 `mcpServers` |
-| 自适应 RAG 网页搜索 | `adaptive-rag` `createWebSearchNode` + `searchMcp` | 平台登记搜索 MCP 后接入 |
+| 图内 MCP 检索 | `createMcpRetrievalNode` | `travel-planner` / `search-aggregator` 的 `searchMcp`；`deep-research` 的 `docMcp`；`rag` / custom 的 `mcpServers` |
+| 自适应 RAG 网页搜索 | `adaptive-rag` `createWebSearchNode` + `searchMcp` | 平台登记搜索 MCP 后接入；**运行期** ACP `mcpServers` |
 | 四路并行联网示例 | `src/app/flows/search-aggregator/` | fanout ×4 + `searchMcp` + aggregate |
-| 未配置搜索源 | `travel-planner` / `search-aggregator` research | `searchMcp` 缺省 → 优雅降级（提示去平台添加） |
+| 未配置搜索源 | `travel-planner` / `search-aggregator` research | `searchMcp` 缺省 → 优雅降级（提示去平台添加）；须开发期已搜平台举证 |
+| **ACP 下发** | `src/surfaces/acp/server.ts` | `session/new` → `mcpServers` 合并进 `loadConfig` → runtime MCP 工具 |
 
 云开发环境中平台 Plugin / `mcpConfigs` 登记由**开发 Agent 技能包**引导（见 README § 扩展阅读），不在本模板 `src/` 内实现。
 

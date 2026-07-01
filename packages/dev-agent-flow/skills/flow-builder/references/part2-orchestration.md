@@ -69,7 +69,7 @@ const aggregate = createLlmStreamNode<MyStateType>({
 - **ReAct 默认图**：`think` 走 messages 白名单另一条通路；勿与 topology 的 aggregate 节点混淆
 - **降级**：无 `onToken` 或模型无 `.stream()` → 退回 invoke；ACP 终态仍整段兜底（目标项目 README § 流式输出检查清单）
 
-详表 → 目标项目 `docs/node-kit.md` § createLlmStreamNode · **R-G009** · system-prompt `<STREAMING_OUTPUT>`。
+详表 → 目标项目 `docs/node-kit.md` § createLlmStreamNode · **R-G009** · 本 Part § 流式输出。
 
 ### createLlmNode 与 parseJson
 

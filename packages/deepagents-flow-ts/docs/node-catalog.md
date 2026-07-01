@@ -63,7 +63,7 @@
 |---|---|---|---|
 | **bindTools 的 ReAct think** | 默认图 think | think↔tools 循环里 think 既决策又写 AIMessage,与 ToolNode 耦合 | 用 `react-tools` topology preset,不手写 |
 | **文件交付** | deep-research delivery | interrupt 收路径 + 文件系统写 markdown/html | 手写;生成后改 |
-| **多源检索取优** | deep-research research 子图 | Context7 ∥ DDG 双源 + 启发式评分合并 | 手写 subgraph(mcp-retrieval 仅单源/简单多源) |
+| **多源检索取优** | deep-research research 子图 | 文档库 + 可选 web 源启发式合并（`docMcp` 须经平台登记 + ACP 注入） | 手写 subgraph(mcp-retrieval 仅单源/简单多源) |
 | **自定义 reducer** | deep-research findings 去重 merge | 业务特定聚合逻辑 | DSL 用 `string-array-append` 近似,生成后改 reducer |
 | **跨子图非平凡映射** | subgraph 与父图字段映射 | 共享 channel 映射 bespoke | 手写 |
 | **含 emitPlan/emitStage 副作用** | deep-research planNode | 节点内发结构化事件需访问 config | B.4 已增强（createLlmNode/Stream write 收 config）;用 createLlmNode 在 write 内 emit |

@@ -9,7 +9,7 @@
  * 韧性原语 → src/runtime/services/llm-resilience。
  *
  * LLM 调用约定（框架优先对照）：
- *  - 外部搜索 → Context7 文档检索（duckduckgo 实测不稳定已移除，原双源改单源）
+ *  - 外部搜索 → 平台登记文档 MCP（联网须经平台登记搜索 MCP + ACP 下发）
  *  - 确定性流水线步骤（plan/draft/review）→ invokeLLM 直调
  */
 

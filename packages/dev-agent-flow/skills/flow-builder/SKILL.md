@@ -1,6 +1,6 @@
 ---
 name: flow-builder
-description: "deepagents-flow-ts flow 开发（分层加载）：Part0 总流程；Part1–4 脚手架/编排/工具/验证；Part5 系统提示词；Part6–7 子智能体/技能。LangGraph API 用 Context7。"
+description: "deepagents-flow-ts flow 开发（分层加载）：Part0 总流程；Part1–4 脚手架/编排/工具/验证；Part5 系统提示词；Part6–7 子智能体/技能。LangGraph TS API 查官方文档。"
 tags: [flow, scaffold, orchestration, tools, mcp, prompt, subagent, stategraph, hitl, debug, deepagents-flow-ts]
 version: "3.0.0"
 ---
@@ -13,7 +13,7 @@ version: "3.0.0"
 flow-builder/
 ├── SKILL.md                 ← L1 入口（本文件）：路由 only
 └── references/
-    ├── part0-workflow.md          ← 端到端流程 / completion gate 清单 / Context7 / 内置工具
+    ├── part0-workflow.md          ← 端到端流程 / completion gate 清单 / LangGraph 文档 / 内置工具
     ├── part1-scaffold.md
     ├── part2-orchestration.md
     ├── part3-tools-config.md
@@ -47,7 +47,7 @@ flow-builder/
 | 子智能体 / subagent / 委派（平台或内置） | [part6-subagent.md](references/part6-subagent.md)；**禁止** `.agents/agents/` |
 | 技能 / skill（平台或内置） | [part7-skill.md](references/part7-skill.md)；**禁止**本地写 `.agents/skills/` |
 
-> LangGraph API → Context7：见 [part0-workflow.md](references/part0-workflow.md) § Context7。
+> LangGraph TS API → 官方文档：见 [part0-workflow.md](references/part0-workflow.md) § LangGraph 文档。
 
 ## 推荐路径
 
@@ -79,7 +79,7 @@ flow-builder/
 - **文档分工**：图规则 / factory API / 配置路径 / **术语** → 目标项目 `docs/`（**术语权威**：`docs/glossary.md`）；脚手架流程 / 平台登记 / **completion gate（完成闸门）** → 本技能 Part*（见 [README.md](../../../README.md) § 文档分工）。
 - 图是契约；factory 优先；**Bespoke nodes** 不硬塞 factory；`examples/` 只读；保护区不改。
 - **用户可见大段 LLM 输出**（compose / aggregate / draft / 修订稿）→ **`createLlmStreamNode`**（`write` 读 `r.text`）；**禁止** `createLlmNode`（仅 invoke，ACP 整段兜底）。custom spec 用 `type: "llm-stream"`；**R-G009**。
-- **平台能力（外部工具/MCP/Plugin/技能）** → **写图前**必须先 `dev-engineer-toolkit` 搜平台并 `add-tool`；收工须贴搜索证据；**联网搜索较常见**，见 Part 3 § 联网搜索；禁止未搜平台就写外部能力、禁止以「用户待配置」代替登记（见 Part 3 § 平台能力登记、`<PLATFORM_CAPABILITIES>`、Part 0 completion gate）。
+- **平台能力（外部工具/MCP/Plugin/技能）** → **写图前**必须先 `dev-engineer-toolkit` 搜平台并 `add-tool`；**MCP 运行期经 ACP `mcpServers` 下发**；收工须贴搜索证据；**联网搜索较常见**，见 Part 3 § 联网搜索 · § ACP MCP 下发；禁止未搜平台就写外部能力、禁止以「用户待配置」代替登记（见 Part 3 § 平台能力登记、Part 0 completion gate）。
 - **禁止写 `.agents/`**：内置能力写 `builtin/`（Part 6、Part 7）；平台能力走平台。
 - 有状态用 `createStatefulFlow`（**HITL durable stateful flow** 默认；`conversational: true` 为对话型；`dev-agent` **topology** `stateful-custom` 手写 run-loop 为例外，见 part2）。
 - **系统提示词非空** — 用户输入提炼进 `systemPrompt`；Part 5 § 用户输入提炼；收工 Part 0 清单

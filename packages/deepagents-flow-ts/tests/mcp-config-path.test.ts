@@ -33,13 +33,10 @@ describe("loadFlowConfig + MCP 默认路径", () => {
 });
 
 describe("createRuntimeContext 默认 MCP servers", () => {
-  it("用户 workspace cwd 不在包根时，仍合并 context7 等默认 server", () => {
+  it("默认 mcp.default.json 为空，无内置 MCP server", () => {
     const { appConfig } = loadFlowConfig({ workspaceRoot: ALIEN_WORKSPACE });
     const ctx = createRuntimeContext(appConfig, { cwd: ALIEN_WORKSPACE });
-    expect(ctx.mcpServerConfigs.context7).toMatchObject({
-      command: "npx",
-      args: ["-y", "@upstash/context7-mcp"],
-    });
+    expect(ctx.mcpServerConfigs).toEqual({});
   });
 
   it("ACP session 下发的 mcpServers 与默认合并（session-wins 同名覆盖）", () => {
@@ -47,14 +44,12 @@ describe("createRuntimeContext 默认 MCP servers", () => {
     const ctx = createRuntimeContext(appConfig, {
       cwd: ALIEN_WORKSPACE,
       mcpServers: {
-        context7: { command: "echo", args: ["acp-override"] },
+        "doc-mcp": { command: "echo", args: ["acp-override"] },
         whois: { command: "npx", args: ["-y", "@whois-mcp/example"] },
       },
     });
-    expect(Object.keys(ctx.mcpServerConfigs).sort()).toEqual(
-      ["context7", "whois"].sort()
-    );
-    expect(ctx.mcpServerConfigs.context7).toMatchObject({
+    expect(Object.keys(ctx.mcpServerConfigs).sort()).toEqual(["doc-mcp", "whois"].sort());
+    expect(ctx.mcpServerConfigs["doc-mcp"]).toMatchObject({
       command: "echo",
       args: ["acp-override"],
     });

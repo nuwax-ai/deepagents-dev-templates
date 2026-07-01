@@ -1,5 +1,5 @@
 {
-  "_comment": "可选 MCP 示例（不会被自动加载）。复制需要的 server 到 mcp.default.json 的 servers 即可启用。",
+  "_comment": "可选 MCP 示例（不会被自动加载）。复制需要的 server 到 mcp.default.json 的 servers，或经平台 mcpConfigs 登记。",
   "servers": {
     "chrome-devtools": {
       "command": "npx",
@@ -15,11 +15,6 @@
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-shell"],
       "description": "shell 执行（如偏好经 MCP 而非内置 bash 工具）—— 扩展能力"
-    },
-    "context7": {
-      "command": "npx",
-      "args": ["-y", "@upstash/context7-mcp"],
-      "description": "库文档检索（resolve-library-id + query-docs，免 key）—— 扩展能力"
     }
   }
 }
