@@ -19,7 +19,7 @@ pnpm build && pnpm typecheck && pnpm test && pnpm graph && pnpm smoke
 
 Scaffold 生成器自带快检（`typecheck && graph`）；**全量 completion gate 仍须上式五连**。
 
-**收尾清单**（persona 非空、R-G009、联网等）→ [part0-workflow.md](part0-workflow.md) § completion gate 收尾清单。
+**收尾清单**（系统提示词非空、R-G009、联网等）→ [part0-workflow.md](part0-workflow.md) § completion gate 收尾清单。
 
 **smoke 细则**（`.env` 模型解析、`activeFlow`、`SMOKE_PROMPT*`、占位符）→ [part4b-smoke-acp.md](part4b-smoke-acp.md)。
 

@@ -9,7 +9,7 @@
 |----|------|------|
 | 0 | 装依赖 | `package.json` 且无 `node_modules`/lock 变更 → `pnpm install`；`pyproject.toml` 且无 `.venv` → `uv sync --group dev` |
 | 1 | 读上下文 | `README.md`、`project.md`（无则创建，见 system-prompt `<PROJECT_MEMORY>`） |
-| 2 | Persona 基线 | `dev-engineer-toolkit` → `get-config.sh --key systemPrompt`（及 `openingChatMsg`）。若平台 **空/占位** 且用户已描述 Agent → **先于写图**走 [part5-prompt-design.md](part5-prompt-design.md) § 用户输入提炼 |
+| 2 | 系统提示词基线 | `dev-engineer-toolkit` → `get-config.sh --key systemPrompt`（及 `openingChatMsg`）。若平台 **空/占位** 且用户已描述 Agent → **先于写图**走 [part5-prompt-design.md](part5-prompt-design.md) § 用户输入提炼 |
 | 3 | 读模板文档 | `docs/glossary.md` → `flow-graph-rules.md` → `node-catalog.md` → `node-kit.md` → `config/flow-agent.config.json` |
 | 4 | 简报 | 项目状态 + 待办，再处理用户指令 |
 
@@ -20,7 +20,7 @@
 ## Phase 1：需求分析与 topology 选型
 
 1. **脚手架优先** → [part1-scaffold.md](part1-scaffold.md)（9 topologies = 8 presets + `custom`）
-2. **Persona 并行** → 用户 Agent 描述按 [part5](part5-prompt-design.md) § 用户输入提炼 **持续合并**；定稿后尽早同步平台，禁止收工仍空 `systemPrompt`
+2. **系统提示词并行** → 用户 Agent 描述按 [part5](part5-prompt-design.md) § 用户输入提炼 **持续合并**；定稿后尽早同步平台，禁止收工仍空 `systemPrompt`
 3. **命中 preset** → 写 spec → `node scripts/scaffold/generate.mjs <spec>` → 改 `activeFlow` → 进 Phase 2 生成路径
 4. **不命中** → 先用 `custom`；仍不行 → [part2-orchestration.md](part2-orchestration.md) 手写
 
@@ -65,7 +65,7 @@ spec → `generate.mjs` → `activeFlow` → part1 自验 → Phase 3
 | 6 | 图规则 → 目标项目 `docs/flow-graph-rules.md`（**R-G001+**） |
 | 7 | 用户可见输出 → **R-G009** `createLlmStreamNode` + `r.text`；手改 graph 同步 spec（**R-G003**） |
 | 8 | 工具 → [part3-tools-config.md](part3-tools-config.md) → `src/app/` → `createFlowTools()` |
-| 9 | persona → [part5](part5-prompt-design.md)；填 scaffold `systemPrompt`（若 topology 注入） |
+| 9 | 系统提示词 → [part5](part5-prompt-design.md)；填 scaffold `systemPrompt`（若 topology 注入） |
 | 10 | 更新 `project.md` |
 
 编排细节 → [part2-orchestration.md](part2-orchestration.md)
@@ -93,7 +93,7 @@ pnpm build && pnpm typecheck && pnpm test && pnpm graph && pnpm smoke
 2. 用户待操作事项、风险与后续
 3. `project.md` 已更新
 4. **`<PLATFORM_CONFIG>.systemPrompt` 非空且已回读**（`openingChatMsg` 若涉及）
-5. persona 提炼来源（用户哪些输入 → 哪一字段）
+5. 提示词提炼来源（用户哪些输入 → 哪一字段）
 
 ---
 

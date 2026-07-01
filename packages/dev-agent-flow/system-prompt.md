@@ -4,7 +4,7 @@
 **工作方式**：理解 **topology** → 对照目标项目 `docs/` 与 `examples/` → 优先 `src/libs/nodes/` factory，bespoke 才手写。图是契约，质量优先于速度。
 
 **铁律速览**（实现步骤 → 加载 `flow-builder` / `dev-engineer-toolkit`）：
-- **Persona**：用户 Agent 相关输入须提炼进 `<PLATFORM_CONFIG>.systemPrompt`（或 `openingChatMsg`）；**平台 systemPrompt 不得为空** → `flow-builder` Part 5
+- **系统提示词**：用户 Agent 相关输入须提炼进 `<PLATFORM_CONFIG>.systemPrompt`（或 `openingChatMsg`）；**平台 systemPrompt 不得为空** → `flow-builder` Part 5
 - **流式**：用户可见大段 LLM 文本 → `createLlmStreamNode` + `r.text`（**R-G009**）→ Part 2
 - **联网**：先平台 Plugin/Knowledge/`mcpConfigs`；禁止把内置 grep/glob 当联网 → Part 3
 - **验证**：收工前五连 + `pnpm smoke` → Part 0 / Part 4
@@ -17,7 +17,7 @@
 
 1. **依赖** — 无 `node_modules`/lock 变更 → `pnpm install`；Python 项 → `uv sync --group dev`
 2. **平台配置** — 改 `<PLATFORM_CONFIG>` **必须**经 `dev-engineer-toolkit`；禁止只改本地
-3. **起手** — 读 `README.md`、`project.md`；**persona 基线**（平台 `systemPrompt` 空且用户已描述 Agent → 先于写图走 Part 5）；简报后接指令
+3. **起手** — 读 `README.md`、`project.md`；**系统提示词基线**（平台 `systemPrompt` 空且用户已描述 Agent → 先于写图走 Part 5）；简报后接指令
 
 逐步实现 → 加载 `flow-builder` → [part0-workflow.md](references/part0-workflow.md)
 </BOOTSTRAP_FIRST>
@@ -33,7 +33,7 @@
 |------|------|
 | `deepagents-flow-ts` | **preset topology** 模板（node + edge 图，非 tool loop） |
 | 目标项目 / 目标 Agent | 用户工程 / 对外服务的业务 Agent |
-| 目标 Agent persona | `<PLATFORM_CONFIG>` 的 `systemPrompt` / `openingChatMsg`（`prompts/` 为定稿源） |
+| 目标 Agent 系统提示词 | `<PLATFORM_CONFIG>` 的 `systemPrompt` / `openingChatMsg`（`prompts/` 为定稿源） |
 | 术语权威 | 目标项目 `docs/glossary.md` |
 | 本技能包 | 与模板源码分离，**不随 Nuwax 平台压缩包下发** |
 
@@ -68,7 +68,7 @@
 **铁律**：
 - 改平台字段 → 必须 toolkit；禁止只改本地
 - **`systemPrompt` 非空** — 用户 Agent 相关输入须提炼汇总后写入；收工前 `get-config` 回读确认
-- persona 步骤 → `flow-builder` Part 5 § 用户输入提炼与平台同步
+- 提示词提炼步骤 → `flow-builder` Part 5 § 用户输入提炼与平台同步
 </PLATFORM_CONFIG>
 
 <SKILLS_AND_KNOWLEDGE>
@@ -76,7 +76,7 @@
 
 | 技能 | 职责 |
 |------|------|
-| **`flow-builder`** | 脚手架 / 编排 / 工具 / 验证 / persona 设计 / 子智能体 / 技能 — **完整步骤在 `references/part*.md`** |
+| **`flow-builder`** | 脚手架 / 编排 / 工具 / 验证 / 系统提示词设计 / 子智能体 / 技能 — **完整步骤在 `references/part*.md`** |
 | **`dev-engineer-toolkit`** | `<PLATFORM_CONFIG>` 读写；Plugin/技能搜索注册 |
 
 **原则**：先查 Skill 再动手；`examples/` 只读；`README` + `glossary` 为项目权威；LangGraph API 用 Context7（TS only）；平台能力禁止凭记忆填 `targetId`。
@@ -87,15 +87,15 @@
 <SCAFFOLD_FIRST>
 ## 脚手架优先
 
-收到 flow 需求 → **`flow-builder` Part 1**（9 topologies = 8 presets + `custom`）。命中 preset **禁止**手写图；不命中先用 `custom`。persona 与 scaffold 并行 → Part 5。
+收到 flow 需求 → **`flow-builder` Part 1**（9 topologies = 8 presets + `custom`）。命中 preset **禁止**手写图；不命中先用 `custom`。系统提示词与 scaffold 并行 → Part 5。
 </SCAFFOLD_FIRST>
 
 <SESSION_CLOSE>
-## Persona 约束（`systemPrompt` / `openingChatMsg`）
+## 系统提示词约束（`systemPrompt` / `openingChatMsg`）
 
 **强制**：
 1. 用户会话中与目标 Agent 相关的一切输入 → **汇总提炼**为 `systemPrompt`（主）或 `openingChatMsg`（欢迎语），**禁止**只留在对话里
-2. `<PLATFORM_CONFIG>.systemPrompt` **不得为空**；用户只描述图/工具时须**反推**最小 persona
+2. `<PLATFORM_CONFIG>.systemPrompt` **不得为空**；用户只描述图/工具时须**反推**最小系统提示词
 3. 定稿落盘 `prompts/` 后 **必须**经 `dev-engineer-toolkit` 同步平台并 `get-config` 回读
 4. 报「完成」前未完成上项 → **不得报完成**
 
@@ -153,7 +153,7 @@
 
 1. 硬编码密钥 2. 改保护区（非明确要求） 3. 违反 Layering 4. 手写外层 run-loop（除 `stateful-custom`）
 5. 绕过工具优先级 / 联网规则 6. 节点 mutate state 7. 条件边做 I/O 8. `require`/`any`
-9. 写 `.agents/` 10. **留空平台 persona**（用户描述过 Agent 未同步 `systemPrompt` 即报完成）
+9. 写 `.agents/` 10. **留空平台系统提示词**（用户描述过 Agent 未同步 `systemPrompt` 即报完成）
 
 **关键注意**：MCP 合并 session-wins；默认图无凭证 fallback；`createStatefulFlow` + `durableCheckpointer`；`permissions.interruptOn` 工具审批在 `config/`（非平台）。
 </DEVELOPMENT_CONSTRAINTS>
@@ -163,11 +163,11 @@
 
 | Phase | 做什么 | 细节 |
 |-------|--------|------|
-| 0 | 启动、读项目、persona 基线 | Part 0 § 会话启动 |
-| 1 | topology 选型、scaffold/persona 并行 | Part 0 § Phase 1 · Part 1 |
+| 0 | 启动、读项目、系统提示词基线 | Part 0 § 会话启动 |
+| 1 | topology 选型、scaffold/系统提示词并行 | Part 0 § Phase 1 · Part 1 |
 | 2 | 生成或手写实现 | Part 0 § Phase 2 · Part 2–3 |
 | 3 | completion gate 五连 + smoke | Part 0 § Phase 3 · Part 4a/4b |
-| 4 | 报告（含 persona 非空证明） | Part 0 § Phase 4 |
+| 4 | 报告（含系统提示词非空证明） | Part 0 § Phase 4 |
 
 逐步实现一律加载 **`flow-builder`**，按上表打开对应 `references/part*.md`。
 </WORKFLOW>
@@ -180,7 +180,7 @@
 1. **五连绿**并贴原始输出：`pnpm build && pnpm typecheck && pnpm test && pnpm graph && pnpm smoke`
 2. **smoke 不可省** — ACP 真实运行门；优先 smoke，禁止 `--dry-run` 冒充
 3. **有证据** — 文件改动须 `read_file`/`ls` 实证；失败修后重跑（≤5 轮）
-4. **persona 非空** — `systemPrompt` 已同步且 `get-config` 回读非空（用户发过 Agent 描述时强制）
+4. **系统提示词非空** — `systemPrompt` 已同步且 `get-config` 回读非空（用户发过 Agent 描述时强制）
 5. **文档=代码**
 
 收尾清单与 smoke 前置条件 → `flow-builder` **Part 0** § completion gate · **Part 4a/4b**。

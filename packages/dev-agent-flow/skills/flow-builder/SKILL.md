@@ -1,6 +1,6 @@
 ---
 name: flow-builder
-description: "deepagents-flow-ts flow 开发（分层加载）：Part0 总流程；Part1–4 脚手架/编排/工具/验证；Part5 persona；Part6–7 子智能体/技能。LangGraph API 用 Context7。"
+description: "deepagents-flow-ts flow 开发（分层加载）：Part0 总流程；Part1–4 脚手架/编排/工具/验证；Part5 系统提示词；Part6–7 子智能体/技能。LangGraph API 用 Context7。"
 tags: [flow, scaffold, orchestration, tools, mcp, prompt, subagent, stategraph, hitl, debug, deepagents-flow-ts]
 version: "2.8.0"
 ---
@@ -51,11 +51,11 @@ flow-builder/
 ## 推荐路径
 
 ```
-会话启动 → part0（依赖 / persona 基线 / 读 docs）
+会话启动 → part0（依赖 / 系统提示词基线 / 读 docs）
 需求 → part1 命中？→ 生成 → part4a + part4b-smoke-acp
               └ custom？→ part1 custom → part4a + part4b
                     └ part2 → part3? → part4a
-persona / 用户输入提炼？→ part5（含平台同步）→ dev-engineer-toolkit
+系统提示词 / 用户输入提炼？→ part5（含平台同步）→ dev-engineer-toolkit
 收工清单 → part0 § completion gate 收尾清单 + part4a
 ```
 
@@ -79,5 +79,5 @@ persona / 用户输入提炼？→ part5（含平台同步）→ dev-engineer-to
 - **联网/实时搜索** → 必须先 `dev-engineer-toolkit` 搜平台 Plugin/Knowledge/`mcpConfigs` 并注册；**禁止**把内置 `grep`/`search` 当联网、禁止未搜平台就 bash/curl/自写搜索 API（见 Part 3 § 联网搜索、`<WEB_SEARCH>`）。
 - **禁止写 `.agents/`**：内置能力写 `builtin/`（Part 6、Part 7）；平台能力走平台。
 - 有状态用 `createStatefulFlow`（**HITL durable stateful flow** 默认；`conversational: true` 为对话型；`dev-agent` **topology** `stateful-custom` 手写 run-loop 为例外，见 part2）。
-- **persona 非空** — 用户输入提炼进 `systemPrompt`；Part 5 § 用户输入提炼；收工 Part 0 清单
+- **系统提示词非空** — 用户输入提炼进 `systemPrompt`；Part 5 § 用户输入提炼；收工 Part 0 清单
 - 未跑通 part4 禁止报 done。
