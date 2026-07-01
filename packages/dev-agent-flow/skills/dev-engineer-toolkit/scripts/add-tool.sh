@@ -58,19 +58,9 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# ---- 环境变量检查 ----
-if [[ -z "${PLATFORM_BASE_URL:-}" ]]; then
-    echo "[ERROR] 环境变量 PLATFORM_BASE_URL 未设置。" >&2
-    exit 2
-fi
-
-if [[ -z "${SANDBOX_ACCESS_KEY:-}" ]]; then
-    echo "[ERROR] 环境变量 SANDBOX_ACCESS_KEY 未设置。" >&2
-    exit 2
-fi
-
-if [[ -z "${DEV_AGENT_ID:-}" ]]; then
-    echo "[ERROR] 环境变量 DEV_AGENT_ID 未设置。" >&2
+# ---- 平台运行时检查 ----
+if [[ -z "${PLATFORM_BASE_URL:-}" || -z "${SANDBOX_ACCESS_KEY:-}" || -z "${DEV_AGENT_ID:-}" ]]; then
+    echo "[ERROR] 平台运行时未就绪，请确认在沙箱环境中执行。" >&2
     exit 2
 fi
 
@@ -106,7 +96,7 @@ if ! [[ "$TARGET_ID" =~ ^[0-9]+$ ]]; then
 fi
 
 if ! [[ "$DEV_AGENT_ID" =~ ^[0-9]+$ ]]; then
-    echo "[ERROR] 环境变量 DEV_AGENT_ID 必须是正整数。" >&2
+    echo "[ERROR] 项目标识无效。" >&2
     exit 1
 fi
 

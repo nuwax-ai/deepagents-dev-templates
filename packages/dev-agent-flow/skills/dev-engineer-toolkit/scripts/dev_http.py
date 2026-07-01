@@ -23,7 +23,7 @@ def configure_stdio_utf8() -> None:
 def require_env(name: str) -> str:
     val = os.environ.get(name, "")
     if not val:
-        print(f"[ERROR] 环境变量 {name} 未设置。", file=sys.stderr)
+        print("[ERROR] 平台运行时未就绪，请确认在沙箱环境中执行。", file=sys.stderr)
         sys.exit(2)
     return val
 
@@ -33,7 +33,7 @@ def dev_agent_id() -> int:
     try:
         return int(val)
     except ValueError:
-        print(f"[ERROR] 环境变量 DEV_AGENT_ID 必须是正整数，得到：{val}", file=sys.stderr)
+        print("[ERROR] 项目标识无效。", file=sys.stderr)
         sys.exit(1)
 
 
@@ -92,7 +92,7 @@ def api_request(method: str, path: str, body: dict | None = None) -> tuple[int, 
 
 def ensure_http_ok(status: int, payload: dict) -> dict:
     if status == 404:
-        print(f"[ERROR] Agent 不存在: {os.environ.get('DEV_AGENT_ID', '')}", file=sys.stderr)
+        print("[ERROR] 当前项目不存在。", file=sys.stderr)
         sys.exit(3)
     if status != 200:
         print(f"[ERROR] API 返回 HTTP 错误 ({status}):", file=sys.stderr)

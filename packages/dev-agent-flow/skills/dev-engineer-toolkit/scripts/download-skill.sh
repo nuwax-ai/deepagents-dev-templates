@@ -57,19 +57,9 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# ---- 环境变量检查 ----
-if [[ -z "${PLATFORM_BASE_URL:-}" ]]; then
-    echo "[ERROR] 环境变量 PLATFORM_BASE_URL 未设置。" >&2
-    exit 2
-fi
-
-if [[ -z "${SANDBOX_ACCESS_KEY:-}" ]]; then
-    echo "[ERROR] 环境变量 SANDBOX_ACCESS_KEY 未设置。" >&2
-    exit 2
-fi
-
-if [[ -z "${DEV_SPACE_ID:-}" ]]; then
-    echo "[ERROR] 环境变量 DEV_SPACE_ID 未设置。" >&2
+# ---- 平台运行时检查 ----
+if [[ -z "${PLATFORM_BASE_URL:-}" || -z "${SANDBOX_ACCESS_KEY:-}" || -z "${DEV_SPACE_ID:-}" ]]; then
+    echo "[ERROR] 平台运行时未就绪，请确认在沙箱环境中执行。" >&2
     exit 2
 fi
 

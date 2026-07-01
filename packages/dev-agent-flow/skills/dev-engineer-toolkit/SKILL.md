@@ -2,14 +2,14 @@
 name: dev-engineer-toolkit
 description: "当开发项目需要搜索可用工具（API）、可用技能（SKILL）、或进行项目配置（系统提示词、开场白等智能体配置）时使用。这是开发工程师的基础技能包，所有涉及额外API接口查询、技能发现、项目配置读写的场景都必须使用本技能。Keywords: API搜索, 技能搜索, 项目配置, 系统提示词, 开场白, agent配置, 工具搜索, tool search, skill discovery"
 tags: [api-search, skill-search, project-config, dev-toolkit, agent-config, tool-discovery]
-version: "1.2.0"
+version: "1.3.0"
 ---
 
 # 开发工程师工具包
 
 ## 概述
 
-本技能为开发工程师Agent 提供四大基础能力：
+本技能为开发工程师 Agent 提供下列基础能力：
 
 | 能力 | 说明 | 脚本 |
 |------|------|------|
@@ -32,18 +32,7 @@ version: "1.2.0"
 3. **需要读取项目配置时** — 需要获取当前项目的系统提示词、开场白、模型设置等配置信息时，使用 `get-config.sh`。
 4. **需要更新项目配置时** — 用户要求修改系统提示词、开场白、或任何项目级配置时，**必须**使用 `update-config.sh` 通过接口更新，不要仅本地修改文件。
 
-### 环境准备
-
-所有脚本依赖以下环境变量（在实际运行环境中由平台注入，脚本内部自动读取，用户无需传入）：
-
-| 环境变量 | 说明 | 使用脚本 |
-|----------|------|----------|
-| `PLATFORM_BASE_URL` | 平台 API 基础地址 | 全部 |
-| `SANDBOX_ACCESS_KEY` | 沙箱认证密钥（作为 Bearer Token 传递） | 全部 |
-| `DEV_SPACE_ID` | 开发空间 ID | search-apis.sh, search-skills.sh, download-skill.sh |
-| `DEV_AGENT_ID` | 开发的 Agent ID | add-tool.sh, remove-tool.sh, get-config.sh, update-config.sh（内部读取） |
-
-脚本在缺失必需环境变量时会输出明确错误并退出。
+所有脚本由平台沙箱运行时自动配置，直接执行即可，无需传入认证或项目标识参数。
 
 ### UTF-8 / Windows 编码（配置读写必读）
 
@@ -81,9 +70,7 @@ version: "1.2.0"
 | `python` / `py -3` | Windows 上最常见可用入口 |
 | `uv` | **不保证**在 PATH 中；有则 `check-python.sh --install` 可安装 Python |
 
-环境变量：`DEV_TOOLKIT_UV_PYTHON`（默认 `3.12`）、`UV_PYTHON_DOWNLOADS=automatic`、`DEV_TOOLKIT_SKIP_UV=1` 禁止自动 uv 安装。
-
-`update-config.sh` 启动时会自动探测；仅当 `python`/`py -3` 都不可用且 PATH 有 `uv` 时，才尝试 `uv python install`。
+Python 环境由 `check-python.sh` 自动探测，缺失时可用 `--install`（需 PATH 中有 uv）。`update-config.sh` 启动时会自动探测；仅当 `python`/`py -3` 都不可用且 PATH 有 `uv` 时，才尝试 `uv python install`。
 
 ---
 
@@ -141,7 +128,7 @@ version: "1.2.0"
 
 > `targetType` 枚举：`Plugin`（插件 API）、`Workflow`（工作流 API）、`Knowledge`（知识库）、`Skill`（技能）
 
-> ⚠️ **环境变量占位约束**：搜索结果中 `schema` 字段包含 `${PLATFORM_BASE_URL}`、`${SANDBOX_ACCESS_KEY}`、`${DEV_SPACE_ID}` 等系统环境变量占位符。在使用这些 API 时**必须保持占位符原样**，不得将占位符替换为实际值硬编码。运行时由平台注入对应环境变量即可自动解析。
+> ⚠️ **schema 占位约束**：搜索结果中 `schema` 字段可能包含 `${...}` 占位符。在使用这些 API 时**必须保持占位符原样**，禁止替换为字面量或硬编码 URL/密钥。
 
 **退出码：**
 
@@ -149,7 +136,7 @@ version: "1.2.0"
 |----|------|
 | 0 | 成功 |
 | 1 | 参数错误 |
-| 2 | 环境变量缺失（`PLATFORM_BASE_URL`、`SANDBOX_ACCESS_KEY`、`DEV_SPACE_ID`） |
+| 2 | 平台运行时未就绪（脚本依赖的沙箱配置缺失） |
 | 3 | HTTP 请求失败 |
 | 4 | 业务错误（`code` ≠ `0000`） |
 
@@ -207,7 +194,7 @@ version: "1.2.0"
 |----|------|
 | 0 | 成功 |
 | 1 | 参数错误 |
-| 2 | 环境变量缺失 |
+| 2 | 平台运行时未就绪（脚本依赖的沙箱配置缺失） |
 | 3 | HTTP 请求失败 |
 | 4 | 业务错误（`code` ≠ `0000`） |
 
@@ -253,7 +240,7 @@ version: "1.2.0"
 |----|------|
 | 0 | 注册成功 |
 | 1 | 参数错误 |
-| 2 | 环境变量缺失 |
+| 2 | 平台运行时未就绪（脚本依赖的沙箱配置缺失） |
 | 3 | HTTP 请求失败 |
 | 4 | 业务错误（`code` ≠ `0000`） |
 
@@ -287,7 +274,7 @@ version: "1.2.0"
 |----|------|
 | 0 | 删除成功 |
 | 1 | 参数错误 |
-| 2 | 环境变量缺失 |
+| 2 | 平台运行时未就绪（脚本依赖的沙箱配置缺失） |
 | 3 | HTTP 请求失败 |
 | 4 | 业务错误 |
 
@@ -326,7 +313,7 @@ version: "1.2.0"
 |----|------|
 | 0 | 下载解压成功 |
 | 1 | 参数错误 |
-| 2 | 环境变量缺失 |
+| 2 | 平台运行时未就绪（脚本依赖的沙箱配置缺失） |
 | 3 | 查询或下载失败 |
 
 ---
@@ -391,7 +378,7 @@ version: "1.2.0"
 |----|------|
 | 0 | 成功 |
 | 1 | 参数错误 |
-| 2 | 环境变量缺失 |
+| 2 | 平台运行时未就绪（脚本依赖的沙箱配置缺失） |
 | 3 | HTTP 请求失败 |
 | 4 | 业务错误 |
 
@@ -434,7 +421,7 @@ version: "1.2.0"
 |----|------|
 | 0 | 更新成功 |
 | 1 | 参数错误 |
-| 2 | 环境变量缺失 |
+| 2 | 平台运行时未就绪（脚本依赖的沙箱配置缺失） |
 | 3 | HTTP 请求失败 |
 | 4 | 业务错误 |
 
@@ -468,7 +455,7 @@ version: "1.2.0"
 
 2. 根据工具的 schema 进行实际开发
    - 使用搜索结果中 schema 字段的接口定义（method, url, params 等）
-   - 保持 schema 中的 ${...} 环境变量占位符，不硬编码
+   - 保持 schema 中的 ${...} 占位符，不硬编码
 ```
 
 > ⚠️ **注册是调用前提**：搜索到的 Plugin、Workflow、Knowledge、Skill 必须先通过 `add-tool.sh` 注册才能调用。
@@ -497,7 +484,7 @@ version: "1.2.0"
 
 ```
 1. 整理所有需要配置的键值对
-2. 逐项执行 update-config.sh（或准备配置文件用 --value-file）
+2. 逐项执行 update-config.sh（长文本用 `--system-prompt-file` / `--opening-msg-file`）
 3. 最后执行 get-config.sh（不带 --key）确认全量配置正确
 ```
 
@@ -509,13 +496,13 @@ version: "1.2.0"
 - ❌ **绕过搜索直接造轮子**：开发新功能前不搜索是否有现成 API/技能，导致重复实现。
 - ❌ **直接修改配置文件**：手动编辑项目配置文件而非使用配置接口更新，导致配置不同步或格式错误。
 - ❌ **假设 API 存在**：不执行搜索就假设某个接口存在，直接编写调用代码。
-- ❌ **替换环境变量占位符**：把搜索到的 API schema 中 `${PLATFORM_BASE_URL}`、`${SANDBOX_ACCESS_KEY}` 等占位符替换为实际值硬编码，导致代码不可移植。
-- ❌ **把 API 地址/Token 硬编码**：在 SKILL.md 或脚本中硬编码接口地址，应通过环境变量注入。
+- ❌ **替换 schema 占位符**：把搜索到的 API schema 中 `${...}` 占位符替换为字面量或硬编码 URL/密钥，导致代码不可移植。
+- ❌ **把 API 地址/Token 硬编码**：在代码或文档中硬编码接口地址或认证信息。
+- ❌ **手写 HTTP 调用平台接口**：应使用 `scripts/*.sh`，不要绕过脚本直接 curl。
 - ❌ **python3 失败就改手写 curl**：应先 `check-python.sh --install`，仍用 `update-config.sh`
 - ❌ **命令行内联多行中文**：应使用 `--system-prompt-file` 读 UTF-8 文件
 - ❌ **忽略返回值**：执行配置更新后不检查返回的 `code`/`success` 字段，可能导致静默失败
 - ✅ **先搜后用**：任何功能开发前，先用对应脚本检索平台已有资源。
 - ✅ **配置走接口**：所有项目配置的读写统一通过 `get-config.sh` / `update-config.sh`（UTF-8 安全的 Python 实现）。
 - ✅ **中文用文件上传**：长系统提示词用 `--system-prompt-file` 指向 UTF-8 文件
-- ✅ **环境变量占位保留**：使用搜索到的 API 时，schema 中的 `${...}` 占位符保持原样，由运行时平台注入。
-- ✅ **环境变量注入**：API 地址通过 `PLATFORM_BASE_URL`、认证通过 `SANDBOX_ACCESS_KEY`、空间 ID 通过 `DEV_SPACE_ID` 环境变量注入。
+- ✅ **占位符原样保留**：使用搜索到的 API 时，schema 中的 `${...}` 占位符保持原样，由运行时平台解析。
