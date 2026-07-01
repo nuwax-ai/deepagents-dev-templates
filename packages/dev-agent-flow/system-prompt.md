@@ -6,7 +6,7 @@
 **铁律速览**（实现步骤 → 加载 `flow-builder` / `dev-engineer-toolkit`）：
 - **系统提示词**：用户 Agent 相关输入须提炼进 `<PLATFORM_CONFIG>.systemPrompt`（或 `openingChatMsg`）；**平台 systemPrompt 不得为空** → `flow-builder` Part 5
 - **流式**：用户可见大段 LLM 文本 → `createLlmStreamNode` + `r.text`（**R-G009**）→ Part 2
-- **联网**：先平台 Plugin/Knowledge/`mcpConfigs`；禁止把内置 grep/glob 当联网 → Part 3
+- **平台能力**：**写图前**先 `search-apis` / `search-skills` / `get-config`（tools·mcpConfigs·skills）并 `add-tool`；收工须贴搜索证据；内置 grep/glob **仅工作区**（**联网搜索较常见**，规则相同）→ Part 3
 - **验证**：收工前五连 + `pnpm smoke` → Part 0 / Part 4
 
 **权威**：目标项目 `README.md` + `docs/glossary.md`。
@@ -87,7 +87,7 @@
 <SCAFFOLD_FIRST>
 ## 脚手架优先
 
-收到 flow 需求 → **`flow-builder` Part 1**（9 topologies = 8 presets + `custom`）。命中 preset **禁止**手写图；不命中先用 `custom`。系统提示词与 scaffold 并行 → Part 5。
+收到 flow 需求 → **`flow-builder` Part 1**（9 topologies = 8 presets + `custom`）。**凡需平台工具/MCP/技能/Plugin 须先 Part 3 搜平台登记**（见 Part 0 § 平台能力门禁）。命中 preset **禁止**手写图；不命中先用 `custom`。系统提示词与 scaffold 并行 → Part 5。
 </SCAFFOLD_FIRST>
 
 <SESSION_CLOSE>
@@ -120,10 +120,26 @@
 用户可见大段 LLM 输出 → **`createLlmStreamNode`** + `r.text`；禁止仅用 `createLlmNode`（turn 末整段兜底）。spec：`llm-stream`；手改 graph 同步 spec（**R-G003 / R-G009**）。详表 → Part 2 § 流式输出 · Part 4a。
 </STREAMING_OUTPUT>
 
-<WEB_SEARCH>
-## 联网（约束）
+<PLATFORM_CAPABILITIES>
+## 平台能力 / 工具（约束）
 
-需要**互联网 / 实时 / 网页搜索**时：**必须先到平台查找并添加**（`dev-engineer-toolkit` → `search-apis.sh` / `get-config.sh mcpConfigs` / `add-tool.sh`），再在图内接 `searchMcp` 或 ReAct 工具。**禁止**用内置 grep/glob 当联网；**禁止**未上平台就用 bash+curl / `http_request` 凑搜索。步骤 → Part 3 § 联网搜索。
+凡 Agent 需**工作区以外**的能力（Plugin / Workflow / Knowledge / MCP / 平台技能 / 外部 API / 联网检索 / 领域数据等），**写图或写 `flow-tools.ts` 之前必须**：
+
+1. 加载 `dev-engineer-toolkit`
+2. `search-apis.sh --kw "<能力关键词>"`（按需求拆词多次搜）
+3. 需技能时 `search-skills.sh --kw "<关键词>"`
+4. `get-config.sh --key tools` / `mcpConfigs` / `skills`（视能力类型）
+5. 命中 → `add-tool.sh`（或对齐 MCP）→ `src/app/` 包装 → `flow-tools.ts` / 图内接线 → 记入 `project.md`
+
+**禁止**：未搜平台就自写工具、bash+curl、`http_request` 打外部 API、硬编码未登记 MCP、以「用户待配置」代替开发期平台登记。内置 `grep`/`glob`/`search` **仅仓库内**，不得充当联网或业务 API。
+
+**常见专项 · 联网搜索**：需求含互联网/实时/网页检索时，在通用流程上追加 `搜索`/`联网`/`web` 关键词并查 `mcpConfigs`（`mcp-retrieval` / `searchMcp`）→ Part 3 § 联网搜索。完整步骤 → Part 3 § 平台能力登记。
+</PLATFORM_CAPABILITIES>
+
+<WEB_SEARCH>
+## 联网（约束 · 常见专项）
+
+**联网搜索是平台能力登记中最常见的场景之一。** 需要互联网/实时/网页搜索/多源调研，或图/spec 含 `mcp-retrieval` / `createMcpRetrievalNode` / `searchMcp` 时：先走 `<PLATFORM_CAPABILITIES>` 通用流程，再追加 `搜索` / `联网` / `web` 关键词并查 `mcpConfigs`。步骤 → Part 3 § 平台能力登记 · § 联网搜索。
 </WEB_SEARCH>
 
 <TEMPLATE_CONSTRAINTS>
@@ -152,8 +168,8 @@
 ## 绝对禁止
 
 1. 硬编码密钥 2. 改保护区（非明确要求） 3. 违反 Layering 4. 手写外层 run-loop（除 `stateful-custom`）
-5. 绕过工具优先级 / 联网规则 6. 节点 mutate state 7. 条件边做 I/O 8. `require`/`any`
-9. 写 `.agents/` 10. **留空平台系统提示词**（用户描述过 Agent 未同步 `systemPrompt` 即报完成）
+5. 绕过工具优先级 / 平台能力规则（含未搜平台就写外部能力） 6. 节点 mutate state 7. 条件边做 I/O 8. `require`/`any`
+9. 写 `.agents/` 10. **留空平台系统提示词**（用户描述过 Agent 未同步 `systemPrompt` 即报完成） 11. **需平台能力却未 search-apis / get-config / add-tool 即报完成**
 
 **关键注意**：MCP 合并 session-wins；默认图无凭证 fallback；`createStatefulFlow` + `durableCheckpointer`；`permissions.interruptOn` 工具审批在 `config/`（非平台）。
 </DEVELOPMENT_CONSTRAINTS>
@@ -164,8 +180,8 @@
 | Phase | 做什么 | 细节 |
 |-------|--------|------|
 | 0 | 启动、读项目、系统提示词基线 | Part 0 § 会话启动 |
-| 1 | topology 选型、scaffold/系统提示词并行 | Part 0 § Phase 1 · Part 1 |
-| 2 | 生成或手写实现 | Part 0 § Phase 2 · Part 2–3 |
+| 1 | topology 选型；**需平台能力先 Part 3**；scaffold/系统提示词并行 | Part 0 § Phase 1 · Part 1 / Part 3 |
+| 2 | 生成或手写实现（外部能力须在 Phase 1 已搜平台并登记） | Part 0 § Phase 2 · Part 2–3 |
 | 3 | completion gate 五连 + smoke | Part 0 § Phase 3 · Part 4a/4b |
 | 4 | 报告（含系统提示词非空证明） | Part 0 § Phase 4 |
 
@@ -181,7 +197,8 @@
 2. **smoke 不可省** — ACP 真实运行门；优先 smoke，禁止 `--dry-run` 冒充
 3. **有证据** — 文件改动须 `read_file`/`ls` 实证；失败修后重跑（≤5 轮）
 4. **系统提示词非空** — `systemPrompt` 已同步且 `get-config` 回读非空（用户发过 Agent 描述时强制）
-5. **文档=代码**
+5. **平台能力已搜已登记**（凡依赖工作区外能力时强制）— 须贴 `search-apis.sh` / `search-skills.sh` 与/或 `get-config.sh --key tools|mcpConfigs|skills` 原始输出；平台有命中须 `add-tool.sh` 并接线；平台确无命中须在报告写明关键词与「已搜索、无命中」后方可自写 app 工具。**联网搜索较常见**，同样适用本项。**禁止**仅以「用户待配置」代替本步
+6. **文档=代码**
 
 收尾清单与 smoke 前置条件 → `flow-builder` **Part 0** § completion gate · **Part 4a/4b**。
 </COMPLETION_GATE>

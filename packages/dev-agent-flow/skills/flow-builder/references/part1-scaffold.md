@@ -25,14 +25,16 @@
 | `react-tools` | oneshot | 客服 / 工具型 / 通用问答 | `prepare → think ↔ tools → respond` |
 | `human-in-loop` | stateful-recipe | 审阅 / 审批 / 校对 | `compose(流式) → review(interrupt) → finalize` |
 | `project-manager` | stateful-recipe | 规划 + 评审重做 | `plan → estimate → evaluate → approve → finalize` |
-| `travel-planner` | stateful-recipe | 多源调研聚合 | `gather → Send research×N → aggregate(流式) → confirm → finalize`（**research 须接平台搜索 MCP**，见 Part 3 § 联网搜索） |
+| `travel-planner` | stateful-recipe | 多源调研聚合 | `gather → Send research×N → aggregate(流式) → confirm → finalize`（**须 Part 3 平台能力登记**；联网搜索较常见，见 § 联网搜索） |
 | `rag` | oneshot | 检索问答 | `rewrite → retrieve → grade → prepare → generate` |
 | `adaptive-rag` | oneshot | 自适应检索 + 路由自纠正 | `route → retrieve/web-search → grade → transform/generate`（**web_search 优先平台 Plugin/MCP**） |
 | `deep-research` | stateful-recipe | 深度研究 / **durable stateful flow** | 多阶段 + Send + 持续会话 |
 | `dev-agent` | stateful-custom | 综合助手 ReAct + 压缩 | 默认 ReAct + 多轮续接 |
-| `custom` ⭐ | stateful-recipe | 无 preset 命中 | spec 声明 state/nodes/edges → 生成 `graph.ts` |
+| `custom` ⭐ | stateful-recipe | 无 preset 命中 | spec 声明 state/nodes/edges → 生成 `graph.ts`；**含外部能力节点须先 Part 3 平台能力登记** |
 
 **`custom`**：`params` 含 `state`/`nodes`（type 见 node-catalog，**用户可见输出用 `llm-stream`**）/`edges`/`input`/`result`；回调写箭头函数字符串，生成时内联为真实 TS。局限（生成后手改）：tool-exec、subgraph、自定义 reducer。流式范例：`_example.translate-review`、`_example.multi-aspect-search`、`_example.router-gate`、`_example.interview-agent`（`llm-stream` + `r.text`）；非流式教学：`_example.grade-redo`；`interview-agent` 的 `prepare`/`evaluate` 仍 `llm`（无 `r.text` / 结构化 parse）。
+
+**含外部能力的 custom**（`tool-exec` / `mcp-retrieval` 等，**联网搜索较常见**如 `search-aggregator`）：**写 spec 前**须完成 Part 3 § 平台能力登记；联网另见 § 联网搜索。命中后 `add-tool` 并接线，禁止占位 `undefined` 甩给用户。
 
 **custom spec 生成后核对**（目标项目 `docs/flow-graph-rules.md`；生成前已由 `lint-graph-rules.mjs` 拦 **R-G001 / R-G007 / R-G009**）：
 
@@ -71,6 +73,7 @@
 
 | 步 | 动作 |
 |----|------|
+| 0 | **需平台能力**（见 Part 3 § 平台能力登记；**联网搜索较常见**）→ 先 `dev-engineer-toolkit` 搜平台并登记，**再**写 spec |
 | 1 | 选 topology；不接近 → `custom`；仍不行 → [part2-orchestration.md](part2-orchestration.md) |
 | 2 | 写 `scripts/scaffold/specs/<name>.flow.json` |
 | 3 | `node scripts/scaffold/generate.mjs scripts/scaffold/specs/<name>.flow.json` |

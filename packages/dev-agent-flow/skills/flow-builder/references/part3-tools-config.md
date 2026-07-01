@@ -17,11 +17,64 @@
 
 > 已无 `mcp_tool_bridge` 元工具；MCP 工具由 runtime 原生绑定，直接用 server 暴露的工具名调用。
 
-## 联网搜索（互联网 / 实时信息 · 强制）
+## 平台能力登记（通用 · 强制）
 
-需求含**查互联网、最新资讯、实时数据、网页检索、多源调研**时：**必须先到平台查找并添加**搜索能力，再在代码里接线。模板不提供开箱即用的联网搜索。
+凡 Agent 需**工作区以外**的能力（Plugin / Workflow / Knowledge / MCP / 平台技能 / 外部 API / 业务数据等），**写 spec、`graph.ts`、`flow-tools.ts` 或 `*.tool.ts` 之前必须**到平台查找并登记。模板内置工具（bash/fs/grep 等）**不能**替代业务 API。
 
-**第一步（必做）**：加载 `dev-engineer-toolkit` → `search-apis.sh --kw "搜索"`（及 `联网` / `web`）→ `get-config.sh --key mcpConfigs` → 命中则 `add-tool.sh` 或同步 MCP → 记入 `project.md`。
+> **常见场景**：**联网搜索**（网页检索、实时资讯、`mcp-retrieval`）出现频率最高，须走本节通用流程 + § 联网搜索 追加步骤；天气、通知、文件上传等业务 API 同理，按能力关键词 `search-apis`。
+
+### 自动触发（满足任一即必读本节）
+
+- 用户要：调 API、接第三方、用知识库、MCP、平台技能、发通知、存取业务数据、**或**联网搜索
+- 代码信号：新增 `tool()` · 改 `flow-tools.ts` · `createToolExecNode` · `createMcpRetrievalNode` · `bindTools` · `mcpServers` / `searchMcp`
+- Topology：`react-tools` · `dev-agent` · `rag` · `adaptive-rag` · `travel-planner` · `deep-research` · custom 含 `tool-exec` / `mcp-retrieval`
+
+**豁免**：纯 LLM 对话；仅工作区内 `grep`/`glob`/`read_file`。
+
+### 工作流（必须 · 写代码前）
+
+1. 加载 `dev-engineer-toolkit`
+2. `search-apis.sh --kw "<能力关键词>"`（按需求拆词，可多轮）
+3. 需领域技能 → `search-skills.sh --kw "<关键词>"`
+4. `get-config.sh --key tools` / `mcpConfigs` / `skills`（按需）
+5. 命中 → `add-tool.sh` → `src/app/tools/` 包装（按 schema）→ `flow-tools.ts` 或图内 MCP 接线
+6. 记入 `project.md`（targetId、工具名、MCP 名、验证方式）
+7. 平台**确无**命中 → 记录搜索输出 → **然后**方可走优先级 4 自写 app 工具
+
+### 优雅降级 vs 完成闸门
+
+| 场景 | 可否报「完成」 |
+|------|----------------|
+| 已执行平台搜索 + `get-config`，**确无**对应能力，已记录关键词与输出 | ✅ 可自写 app 工具或图内降级 |
+| 平台**有**命中，已 `add-tool` 并接线 | ✅ |
+| **未执行**平台搜索就写外部能力 / 占位未接线 | ❌ **不得报完成**（即使 smoke 绿） |
+| 平台有命中但未 `add-tool` / 未注册 `flow-tools.ts` | ❌ **不得报完成** |
+| 以「用户待配置」代替开发期登记 | ❌ **不得报完成** |
+
+> 优雅降级仅适用于「**已证明**平台无可用能力」；不是跳过本节的借口。
+
+### 禁止
+
+- ❌ 不查平台就自写 `*.tool.ts`、bash+curl、`http_request` 打外部 API
+- ❌ 硬编码未在平台登记的 MCP / Plugin
+- ❌ 在 `src/libs/tools/` 写业务工具（保护区）
+- ❌ 把内置 `grep`/`search` 当业务 API 或联网
+
+system-prompt 详版 → `<PLATFORM_CAPABILITIES>`
+
+## 联网搜索（互联网 / 实时信息 · 常见专项）
+
+> **说明**：联网搜索是 § 平台能力登记 中**最常见的专项**；下列规则在通用登记之上追加，不替代通用流程。
+
+需求含**查互联网、最新资讯、实时数据、网页检索、多源调研**，或图/spec 使用 `mcp-retrieval` / `createMcpRetrievalNode` / `searchMcp` 时：先走上文 **§ 平台能力登记**，并追加搜索关键词与 `mcpConfigs` 检查。模板不提供开箱即用的联网搜索。
+
+### 自动触发（满足任一即必读本节）
+
+- 用户意图：搜索、联网、实时、网页、多源调研、资讯聚合
+- Topology：`travel-planner` · `adaptive-rag` · `deep-research` · `search-aggregator` · 任意 custom 含 `type: "mcp-retrieval"`
+- 代码信号：`createMcpRetrievalNode` · `createWebSearchNode` · `TravelSearchMcp` · `SEARCH_MCP`
+
+**第一步（必做 · 写 spec/graph 之前）**：在 § 平台能力登记 基础上 → `search-apis.sh --kw "搜索"`（及 `联网` / `web`）→ `get-config.sh --key mcpConfigs` → 命中则 `add-tool.sh` 或同步 MCP。
 
 ### 选型表
 
@@ -37,23 +90,34 @@
 
 | Topology | 做法 |
 |------|------|
-| `travel-planner` / `deep-research` | `searchMcp` 接**平台登记**的搜索 MCP → `createMcpRetrievalNode`；未配置则优雅降级 |
+| `travel-planner` / `deep-research` | `searchMcp` 接**平台登记**的搜索 MCP → `createMcpRetrievalNode` |
+| `search-aggregator`（custom） | 同 travel-planner：`index.ts` 填 `SEARCH_MCP` → `createMcpRetrievalNode` |
 | `adaptive-rag` | 路由 `web_search`；经平台 `searchMcp`（`createWebSearchNode`） |
 | `multi-aspect-search`（custom） | `mcp-retrieval` 节点 + 平台搜索 MCP |
-| `react-tools` / `dev-agent` | 平台搜索 Plugin 注册为 tool → ReAct 调用 |
+| `react-tools` / `dev-agent` | 平台业务 Plugin 注册为 tool → ReAct / `createToolExecNode` |
+| **任意** custom / 手写 | spec 或 `graph.ts` 出现 `mcp-retrieval` / `searchMcp` → 同上行 |
 
-### 工作流（必须）
+### 优雅降级 vs 完成闸门（联网专项）
 
-1. 加载 `dev-engineer-toolkit`
+| 场景 | 图内行为 | 可否报「完成」 |
+|------|----------|----------------|
+| 已执行 § 平台能力登记 + 联网关键词搜索，平台**确无**搜索能力 | `searchMcp` 可缺省，research 写降级文案 | ✅ 须贴搜索无命中证据 |
+| 平台**有**搜索 MCP/API，已 `add-tool` 并填入 `searchMcp` / `flow-tools.ts` | 正常检索 | ✅ |
+| **未执行**平台搜索就写联网图 | smoke 可能靠模型知识通过 | ❌ 见 § 平台能力登记 |
+
+### 工作流（联网 · 在通用登记之上）
+
+1. 完成 § 平台能力登记 步骤 1–4
 2. `search-apis.sh --kw "<关键词> 搜索"`（及 `联网` / `web`）
 3. `get-config.sh --key mcpConfigs`
-4. 命中 → `add-tool.sh` 或同步 MCP 配置 → 图内接线
-5. 记入 `project.md`（targetId、MCP 名、验证命令）
+4. 命中 → `add-tool.sh` 或同步 MCP → 图内接线（`searchMcp` 等）
+5. 记入 `project.md`
 
 ### 禁止
 
 - ❌ 内置 `search`/`grep` 当联网
 - ❌ 未搜平台就 bash+curl、自写搜索 API、`http_request` 打搜索站
+- ❌ 未搜平台就写图或报完成（需平台能力的 flow；联网较常见）
 - ❌ 硬编码未在平台登记的第三方搜索 MCP（用平台源）
 - ❌ 在 `src/libs/` 写搜索（保护区）
 

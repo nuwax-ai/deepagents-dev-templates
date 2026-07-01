@@ -1,8 +1,8 @@
 ---
 name: dev-engineer-toolkit
-description: "当开发项目需要搜索可用工具（API）、可用技能（SKILL）、或进行项目配置（系统提示词、开场白等智能体配置）时使用。这是开发工程师的基础技能包，所有涉及额外API接口查询、技能发现、项目配置读写的场景都必须使用本技能。Keywords: API搜索, 技能搜索, 项目配置, 系统提示词, 开场白, agent配置, 工具搜索, tool search, skill discovery"
+description: "当开发项目需要搜索可用工具（API）、可用技能（SKILL）、平台能力登记（Plugin/MCP/外部 API；联网搜索较常见）、或项目配置读写时使用。Keywords: API搜索, 平台能力, 工具登记, MCP, 联网搜索, 技能搜索, 项目配置"
 tags: [api-search, skill-search, project-config, dev-toolkit, agent-config, tool-discovery]
-version: "1.3.0"
+version: "1.5.0"
 ---
 
 # 开发工程师工具包
@@ -27,10 +27,40 @@ version: "1.3.0"
 
 **必须使用本技能的场景：**
 
-1. **需要新的 API 接口时** — 开发中需要调用某个功能接口，先通过 `search-apis.sh` 搜索平台是否已有可用 API，避免重复造轮子。
-2. **需要查找已有技能时** — 开发中需要某个领域能力（如代码审查、测试生成），先通过 `search-skills.sh` 检索是否已有对应技能可复用。
-3. **需要读取项目配置时** — 需要获取当前项目的系统提示词、开场白、模型设置等配置信息时，使用 `get-config.sh`。
-4. **需要更新项目配置时** — 用户要求修改系统提示词、开场白、或任何项目级配置时，**必须**使用 `update-config.sh` 通过接口更新，不要仅本地修改文件。
+1. **需要工作区以外的任何能力时（写图前强制）** — Plugin / Workflow / Knowledge / MCP / 外部 API / 平台技能等。先 `search-apis.sh`（按能力拆词）、`search-skills.sh`（若需）、`get-config.sh`（tools / mcpConfigs / skills），命中则 `add-tool.sh`，**再**写 `graph.ts` / `flow-tools.ts`。禁止未搜平台就自写工具或以「用户待配置」甩锅。
+2. **联网搜索（较常见）** — 在场景 1 之上追加 `搜索`/`联网`/`web` 关键词并查 `mcpConfigs`（`travel-planner`、`search-aggregator`、`adaptive-rag` 等）。见下文「联网搜索登记」。
+3. **需要查找已有技能时** — `search-skills.sh` 检索是否可复用。
+4. **需要读取项目配置时** — `get-config.sh`。
+5. **需要更新项目配置时** — **必须** `update-config.sh`，不要仅改本地。
+
+### 平台能力登记（写图前 · 通用）
+
+```bash
+./scripts/search-apis.sh --kw "<能力关键词>"    # 按需求多轮，如 天气 / 通知 / 文件上传
+./scripts/search-skills.sh --kw "<关键词>"      # 可选
+./scripts/get-config.sh --key tools
+./scripts/get-config.sh --key mcpConfigs
+./scripts/get-config.sh --key skills
+# 命中后：
+./scripts/add-tool.sh --target-id <targetId>
+```
+
+- 将 `targetId`、工具名、MCP 名、接线位置记入 `project.md`
+- 平台确无命中：须在 completion gate 贴上述命令原始输出，方可自写 app 工具
+- **禁止**跳过搜索就写占位工具或未接线报完成
+
+### 联网搜索登记（常见专项 · 在通用登记之上）
+
+```bash
+./scripts/search-apis.sh --kw "搜索"
+./scripts/search-apis.sh --kw "联网"
+./scripts/get-config.sh --key mcpConfigs
+# 命中后：
+./scripts/add-tool.sh --target-id <targetId>
+```
+
+- 联网是平台能力登记中**最高频场景**；须完成通用登记 + 本段搜索/MCP 检查
+- **禁止**在 `index.ts` 写 `SEARCH_MCP = undefined` 后报完成
 
 所有脚本由平台沙箱运行时自动配置，直接执行即可，无需传入认证或项目标识参数。
 

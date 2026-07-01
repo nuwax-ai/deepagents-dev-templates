@@ -19,7 +19,7 @@ pnpm build && pnpm typecheck && pnpm test && pnpm graph && pnpm smoke
 
 Scaffold 生成器自带快检（`typecheck && graph`）；**全量 completion gate 仍须上式五连**。
 
-**收尾清单**（系统提示词非空、R-G009、联网等）→ [part0-workflow.md](part0-workflow.md) § completion gate 收尾清单。
+**收尾清单**（系统提示词非空、R-G009、**平台能力搜索证据**等）→ [part0-workflow.md](part0-workflow.md) § completion gate 收尾清单。
 
 **smoke 细则**（`.env` 模型解析、`activeFlow`、`SMOKE_PROMPT*`、占位符）→ [part4b-smoke-acp.md](part4b-smoke-acp.md)。
 
@@ -105,18 +105,37 @@ pnpm graph                   # export graph topology
 
 ---
 
-## 典型错误：联网搜索不生效 / 误用内置 search
+## 典型错误：平台能力未登记 / 误用内置工具 / 未搜平台就报完成
 
-**规则**：Part 3 § 联网搜索；system-prompt `<WEB_SEARCH>`。
+**规则**：Part 3 § 平台能力登记（**联网搜索较常见**，见 § 联网搜索）；system-prompt `<PLATFORM_CAPABILITIES>`、`<COMPLETION_GATE>`。
+
+### completion gate 判定（需平台能力时 · 通用）
+
+| 条件 | 结果 |
+|------|------|
+| 已贴 `search-apis` / `search-skills` / `get-config` 输出，平台无命中 | 可完成；可自写 app 工具或图内降级（须记录关键词） |
+| 平台有命中，已 `add-tool` 并接线（`flow-tools.ts` / `searchMcp` / MCP） | 可完成 |
+| **未执行**平台搜索就写外部能力 | **不可报完成**（即使 smoke 绿） |
+| 平台有命中但未 `add-tool` / 未接线 | **不可报完成** |
+| 以「用户待配置」代替开发期登记 | **不可报完成** |
+
+### 联网搜索（常见专项 · 追加检查）
+
+| 条件 | 结果 |
+|------|------|
+| 已贴搜索关键词 + `mcpConfigs` 输出，平台无搜索能力 | 可完成；`searchMcp` 可缺省降级 |
+| 平台有搜索 MCP/API 且已接线 | 可完成 |
+| 未执行 `search-apis --kw 搜索` 或未查 `mcpConfigs` | **不可报完成** |
+| `SEARCH_MCP = undefined` 且平台有命中 | **不可报完成** |
 
 | 步 | 动作 |
 |----|------|
-| 1 | 确认需求是**互联网/实时**检索，而非工作区内 grep（内置 `search` 仅后者） |
-| 2 | 是否已 `search-apis.sh --kw "搜索"` / `get-config.sh --key mcpConfigs`？未搜平台 → 先补 |
-| 3 | Plugin 命中是否已 `add-tool.sh` 并在 `flow-tools.ts` 注册？MCP 是否对齐 `mcp.default.json`？ |
-| 4 | `travel-planner` / custom `mcp-retrieval`：`searchMcp` 是否传入平台登记的搜索 MCP？未传则 research 优雅降级（无结果） |
-| 5 | 禁止用 `bash`+`curl` / 自写搜索 API 替代平台能力；`pnpm exec tsx src/index.ts capabilities` 核对 MCP/工具列表 |
-| 6 | 仍无结果：查 MCP 工具名是否与 `chooseMcpToolName` 匹配；`onToolCall` / 日志是否有检索调用 |
+| 1 | 确认需**工作区外**能力（非仅 `grep`/`glob`） |
+| 2 | 是否已 `search-apis.sh --kw "<能力词>"` / `search-skills.sh` / `get-config.sh --key tools|mcpConfigs|skills`？ |
+| 3 | 命中是否已 `add-tool.sh` 并注册 `flow-tools.ts` 或 MCP 接线？ |
+| 4 | **联网**：另查 `mcpConfigs`、`searchMcp`；禁止 bash+curl 自写搜索 API |
+| 5 | `pnpm exec tsx src/index.ts capabilities` 核对工具/MCP 列表 |
+| 6 | 仍不生效：查工具名、`.logs/` 中 `onToolCall` |
 
 ---
 
@@ -127,5 +146,7 @@ pnpm graph                   # export graph topology
 - ❌ 把 `.log` 全文贴进对话或提交 git
 - ❌ 见 JSON 解析错就加更严 prompt，不检查 `write` 是否真需要 `r.parsed`
 - ❌ 用户反馈「不流式」却只改 ACP/客户端，不检查节点是否误用 `createLlmNode`
-- ❌ 用户要「联网搜索」却只用内置 `grep`/`search`，或未搜平台就自写搜索 API
+- ❌ 需外部能力却未 `search-apis` / `get-config` / `add-tool` 就以 smoke 通过报完成
+- ❌ 用户要业务 API/联网却只用内置 `grep`/`search`，或未搜平台就自写工具
+- ❌ 平台有能力却留占位未接线（如 `SEARCH_MCP = undefined`），把登记甩给「用户待操作」
 - ✅ 命令退出码 0 + 文件实证 + 日志无未预期 error
