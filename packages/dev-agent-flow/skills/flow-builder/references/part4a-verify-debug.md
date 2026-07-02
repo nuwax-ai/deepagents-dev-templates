@@ -149,4 +149,7 @@ pnpm graph                   # export graph topology
 - ❌ 需外部能力却未 `search-apis` / `get-config` / `add-tool` 就以 smoke 通过报完成
 - ❌ 用户要业务 API/联网却只用内置 `grep`/`search`，或未搜平台就自写工具
 - ❌ 平台有能力却留占位未接线（如 `SEARCH_MCP = undefined`），把登记甩给「用户待操作」
+- ❌ Phase 4 复述沙箱环境变量名，或要求用户配置 ACP 已默认集成的平台认证/基址
+- ❌ Phase 4 写「后续：配置 Plugin Authorization / 搜索 API key」等开发期登记事项
 - ✅ 命令退出码 0 + 文件实证 + 日志无未预期 error
+- ✅ 无用户业务待办 → Phase 4 **不写**「后续」段
