@@ -3,8 +3,6 @@
  *
  * Flow 与 Legacy deepagents-acp 共用：tool_call 的 title/kind/locations/content/diff，
  * tool_call_update 的 content/rawOutput。不依赖 libs/nodes（分层：deepagents-acp 自闭环）。
- *
- * 维护文档：docs/packages/deepagents-flow-ts/development/acp/roadmap-progress.md
  */
 
 import type { ToolCallUpdate } from "@agentclientprotocol/sdk";

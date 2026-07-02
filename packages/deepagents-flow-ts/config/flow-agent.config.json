@@ -3,7 +3,7 @@
   "agent": {
     "name": "deepagents-flow-ts",
     "description": "通用工作流编排模板 — Agent 按显式 LangGraph 节点图运行（默认 ReAct：prepare → think ↔ tools → respond）。工具/会话/压缩/Skills/Subagent 经本仓库 config 与能力分层驱动。",
-    "version": "1.7.0",
+    "version": "1.8.0",
     "outputStyle": "concise",
     "systemPromptPath": "prompts/flow.base.md",
     "includeWorkspaceInstructions": true
@@ -33,7 +33,6 @@
       "prompts/",
       "builtin/",
       "config/",
-      "examples/",
       ".agents/"
     ],
     "deniedPaths": [
@@ -48,7 +47,6 @@
       "prompts/",
       "builtin/",
       "config/",
-      "examples/",
       ".agents/"
     ],
     "deniedWritePaths": [

@@ -7,7 +7,7 @@
  * 直接返回 StatefulFlow，无需组合根 materializeFlow 桥接。
  *
  * 拓扑反射 = 默认图（prepare → think ↔ tools → respond）。
- * researcher 子图（examples/dev-agent/researcher.ts）是独立 subgraph demo，不在此 flow 主路径。
+ * 子图（subgraph）需求见 libs/nodes 的 createSubgraphNode（docs/node-kit.md）。
  */
 import type { FlowRuntime } from "../../runtime/flow-runtime.js";
 import type { StatefulFlow } from "../../core/flow-types.js";

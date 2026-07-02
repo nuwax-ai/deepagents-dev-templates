@@ -1,10 +1,48 @@
 /**
- * createHumanApprovalNode —— HITL 审批节点（interrupt + isApproval）。
+ * HITL 人审节点工厂 —— `createHumanApprovalNode` / `createPermissionApprovalNode`。
  *
- * 泛化 review / approve / confirm / clarify 等人审节点：
- *  - 简单写回：`{ question, write? }` → 默认写 { feedback }；
- *  - 路由变体：`{ question, route }` → 返回 Command | 节点名（按 approved + feedback 决定去向）。
- * 默认 APPROVAL_RE 内置中英文通过词；opts.regex 覆盖。
+ * ## 三种人审形态（选型）
+ *
+ * | 形态 | 工厂 | 机制 | 适用场景 |
+ * | --- | --- | --- | --- |
+ * | **对话式 interrupt** | `createHumanApprovalNode` | `interrupt()` → 跨 turn 收用户**文本** | 长文 review、需自由反馈、CLI/任意 ACP 客户端 |
+ * | **同步弹窗** | `createPermissionApprovalNode` | `onApprovalRequest` → 同 turn 点选 | 秒级 yes/no（确认发布、确认删除） |
+ * | **结构化表单（ask-question MCP）** | `createAskQuestionPresentationNode`（拓扑层，见下） | 图节点内 **direct invoke** MCP 工具 → 再 `interrupt` 收回复 | 平台问答卡片 / 多字段表单（通过+意见、选项等） |
+ *
+ * **ask-question MCP 不是 `createHumanApprovalNode` 的替代品**，而是其**前置展示层**：
+ * MCP 负责渲染结构化 UI（`rawInput.ui` → ACP tool_call）；`interrupt` 仍负责 durable checkpoint / resume。
+ * 二者必须拆成**相邻两节点**（如 `present_review` → `review`），见
+ * `libs/topologies/human-in-loop/graph.ts`。
+ *
+ * ## ask-question MCP：何时用、如何用
+ *
+ * **应用 ask-question 的场景**（图内 HITL，非 default ReAct 随意调用）：
+ * - 内容审阅定稿：草稿 +「通过 / 按意见修改」+ 修改意见（human-in-loop）
+ * - 需固定字段（radio / select / textarea）的多步确认，且 ACP 宿主支持平台问答卡片渲染
+ * - 要在 ACP 侧展示 **tool_call 卡片**（`ask-question__nuwax_ask_question`），而非纯文本 interrupt
+ *
+ * **不要用 ask-question 的场景**：
+ * - 秒级二元确认 → `createPermissionApprovalNode`
+ * - 只需用户打一段话 → 单独 `createHumanApprovalNode`（纯文本 interrupt 即可）
+ * - default ReAct 普通闲聊 / 澄清 —— **禁止**模型在 think 里调 `nuwax_ask_question` 代替对话；
+ *   结构化表单仅用于**图编排好的 HITL 节点**或用户明确要求填表
+ *
+ * **配置与工具定位**：
+ * - 包内 fallback：`config/mcp.default.json` → `ask-question` server（`nuwax-ask-question-mcp`）
+ * - 平台同名下发 **session-wins** 覆盖内置（`runtime-context` `mergeServers` 后者优先）
+ * - 工具名：`ask-question__nuwax_ask_question`（或无前缀 `nuwax_ask_question`）；用
+ *   `findAskQuestionTool(runtime.allTools)` 从已 hydrate 的 MCP 工具集定位
+ *
+ * **接线模板**（human-in-loop 拓扑）：
+ * ```
+ * START → compose → present_review(MCP 展示) → review(interrupt) → finalize → END
+ * ```
+ * - `present_review`：`createAskQuestionPresentationNode(askQuestionTool)`，经 `onToolCall` 透出
+ *   in_progress/completed；MCP 返回 `pending`，**不**替代 checkpoint
+ * - `review`：`createHumanApprovalNode` + `normalizeReviewFeedback` 归一化 JSON/表单文本 → `ok` 或修改意见
+ * - resume 只重跑 `review`，**不会**重复发 MCP 卡片（`present_review` 已落 checkpoint）
+ *
+ * 范例与 API 见 `libs/topologies/human-in-loop/`、`docs/node-kit.md` § createHumanApprovalNode。
  */
 
 import { Command, interrupt, type LangGraphRunnableConfig } from "@langchain/langgraph";
@@ -32,6 +70,12 @@ export interface HumanApprovalNodeOptions<S> {
   route?: (approved: boolean, feedback: string, state: S) => Command;
 }
 
+/**
+ * 对话式 HITL：跨 turn `interrupt` 收用户文本（或宿主把表单提交格式化成文本/JSON）。
+ *
+ * 若上游有 ask-question MCP 展示节点，在 `write` 里用 `normalizeReviewFeedback`（human-in-loop 拓扑）
+ * 把表单 JSON /「处理方式：通过」等格式统一成 `ok` 或修改意见，再交 `createApprovalFinalizeNode`。
+ */
 export function createHumanApprovalNode<S>(
   opts: HumanApprovalNodeOptions<S>
 ) {
@@ -55,6 +99,8 @@ export function createHumanApprovalNode<S>(
  * `session/request_permission` 征询确认，用户点选项即决（不结束 turn、不等下一轮消息）。
  * 适合秒级 yes/no（如"确认发布?"）。复用工具审批（A）的同步弹窗通道；
  * 未注入回调（CLI / 非 ACP）→ 默认放行（graceful，与工具审批一致）。
+ *
+ * 需要多字段表单（非二元选项）时，不要用本节点 —— 用 ask-question MCP + interrupt（见模块头注释）。
  *
  * @example
  * const confirm = createPermissionApprovalNode<S>({

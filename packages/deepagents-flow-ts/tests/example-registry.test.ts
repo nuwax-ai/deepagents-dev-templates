@@ -23,7 +23,8 @@ describe("example-registry", () => {
   it("listExamples 覆盖全部注册范例", () => {
     const names = listExamples().map((e) => e.name);
     expect(names).toContain("rag");
-    expect(names).toContain("dev-agent");
-    expect(names.length).toBe(6);
+    expect(names).toContain("research");
+    expect(names).not.toContain("dev-agent");
+    expect(names.length).toBe(5);
   });
 });

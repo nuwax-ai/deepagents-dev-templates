@@ -10,12 +10,12 @@
 
 > **节点选型**：`docs/node-catalog.md` + `docs/node-kit.md`。
 
-| 类型 | 场景 | seam（接入层） | 范例 |
+| 类型 | 场景 | seam（接入层） | 参考实现 |
 |------|------|------|------|
-| `FlowExecutor` | 问答 / 检索 / 批处理 | `(query, cb) => Promise<FlowResult>` | `examples/rag` |
-| `StatefulFlow` | HITL / **durable stateful flow** 或 **conversational** | `createStatefulFlow(...)` | `examples/travel-planner` / `project-manager` / `human-in-loop`；default 等为 conversational |
+| `FlowExecutor` | 问答 / 检索 / 批处理 | `(query, cb) => Promise<FlowResult>` | `src/libs/topologies/rag` |
+| `StatefulFlow` | HITL / **durable stateful flow** 或 **conversational** | `createStatefulFlow(...)` | `src/libs/topologies/travel-planner` / `project-manager` / `human-in-loop`；default 等为 conversational |
 
-开发位置：`src/app/graph.ts` + `src/app/nodes/` + `src/app/flow-tools.ts`；factory 来自 `src/libs/nodes/`。**examples/ 只读**。
+开发位置：`src/app/graph.ts` + `src/app/nodes/` + `src/app/flow-tools.ts`；factory 来自 `src/libs/nodes/`，完整 topology 参考实现位于 `src/libs/topologies/`。
 
 ## Step 2: State
 
@@ -84,25 +84,31 @@ const aggregate = createLlmStreamNode<MyStateType>({
 
 custom spec：`write` 含 `r.parsed` 才写 `"parse"`。范例：`_example.interview-agent.flow.json`。
 
-### HITL 选型（三种机制，勿混用）
+### HITL 选型（四种机制，勿混用）
 
 | 场景 | 机制 | Factory / 配置 |
 |------|------|----------------|
 | 副作用工具执行前（写盘 / bash / HTTP…） | ACP 弹窗，**turn 内、可多次** | 自动：`createToolExecNode` + `config/flow-agent.config.json` → `permissions` |
-| 图内跨轮人审（草稿评审、大纲确认） | `interrupt` + 下轮用户消息 resume | `createHumanApprovalNode` → 常配对 `createApprovalFinalizeNode` |
+| 图内跨轮人审（纯文本：说意见或 ok） | `interrupt` + 下轮用户消息 resume | `createHumanApprovalNode` → 常配对 `createApprovalFinalizeNode` |
+| 图内跨轮人审（**固定字段表单**） | **平台问答卡片**（ask-question MCP 展示）+ `interrupt` 收回复 | `present_review`：`createAskQuestionPresentationNode`（`human-in-loop/graph.ts`）→ `review`：`createHumanApprovalNode` + `normalizeReviewFeedback` → `createApprovalFinalizeNode` |
 | 图内秒级 yes/no（确认发布？） | 同步弹窗，**不结束 turn** | `createPermissionApprovalNode`（`onApprovalRequest`） |
 
+> **平台问答卡片** = **主平台的问答卡片**（模板术语，见目标项目 `docs/glossary.md`）。它是 UI 展示层；**durable resume 仍靠 `interrupt`**，不是 MCP 工具替代品。
+>
+> **两节点范式（必拆）**：`present_review`（MCP 调 ask-question，工具返回 `pending`）与 `review`（`interrupt`）必须分开——MCP 不维护 LangGraph checkpoint；resume 时只重跑 `review`，避免重复弹表单。权威：`src/libs/topologies/human-in-loop/`。
+>
 > 工具审批由部署者配 `permissions.interruptOn`；流程弹窗由开发者在图里显式放节点。详见 `docs/node-catalog.md` HITL 类。
 
 ```typescript
-async function composeNode(state: MyStateType): Promise<Partial<MyStateType>> {
-  return { draft: "..." };  // 不 mutate state
-}
-
+// 纯文本人审（travel-planner confirm / pm approve 等）
 function reviewNode(state: MyStateType): Partial<MyStateType> {
   const feedback = interrupt({ question: `草稿：${state.draft}\n回复意见或「ok」` });
   return { feedback: String(feedback ?? "") };
 }
+
+// 结构化表单人审（human-in-loop）：present_review → review 两节点，勿合并
+// present_review = createAskQuestionPresentationNode(findAskQuestionTool(allTools))
+// review = createHumanApprovalNode({ write: (fb) => ({ feedback: normalizeReviewFeedback(fb) }) })
 ```
 
 ## Step 4: 连线（graph.ts）
@@ -141,7 +147,7 @@ function fanoutToResearch(state): Send[] {
 | 模式 | 配置 | 行为 |
 |------|------|------|
 | **HITL durable stateful flow**（默认） | 默认 | 暴露 `hasStarted`；首条 `query` 开题 → 后续 `resume` 同一任务（**one session, one topic**）；`durableCheckpointer` 支持 **cross-restart resume** |
-| **conversational** | `conversational: true` | 不暴露 `hasStarted`；surface 每轮 `query` + 稳定 threadId + checkpointer → 多轮记忆；`graph.stream` 真流式（如 default / knowledge-qa） |
+| **conversational** | `conversational: true` | 不暴露 `hasStarted`；surface 每轮 `query` + 稳定 threadId + checkpointer → 多轮记忆；`graph.stream` 真流式（如 default / search-aggregator） |
 
 ## Step 6: Surface
 
@@ -152,11 +158,11 @@ function fanoutToResearch(state): Send[] {
 | 模式 | 关键 API | 范例 |
 |------|----------|------|
 | ReAct | `toolsCondition` + `bindTools` | 默认图（`think` 只**决策** tool_calls，`tools` 节点才**执行**；见 `docs/flow-orchestration.md`） |
-| 条件重试 | `addConditionalEdges` | `examples/rag` |
-| Send 并行 | `Send` + reducer | `examples/travel-planner`（**aggregate 用 createLlmStreamNode**；**research 接平台搜索 MCP**） |
+| 条件重试 | `addConditionalEdges` | `src/libs/topologies/rag` |
+| Send 并行 | `Send` + reducer | `src/libs/topologies/travel-planner`（**aggregate 用 createLlmStreamNode**；**research 接平台搜索 MCP**） |
 | reflection | `createLlmRouterNode` 或条件边 | pm / deep-research |
-| HITL | `interrupt` + resume | `examples/human-in-loop`（**compose 流式初稿**） |
-| **Durable stateful flow** | `onStage` + checkpoint | `examples/deep-research`（**draft 流式**） |
+| HITL | `interrupt` + resume | `src/libs/topologies/human-in-loop`（**compose 流式初稿 + 平台问答卡片 present_review（可选）**）；纯文本门控见 travel/pm |
+| **Durable stateful flow** | `onStage` + checkpoint | `src/libs/topologies/deep-research`（**draft 流式**） |
 | **流式用户可见输出** | **`createLlmStreamNode`** | travel aggregate / human-in-loop compose / rag generate |
 
 ## Anti-patterns

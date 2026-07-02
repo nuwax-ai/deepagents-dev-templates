@@ -15,28 +15,59 @@ import { config as loadDotenv } from "dotenv";
 import { bootstrapFlowAcp } from "../../src/surfaces/acp/server.js";
 import { runFlowCli } from "../../src/surfaces/cli/run.js";
 import { loadFlowConfig } from "../../src/runtime/flow-config.js";
+import { destroyRuntimeContext, type ACPSessionConfig } from "../../src/runtime/index.js";
+import { createFlowRuntime } from "../../src/index.js";
+import { findAskQuestionTool } from "../../src/libs/topologies/human-in-loop/index.js";
 import { createReviewFlow } from "./graph.js";
 
 const argv = process.argv.slice(2);
 const interactive = argv.includes("-i") || argv.includes("--interactive");
+const debug = argv.includes("--debug");
 const positional = argv.filter((a) => !a.startsWith("-"));
 const isCli = positional[0] === "review";
 const query = isCli ? positional.slice(1).join(" ") || undefined : undefined;
 
+async function buildReviewRuntime(
+  sessionConfig?: ACPSessionConfig,
+  workspaceRoot = process.cwd()
+) {
+  const { appConfig } = loadFlowConfig({ sessionConfig, workspaceRoot });
+  const runtime = await createFlowRuntime(appConfig, { sessionConfig, workspaceRoot });
+  const flow = createReviewFlow(appConfig, {
+    checkpointer: runtime.checkpointer,
+    askQuestionTool: findAskQuestionTool(runtime.allTools),
+  });
+  return { appConfig, runtime, flow };
+}
+
 async function main(): Promise<void> {
   loadDotenv();
-  const { appConfig } = loadFlowConfig();
-  const flow = createReviewFlow(appConfig);
 
   if (isCli) {
-    await runFlowCli(flow, {
-      query,
-      interactive,
-      usage:
-        '用法：\n  tsx examples/human-in-loop/index.ts review "写一段产品介绍"\n  tsx examples/human-in-loop/index.ts review -i\n',
-    });
+    const { runtime, flow } = await buildReviewRuntime();
+    try {
+      await runFlowCli(flow, {
+        query,
+        interactive,
+        usage:
+          '用法：\n  tsx examples/human-in-loop/index.ts review "写一段产品介绍"\n  tsx examples/human-in-loop/index.ts review -i\n',
+      });
+    } finally {
+      await destroyRuntimeContext(runtime.ctx);
+    }
   } else {
-    await bootstrapFlowAcp({ executor: flow, appConfig });
+    const { appConfig } = loadFlowConfig();
+    await bootstrapFlowAcp({
+      appConfig,
+      debug,
+      createExecutor: async ({ sessionConfig, workspaceRoot }) => {
+        const built = await buildReviewRuntime(sessionConfig, workspaceRoot);
+        return {
+          executor: built.flow,
+          dispose: () => destroyRuntimeContext(built.runtime.ctx),
+        };
+      },
+    });
   }
 }
 

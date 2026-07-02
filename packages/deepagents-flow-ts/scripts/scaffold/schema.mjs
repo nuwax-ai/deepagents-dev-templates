@@ -97,7 +97,7 @@ export const specSchema = z.discriminatedUnion("topology", [
     topology: z.literal("react-tools"),
     params: z.object({}).default({}),
   }),
-  // 人审定稿：compose → review(interrupt) → finalize（审批 / 校对 / 可控生成）。
+  // 人审定稿：compose → present_review(MCP，可选) → review(interrupt) → finalize。
   z.object({
     ...base,
     topology: z.literal("human-in-loop"),

@@ -5,7 +5,6 @@
  *   pnpm example rag "什么是 LangGraph？"   # CLI
  *   pnpm example rag -i                    # 交互 CLI
  *   pnpm example rag                       # 启动 ACP 服务
- *   pnpm example dev-agent "查 ToolNode"   # 无子命令，直接传 query
  *   pnpm example --list                    # 列出可用范例
  */
 import { existsSync } from "node:fs";
@@ -38,7 +37,7 @@ Examples:
   pnpm example rag "什么是 LangGraph？"
   pnpm example rag -i
   pnpm example travel "东京 3 天"
-  pnpm example dev-agent "查 langgraph ToolNode"
+  pnpm example research "调研 LangGraph 生态"
   pnpm smoke -- --example rag
 
 Available examples:`);

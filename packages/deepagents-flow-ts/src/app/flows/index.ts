@@ -5,6 +5,13 @@
  * scaffold 生成的场景 flow 落在 `src/app/flows/<name>/`，并在下方 `flows` 表注册一行
  * —— generator 在 SCAFFOLD-REGISTRY 标记区自动插入 import + 表项，勿手动打乱标记。
  *
+ * 内置示例刻意精简为 4 个（宁缺毋滥，各代表一类形态）：
+ *  - default          conversational ReAct 泛化底座（多数对话型需求 = 零图路径：default + 平台能力 + systemPrompt）
+ *  - search-aggregator conversational + 平台能力样板（复用默认图，演示「登记即接入」，见其 index.ts）
+ *  - translate-review  one-shot 流式管道教学（custom 拓扑）
+ *  - router-gate       LLM 路由教学（custom 拓扑）
+ * 更多形态见 `src/libs/topologies/`（8 积木）；场景 spec 范例在 `scripts/scaffold/specs/`。
+ *
  * 选图：config 顶层自定义键 `activeFlow`（经 loadFlowConfig 的 `raw` 读取，缺省 "default"，
  * 机制同 examples 读 `raw.rag`）。组合根 index.ts 按 `resolveFlow(activeFlow)` 取 executor / topology。
  * 不改 runtime 的 AppConfig schema（保护区），零侵入。
@@ -14,21 +21,10 @@ import type { FlowRuntime } from "../../runtime/flow-runtime.js";
 import type { StatefulFlow } from "../../core/flow-types.js";
 import { recipe as defaultRecipe } from "../default-flow.js";
 import { getFlowTopology, type FlowTopology } from "../topology.js";
-import * as interviewAgentFlow from "./interview-agent/index.js";
 import * as routerGateFlow from "./router-gate/index.js";
-import * as gradeRedoFlow from "./grade-redo/index.js";
-import * as multiAspectSearchFlow from "./multi-aspect-search/index.js";
 import * as searchAggregatorFlow from "./search-aggregator/index.js";
 import * as translateReviewFlow from "./translate-review/index.js";
 import { logger } from "../../runtime/index.js";
-import * as codingAgentFlow from "./coding-agent/index.js";
-import * as researchAgentFlow from "./research-agent/index.js";
-import * as knowledgeQaFlow from "./knowledge-qa/index.js";
-import * as adaptiveKnowledgeQaFlow from "./adaptive-knowledge-qa/index.js";
-import * as tripPlannerFlow from "./trip-planner/index.js";
-import * as projectPlannerFlow from "./project-planner/index.js";
-import * as contentReviewFlow from "./content-review/index.js";
-import * as customerSupportFlow from "./customer-support/index.js";
 import type { StatefulTopologyRecipe } from "../../libs/topologies/types.js";
 
 /**
@@ -70,20 +66,9 @@ export const flows: Record<string, FlowDef> = {
     getTopology: () => getFlowTopology(),
   },
   // --- SCAFFOLD-REGISTRY-START (generator 自动维护，勿手改此区) ---
-  "interview-agent": { name: "interview-agent", kind: "stateful-recipe", recipe: interviewAgentFlow.recipe, getTopology: interviewAgentFlow.getTopology },
   "router-gate": { name: "router-gate", kind: "stateful-recipe", recipe: routerGateFlow.recipe, getTopology: routerGateFlow.getTopology },
-  "grade-redo": { name: "grade-redo", kind: "stateful-recipe", recipe: gradeRedoFlow.recipe, getTopology: gradeRedoFlow.getTopology },
-  "multi-aspect-search": { name: "multi-aspect-search", kind: "stateful-recipe", recipe: multiAspectSearchFlow.recipe, getTopology: multiAspectSearchFlow.getTopology },
-  "search-aggregator": { name: "search-aggregator", kind: "stateful-recipe", recipe: searchAggregatorFlow.recipe, getTopology: searchAggregatorFlow.getTopology },
+  "search-aggregator": { name: "search-aggregator", kind: "stateful-recipe", conversational: true, recipe: searchAggregatorFlow.recipe, getTopology: searchAggregatorFlow.getTopology },
   "translate-review": { name: "translate-review", kind: "stateful-recipe", recipe: translateReviewFlow.recipe, getTopology: translateReviewFlow.getTopology },
-  "coding-agent": { name: "coding-agent", kind: "stateful-custom", createExecutor: codingAgentFlow.createExecutor, getTopology: codingAgentFlow.getTopology },
-  "research-agent": { name: "research-agent", kind: "stateful-recipe", recipe: researchAgentFlow.recipe, getTopology: researchAgentFlow.getTopology },
-  "knowledge-qa": { name: "knowledge-qa", kind: "stateful-recipe", conversational: true, recipe: knowledgeQaFlow.recipe, getTopology: knowledgeQaFlow.getTopology },
-  "adaptive-knowledge-qa": { name: "adaptive-knowledge-qa", kind: "stateful-recipe", conversational: true, recipe: adaptiveKnowledgeQaFlow.recipe, getTopology: adaptiveKnowledgeQaFlow.getTopology },
-  "trip-planner": { name: "trip-planner", kind: "stateful-recipe", recipe: tripPlannerFlow.recipe, getTopology: tripPlannerFlow.getTopology },
-  "project-planner": { name: "project-planner", kind: "stateful-recipe", recipe: projectPlannerFlow.recipe, getTopology: projectPlannerFlow.getTopology },
-  "content-review": { name: "content-review", kind: "stateful-recipe", recipe: contentReviewFlow.recipe, getTopology: contentReviewFlow.getTopology },
-  "customer-support": { name: "customer-support", kind: "stateful-recipe", conversational: true, recipe: customerSupportFlow.recipe, getTopology: customerSupportFlow.getTopology },
   // --- SCAFFOLD-REGISTRY-END ---
 };
 

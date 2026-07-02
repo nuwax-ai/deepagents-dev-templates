@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chooseMcpToolName } from "../mcp-client.js";
+import { chooseMcpToolName } from "../../src/libs/mcp/mcp-access.js";
 
 describe("chooseMcpToolName", () => {
   it("优先精确匹配 preferred", () => {

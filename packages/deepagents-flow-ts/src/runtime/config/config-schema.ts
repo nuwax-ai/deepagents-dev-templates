@@ -222,7 +222,7 @@ export const AppConfigSchema = z.object({
    * Optional flat roots: `config.subagents.directories`（高级，默认空）。
    * Skills from agentsDirectories are merged with `config.skills.directories`.
    *
-   * @example ["../examples/thesis-ppt/.agents", "./my-custom-agents"]
+   * @example ["../shared-agents/.agents", "./my-custom-agents"]
    */
   agentsDirectories: z.array(z.string()).default([`~/${FLOWAGENTS_DIRNAME}`, `./${FLOWAGENTS_DIRNAME}`, "./.agents"]),
   memory: MemoryConfigSchema.default({}),

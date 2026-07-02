@@ -117,4 +117,4 @@ toolCall: { toolCallId, rawInput: toolInput, ...toolInfoFromToolUse() }
 | 终端 / diff / locations | ★★★★☆ | ★★★★☆ |
 | 单测覆盖 | ★★★★★ | ★★★★☆ |
 
-**维护原则**：不必追平全部 Zed 特性，但 **工具出站必须与 v1 schema + 参考实现一致**，否则 NuwaClaw / Web 会丢字段（如 ask-question dockpanel）。
+**维护原则**：不必追平全部 Zed 特性，但 **工具出站必须与 v1 schema + 参考实现一致**，否则平台客户端会丢字段（如 ask-question **平台问答卡片**所需的 `rawInput.ui`）。

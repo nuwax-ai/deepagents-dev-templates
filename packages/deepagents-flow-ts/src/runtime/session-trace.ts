@@ -73,6 +73,21 @@ function resolveSessionId(ctx?: SessionTraceContext): string | undefined {
   return getAcpPromptCycle()?.sessionId ?? ctx?.sessionId ?? ctx?.threadId;
 }
 
+/**
+ * SMOKE_EXPECT_TOOL 只需要工具名、状态与结果长度，不应为此开启全局 debug
+ * （debug 会关闭凭证/端点脱敏）。专用开关下以 info 输出安全摘要；正常运行仍保持 debug。
+ */
+function logToolInvokeSummary(
+  message: "tool invoke start" | "tool invoke done" | "tool invoke failed",
+  context: Record<string, unknown>
+): void {
+  if (process.env.SMOKE_TOOL_TRACE === "1") {
+    log.info(message, context);
+  } else {
+    log.debug(message, context);
+  }
+}
+
 function traceToolCallEvent(e: ToolCallEvent, ctx?: SessionTraceContext): void {
   const base = acpPromptLogFields({
     toolName: e.toolName,
@@ -80,17 +95,22 @@ function traceToolCallEvent(e: ToolCallEvent, ctx?: SessionTraceContext): void {
     sessionId: resolveSessionId(ctx),
   });
   if (e.status === "in_progress") {
-    log.debug("tool invoke start", base);
+    logToolInvokeSummary("tool invoke start", base);
     log.block("debug", `tool ${e.toolName} args`, formatPayloadForLog(e.args));
     return;
   }
   if (e.status === "completed") {
     const text = typeof e.result === "string" ? e.result : JSON.stringify(e.result ?? "");
-    log.debug("tool invoke done", { ...base, resultChars: text.length });
+    logToolInvokeSummary("tool invoke done", { ...base, resultChars: text.length });
     log.block("debug", `tool ${e.toolName} result`, formatPayloadForLog(text));
     return;
   }
-  log.debug("tool invoke failed", { ...base, error: e.error });
+  // smoke 摘要不带底层错误正文；其中可能包含 URL、响应体或凭证。
+  if (process.env.SMOKE_TOOL_TRACE === "1") {
+    logToolInvokeSummary("tool invoke failed", base);
+  } else {
+    logToolInvokeSummary("tool invoke failed", { ...base, error: e.error });
+  }
   if (e.error) {
     log.block("debug", `tool ${e.toolName} error`, formatPayloadForLog(e.error));
   }

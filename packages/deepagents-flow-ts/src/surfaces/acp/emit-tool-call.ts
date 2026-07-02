@@ -2,12 +2,12 @@
  * emitToolCall —— Flow ToolCallEvent → ACP session/update（tool_call / tool_call_update）。
  *
  * 展示逻辑：libs/deepagents-acp/acp-tool-presentation.ts（与 Legacy 共用）
- * 文档：docs/packages/deepagents-flow-ts/development/acp/README.md
+ * ACP 调试与 HITL：docs/zed-debug.md、docs/troubleshooting.md
  * 参考实现：https://github.com/nuwax-ai/claude-code-acp-ts
  *
- * NuwaClaw acpUpdateMapper 只读 rawInput / rawOutput。ask-question 依赖 rawInput.ui。
- * Backend SandboxAgentClient 合成 ASK_QUESTION Event 要求每条 tool 进度含 title（含 nuwax_ask_question），
- * completed 也必须带 title（见 ~/.nuwaclaw/logs 中 in_progress 被 delay 后仅 completed 到达 Backend）。
+ * ACP 宿主 acpUpdateMapper 只读 rawInput / rawOutput。ask-question 依赖 rawInput.ui（平台问答卡片）。
+ * 部分宿主合成 ASK_QUESTION 事件要求 tool 进度 title 含 `nuwax_ask_question`；
+ * completed 也须带 title（in_progress 被 delay 时可能仅收到 completed）。
  */
 
 import type {
@@ -56,7 +56,7 @@ export interface EmitToolCallOptions {
    * 本 prompt 回合已发过 terminal（completed/failed）update 的 id（双轨去重）。
    * 节点直出 completed（带完整 rawInput + result）先到；stream `on_tool_end` 的冗余 completed
    * 后到且缺 rawInput（dispatch tool_update 不带 input）→ 据此跳过，避免无 rawInput 的第二个
-   * completed 覆盖首个（ask-question dockpanel 依赖 rawInput.ui）。
+   * completed 覆盖首个（ask-question 平台问答卡片依赖 rawInput.ui）。
    */
   completedToolCallIds?: Set<string>;
 }
@@ -130,8 +130,8 @@ export async function emitToolCall(
     mcpStructuredRawInput ??
     (cached?.args && Object.keys(cached.args).length > 0 ? cached.args : undefined);
 
-  // terminal update 也要带 title/kind：Backend 用 title.contains("nuwax_ask_question") 合成 ASK_QUESTION；
-  // NuwaClaw 可能只转发 completed（in_progress 被 permissionGatedToolUpdate delay）。
+  // terminal update 也要带 title/kind：部分 ACP 宿主用 title.contains("nuwax_ask_question") 合成 ASK_QUESTION；
+  // 部分宿主可能只转发 completed（in_progress 被 permissionGatedToolUpdate delay）。
   const presentationToolName = cached?.toolName ?? e.toolName;
   const presentationArgs: Record<string, unknown> =
     rawInput != null &&

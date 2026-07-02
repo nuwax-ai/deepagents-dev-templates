@@ -8,14 +8,20 @@
  */
 import type { FlowRuntime } from "../../../runtime/flow-runtime.js";
 import type { StatefulTopologyRecipe } from "../types.js";
-import { createReviewGraph, type ReviewStateType } from "./graph.js";
+import {
+  createReviewGraph,
+  findAskQuestionTool,
+  type ReviewStateType,
+} from "./graph.js";
 
 export function reviewRecipe(
   runtime: FlowRuntime,
   opts: { systemPrompt?: string } = {}
 ): StatefulTopologyRecipe<ReviewStateType> {
+  const askQuestionTool = findAskQuestionTool(runtime.allTools);
   return {
-    buildGraph: (cp) => createReviewGraph(runtime.config, cp, opts.systemPrompt),
+    buildGraph: (cp) =>
+      createReviewGraph(runtime.config, cp, opts.systemPrompt, askQuestionTool),
     toInput: (query) => ({ query }),
     toResult: (v) => ({ answer: v.output ?? "" }),
   };

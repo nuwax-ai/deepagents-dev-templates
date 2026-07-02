@@ -95,16 +95,96 @@ export const SMOKE_FAIL_SIGNATURES = [
   { re: /\boutputChars=0\b/, reason: "flow 输出为空（outputChars=0）", skipIfInterrupted: true },
 ];
 
+/** @typedef {{ name: string; status: "start" | "done" | "failed"; resultChars?: number }} SmokeToolCall */
+
+// session-trace 的工具摘要行：`tool invoke start|done|failed  toolName=xxx …`
+const TOOL_LINE_RE = /tool invoke (start|done|failed)[^\n]*/g;
+
+/**
+ * 解析工具调用轨迹。SMOKE_EXPECT_TOOL 下由子进程 SMOKE_TOOL_TRACE=1 以 info 级输出
+ * 脱敏摘要；正常运行时仍为 debug 级。
+ * @param {string} text
+ * @returns {SmokeToolCall[]}
+ */
+export function parseSmokeToolCalls(text) {
+  if (typeof text !== "string" || !text.trim()) return [];
+  /** @type {SmokeToolCall[]} */
+  const calls = [];
+  for (const m of text.matchAll(TOOL_LINE_RE)) {
+    const line = m[0];
+    const name = line.match(/\btoolName=([^\s]+)/)?.[1];
+    if (!name) continue;
+    /** @type {SmokeToolCall} */
+    const call = { name, status: /** @type {SmokeToolCall["status"]} */ (m[1]) };
+    const resultChars = line.match(/\bresultChars=(\d+)/)?.[1];
+    if (resultChars !== undefined) call.resultChars = Number(resultChars);
+    calls.push(call);
+  }
+  return calls;
+}
+
+/**
+ * SMOKE_EXPECT_TOOL 断言（平台能力真实调用闸门）：
+ * 轨迹须出现名称含 expect（大小写不敏感子串）的工具调用，至少一次 done 且结果非空、无 failed。
+ * @param {string} combined
+ * @param {string} expect
+ * @returns {{ failed: boolean; reason: string; calls: SmokeToolCall[] }}
+ */
+export function evaluateExpectedTool(combined, expect) {
+  const want = String(expect ?? "").trim().toLowerCase();
+  if (!want) return { failed: false, reason: "", calls: [] };
+  const calls = parseSmokeToolCalls(combined).filter((c) =>
+    c.name.toLowerCase().includes(want)
+  );
+  if (!calls.length) {
+    return {
+      failed: true,
+      reason: `SMOKE_EXPECT_TOOL="${expect}"：轨迹未出现该工具调用（检查 SMOKE_PROMPT 是否能触发该能力、能力是否已登记/下发、SMOKE_TOOL_TRACE 是否生效）`,
+      calls,
+    };
+  }
+  const failedCall = calls.find((c) => c.status === "failed");
+  if (failedCall) {
+    return {
+      failed: true,
+      reason: `SMOKE_EXPECT_TOOL="${expect}"：工具 ${failedCall.name} 调用失败（tool invoke failed）`,
+      calls,
+    };
+  }
+  const doneCalls = calls.filter((c) => c.status === "done");
+  if (!doneCalls.length) {
+    return {
+      failed: true,
+      reason: `SMOKE_EXPECT_TOOL="${expect}"：工具 ${calls[0].name} 只见 start 未见 done（可能卡住/超时）`,
+      calls,
+    };
+  }
+  if (doneCalls.every((c) => (c.resultChars ?? 0) === 0)) {
+    return {
+      failed: true,
+      reason: `SMOKE_EXPECT_TOOL="${expect}"：工具 ${doneCalls[0].name} 调用完成但结果为空（resultChars=0）`,
+      calls,
+    };
+  }
+  return { failed: false, reason: "", calls };
+}
+
 /**
  * @param {string} combined
- * @returns {{ failed: boolean; reason: string; trace: SmokeFlowTrace | null }}
+ * @param {{ expectTool?: string }} [opts]
+ * @returns {{ failed: boolean; reason: string; trace: SmokeFlowTrace | null; toolCalls?: SmokeToolCall[] }}
  */
-export function evaluateSmokeOutput(combined) {
+export function evaluateSmokeOutput(combined, opts = {}) {
   const trace = parseSmokeSessionTrace(combined);
   const success = isSmokeFlowSuccess(trace);
+  // 平台能力闸门：flow 绿也必须过工具断言（LLM 兜底输出会让 flow 假绿）
+  const toolCheck = opts.expectTool ? evaluateExpectedTool(combined, opts.expectTool) : null;
 
   if (success) {
-    return { failed: false, reason: "", trace };
+    if (toolCheck?.failed) {
+      return { failed: true, reason: toolCheck.reason, trace, toolCalls: toolCheck.calls };
+    }
+    return { failed: false, reason: "", trace, toolCalls: toolCheck?.calls };
   }
 
   for (const { re, reason, rcoderNoise, skipIfInterrupted } of SMOKE_FAIL_SIGNATURES) {
@@ -121,5 +201,9 @@ export function evaluateSmokeOutput(combined) {
     };
   }
 
-  return { failed: false, reason: "", trace };
+  if (toolCheck?.failed) {
+    return { failed: true, reason: toolCheck.reason, trace, toolCalls: toolCheck.calls };
+  }
+
+  return { failed: false, reason: "", trace, toolCalls: toolCheck?.calls };
 }

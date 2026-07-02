@@ -20,6 +20,7 @@ import { config as loadDotenv } from "dotenv";
 import { commandExists } from "./lib/tools.mjs";
 import { resolveExample } from "./lib/example-registry.mjs";
 import {
+  configureExpectedToolTrace,
   hasSmokeCredential,
   loadFlowAgentConfig,
   resolveSmokeModelEnv,
@@ -119,7 +120,17 @@ function formatCommand(pnpm, args) {
 // rcoder 在 agent 空答 / Session cancelled 时仍可能 exit 0 —— 仅看退出码会把「agent 没产出答案」漏成通过。
 // 判定逻辑见 scripts/lib/smoke-outcome.mjs（session-trace 优先于 rcoder 收尾噪音）。
 
-function runPnpm(args, { debug }) {
+/** 回显 MCP 加载摘要（runtime info 日志 `Loaded MCP tools total=… connectedServers=… failedServers=…`）。 */
+function echoMcpSummary(combined) {
+  const loaded = [...combined.matchAll(/Loaded MCP tools[^\n]*/g)].at(-1)?.[0];
+  if (loaded) console.error(`[smoke:acp] mcp: ${loaded.replace(/^.*Loaded MCP tools/, "Loaded MCP tools")}`);
+  const failedLines = [...combined.matchAll(/MCP server 连接失败[^\n]*/g)].map((m) => m[0]);
+  for (const line of failedLines.slice(0, 5)) {
+    console.error(`[smoke:acp] mcp: ${line}`);
+  }
+}
+
+function runPnpm(args, { debug, expectTool }) {
   const pnpm = resolvePnpm();
   logDebug(debug, "cwd:", PKG_DIR);
   logDebug(debug, "cmd:", formatCommand(pnpm, args));
@@ -137,6 +148,10 @@ function runPnpm(args, { debug }) {
     // 输出超 maxBuffer 等异常：回退 inherit（仅看退出码，放弃特征扫描）
     logDebug(debug, "captured run threw, fallback to inherit:", String(err));
     const r = spawnSync(pnpm, args, { cwd: PKG_DIR, stdio: "inherit", shell: false, env: process.env });
+    if (expectTool) {
+      // 平台能力闸门依赖输出扫描；无法捕获输出时不能假绿
+      return { code: r.status ?? 1, failed: true, reason: `SMOKE_EXPECT_TOOL="${expectTool}"：输出捕获失败，无法验证工具调用` };
+    }
     return { code: r.status ?? 1, failed: false, reason: "" };
   }
   // 回放捕获的输出，保持原 stdio:inherit 的可见性
@@ -144,7 +159,14 @@ function runPnpm(args, { debug }) {
   if (result.stderr) process.stderr.write(result.stderr);
   const code = result.status ?? 1;
   const combined = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
-  const evalResult = evaluateSmokeOutput(combined);
+  echoMcpSummary(combined);
+  const evalResult = evaluateSmokeOutput(combined, { expectTool });
+  if (expectTool && !evalResult.failed) {
+    const done = (evalResult.toolCalls ?? []).filter((c) => c.status === "done");
+    console.error(
+      `[smoke:acp] expect tool "${expectTool}": OK — ${done.map((c) => `${c.name}(resultChars=${c.resultChars ?? "?"})`).join(", ")}`
+    );
+  }
   if (evalResult.failed) return { code, failed: true, reason: evalResult.reason };
   if (evalResult.trace) logDebug(debug, "flow trace OK:", JSON.stringify(evalResult.trace));
   // rcoder 常在 trace 正常时仍 exit 1（Session cancelled 等）；以 trace 为准
@@ -167,7 +189,7 @@ function warnActiveFlow(smokeEnv, { entry, debug }) {
     process.env.SMOKE_WARN_ACTIVE_FLOW !== "0"
   ) {
     console.error(
-      `WARN: activeFlow=default — smoke 跑的是默认 ReAct 图，不是 custom flow。开发 interview-agent 等请先把 activeFlow 写入 config，或设 SMOKE_EXPECT_ACTIVE_FLOW=<name>`
+      `WARN: activeFlow=default — smoke 跑的是默认 ReAct 图，不是 custom flow。开发场景 flow（如 router-gate）请先把 activeFlow 写入 config，或设 SMOKE_EXPECT_ACTIVE_FLOW=<name>`
     );
   }
   logDebug(debug, "activeFlow:", active);
@@ -178,7 +200,7 @@ function usage() {
 
 Options:
   --entry PATH     Agent entry TS file (default: src/index.ts; also AGENT_ENTRY env)
-  --example NAME   Shorthand for --entry (rag | travel | pm | review | dev-agent | research)
+  --example NAME   Shorthand for a curated example (rag | travel | pm | review | research)
   --debug       Log resolved paths, env (masked), and command (also SMOKE_DEBUG=1)
   --dry-run     Print plan and exit 0 without calling rcoder-cli (also SMOKE_DRY_RUN=1)
   -h, --help    Show help
@@ -190,6 +212,8 @@ Env (model — 与 runtime config-loader 对齐):
   SMOKE_PROMPT         主路径 prompt（默认 React useState 题）
   SMOKE_PROMPT_EDGE    可选第二条 prompt（边界输入，如「你是？」，验 R-G002）
   SMOKE_EXPECT_ACTIVE_FLOW  与 config.activeFlow 不一致则失败
+  SMOKE_EXPECT_TOOL    平台能力闸门：轨迹须现名称含该子串的工具调用且 done 非空，
+                       否则 exit 1（自动启用脱敏工具摘要；prompt 须设计成能触发该工具）
   SMOKE_WARN_ACTIVE_FLOW=0  关闭 activeFlow=default 警告
   SMOKE_TIMEOUT        Timeout seconds (default: 150)
   SMOKE_VERBOSE=1      Pass -v to rcoder-cli
@@ -244,6 +268,12 @@ Debug without credentials:
   const timeoutS = process.env.SMOKE_TIMEOUT ?? DEFAULT_TIMEOUT;
   const verbose = process.env.SMOKE_VERBOSE === "1";
   const entryPath = path.resolve(PKG_DIR, flags.entry);
+  const expectTool = process.env.SMOKE_EXPECT_TOOL?.trim() || undefined;
+  if (configureExpectedToolTrace(smokeEnv, expectTool)) {
+    console.error(
+      `[smoke:acp] SMOKE_EXPECT_TOOL="${expectTool}" — 已启用脱敏工具摘要（不修改 LOG_LEVEL）`
+    );
+  }
 
   warnActiveFlow(smokeEnv, flags);
 
@@ -293,7 +323,8 @@ Debug without credentials:
       continue;
     }
 
-    const res = runPnpm(rcoderArgs, { debug: flags.debug });
+    // SMOKE_EXPECT_TOOL 只对主 prompt（第一条）断言；SMOKE_PROMPT_EDGE 边界输入（如「你是？」）不要求触发工具
+    const res = runPnpm(rcoderArgs, { debug: flags.debug, expectTool: i === 0 ? expectTool : undefined });
     if (res.code !== 0 || res.failed) {
       const reason = res.failed ? ` — ${res.reason}` : "";
       console.error(`[smoke:acp] failed${label} (exit ${res.code})${reason}`);

@@ -2,10 +2,10 @@
  * Flow 契约（core 层）—— graph 与 surface 之间的共享词汇，**纯类型、零依赖**。
  *
  * 这是分层架构的最底契约层（L1 core）：app（默认图）与 surfaces（ACP/CLI）都 import
- * 这里的类型，从而**互不直接依赖**。包默认图、examples/* 各自实现一个 FlowExecutor /
+ * 这里的类型，从而**互不直接依赖**。默认图与各 flow/topology 各自实现一个 FlowExecutor /
  * StatefulFlow 插进同一套 surface，避免重复 DeepAgentsServer / onPrompt / 流式 等 plumbing。
  *
- * 历史路径 `surfaces/flow-types.ts` 现为本文件的 re-export shim（examples 与对外消费者仍可用）。
+ * 历史路径 `surfaces/flow-types.ts` 现为本文件的 re-export shim（对外消费者仍可用）。
  */
 
 /** flow 执行结果：answer 为完整回答，footer 为可选脚注（如来源列表）。 */

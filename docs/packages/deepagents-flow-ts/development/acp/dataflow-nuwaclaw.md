@@ -56,7 +56,7 @@ sequenceDiagram
   Dispatch->>Emit: ToolCallEvent
   Emit->>Host: session/update rawInput/rawOutput
   Host->>Web: message.part.updated input=rawInput
-  Web->>Web: AskQuestion dockpanel 读 input.ui
+  Web->>Web: 平台问答卡片读 input.ui
 ```
 
 ---

@@ -33,10 +33,14 @@ describe("loadFlowConfig + MCP 默认路径", () => {
 });
 
 describe("createRuntimeContext 默认 MCP servers", () => {
-  it("默认 mcp.default.json 为空，无内置 MCP server", () => {
+  it("默认 mcp.default.json 内置 ask-question", () => {
     const { appConfig } = loadFlowConfig({ workspaceRoot: ALIEN_WORKSPACE });
     const ctx = createRuntimeContext(appConfig, { cwd: ALIEN_WORKSPACE });
-    expect(ctx.mcpServerConfigs).toEqual({});
+    expect(Object.keys(ctx.mcpServerConfigs)).toEqual(["ask-question"]);
+    expect(ctx.mcpServerConfigs["ask-question"]).toMatchObject({
+      command: "npx",
+      args: ["-y", "nuwax-ask-question-mcp@latest"],
+    });
   });
 
   it("ACP session 下发的 mcpServers 与默认合并（session-wins 同名覆盖）", () => {
@@ -48,7 +52,9 @@ describe("createRuntimeContext 默认 MCP servers", () => {
         whois: { command: "npx", args: ["-y", "@whois-mcp/example"] },
       },
     });
-    expect(Object.keys(ctx.mcpServerConfigs).sort()).toEqual(["doc-mcp", "whois"].sort());
+    expect(Object.keys(ctx.mcpServerConfigs).sort()).toEqual(
+      ["ask-question", "doc-mcp", "whois"].sort()
+    );
     expect(ctx.mcpServerConfigs["doc-mcp"]).toMatchObject({
       command: "echo",
       args: ["acp-override"],
@@ -56,6 +62,20 @@ describe("createRuntimeContext 默认 MCP servers", () => {
     expect(ctx.mcpServerConfigs.whois).toMatchObject({
       command: "npx",
       args: ["-y", "@whois-mcp/example"],
+    });
+  });
+
+  it("平台同名 ask-question 覆盖内置（session-wins）", () => {
+    const { appConfig } = loadFlowConfig({ workspaceRoot: ALIEN_WORKSPACE });
+    const ctx = createRuntimeContext(appConfig, {
+      cwd: ALIEN_WORKSPACE,
+      mcpServers: {
+        "ask-question": { command: "echo", args: ["platform"] },
+      },
+    });
+    expect(ctx.mcpServerConfigs["ask-question"]).toMatchObject({
+      command: "echo",
+      args: ["platform"],
     });
   });
 });

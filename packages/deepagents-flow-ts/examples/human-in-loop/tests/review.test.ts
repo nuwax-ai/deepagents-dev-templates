@@ -7,11 +7,18 @@
 import { config as loadDotenv } from "dotenv";
 loadDotenv();
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { randomUUID } from "node:crypto";
 import { createReviewFlow } from "../graph.js";
 import { loadFlowConfig } from "../../../src/runtime/flow-config.js";
 import { isApproval } from "../../../src/libs/nodes/index.js";
+import {
+  createAskQuestionPresentationNode,
+  findAskQuestionTool,
+  getReviewTopology,
+  normalizeReviewFeedback,
+} from "../../../src/libs/topologies/human-in-loop/index.js";
+import type { StructuredTool } from "@langchain/core/tools";
 
 const hasCreds = ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "OPENAI_API_KEY"].some(
   (k) => Boolean(process.env[k])
@@ -29,6 +36,145 @@ describe("isApproval (纯函数, 无凭证)", () => {
     for (const fb of ["改短一点", "不可以", "再加一段", "no"]) {
       expect(isApproval(fb)).toBe(false);
     }
+  });
+});
+
+describe("ask-question MCP 人审表单（无凭证）", () => {
+  it("把表单回复归一化为通过或修改意见", () => {
+    expect(normalizeReviewFeedback("ok")).toBe("ok");
+    expect(
+      normalizeReviewFeedback(
+        JSON.stringify({
+          requestId: "review-1",
+          action: "submit",
+          formData: { decision: "approve", feedback: "" },
+        })
+      )
+    ).toBe("ok");
+    expect(
+      normalizeReviewFeedback(
+        JSON.stringify({
+          formData: { decision: "revise", feedback: "标题再短一些" },
+        })
+      )
+    ).toBe("标题再短一些");
+    expect(
+      normalizeReviewFeedback(
+        [
+          "我已填写「审阅草稿」，表单内容如下：",
+          "处理方式：通过并定稿",
+          "修改意见：未填写",
+        ].join("\n")
+      )
+    ).toBe("ok");
+    expect(
+      normalizeReviewFeedback(
+        [
+          'I submitted "审阅草稿" with the following form content:',
+          "处理方式: 按意见修改",
+          "修改意见: 保留结论，缩短背景",
+        ].join("\n")
+      )
+    ).toBe("保留结论，缩短背景");
+  });
+
+  it("能识别带 MCP server 前缀的 nuwax_ask_question 工具", () => {
+    const unrelated = { name: "search" } as StructuredTool;
+    const askQuestion = {
+      name: "ask-question__nuwax_ask_question",
+    } as StructuredTool;
+    expect(findAskQuestionTool([unrelated, askQuestion])).toBe(askQuestion);
+  });
+
+  it("展示节点调用 MCP 并透出可渲染的完整工具事件", async () => {
+    const invoke = vi.fn(async (args: Record<string, unknown>) => ({
+      structuredContent: {
+        status: "pending",
+        input: { toolName: "nuwax_ask_question", ...args },
+      },
+    }));
+    const askQuestion = {
+      name: "ask-question__nuwax_ask_question",
+      invoke,
+    } as unknown as StructuredTool;
+    const events: Array<Record<string, unknown>> = [];
+
+    await createAskQuestionPresentationNode(askQuestion)(
+      {
+        query: "写产品介绍",
+        draft: "这是初稿。",
+        feedback: "",
+        output: "",
+      },
+      {
+        configurable: {
+          thread_id: "session-1",
+          onToolCall: (event: Record<string, unknown>) => events.push(event),
+        },
+      }
+    );
+
+    expect(invoke).toHaveBeenCalledOnce();
+    const args = invoke.mock.calls[0]?.[0];
+    expect(args).toMatchObject({
+      schemaVersion: "nuwax.mcp_ask.v2",
+      requestId: "session-1:review",
+      revision: 1,
+      sessionId: "session-1",
+      title: "审阅草稿",
+      ui: {
+        version: "nuwax.interaction.v2",
+        presentation: "inline",
+        fields: [
+          {
+            name: "decision",
+            widget: "radio",
+            options: [
+              { value: "approve", label: "通过并定稿" },
+              { value: "revise", label: "按意见修改" },
+            ],
+          },
+          { name: "feedback", widget: "textarea" },
+        ],
+      },
+    });
+    expect(events.map((event) => event.status)).toEqual([
+      "in_progress",
+      "completed",
+    ]);
+    expect(events[0]?.args).toBe(args);
+    expect(events[1]?.result).toMatchObject({
+      structuredContent: { status: "pending" },
+    });
+  });
+
+  it("拓扑把 MCP 展示和 durable interrupt 拆成相邻节点", async () => {
+    const topology = await getReviewTopology();
+    expect(topology.nodes.map((node) => node.id)).toEqual(
+      expect.arrayContaining(["compose", "present_review", "review", "finalize"])
+    );
+    expect(topology.edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ source: "compose", target: "present_review" }),
+        expect.objectContaining({ source: "present_review", target: "review" }),
+      ])
+    );
+  });
+});
+
+describe("createReviewFlow + askQuestionTool 注入", () => {
+  it("注入 MCP 工具后图含 present_review 节点", async () => {
+    const { appConfig } = loadFlowConfig();
+    const askQuestion = {
+      name: "ask-question__nuwax_ask_question",
+      invoke: async () => ({ structuredContent: { status: "pending" } }),
+    } as unknown as StructuredTool;
+    const flow = createReviewFlow(appConfig, { askQuestionTool: askQuestion });
+    const topology = await getReviewTopology();
+    expect(topology.nodes.map((n) => n.id)).toEqual(
+      expect.arrayContaining(["present_review", "review"])
+    );
+    expect(flow).toBeDefined();
   });
 });
 

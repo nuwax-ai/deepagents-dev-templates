@@ -58,7 +58,7 @@ graph.addNode("compose", compose);
 - `r.content` 已是 `extractText` 后的纯文本;`parse` 提供时 `r.parsed = parse(content)`。
 - **结构化**:加 `parse`(常用 `parseJson`),`write` 里读 `r.parsed`。PM 的 plan/evaluate、rag 的 rewrite 都用这个。
 - **`write` 可收第三参 `config?`**(LangGraphRunnableConfig)——供 write 内发 `emitPlan(config,…)`/`emitStage(config,…)` 副作用;不用就忽略(默认两参 `(r, s)`)。
-- 例:[project-manager](../examples/project-manager/) plan/estimate/evaluate、[rag](../examples/rag/) rewrite、[adaptive-rag](../src/libs/topologies/adaptive-rag/) route_question / transform_query（`{ parse }` 结构化裁决 / 查询重写）。
+- 例:[project-manager](../src/libs/topologies/project-manager/) plan/estimate/evaluate、[rag](../src/libs/topologies/rag/) rewrite、[adaptive-rag](../src/libs/topologies/adaptive-rag/) route_question / transform_query（`{ parse }` 结构化裁决 / 查询重写）。
 - **用户可见初稿/汇总**见 [`createLlmStreamNode`](#createllmstreamnode--流式-llm)（human-in-loop compose、travel aggregate 等已迁移）。
 
 ### parse 使用契约（必读）
@@ -107,7 +107,7 @@ const draft = createLlmStreamNode<MyState>({
 ```
 
 - 只用于**用户可见的大段输出**:有 `onToken` sink 且模型支持 stream 时逐 chunk `emitTextToken`,否则退回一次性 invoke(`r.streamed=false`)。
-- 例:[deep-research](../examples/deep-research/) draft、[travel-planner](../src/libs/topologies/travel-planner/graph.ts) aggregate、[human-in-loop](../src/libs/topologies/human-in-loop/graph.ts) compose（带「失败复用上版草稿」fallback）。
+- 例:[deep-research](../src/libs/topologies/deep-research/) draft、[travel-planner](../src/libs/topologies/travel-planner/graph.ts) aggregate、[human-in-loop](../src/libs/topologies/human-in-loop/graph.ts) compose（带「失败复用上版草稿」fallback）。
 
 ## createLlmRouterNode —— LLM 裁决 → Command goto
 
@@ -180,7 +180,9 @@ const gate = createHumanApprovalNode<MyState>({
 
 - `interrupt` 暂停、`isApproval(feedback)` 判定(默认中英文通过词;`regex` 可覆盖)。空回复视为通过。
 - `write`(简单写回)或 `route`(Command 路由)二选一。
-- 例:[human-in-loop](../examples/human-in-loop/) review、[travel-planner](../examples/travel-planner/) confirm、[project-manager](../examples/project-manager/) approve、[deep-research](../examples/deep-research/) clarify/outlineGate。
+- **结构化表单（平台问答卡片）**：审阅定稿等多字段场景在 interrupt **之前**加 `createAskQuestionPresentationNode`（ask-question MCP），见 [human-in-loop](../src/libs/topologies/human-in-loop/)、[flow-patterns.md](./flow-patterns.md) § interrupt 人审。
+- 术语口径：**平台问答卡片** = **主平台的问答卡片**（定义见 [glossary.md](./glossary.md)）；文档/注释勿用产品口语问答卡片、dockpanel 等指代该 UI。
+- 例:[human-in-loop](../src/libs/topologies/human-in-loop/) review、[travel-planner](../src/libs/topologies/travel-planner/) confirm、[project-manager](../src/libs/topologies/project-manager/) approve、[deep-research](../src/libs/topologies/deep-research/) clarify/outlineGate。
 
 ## createPermissionApprovalNode —— 同步弹窗审批
 
@@ -239,7 +241,7 @@ graph.addConditionalEdges("gather", fanout, ["research"]);
 // state 的聚合 channel 必须用 reducer(并行写才安全):results: Annotation<T[]>({ reducer: (a,b)=>[...a,...b] })
 ```
 
-- 例:[travel-planner](../examples/travel-planner/) fanoutToResearch、[deep-research](../examples/deep-research/) fanoutToResearch。
+- 例:[travel-planner](../src/libs/topologies/travel-planner/) fanoutToResearch、[deep-research](../src/libs/topologies/deep-research/) fanoutToResearch。
 
 ## createSubgraphNode —— 子图作节点
 
@@ -253,7 +255,7 @@ parentGraph.addNode("research", researcher);   // 编译后的子图直接当节
 ```
 
 - 子图独立 state,经共享 channel(如 `messages`)与父图映射。
-- 例:[dev-agent](../examples/dev-agent/) createResearcherSubgraph。
+- 例:[dev-agent](../src/app/topologies/dev-agent.ts) 的 researcher subgraph。
 
 ---
 
@@ -294,7 +296,7 @@ parentGraph.addNode("research", researcher);   // 编译后的子图直接当节
 spec 声明 `state`(channels + reducer 类型)/ `nodes`(name→type+params)/ `edges`(static/conditional/fanout)/ `input`/`result`,
 `scripts/scaffold/blueprints/custom.mjs` **生成时渲染**真实 `src/app/flows/<name>/graph.ts`(内联本目录 factory,受 tsc 检查;无运行时解释器)。节点 `type` 词表 + 选型见 [node-catalog.md](node-catalog.md)。
 
-**custom 范例**（`scripts/scaffold/specs/_example.*.flow.json`）：
+**custom 范例**（`scripts/scaffold/specs/_example.*.flow.json`；spec 教学件，仅 `translate-review` / `router-gate` 同时注册为内置 flow，其余按需自行生成）：
 - 流式：`translate-review` / `multi-aspect-search` / `router-gate`（`draft`）/ `interview-agent`（`ask` + `writeReport`）
 - 教学用非流式（勿照抄到生产 flow）：`grade-redo`（`write` 仍 `llm`）、`interview-agent`（`prepare` / `evaluate` 结构化仍 `llm`）
 

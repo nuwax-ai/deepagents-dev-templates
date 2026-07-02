@@ -14,37 +14,32 @@ START → rewrite → retrieve → grade_docs ─(条件边)─┐
 
 | 节点 | 职责 |
 |---|---|
-| `rewrite` | 意图识别 + 查询重写 + 选检索源（[nodes/rewrite.ts](nodes/rewrite.ts)） |
-| `retrieve` | 调检索源（示例用 MCP：howtocook；文档类 MCP 须经平台登记）（[nodes/retrieve.ts](nodes/retrieve.ts)） |
-| `grade_docs` + 条件边 | 编排核心：检索不足回 rewrite 重试，`MAX_RETRIEVE_ATTEMPTS` 封顶（[nodes/grade.ts](nodes/grade.ts)） |
-| `prepare` | 合并/去重/排序/截断上下文（[nodes/prepare.ts](nodes/prepare.ts)） |
-| `generate` | 基于上下文生成带 `[来源X]` 引用的回答（[nodes/generate.ts](nodes/generate.ts)） |
+| `rewrite` | 意图识别 + 查询重写 + 选检索源（[rewrite.ts](../../src/libs/topologies/rag/nodes/rewrite.ts)） |
+| `retrieve` | 调平台登记并经 ACP 注入的 MCP 检索源（[retrieve.ts](../../src/libs/topologies/rag/nodes/retrieve.ts)） |
+| `grade_docs` + 条件边 | 检索不足回 rewrite 重试，`MAX_RETRIEVE_ATTEMPTS` 封顶（[grade.ts](../../src/libs/topologies/rag/nodes/grade.ts)） |
+| `prepare` | 合并/去重/排序/截断上下文（[prepare.ts](../../src/libs/topologies/rag/nodes/prepare.ts)） |
+| `generate` | 基于上下文生成带来源引用的回答（[generate.ts](../../src/libs/topologies/rag/nodes/generate.ts)） |
 
 > 注意 LangGraph 限制：节点名不能与 state channel 同名。这里 channel 叫 `grade`，所以节点叫 `grade_docs`。
 
 ## 它如何复用模板
 
-这正是模板的用法示范——示例**不重写** ACP/CLI 接入逻辑，只：
+图和节点的单一权威是 [`src/libs/topologies/rag`](../../src/libs/topologies/rag/)。
+本示例**不复制图逻辑、不重写 ACP/CLI 接入**，只：
 
-1. 写自己的图 + 节点（[graph.ts](graph.ts)、[nodes/](nodes/)）
-2. 包装成 `FlowExecutor`（[index.ts](index.ts)）
-3. 插进包的 `bootstrapFlowAcp` / `runFlowCli`（surface 完全复用）
+1. 加载 RAG 场景配置（[config.ts](config.ts)）
+2. 把 canonical graph 包成 conversational `StatefulFlow`（[flow.ts](flow.ts)）
+3. 插进 `bootstrapFlowAcp` / `runFlowCli`（[index.ts](index.ts)）
 
 ```ts
-// index.ts 核心
-const executor: FlowExecutor = async (query, { onToken }) => {
-  const res = await executeRAG(query, { config, callbacks: onToken ? { onToken } : undefined });
-  return { answer: res.answer, footer: formatSourcesFooter(res) };
-};
-await bootstrapFlowAcp({ executor, appConfig });   // 或 runFlowCli(executor, ...)
+const loaded = loadRagConfig();
+const flow = createRagFlow(loaded);
+await bootstrapFlowAcp({ executor: flow, appConfig: loaded.appConfig });
 ```
 
 ## 运行
 
 ```bash
-# 先构建 runtime 依赖
-pnpm --filter deepagents-app-ts build
-
 # CLI 单次（需在 .env 或 host 提供模型凭证）
 pnpm --filter deepagents-flow-ts example rag "什么是 LangGraph？"
 # 交互
@@ -54,9 +49,6 @@ pnpm --filter deepagents-flow-ts example rag
 ```
 
 ## 调试
-
-重构后 RAG 搬进了 `examples/rag/`,默认入口(`src/index.ts`)跑的是占位 flow。调试
-RAG 用下面这些入口(都在 `packages/deepagents-flow-ts` 内跑,凭证放 `./.env` 或 shell):
 
 **CLI 单次**(最快看图执行):
 ```bash

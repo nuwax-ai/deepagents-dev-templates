@@ -1,11 +1,10 @@
 /**
- * requireModel —— 「无 demo fallback」模型凭证策略（自 examples/shared.ts 提升）。
+ * requireModel —— 「无 demo fallback」模型凭证策略。
  *
  * 通用节点 factory（createLlmNode 等）不强制凭证；本函数给「真实接入」的拓扑/示例用：
  * 必须有模型凭证，否则直接报错（不降级 demo）。各拓扑节点统一经此取模型，错误信息一致。
  *
- * 提升自 examples/shared.ts（P1：拓扑进 libs 前先把共享件落 src）。runtime 的 resolveModel
- * 是框架默认图的模型解析；requireModel 是其「硬凭证」包装。
+ * runtime 的 resolveModel 是框架默认图的模型解析；requireModel 是其「硬凭证」包装。
  */
 import { resolveModel, resolveApiKey, logger, type AppConfig } from "../../runtime/index.js";
 

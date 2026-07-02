@@ -1,6 +1,6 @@
 # .nuwax-agent 开发配置
 
-本目录存放 **deepagents-flow-ts** 工作流编排模板的 Nuwax 平台侧元数据：开发配置、能力分层、打包契约。
+本目录存放 **deepagents-flow-ts** 工作流编排模板的**平台侧**（主平台）元数据：开发配置、能力分层、打包契约。
 
 它与 `config/` 有意分开：
 

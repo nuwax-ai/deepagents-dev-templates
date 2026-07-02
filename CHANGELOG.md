@@ -9,12 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 - deepagents-flow-ts：移除 duckduckgo-mcp-server 残留引用；联网搜索统一走平台 MCP 登记
+- deepagents-flow-ts：精选 5 个面向 AI Agent 的可运行 seam 范例，移除误导性的 `dev-agent` 重复示例，并明确 topology 单一权威
 
 ### Fixed
 - CI workflow references `packages/template` → `packages/deepagents-app-ts`
 - Unified package manager to pnpm (added pnpm-lock.yaml, updated CI)
 
 ### Added
+- deepagents-flow-ts：builtin `ask-question` MCP in `config/mcp.default.json` for default flow（平台同名 session-wins 覆盖）
+- docs：`docs/packages/deepagents-flow-ts/development/ask-question-mcp-hitl.md`（HITL 选型、平台合并、code-review 处理记录）
 - `scripts/pack-template.js` for TS/Python zip packaging
 - `AGENTS.md` symlink to `CLAUDE.md` in both templates
 - `CONTRIBUTING.md` and `CHANGELOG.md`

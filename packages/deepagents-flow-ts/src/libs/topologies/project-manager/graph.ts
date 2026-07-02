@@ -1,5 +1,5 @@
 /**
- * project-manager 拓扑图 —— reflection 评估循环 + HITL 审批（自 examples/project-manager 提升）。
+ * project-manager 拓扑图 —— reflection 评估循环 + HITL 审批。
  *
  *   START → plan → estimate → evaluate ─(条件边)─ 不完备 & 未达上限 → plan(带评审意见重规划)
  *                                      └ 否则 → approve(interrupt 审批) → finalize → END

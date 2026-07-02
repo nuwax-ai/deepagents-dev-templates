@@ -101,6 +101,23 @@ const confirm = createPermissionApprovalNode<S>({
 | --- | --- |
 | 秒级 yes/no（确认发布、确认删除） | 弹窗式 `createPermissionApprovalNode`（§2.3） |
 | 需要详细反馈 / 多轮重审 / 长文 review | 对话式 `createHumanApprovalNode`（§2.2） |
+| 结构化表单（通过/修改+意见、多字段） | ask-question MCP `present_review` + `createHumanApprovalNode`（§2.5） |
+
+### 2.5 ask-question MCP 表单（结构化 UI + interrupt）
+
+在 §2.2 对话式之上，支持 **ask-question MCP** 的 **平台客户端** 可在 **平台问答卡片** 中渲染结构化表单；**checkpoint/resume 仍由 interrupt 负责**。
+
+```
+compose → present_review(ask-question tool.invoke + onToolCall)
+       → review(createHumanApprovalNode + normalizeReviewFeedback)
+       → finalize
+```
+
+- 包内 fallback：`config/mcp.default.json`；平台同名 **session-wins**
+- 工具：`ask-question__nuwax_ask_question`；`findAskQuestionTool(runtime.allTools)`
+- ACP 出站：`rawInput.ui` 须保留（`emit-tool-call.ts`）
+
+**完整选型与 breaking 说明**：[ask-question-mcp-hitl.md](../ask-question-mcp-hitl.md)。工厂注释：`libs/nodes/hitl.ts`。
 
 ## 3. 为什么两套不统一
 
@@ -150,4 +167,5 @@ UX 要求相反：
 | B interrupt 检测 + resume | `surfaces/stateful-flow.ts` `pickInterruptValue`/`consumeStream`/`run` |
 | B onPrompt 桥接 | `surfaces/acp/server.ts` onPrompt interrupted 分支 |
 | B 拓扑实例 | `libs/topologies/human-in-loop`、`libs/topologies/deep-research/nodes/delivery.ts` |
+| B ask-question 表单层 | `libs/topologies/human-in-loop/graph.ts` `createAskQuestionPresentationNode`；开发文档 [ask-question-mcp-hitl.md](../ask-question-mcp-hitl.md) |
 | 弹窗载荷复用 | `libs/deepagents-acp/acp-tool-presentation.ts` `buildPermissionToolCall` |

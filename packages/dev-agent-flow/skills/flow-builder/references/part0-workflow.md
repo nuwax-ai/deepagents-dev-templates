@@ -19,7 +19,19 @@
 
 ## Phase 1：需求分析与 topology 选型
 
-1. **脚手架优先** → [part1-scaffold.md](part1-scaffold.md)（9 topologies = 8 presets + `custom`）
+### 第 0 问：会话形态分类（选 topology 之前必答）
+
+| 判断 | 需求信号 | 落点 |
+|------|----------|------|
+| **多轮对话 / 追问 / 钻取 / 开放泛化** | 「支持追问」「继续问」「随便问」「助手」「客服」——只要用户会连续发问 | **conversational：default ReAct（零图路径，见下）**；确需专属样板才建薄 recipe（对照 `search-aggregator`） |
+| **固定输入 → 固定阶段 → 单次输出** | 「翻译这段」「审这篇」「生成一份」「给 X 打分」——流程固定、一次交付 | one-shot preset / `custom` 管道 |
+| **需人工审批 / 确认后定稿** | 「审批」「确认后发布」「人工复核」 | HITL 系（`human-in-loop` / `project-manager`） |
+
+**零图路径（conversational 首选，MVP 最快）**：`activeFlow: "default"` + `dev-engineer-toolkit` 登记平台能力（运行期统一转 MCP，自动进 `think ↔ tools`）+ Part 5 systemPrompt 定制 ≈ 交付，**不写任何图代码**。新建图必须能说明「default ReAct 为什么不够」（如：固定阶段顺序、需 Send 并行、需 HITL interrupt），说不出就走零图路径。
+
+> **反例（真实失败案例）**：「搜索聚合 Agent，支持**追问和钻取**」被误判成 fanout×4 固定管道——每轮盲搜 4 路、无法真正追问钻取。「追问」即 conversational 信号，正确落点：default ReAct + 平台搜索能力登记 + systemPrompt。
+
+1. **脚手架优先**（第 0 问判定为管道/HITL 后）→ [part1-scaffold.md](part1-scaffold.md)（9 topologies = 8 presets + `custom`）
 2. **系统提示词并行** → 用户 Agent 描述按 [part5](part5-prompt-design.md) § 用户输入提炼 **持续合并**；定稿后尽早同步平台，禁止收工仍空 `systemPrompt`
 3. **命中 preset** → 写 spec → `node scripts/scaffold/generate.mjs <spec>` → 改 `activeFlow` → 进 Phase 2 生成路径
 4. **不命中** → 先用 `custom`；仍不行 → [part2-orchestration.md](part2-orchestration.md) 手写
@@ -42,11 +54,11 @@
 | 1 | 加载 `dev-engineer-toolkit` + [part3-tools-config.md](part3-tools-config.md) § 平台能力登记 |
 | 2 | 按能力拆词：`search-apis.sh --kw "<关键词>"`（可多轮）；需技能 → `search-skills.sh` |
 | 3 | `get-config.sh --key tools` / `mcpConfigs` / `skills`（按需） |
-| 4 | 命中 → `add-tool.sh` 或对齐 MCP → `src/app/` 包装 → `flow-tools.ts` 或图内接线 → `project.md` 记 targetId |
-| 5 | 平台确无命中 → 记录关键词与输出，**然后**方可走优先级 4 自写 app 工具 |
+| 4 | 命中 → `add-tool.sh`（**登记即接入**：运行期统一转 MCP 自动下发）；conversational ReAct **零接线**，固定管道图内按名接线 → `project.md` 记 targetId |
+| 5 | 平台确无命中 → 记录关键词与输出，**然后**方可走优先级 3 自写 app 工具 |
 | 6 | **然后**写 spec / `graph.ts` |
 
-> **禁止**：先写占位工具 / `SEARCH_MCP = undefined` / 空 `flow-tools.ts` 再 smoke 报完成，把平台登记甩给「用户待操作」。**联网搜索**是高频场景，同样不得跳过登记；**运行期搜索 MCP 经 ACP `mcpServers` 下发**，模板不内置。
+> **禁止**：先写占位工具 / `SEARCH_MCP = undefined` / 空 `flow-tools.ts` 再 smoke 报完成，把平台登记甩给「用户待操作」；**为已登记能力手写 fetch/`tool()` 包装**（运行期它已是 MCP 工具）。**联网搜索**是高频场景，同样不得跳过登记；**平台工具（Plugin/Workflow/MCP）运行期统一转 MCP 经 ACP `mcpServers` 下发**，模板不内置。
 
 ### Factory 速查（手写路径）
 
@@ -57,17 +69,23 @@
 | LLM 裁决路由 | `createLlmRouterNode` |
 | MCP 检索 | `createMcpRetrievalNode` |
 | tool_calls | `createToolExecNode` |
-| HITL interrupt | `createHumanApprovalNode` |
+| HITL interrupt（纯文本） | `createHumanApprovalNode` |
+| HITL **平台问答卡片**（interrupt 前展示表单） | `createAskQuestionPresentationNode`（`human-in-loop/graph.ts`）；表单回复用 `normalizeReviewFeedback` |
 | HITL 后置定稿 | `createApprovalFinalizeNode` |
 | 同 turn 工具审批弹窗 | `createPermissionApprovalNode` |
 | input→HumanMessage | `createPrepareNode` |
 | Send 并行 | `createFanout` |
 | 子图 | `createSubgraphNode` |
 
-### examples/ 对照（只读，6 个）
+### Topology 参考实现
 
-`rag` · `travel-planner` · `project-manager` · `human-in-loop` · `dev-agent` · `deep-research`  
-路由+自纠正检索 → scaffold topology `adaptive-rag`（非 `examples/` 目录）
+`src/libs/topologies/`：`rag` · `adaptive-rag` · `travel-planner` · `project-manager` ·
+`human-in-loop` · `deep-research`；`dev-agent` 在 `src/app/topologies/dev-agent.ts`，
+`react-tools` 复用默认图。
+
+`examples/` 仅保留 5 个互补的可运行 seam 范例：`rag` · `travel-planner` ·
+`project-manager` · `human-in-loop` · `deep-research`。先读 `examples/README.md` 选型；
+不要把 re-export shim 当成第二份图实现。
 
 ---
 
@@ -82,7 +100,7 @@
 
 | 步 | 动作 |
 |----|------|
-| 1 | 读最接近 `examples/`（只读） |
+| 1 | 读最接近的 `src/libs/topologies/` 参考实现或 scaffold spec |
 | 2 | `src/app/`：`graph.ts` 连线、`nodes/`、`flow-tools.ts` |
 | 3 | 节点优先 factory；bespoke 须说明原因 |
 | 4 | `Annotation.Root`；Send 并行加 reducer |
@@ -120,6 +138,7 @@ pnpm build && pnpm typecheck && pnpm test && pnpm graph && pnpm smoke
 4. **平台 `systemPrompt` 非空且已回读**（`openingChatMsg` 若涉及）
 5. 提示词提炼来源（用户哪些输入 → 哪一字段）
 6. **需平台能力时**：`search-apis` / `search-skills` / `get-config` 结果摘要（或「已搜索、无命中」+ 关键词）；自写工具须说明平台无命中依据（**联网搜索较常见**，须单独列出搜索/MCP 关键词）
+7. **平台能力真实调用证据**：运行期下发的 MCP 工具名 + smoke 调用轨迹片段（`SMOKE_EXPECT_TOOL` 断言通过；工具被调用且未失败）
 
 ### Phase 4「后续」可写 / 禁止（ACP 默认集成）
 
@@ -144,7 +163,8 @@ pnpm build && pnpm typecheck && pnpm test && pnpm graph && pnpm smoke
 - [ ] `.logs/` 无未预期 `error`
 - [ ] `get-config.sh --key systemPrompt` 回读**非空**；用户发过 Agent 描述 → 已按 part5 提炼并同步
 - [ ] 用户可见 LLM 节点 → `createLlmStreamNode` + `r.text`（**R-G009**）
-- [ ] **需平台能力**（见 Phase 1「平台能力门禁」）→ 已贴 `search-apis.sh` / `search-skills.sh` 与/或 `get-config.sh --key tools|mcpConfigs|skills` **原始输出**；有命中 → 已 `add-tool.sh` 并接线；无命中 → 报告写明关键词与「已搜索、无命中」后方可自写工具。**联网搜索较常见**，须含 `mcpConfigs` 或搜索关键词证据。**未搜平台即报完成 = 不通过**
+- [ ] **需平台能力**（见 Phase 1「平台能力门禁」）→ 已贴 `search-apis.sh` / `search-skills.sh` 与/或 `get-config.sh --key tools|mcpConfigs|skills` **原始输出**；有命中 → 已 `add-tool.sh`（conversational 零接线 / 管道已按名接线）；无命中 → 报告写明关键词与「已搜索、无命中」后方可自写工具。**联网搜索较常见**，须含 `mcpConfigs` 或搜索关键词证据。**未搜平台即报完成 = 不通过**
+- [ ] **平台能力真实调用**（凡已登记）→ `SMOKE_EXPECT_TOOL=<工具名子串>` + 触发式 `SMOKE_PROMPT` 跑 smoke 通过，已贴工具调用轨迹片段。**smoke 绿但工具未真调用 = 不通过**（LLM 兜底输出会假绿）
 
 ---
 

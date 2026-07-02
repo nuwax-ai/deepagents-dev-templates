@@ -13,6 +13,7 @@
 | --- | --- |
 | 理解默认 ReAct 图为何 `think` + `tools` 分两节点 | [react-two-phase.md](./react-two-phase.md) |
 | 查 MCP / Skill / Subagent 加载、运行、停止 | [runtime-capabilities-lifecycle.md](./runtime-capabilities-lifecycle.md) |
+| 理解 ask-question MCP 与 HITL 三种形态选型 | [ask-question-mcp-hitl.md](./ask-question-mcp-hitl.md) |
 | 跟进 ACP 协议对齐与工具出站 | [acp/README.md](./acp/README.md) |
 | 查 LangGraph 原生能力收敛计划 | [langgraph-native-convergence.md](./langgraph-native-convergence.md) |
 | 查拓扑 scaffold 重构 code-review 修复计划 | [topology-scaffold-review-fixes-plan.md](./topology-scaffold-review-fixes-plan.md) |
@@ -27,7 +28,8 @@ development/
 ├── README.md                           ← 本页（总索引）
 ├── react-two-phase.md                  ← ReAct 两阶段分工（think bindTools vs tools 节点）
 ├── runtime-capabilities-lifecycle.md   ← MCP / Skill / Subagent 加载·运行·停止
-├── langgraph-native-convergence.md     ← LangGraph 原生对象收敛开发方案
+├── ask-question-mcp-hitl.md              ← 内置 ask-question MCP + HITL 选型（✅ 现行）
+├── langgraph-native-convergence.md       ← LangGraph 原生对象收敛开发方案
 ├── topology-scaffold-review-fixes-plan.md  ← 拓扑积木化重构修复计划（✅ 已落地）
 ├── rag-agent-plan.md                   ← RAG 早期计划（⚠️ 已过时）
 ├── acp-spec-alignment.md               ← → acp/ 的跳转页（兼容旧链接）
@@ -58,6 +60,7 @@ development/
 | --- | --- | --- |
 | [react-two-phase.md](./react-two-phase.md) | 现行 | 默认图 ReAct：`bindTools`（决策）与 `ToolNode`（执行）为何拆节点 |
 | [runtime-capabilities-lifecycle.md](./runtime-capabilities-lifecycle.md) | 现行 | MCP / Skill / Subagent 装配、session 生命周期与资源边界 |
+| [ask-question-mcp-hitl.md](./ask-question-mcp-hitl.md) | 现行 | 内置 ask-question MCP、图内 present_review + interrupt、与 default ReAct 边界 |
 | [langgraph-native-convergence.md](./langgraph-native-convergence.md) | 计划中 | surface 流式、MessagesAnnotation、compaction 等向 LangGraph 原生收敛 |
 
 ### ACP / Surface
@@ -82,7 +85,7 @@ development/
 
 | 文档 | 状态 | 摘要 |
 | --- | --- | --- |
-| [rag-agent-plan.md](./rag-agent-plan.md) | ⚠️ 已过时 | RAG 内置于 app-ts 的早期方案；现状见 `examples/rag/` |
+| [rag-agent-plan.md](./rag-agent-plan.md) | ⚠️ 已过时 | RAG 内置于 app-ts 的早期方案；现状见 `src/libs/topologies/rag/` |
 
 ---
 
@@ -106,8 +109,9 @@ development/
 
 1. **新增开发/方案文档** → 放在本目录（或 `acp/` 子目录），并在本页「文档地图」与「按主题分类」登记。
 2. **使用者向文档** → 留在包内 `docs/`，在本页「包内文档」交叉引用即可，不迁入 `development/`。
-3. **ACP 相关改动** → 同步更新 `acp/` 下对应文档；见 [acp/README.md §维护约定](./acp/README.md#维护约定)。
-4. **方案已落地或过时** → 在文档头部标状态（✅ / ⚠️），本索引表同步更新。
+3. **模板包边界** → `packages/deepagents-flow-ts` 的 `src/`、`docs/`、`prompts/`、`examples/`、`scripts/` **不得**引用本 `development/` 路径；维护记录、code-review、方案演进只写在本目录。
+4. **ACP 相关改动** → 同步更新 `acp/` 下对应文档；见 [acp/README.md §维护约定](./acp/README.md#维护约定)。
+5. **方案已落地或过时** → 在文档头部标状态（✅ / ⚠️），本索引表同步更新。
 
 ---
 

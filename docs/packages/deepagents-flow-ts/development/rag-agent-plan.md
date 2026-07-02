@@ -1,7 +1,7 @@
 # RAG Agent 开发计划
 
 > **⚠️ 已过时（2026-06-12）**：本文件是 RAG 内置于 `deepagents-app-ts` 的早期计划，与现状不符。
-> 现状：RAG 已抽为 `deepagents-flow-ts` 的通用 flow 模板范例（`examples/rag/`），`app-ts` 还原为
+> 现状：RAG 已抽为 `deepagents-flow-ts` 的通用 topology（`src/libs/topologies/rag/`），`app-ts` 还原为
 > 纯 coding-agent，默认 flow 是占位骨架。当前架构见
 > [`packages/deepagents-flow-ts/README.md`](../packages/deepagents-flow-ts/README.md)。
 > 本文件保留作历史参考。

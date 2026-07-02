@@ -199,7 +199,7 @@ function sanitizeLoadedMcpTools(
 /**
  * 从 config.mcp.servers + configPath/configPaths 指向的文件加载 default MCP servers。
  * 注意:不读 configPath 会丢失 mcp.default.json
- * 里的默认 server（`mcp.default.json` 默认可为空）。
+ * 里的默认 server（`mcp.default.json` 默认含 `ask-question` fallback）。
  *
  * MCP 默认配置属于 Agent 安装包，相对包根解析；ACP session cwd（用户工作区）不参与。
  */

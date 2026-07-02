@@ -4,7 +4,7 @@
  * MCP server 经 runtime-context（@langchain/mcp-adapters）hydrate 加载为 native 工具
  * （ctx.mcpTools），不再经 mcp_tool_bridge 元工具（已移除：它与有状态 server 冲突，
  * 每次 call kill 子进程导致 chrome-devtools 页面反复关闭）。本测试不 spawn 真实 MCP 子进程：
- * 只验证 mcpServerConfigs 合并正确（default + ACP session），以及工具集不再含 bridge。
+ * 只验证 mcpServerConfigs 合并正确（builtin ask-question + ACP session），以及工具集不再含 bridge。
  */
 
 import { describe, it, expect } from "vitest";
@@ -20,7 +20,7 @@ import { createFileCheckpointer } from "../src/runtime/services/file-checkpoint-
 const ALIEN_WORKSPACE = "/tmp/deepagents-flow-ts-default-flow-acp-mcp";
 
 describe("默认 flow：ACP session mcpServers → 工具集", () => {
-  it("mcpServerConfigs 合并空 default + ACP 下发 server；工具集不再含 mcp_tool_bridge", () => {
+  it("mcpServerConfigs 合并 builtin ask-question + ACP 下发 server；工具集不再含 mcp_tool_bridge", () => {
     const { appConfig } = loadFlowConfig({ workspaceRoot: ALIEN_WORKSPACE });
     const ctx = createRuntimeContext(appConfig, {
       cwd: ALIEN_WORKSPACE,
@@ -28,8 +28,8 @@ describe("默认 flow：ACP session mcpServers → 工具集", () => {
         time: { command: "npx", args: ["-y", "@modelcontextprotocol/server-time"] },
       },
     });
-    const serverNames = Object.keys(ctx.mcpServerConfigs);
-    expect(serverNames).toEqual(["time"]);
+    const serverNames = Object.keys(ctx.mcpServerConfigs).sort();
+    expect(serverNames).toEqual(["ask-question", "time"].sort());
 
     const policy = getFlowSandboxPolicy(appConfig);
     const allTools = createFlowTools(ctx, {

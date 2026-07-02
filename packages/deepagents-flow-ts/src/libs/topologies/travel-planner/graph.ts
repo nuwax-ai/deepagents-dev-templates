@@ -1,5 +1,5 @@
 /**
- * travel-planner 拓扑图 —— Map-reduce（Send 扇出）+ HITL（自 examples/travel-planner 提升）。
+ * travel-planner 拓扑图 —— Map-reduce（Send 扇出）+ HITL。
  *
  *   START → gather → ⟨Send 并行⟩ research × 4（交通/住宿/景点/美食，各发一次平台搜索 MCP）
  *         → aggregate（LLM 整理成 N 天行程）→ confirm(interrupt) → finalize → END

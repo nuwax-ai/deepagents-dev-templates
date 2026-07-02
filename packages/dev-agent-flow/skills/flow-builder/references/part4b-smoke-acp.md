@@ -12,6 +12,7 @@
 | 模型凭证 + provider/model 解析正确 | HITL **多轮 resume**（one-shot only；首轮 interrupt 见下节） |
 | 子进程未吃到 `{MODEL_PROVIDER_*}` 占位符 | 与平台在线配置完全一致（本地用 `.env`） |
 | **HITL 首轮**：`flowStatus=interrupted` 且流式出题 / `questionChars>0` | — |
+| **平台能力真实调用**（设 `SMOKE_EXPECT_TOOL=<名称子串>`）：轨迹中该工具**被调用且未失败**，否则 exit 1 | 工具返回内容的业务正确性（人工抽查） |
 
 ---
 
@@ -44,7 +45,7 @@ trace 通过后：**忽略** rcoder 的 `Session cancelled` / `Prompt ended with
 典型场景：
 
 - **router-gate**（`llm-stream`）：`done` + `streamed=true` → 绿
-- **interview-agent**（HITL `wait`）：`interrupted` + `streamed=true` + `questionChars>0` → 绿（图在首轮暂停属预期）
+- **HITL 类 flow**（含 `wait`/interrupt 节点）：`interrupted` + `streamed=true` + `questionChars>0` → 绿（图在首轮暂停属预期）
 
 ### 判为失败
 
@@ -89,7 +90,7 @@ cp .env.example .env
 
 ```json
 // config/flow-agent.config.json
-{ "activeFlow": "interview-agent", ... }
+{ "activeFlow": "router-gate", ... }
 ```
 
 smoke 默认入口 `src/index.ts` 读此字段。若仍为 `default`，脚本会 **WARN**（测的是 ReAct 默认图，不是你的 custom flow）。
@@ -97,7 +98,7 @@ smoke 默认入口 `src/index.ts` 读此字段。若仍为 `default`，脚本会
 强制校验：
 
 ```bash
-SMOKE_EXPECT_ACTIVE_FLOW=interview-agent pnpm smoke
+SMOKE_EXPECT_ACTIVE_FLOW=router-gate pnpm smoke
 ```
 
 ### 3. 运行（五连中的最后一项）
@@ -119,22 +120,30 @@ pnpm build && pnpm typecheck && pnpm test && pnpm graph && pnpm smoke
 | `SMOKE_PROMPT` | 主路径用户输入（默认 React 题） |
 | `SMOKE_PROMPT_EDGE` | **第二条** prompt（如 `你是？`，验入口节点 **R-G002**） |
 | `SMOKE_EXPECT_ACTIVE_FLOW` | 与 `activeFlow` 不一致 → exit 1 |
+| `SMOKE_EXPECT_TOOL` | **平台能力闸门**：轨迹须出现名称含该子串的工具调用且未失败，否则 exit 1（登记了平台能力时**必设**） |
 | `SMOKE_WARN_ACTIVE_FLOW=0` | 关闭 `activeFlow=default` 警告 |
 | `SMOKE_TIMEOUT` | rcoder 超时秒数（默认 `150`） |
 | `SMOKE_VERBOSE=1` | 传 `-v` 给 rcoder-cli |
 | `SMOKE_DEBUG=1` | 打印解析后的 provider/model/forward env |
 | `SMOKE_DRY_RUN=1` | 只打印 rcoder 命令，不调 API |
-| `AGENT_ENTRY` / `--entry` | 非默认入口（如 `examples/rag/index.ts`） |
+| `AGENT_ENTRY` / `--entry` | 非默认入口 TS 文件 |
 
 ### 按 flow 定制 prompt 示例
 
 ```bash
-# interview-agent：happy path + 边界
-SMOKE_PROMPT='岗位：高级前端… 简历：5年React…' \
+# router-gate：happy path + 边界
+SMOKE_PROMPT='帮我把这段话翻译成英文：你好世界' \
 SMOKE_PROMPT_EDGE='你是？' \
-SMOKE_EXPECT_ACTIVE_FLOW=interview-agent \
+SMOKE_EXPECT_ACTIVE_FLOW=router-gate \
+pnpm smoke
+
+# 登记了平台搜索能力的 conversational Agent：prompt 必须设计成触发搜索
+SMOKE_PROMPT='搜索并总结今天的 AI 行业新闻，标注来源' \
+SMOKE_EXPECT_TOOL=search \
 pnpm smoke
 ```
+
+> **SMOKE_PROMPT 设计原则（平台能力闸门）**：登记了什么能力，prompt 就必须逼它用什么能力——「今天/最新/实时」逼联网搜索、「查询 X 的数据」逼数据 API。泛泛的「你好」永远不会触发工具，smoke 绿也证明不了能力可用。
 
 ### 占位符问题（曾导致 400 Invalid model）
 
@@ -154,10 +163,10 @@ rcoder-cli 子进程可能继承未替换的 `ANTHROPIC_MODEL={MODEL_PROVIDER_MO
 | `pnpm smoke -- --example travel` | 旅行规划（map-reduce + HITL） |
 | `pnpm smoke -- --example pm` | 项目管理 |
 | `pnpm smoke -- --example review` | human-in-loop |
-| `pnpm smoke -- --example dev-agent` | dev-agent |
 | `pnpm smoke -- --example research` | 深度研究 |
+| `pnpm smoke -- --entry <path>` | 指定其他 TS 入口 |
 
-完整列表：`pnpm example --list`。本地手测范例用 `pnpm example <name>`（CLI/ACP 模式，见 `scripts/run-example.mjs`）。
+本地手测注册 flow 用 `pnpm flow "<prompt>"`；精选范例用 `pnpm example <name>`。
 
 ---
 
@@ -165,6 +174,7 @@ rcoder-cli 子进程可能继承未替换的 `ANTHROPIC_MODEL={MODEL_PROVIDER_MO
 
 - **必须真实跑** `pnpm smoke`（禁止 `--dry-run` 冒充通过）。
 - 开发 **custom / stateful** flow 时：先改 `activeFlow`，再设 `SMOKE_PROMPT`（+ 可选 `SMOKE_PROMPT_EDGE`）。
+- **凡登记了平台能力**：必设 `SMOKE_EXPECT_TOOL` + 触发式 `SMOKE_PROMPT`；报告须贴该工具调用轨迹片段（工具名 + ok）。**smoke 绿但未验证工具真调用 = 不通过**（真实失败案例：搜索全空仍报完成，因 smoke 只看了输出字符数）。
 - smoke 绿 **不能**替代 **R-G001** 静态核对；边界类 bug 靠 `SMOKE_PROMPT_EDGE` 或 `docs/flow-graph-rules.md`。
 
 ---
@@ -177,4 +187,5 @@ rcoder-cli 子进程可能继承未替换的 `ANTHROPIC_MODEL={MODEL_PROVIDER_MO
 - ❌ 手 export 一堆模型 env 覆盖 config，而不改 `.env` / config
 - ❌ 只跑 `build/test/graph`，跳过 smoke
 - ❌ 见 `400 Invalid model` 就改 config 模型名，不查占位符与 `.env`
-- ✅ `.env` + `activeFlow` + `SMOKE_PROMPT*` + `SMOKE_DEBUG` 干跑确认 → 真跑 smoke
+- ❌ 登记了平台能力却不设 `SMOKE_EXPECT_TOOL` / prompt 不触发该能力就报完成（LLM 兜底输出会让 smoke 假绿）
+- ✅ `.env` + `activeFlow` + `SMOKE_PROMPT*`（+ `SMOKE_EXPECT_TOOL`）+ `SMOKE_DEBUG` 干跑确认 → 真跑 smoke

@@ -2,7 +2,7 @@
 name: flow-builder
 description: "deepagents-flow-ts flow 开发（分层加载）：Part0 总流程；Part1–4 脚手架/编排/工具/验证；Part5 系统提示词；Part6–7 子智能体/技能。LangGraph TS API 查官方文档。"
 tags: [flow, scaffold, orchestration, tools, mcp, prompt, subagent, stategraph, hitl, debug, deepagents-flow-ts]
-version: "3.0.0"
+version: "3.1.0"
 ---
 
 # Flow 开发（deepagents-flow-ts）
@@ -32,6 +32,7 @@ flow-builder/
 | 场景 | 读取 |
 |------|------|
 | **会话启动 / Phase 0–4 总流程 / 收尾清单** | **[part0-workflow.md](references/part0-workflow.md)** |
+| **需求分类（对话型 vs one-shot vs HITL）/ 零图路径** | **[part0-workflow.md](references/part0-workflow.md)** § Phase 1 第 0 问 |
 | 一句话需求 → 可跑 flow | [part1-scaffold.md](references/part1-scaffold.md) |
 | 手写 StateGraph | [part2-orchestration.md](references/part2-orchestration.md) + [flow-graph-rules-pointer.md](references/flow-graph-rules-pointer.md) |
 | 自写工具 / MCP / 变量 | [part3-tools-config.md](references/part3-tools-config.md) |
@@ -42,6 +43,7 @@ flow-builder/
 | **平台能力 / 外部工具 / MCP / Plugin / 技能登记** | **[part3-tools-config.md](references/part3-tools-config.md) § 平台能力登记** + `dev-engineer-toolkit` |
 | **联网 / 网页搜索 / 实时资讯**（**较常见**） | Part 3 § **联网搜索**（在平台能力登记之上） |
 | 工具审批 / `Permission denied` / `permissions` 配置 | [part3-tools-config.md](references/part3-tools-config.md) + [part4a-verify-debug.md](references/part4a-verify-debug.md) |
+| HITL 结构化表单 / **平台问答卡片** | [part2-orchestration.md](references/part2-orchestration.md) § HITL 选型 + [part3-tools-config.md](references/part3-tools-config.md) § MCP；术语见目标项目 `docs/glossary.md` |
 | 设计目标 Agent 提示词 / **用户输入提炼** / 平台同步 | **[part5-prompt-design.md](references/part5-prompt-design.md)** |
 | 创建/命名目标 Agent（通用智能体） | [part5-prompt-design.md](references/part5-prompt-design.md) + `dev-engineer-toolkit`；**禁止** `AGENT.md` |
 | 子智能体 / subagent / 委派（平台或内置） | [part6-subagent.md](references/part6-subagent.md)；**禁止** `.agents/agents/` |
@@ -53,13 +55,15 @@ flow-builder/
 
 ```
 会话启动 → part0（依赖 / 系统提示词基线 / 读 docs）
+第 0 问（part0 § Phase 1）：多轮对话 / 追问 / 泛化？→ 零图路径（default ReAct + 平台能力登记 + part5 systemPrompt，不写图）
+              └ 固定管道 / HITL？→ 继续 ↓
 需工作区外能力（Plugin/MCP/技能/外部 API；联网搜索较常见）？→ part3 § 平台能力登记（强制，写图前）→ dev-engineer-toolkit
               └ 含联网 / mcp-retrieval？→ 追加 part3 § 联网搜索
               └ part1 命中？→ 生成 → part4a + part4b-smoke-acp
                     └ custom？→ part1 custom → part4a + part4b
                           └ part2 → part3（若 Phase 1 未做）→ part4a
 系统提示词 / 用户输入提炼？→ part5（含平台同步）→ dev-engineer-toolkit
-收工清单 → part0 § completion gate 收尾清单 + part4a（平台能力须贴搜索证据）
+收工清单 → part0 § completion gate 收尾清单 + part4a（平台能力须贴搜索证据 + 工具真实调用证据）
 ```
 
 ## 目标项目文档（模板自洽，开发 Agent 按需读取）
@@ -77,9 +81,9 @@ flow-builder/
 ## L1 铁律
 
 - **文档分工**：图规则 / factory API / 配置路径 / **术语** → 目标项目 `docs/`（**术语权威**：`docs/glossary.md`）；脚手架流程 / 平台登记 / **completion gate（完成闸门）** → 本技能 Part*（见 [README.md](../../../README.md) § 文档分工）。
-- 图是契约；factory 优先；**Bespoke nodes** 不硬塞 factory；`examples/` 只读；保护区不改。
+- 图是契约；factory 优先；**Bespoke nodes** 不硬塞 factory；`examples/` 只读且只参考 surface seam，topology 单一权威看 `src/libs/topologies/`；保护区不改。
 - **用户可见大段 LLM 输出**（compose / aggregate / draft / 修订稿）→ **`createLlmStreamNode`**（`write` 读 `r.text`）；**禁止** `createLlmNode`（仅 invoke，ACP 整段兜底）。custom spec 用 `type: "llm-stream"`；**R-G009**。
-- **平台能力（外部工具/MCP/Plugin/技能）** → **写图前**必须先 `dev-engineer-toolkit` 搜平台并 `add-tool`；**MCP 运行期经 ACP `mcpServers` 下发**；收工须贴搜索证据；**联网搜索较常见**，见 Part 3 § 联网搜索 · § ACP MCP 下发；禁止未搜平台就写外部能力、禁止以「用户待配置」代替登记（见 Part 3 § 平台能力登记、Part 0 completion gate）。
+- **平台能力（外部工具/MCP/Plugin/技能）** → **写图前**必须先 `dev-engineer-toolkit` 搜平台并 `add-tool`；**登记即接入：平台工具（Plugin/Workflow/MCP）运行期统一转 MCP 经 ACP `mcpServers` 下发**，ReAct 自动 bind；**禁止**为已登记能力手写 fetch/`tool()` 包装；收工须贴搜索证据 + 工具真实调用证据（`SMOKE_EXPECT_TOOL`）；**联网搜索较常见**，见 Part 3 § 联网搜索 · § 运行期统一 MCP 下发；禁止未搜平台就写外部能力、禁止以「用户待配置」代替登记（见 Part 3 § 平台能力登记、Part 0 completion gate）。
 - **禁止写 `.agents/`**：内置能力写 `builtin/`（Part 6、Part 7）；平台能力走平台。
 - 有状态用 `createStatefulFlow`（**HITL durable stateful flow** 默认；`conversational: true` 为对话型；`dev-agent` **topology** `stateful-custom` 手写 run-loop 为例外，见 part2）。
 - **系统提示词非空** — 用户输入提炼进 `systemPrompt`；Part 5 § 用户输入提炼；收工 Part 0 清单

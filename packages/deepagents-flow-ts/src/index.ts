@@ -17,6 +17,8 @@
  */
 
 import { config as loadDotenv } from "dotenv";
+import { resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { loadFlowConfig } from "./runtime/flow-config.js";
 import { destroyRuntimeContext, setLogAgent } from "./runtime/index.js";
 import {
@@ -292,7 +294,13 @@ async function main(): Promise<void> {
   });
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+const isMainModule =
+  typeof process.argv[1] === "string" &&
+  import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
+
+if (isMainModule) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}

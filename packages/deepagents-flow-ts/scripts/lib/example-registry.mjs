@@ -23,11 +23,6 @@ export const EXAMPLES = {
     cli: "review",
     description: "人审草稿（HITL）",
   },
-  "dev-agent": {
-    entry: "examples/dev-agent/index.ts",
-    cli: null,
-    description: "综合能力 dev-agent",
-  },
   research: {
     entry: "examples/deep-research/index.ts",
     cli: "research",
@@ -56,8 +51,6 @@ export function resolveExample(name) {
 
 /**
  * 有 query / -i 时插入 CLI 子命令；否则走 ACP 模式（仅启动服务）。
- * dev-agent 无子命令，始终原样转发。
- *
  * @param {string | null} cli
  * @param {string[]} userArgs
  * @returns {string[]}

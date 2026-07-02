@@ -1,6 +1,6 @@
 /**
  * human-in-loop 拓扑静态反射 —— 不运行图、不需凭证，供 `graph` 命令 / inspector 消费。
- * 节点名：__start__ → compose → review → finalize → __end__。
+ * 节点名：__start__ → compose → present_review → review → finalize → __end__。
  */
 import { createReviewGraph } from "./graph.js";
 import { reflectTopology } from "../reflect.js";

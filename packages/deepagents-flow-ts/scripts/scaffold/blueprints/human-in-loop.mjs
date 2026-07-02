@@ -1,5 +1,5 @@
 /**
- * blueprint: human-in-loop —— 线性 + 中途 interrupt（compose → review → finalize）。
+ * blueprint: human-in-loop —— MCP 可选展示 + interrupt（compose → present_review → review → finalize）。
  *
  * 适合：内容审阅定稿、审批、校对、可控生成（生成 → 人审 → 按意见定稿）。
  * 图逻辑单一权威在 src/libs/topologies/human-in-loop/；本 blueprint 只生成薄封装绑 spec。
@@ -19,7 +19,7 @@ export function render(spec) {
   const fallback = spec.systemPrompt ? JSON.stringify(spec.systemPrompt) : "undefined";
   const content = `/**
  * ${spec.name} — human-in-loop 拓扑（scaffold 生成，可手改）
- * ${spec.description || "线性 + 中途 interrupt：compose → review(interrupt) → finalize"}
+ * ${spec.description || "MCP 可选展示 + interrupt：compose → present_review → review(interrupt) → finalize"}
  *
  * 图逻辑单一权威在 src/libs/topologies/human-in-loop/；本文件只绑 spec。
  * systemPrompt 注入 compose 节点（spec 场景优先；spec 空时图用领域默认 DEFAULT_COMPOSE_PROMPT）。

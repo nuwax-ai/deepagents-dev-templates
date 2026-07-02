@@ -4,6 +4,8 @@
 
 把**一句话需求**落地成可跑 flow：**选择题 + 填空**（选 **topology** → 填参数），不要从零写 StateGraph。
 
+> **第 0 问（先于选 topology）**：会话形态分类 → [part0-workflow.md](part0-workflow.md) § Phase 1 第 0 问。多轮对话/**追问**/钻取/开放泛化 → **零图路径**（`activeFlow: "default"` + 平台能力登记 + systemPrompt，**不进本 Part**）；只有固定管道 / HITL 才继续往下选 preset/custom。
+
 > **节点选型**：`docs/node-catalog.md`（决策树 + `type` 词表）。**8 presets** 走生成器；preset 外用 `custom` 按 nodes+edges+state 编排（生成真实 `graph.ts`）。
 
 ## 生成器
@@ -23,7 +25,7 @@
 | topology | kind | 适用场景 | 节点结构 |
 |------|------|----------|----------|
 | `react-tools` | oneshot | 客服 / 工具型 / 通用问答 | `prepare → think ↔ tools → respond` |
-| `human-in-loop` | stateful-recipe | 审阅 / 审批 / 校对 | `compose(流式) → review(interrupt) → finalize` |
+| `human-in-loop` | stateful-recipe | 审阅 / 审批 / 校对 | `compose(流式) → present_review(MCP，可选) → review(interrupt) → finalize` |
 | `project-manager` | stateful-recipe | 规划 + 评审重做 | `plan → estimate → evaluate → approve → finalize` |
 | `travel-planner` | stateful-recipe | 多源调研聚合 | `gather → Send research×N → aggregate(流式) → confirm → finalize`（**须 Part 3 平台能力登记**；联网搜索较常见，见 § 联网搜索） |
 | `rag` | oneshot | 检索问答 | `rewrite → retrieve → grade → prepare → generate` |
@@ -34,7 +36,8 @@
 
 **`custom`**：`params` 含 `state`/`nodes`（type 见 node-catalog，**用户可见输出用 `llm-stream`**）/`edges`/`input`/`result`；回调写箭头函数字符串，生成时内联为真实 TS。局限（生成后手改）：tool-exec、subgraph、自定义 reducer。流式范例：`_example.translate-review`、`_example.multi-aspect-search`、`_example.router-gate`、`_example.interview-agent`（`llm-stream` + `r.text`）；非流式教学：`_example.grade-redo`；`interview-agent` 的 `prepare`/`evaluate` 仍 `llm`（无 `r.text` / 结构化 parse）。
 
-**含外部能力的 custom**（`tool-exec` / `mcp-retrieval` 等，**联网搜索较常见**如 `search-aggregator`）：**写 spec 前**须完成 Part 3 § 平台能力登记；联网另见 § 联网搜索。命中后 `add-tool` 并接线，禁止占位 `undefined` 甩给用户。
+**含外部能力的 custom**（`tool-exec` / `mcp-retrieval` 等，**联网搜索较常见**）：**写 spec 前**须完成 Part 3 § 平台能力登记；联网另见 § 联网搜索。命中后 `add-tool`（登记即接入；管道内按名接线），禁止占位 `undefined` 甩给用户。
+> 注意：对话型多源搜索（如目标项目内置 `search-aggregator` 样板）走**零图路径**（default ReAct + 登记 + systemPrompt），不属于本节 custom 管道。
 
 **custom spec 生成后核对**（目标项目 `docs/flow-graph-rules.md`；生成前已由 `lint-graph-rules.mjs` 拦 **R-G001 / R-G007 / R-G009**）：
 

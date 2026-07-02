@@ -3,8 +3,8 @@
 **通用工作流编排模板** —— Agent 按 **preset topology**（预先设计的 node + edge 图）跑 LangGraph 工作流，而不是自由的 tool loop。
 
 > **两种获取方式**：
-> - **源码开发**（git / npm 源码包，含 `src/`、`examples/`、`tsconfig`）：本目录 `pnpm install && pnpm build` 即可改默认图、跑示例、扩展能力。
-> - **Nuwax 平台压缩包**（`.tar.gz` / `.zip`）：内含已构建的 `dist/bundle.mjs`（单文件打包，不依赖 `node_modules`），由平台直接运行，**无需 `build`**；不含 `src/`，随包的 `examples/` 仅作**只供查阅的示例代码**（示例里的 `import "../../src"` 在压缩包里解析不了，要跑示例需用完整源码仓库）。
+> - **源码开发**（git checkout，含 `src/`、`examples/`、`tsconfig`）：本目录 `pnpm install && pnpm build` 即可改默认图、生成场景 flow、扩展能力。
+> - **平台压缩包**（`.tar.gz` / `.zip`，nuwax 打包格式）：内含已构建的 `dist/bundle.mjs`（单文件打包，不依赖 `node_modules`），由主平台直接运行，**无需 `build`**。
 
 本模板是 **工作流编排 Agent**（显式 LangGraph 图），与 Coding Agent（tool loop）产品形态不同；运行时基础能力由模板**内置底层运行时**（`src/runtime/`）承担，「大脑」是一张可设计的节点图。
 
@@ -39,7 +39,7 @@ const graph = new StateGraph(S)
 - **节点选型**见 [docs/node-catalog.md](docs/node-catalog.md)；**factory API** 见 [docs/node-kit.md](docs/node-kit.md)
 - **一句话需求 → flow**：`scripts/scaffold/`（9 topologies：8 presets = react-tools / human-in-loop / project-manager / travel-planner / rag / adaptive-rag / deep-research / dev-agent + `custom` 任意节点级编排）
 - 进阶模式（Send / interrupt / subgraph / **durable stateful flow**）见 [docs/flow-patterns.md](docs/flow-patterns.md)
-- 6 个完整可跑范例见 [examples/](examples/)
+- 5 个面向 AI Agent 的精选可运行范例见 [examples/README.md](examples/README.md)
 
 ## 项目结构 + 分层
 
@@ -56,7 +56,7 @@ src/
   app/           默认 ReAct 图（★ 可改、开发工作区）：graph.ts + nodes/ + flow-tools/task + state/topology/default-flow + flows/（注册表+scaffold 薄封装）+ topologies/（app-layer topology，如 dev-agent stateful-custom）
   surfaces/      ACP/CLI 适配器（保护）：acp/ cli/ + stateful-flow/map-stream-chunk/...
   index.ts       入口 + 组合根（createFlowRuntime + materializeFlow 桥接 stateful-recipe）
-examples/        参考实现（只读；去重后 graph/nodes 多为 re-export 转发层，指向 libs/topologies）
+examples/        精选 surface 接入范例（只读；图逻辑指向 canonical topology）
 config/ prompts/ skills/ scripts/ docs/ tests/
 ```
 
@@ -68,20 +68,20 @@ config/ prompts/ skills/ scripts/ docs/ tests/
 
 `createLlmNode` · `createLlmStreamNode` · `createLlmRouterNode`（LLM 裁决 → Command goto）· `createToolExecNode` · `createHumanApprovalNode`（HITL 前置 interrupt）· `createApprovalFinalizeNode`（HITL 后置定稿）· `createMcpRetrievalNode`（主动 MCP 检索）· `createPrepareNode` · `createFanout` · `createSubgraphNode`
 
-> **Bespoke nodes** — do not force into a factory (multi-source retrieval merge, file delivery, converse routing, etc.); keep hand-written. See example comments and [node-catalog.md](docs/node-catalog.md) § BESPOKE.
+> **Bespoke nodes** — do not force into a factory (multi-source retrieval merge, file delivery, converse routing, etc.); keep hand-written. See topology comments and [node-catalog.md](docs/node-catalog.md) § BESPOKE.
 
 两种方式落地：
 
 1. **脚手架优先**（一句话 / 简单场景）：写 spec → `node scripts/scaffold/generate.mjs <spec>` → 改 `config/flow-agent.config.json` 的 `activeFlow`（自带 typecheck+graph 自验）
-2. **直接改默认图**：编辑 [src/app/graph.ts](src/app/graph.ts) 连线 + [src/app/nodes/](src/app/nodes/) 节点逻辑；或对照 [examples/](examples/) 在 `src/app/` 实现
+2. **直接改默认图**：编辑 [src/app/graph.ts](src/app/graph.ts) 连线 + [src/app/nodes/](src/app/nodes/) 节点逻辑；进阶形态对照 [src/libs/topologies/](src/libs/topologies/)，surface 接法对照 [examples/](examples/)
 
-**多 flow 选图**：`config/flow-agent.config.json` 顶层 `activeFlow`（缺省 `default`）经 [src/app/flows/index.ts](src/app/flows/index.ts) 注册表解析——`flow` / `graph` / ACP 三条入口共用。已注册：`default`（conversational ReAct）、`knowledge-qa` / `adaptive-knowledge-qa` / `customer-support`（conversational）、`trip-planner` / `project-planner` / `content-review` / `research-agent` 等 scaffold 场景 flow，及 `coding-agent`（stateful-custom）。`pnpm graph` 导出**当前 activeFlow** 的 graph topology。
+**多 flow 选图**：`config/flow-agent.config.json` 顶层 `activeFlow`（缺省 `default`）经 [src/app/flows/index.ts](src/app/flows/index.ts) 注册表解析——`flow` / `graph` / ACP 三条入口共用。内置 flow（各代表一类形态）：`default`（conversational ReAct 泛化底座）、`search-aggregator`（conversational + 平台能力样板，**零图路径**：default 底座 + systemPrompt，平台登记的能力运行期转 MCP 自动 bind）、`translate-review`（one-shot 流式管道教学）、`router-gate`（LLM 路由教学）。更多形态见 `src/libs/topologies/`（8 积木）；场景 spec 范例在 `scripts/scaffold/specs/`。`pnpm graph` 导出**当前 activeFlow** 的 graph topology。
 
 **两类 flow**（[src/core/flow-types.ts](src/core/flow-types.ts)）：
-- `FlowExecutor`：one-shot，`(query, cb) => Promise<FlowResult>`。无记忆单次调用（见 examples/rag）。
+- `FlowExecutor`：one-shot，`(query, cb) => Promise<FlowResult>`。无记忆单次调用（见 `src/libs/topologies/rag`）。
 - `StatefulFlow`：支持 human-in-the-loop，`run({query|resume}, threadId, cb) => {done|interrupted}`。图里 `interrupt` 暂停 → surface 把问题发给用户 → 下一轮 `resume`。**别手写 run-loop**——用 `createStatefulFlow`（[src/surfaces/stateful-flow.ts](src/surfaces/stateful-flow.ts)），它有**两种用法**：
   - **HITL durable stateful flow**（默认）：暴露 `hasStarted`，首条 query 开题、之后续跑同一任务（`resume` 走 interrupt 续跑）。
-  - **conversational 对话**（`conversational: true`，如 default / knowledge-qa / adaptive-knowledge-qa / customer-support）：不暴露 `hasStarted`，surface 每轮走 query + 稳定 threadId + checkpointer → 多轮记忆；图层 `graph.stream` 真流式。详见 [docs/flow-patterns.md](docs/flow-patterns.md) 第 6 节。
+  - **conversational 对话**（`conversational: true`，如 default / search-aggregator）：不暴露 `hasStarted`，surface 每轮走 query + 稳定 threadId + checkpointer → 多轮记忆；图层 `graph.stream` 真流式。详见 [docs/flow-patterns.md](docs/flow-patterns.md) 第 6 节。
 
 ## 开发规则
 
@@ -112,28 +112,26 @@ START → prepare → think(model.bindTools) ──(toolsCondition)──┐
 | `respond` | 取回答流式输出（onToken） | — |
 
 状态用标准消息流（`MessagesAnnotation`），自动进 `FileCheckpointSaver`（跨重启恢复 + interrupt/resume）。
-工具集来自 `FlowRuntime.allTools`（[src/app/flow-tools.ts](src/app/flow-tools.ts)）：bash / 文件读写 / grep·glob / http / json + **native MCP**（经 `@langchain/mcp-adapters` 加载；**开发期**平台 `mcpConfigs` 登记 + **运行期** ACP session `mcpServers` 合并 `config/mcp.default.json`，默认 session-wins；**模板 default 为空，不内置搜索/文档 server**）+ demo(echo/calculate/time) + 可选 `load_skill` / `task`（子智能体 subagent 委派，流式透出 token 与 `[subagent] tool` 调用）。
+工具集来自 `FlowRuntime.allTools`（[src/app/flow-tools.ts](src/app/flow-tools.ts)）：bash / 文件读写 / grep·glob / http / json + **native MCP**（经 `@langchain/mcp-adapters` 加载；**开发期**平台 `mcpConfigs` 登记 + **运行期** ACP session `mcpServers` 合并 `config/mcp.default.json`，默认 session-wins；**内置 `ask-question`（结构化提问 fallback），不内置搜索/文档 server**）+ demo(echo/calculate/time) + 可选 `load_skill` / `task`（子智能体 subagent 委派，流式透出 token 与 `[subagent] tool` 调用）。
 无模型凭证时 think 走 fallback（回显输入），图始终可跑、可测。见 [src/app/graph.ts](src/app/graph.ts)。
 
 **进阶模式**（并行 fan-out、HITL `interrupt`、subgraph 子智能体（subagent）、压缩、**durable stateful flow**：cross-restart resume / stage progress / recursion guard）见 [docs/flow-patterns.md](docs/flow-patterns.md)；
 能力分层与配置见 [docs/capabilities.md](docs/capabilities.md)。
 
-## 示例：不同需求 → 不同 topology
+## Topology 积木：不同需求 → 不同图
 
-| 示例 | 需求类型 | Topology | LangGraph 特性 | 接入层 |
+| Topology | 需求类型 | LangGraph 特性 | 单一权威 | 可运行范例 |
 |---|---|---|---|---|
-| [examples/rag](examples/rag/) | 检索增强问答 | 线性 + 条件重试 | `addConditionalEdges` 重试 | one-shot |
-| [examples/travel-planner](examples/travel-planner/) | 并行调研聚合 | 并行 map-reduce + HITL | `Send` 扇出 + reducer + 真实搜索 MCP | stateful |
-| [examples/project-manager](examples/project-manager/) | 分解-评估-审批 | 评估循环 + HITL | reflection 回边 + 条件边 | stateful |
-| [examples/human-in-loop](examples/human-in-loop/) | 生成→人审→定稿 | 线性 + 中途暂停 | `interrupt` + `Command(resume)` | stateful |
-| [examples/dev-agent](examples/dev-agent/) | 综合能力展示 | 标准 ReAct + subgraph | bindTools/ToolNode/FileCheckpointSaver/compactHistory/subgraph | stateful |
-| [examples/deep-research](examples/deep-research/) | 深度研究报告（durable stateful flow） | 多阶段流水线 + 双层 reflection + 持续会话 | 2 确认门 + Send 并行调研 + 条件边循环 + 报告后持续会话 + cross-restart resume / stage progress / recursion guard | stateful |
+| `react-tools` | 通用工具对话 | `bindTools` + `ToolNode` | [默认图](src/app/graph.ts) | `pnpm flow` |
+| `rag` | 检索增强问答 | 线性 + 条件重试 | [libs/topologies/rag](src/libs/topologies/rag/) | [rag](examples/rag/) |
+| `adaptive-rag` | 自适应检索问答 | 路由 + 检索/生成双自纠正 | [libs/topologies/adaptive-rag](src/libs/topologies/adaptive-rag/) | scaffold spec |
+| `travel-planner` | 并行调研聚合 | `Send` 扇出 + reducer + HITL | [libs/topologies/travel-planner](src/libs/topologies/travel-planner/) | [travel-planner](examples/travel-planner/) |
+| `project-manager` | 分解-评估-审批 | reflection 回边 + HITL | [libs/topologies/project-manager](src/libs/topologies/project-manager/) | [project-manager](examples/project-manager/) |
+| `human-in-loop` | 生成→人审→定稿 | ask-question MCP（内置 fallback）+ `interrupt` + `Command(resume)` | [libs/topologies/human-in-loop](src/libs/topologies/human-in-loop/) | [human-in-loop](examples/human-in-loop/) |
+| `deep-research` | 深度研究报告 | 多阶段 + 双层 reflection + 持续会话 | [libs/topologies/deep-research](src/libs/topologies/deep-research/) | [deep-research](examples/deep-research/) |
+| `dev-agent` | 综合工具助手 | ReAct + 压缩 | [app/topologies/dev-agent.ts](src/app/topologies/dev-agent.ts) | 默认图已覆盖，不重复 |
 
-每个示例都**不重写** surface 接入逻辑（plumbing）：写自己的图 + 节点 → 包成 `FlowExecutor`/`StatefulFlow` → 插进同一套 `bootstrapFlowAcp`/`runFlowCli`。有状态示例共用 **`createStatefulFlow`** 基座 —— 统一 interrupt/resume run-loop + 默认 `FileCheckpointSaver`（`durableCheckpointer`）+ 从 checkpointer 推断续跑（`hasStarted`：one session, one topic），**durable across process/IDE restarts**。
-
-示例**真实接入**业务依赖（travel 用可配置搜索 MCP；其余 LLM 节点真调大模型），**无 demo fallback——未配凭证直接报错**；运行前在 `.env` 配模型凭证（见下）。各示例的 graph topology / 路由仍抽成纯函数单测，无凭证恒跑；真实接入用例 `skipIf` 无凭证自动跳过。
-
-> 这与**默认 flow**（`src/app`，内置 demo 工具 + 无凭证启发式 fallback、始终可跑）取向不同：默认 flow 重「开箱即跑」，示例重「贴近真实业务」。**不要改 examples/，在 `src/app/` 实现。**
+这些 topology 由 scaffold 生成薄封装后注册到 `src/app/flows/`；surface 接入统一走 `FlowExecutor` / `StatefulFlow`，不重写 ACP/CLI plumbing。有状态 topology 通过 `createStatefulFlow` 统一 interrupt/resume、checkpoint 与跨进程恢复。`examples/` 只展示运行入口与 seam，节点和边以“单一权威”列为准。
 
 **关键接入层（seam）**：surface 与具体图解耦。[src/surfaces/acp/server.ts](src/surfaces/acp/server.ts) 的 `bootstrapFlowAcp` 和 [src/surfaces/cli/run.ts](src/surfaces/cli/run.ts) 的 `runFlowCli` 按 `typeof executor` 自动分流两类 flow。ACP 路径用 deepagents-acp 的 `onPrompt` 钩子跑 executor、经 `conn` 流式回传、返回 `{ stopReason }` **绕过 deep agent 默认循环**。
 
@@ -159,18 +157,18 @@ pnpm exec tsx src/index.ts sessions delete <thread-id>
 
 # 可选：--config <path> 指定配置文件（默认 config/flow-agent.config.json）
 
-# 跑范例（travel/pm/review 会在中途暂停等你输入确认/审阅）
+# 精选范例
+pnpm example --list
 pnpm example rag "什么是 LangGraph？"
+pnpm example review "写一段产品介绍"
 pnpm example travel "东京 3 天 美食优先"
 pnpm example pm "做一个落地页"
-pnpm example review "写一段产品介绍"
-pnpm example dev-agent
 pnpm example research "调研 LangGraph 生态"
 
 # 验证
 pnpm test && pnpm typecheck && pnpm typecheck:examples
 pnpm smoke                          # 默认 flow ACP 冒烟（-- --dry-run 仅打印）
-pnpm smoke -- --example rag         # 指定范例冒烟
+pnpm smoke -- --example rag         # 精选范例 ACP 冒烟
 ```
 
 模型凭证见 [`.env.example`](.env.example)（ACP 模式下通常由 IDE host 注入）。
@@ -184,14 +182,12 @@ pnpm smoke -- --example rag         # 指定范例冒烟
 | 能力分层查询 | `pnpm exec tsx src/index.ts capabilities`（无凭证，工具/MCP/skills/subagents） |
 | 已持久化会话 | `pnpm exec tsx src/index.ts sessions` / `sessions delete <id>` |
 | 默认 flow ACP 冒烟（rcoder） | `pnpm smoke` |
-| 范例 CLI | `pnpm example rag "..."` / `pnpm example rag -i`（交互） |
-| travel/pm/review 范例 CLI | `pnpm example travel "..."` / `example pm "..."` / `example review "..."`（中途暂停等输入；加 `-i` 交互） |
-| dev-agent / deep-research 范例 | `pnpm example dev-agent` / `pnpm example research "..."` |
-| 范例 ACP 冒烟（rcoder） | `pnpm smoke -- --example rag` / `--example dev-agent` |
-| 类型检查 | `pnpm typecheck`（src）/ `pnpm typecheck:examples`（examples + src，noEmit） |
+| 精选范例 | `pnpm example --list` / `pnpm example <name> [args]` |
+| 其他入口 ACP 冒烟 | `pnpm smoke -- --example <name>` / `--entry <path>` |
+| 类型检查 | `pnpm typecheck` / `pnpm typecheck:examples` |
 
-`pnpm smoke` 用 rcoder-cli 端到端驱动 ACP（握手 → `onPrompt` → 整图 → 流式答案）；`--entry PATH` 或 `--example NAME` 或 `AGENT_ENTRY` 可指向任意 flow 入口。`pnpm example --list` 列出全部范例。
-**在 Zed 里 chat 调试**全部入口的 `agent_servers` 配置 + HITL 两轮玩法见 [docs/zed-debug.md](docs/zed-debug.md)。
+`pnpm smoke` 用 rcoder-cli 端到端驱动 ACP（握手 → `onPrompt` → 整图 → 流式答案）；`--example NAME` 选择精选范例，`--entry PATH` 或 `AGENT_ENTRY` 可指向其他 flow 入口。
+**在 Zed 里 chat 调试**当前 `activeFlow` 的 `agent_servers` 配置见 [docs/zed-debug.md](docs/zed-debug.md)。
 
 ## Export graph topology（可视化对接）
 
@@ -211,7 +207,7 @@ const { nodes, edges, mermaid } = await getFlowTopology();
 
 ## 配置与能力分层
 
-[config/flow-agent.config.json](config/flow-agent.config.json)：标准 `agent` / `model` / `mcp` / `permissions` / `sandbox` / `skills` / `agentsDirectories` / `memory` / `compaction` / `middleware` 段，以及顶层 **`activeFlow`**（选 [src/app/flows/](src/app/flows/) 注册表中的 flow；缺省 `default`）。配置走 `loadFlowConfig` → 底层 `loadConfig`（[src/runtime/](src/runtime/)），Zod schema 校验。自定义块加在顶层、用 `loadFlowConfig().raw` 取出（RAG 范例放 `rag` 段）。
+[config/flow-agent.config.json](config/flow-agent.config.json)：标准 `agent` / `model` / `mcp` / `permissions` / `sandbox` / `skills` / `agentsDirectories` / `memory` / `compaction` / `middleware` 段，以及顶层 **`activeFlow`**（选 [src/app/flows/](src/app/flows/) 注册表中的 flow；缺省 `default`）。配置走 `loadFlowConfig` → 底层 `loadConfig`（[src/runtime/](src/runtime/)），Zod schema 校验。自定义块加在顶层、用 `loadFlowConfig().raw` 取出。
 
 **能力分层**（工作区配置 / 内置 / 环境 / 文件持久化）见 [docs/capabilities.md](docs/capabilities.md) 与 [.nuwax-agent/capability-sources.json](.nuwax-agent/capability-sources.json)——`capabilities` 命令查询当前可用工具/MCP/skills/子智能体（subagents）。
 
@@ -228,7 +224,7 @@ pnpm test
 ```
 
 - `tests/` — 默认图（条件边决策表 + 收敛）、纯函数（safeCalc 注入边界等）、graph topology 导出、分层守卫（`layering.test.ts`）
-- `examples/*/tests/` — 范例：RAG 重试、travel 并行+HITL、pm 评估循环+HITL、review 人审闭环
+- `examples/*/tests/` — topology 决策表、并行/HITL、RAG 重试与 deep-research 收敛回归
 
 ## 提交前检查
 
@@ -248,16 +244,17 @@ pnpm test
 
 ## 联网 / 外部检索
 
-> **需要联网搜索时**：模板**不提供**开箱即用的网页搜索。必须到**平台**查找并添加（开发 Agent 经 `dev-engineer-toolkit`：`search-apis.sh` → `add-tool.sh` / `mcpConfigs`），再在 app 层 `searchMcp` 或图内 `createMcpRetrievalNode` 接线。**运行期**搜索等 MCP 能力由 **ACP `session/new` 下发的 `mcpServers`** 注入 runtime（与 `config/mcp.default.json` 合并，默认 session-wins）。禁止用 `bash`+curl / `http_request` 替代平台已登记的搜索能力；禁止在 `mcp.default.json` 内置搜索 server。
+> **需要联网搜索时**：模板**不提供**开箱即用的网页搜索。必须到**平台**查找并添加（开发 Agent 经 `dev-engineer-toolkit`：`search-apis.sh` → `add-tool.sh` / `mcpConfigs`）。**登记即接入**：平台已登记的一切工具能力（Plugin / Workflow / MCP）运行期由平台后端**统一转成 MCP**，经 **ACP `session/new` 下发的 `mcpServers`** 注入 runtime（与 `config/mcp.default.json` 合并，默认 session-wins）→ 自动进 `allTools`，conversational ReAct `think ↔ tools` 零代码可用；固定管道用 `createMcpRetrievalNode` 按名接线。禁止为已登记能力手写 fetch / `tool()` 包装；禁止用 `bash`+curl / `http_request` 替代；禁止在 `mcp.default.json` 内置搜索 server。
 
 | 能力 | 代码落点 | 说明 |
 |------|----------|------|
 | 工作区检索 | `grep` / `glob` 工具（`createSearchTools`） | **非**联网；ReAct 默认图经 `flow-tools.ts` 注册 |
-| 图内 MCP 检索 | `createMcpRetrievalNode` | `travel-planner` / `search-aggregator` 的 `searchMcp`；`deep-research` 的 `docMcp`；`rag` / custom 的 `mcpServers` |
-| 自适应 RAG 网页搜索 | `adaptive-rag` `createWebSearchNode` + `searchMcp` | 平台登记搜索 MCP 后接入；**运行期** ACP `mcpServers` |
-| 四路并行联网示例 | `src/app/flows/search-aggregator/` | fanout ×4 + `searchMcp` + aggregate |
-| 未配置搜索源 | `travel-planner` / `search-aggregator` research | `searchMcp` 缺省 → 优雅降级（提示去平台添加）；须开发期已搜平台举证 |
+| **平台能力对话（零图路径）** | `src/app/flows/search-aggregator/` | default ReAct 底座 + systemPrompt；平台登记的搜索能力运行期转 MCP 自动 bind，零接线 |
+| 图内 MCP 检索（固定管道） | `createMcpRetrievalNode` | `travel-planner` 的 `searchMcp`；`deep-research` 的 `docMcp`；`rag` / custom 的 `mcpServers` |
+| 自适应 RAG 网页搜索 | `adaptive-rag` `createWebSearchNode` + `searchMcp` | 平台登记搜索能力后接入；**运行期** ACP `mcpServers` |
+| 未配置搜索源 | `travel-planner` research；`search-aggregator` 提示词 | `searchMcp` 缺省 → 优雅降级（提示去平台添加）；样板无搜索工具时如实告知；须开发期已搜平台举证 |
 | **ACP 下发** | `src/surfaces/acp/server.ts` | `session/new` → `mcpServers` 合并进 `loadConfig` → runtime MCP 工具 |
+| **真实调用验证** | `SMOKE_EXPECT_TOOL=<子串> pnpm smoke` | 轨迹须现该工具调用且 done 非空，否则 exit 1（防 LLM 兜底假绿） |
 
 云开发环境中平台 Plugin / `mcpConfigs` 登记由**开发 Agent 技能包**引导（见 README § 扩展阅读），不在本模板 `src/` 内实现。
 
@@ -271,6 +268,7 @@ pnpm test
 - [docs/node-kit.md](docs/node-kit.md) — **factory catalog（建 flow 必读）**
 - [docs/troubleshooting.md](docs/troubleshooting.md) — **排错索引**（`LLM 未返回 JSON` / Invalid edge / HITL / spec 漂移）
 - [docs/flow-patterns.md](docs/flow-patterns.md) — 进阶模式（Send/interrupt/Command/subgraph/checkpointer/durable stateful flow）
-- [docs/glossary.md](docs/glossary.md) — **术语对照表**（durable stateful flow / topology / 护栏分语境 等，统一指代、防漂移）
-- [docs/zed-debug.md](docs/zed-debug.md) · 各 `examples/*/README.md`
+- [docs/glossary.md](docs/glossary.md) — **术语对照表**（durable stateful flow / topology / **平台侧** / **平台问答卡片** 等，统一指代、防漂移）
+- [docs/zed-debug.md](docs/zed-debug.md) — Zed / ACP 调试
+- [examples/README.md](examples/README.md) — AI Agent 如何选择精选范例与 canonical topology
 - **API 细节看源码**：`FlowRuntime`（[src/runtime/flow-runtime.ts](src/runtime/flow-runtime.ts)）、`FlowCallbacks`（[src/core/flow-types.ts](src/core/flow-types.ts)）、`createFlowRuntime`（[src/index.ts](src/index.ts)）、Surface Seam（[src/surfaces/](src/surfaces/)）、ACP hooks（[src/libs/deepagents-acp/](src/libs/deepagents-acp/)）、`createFlowTools`（[src/app/flow-tools.ts](src/app/flow-tools.ts)）

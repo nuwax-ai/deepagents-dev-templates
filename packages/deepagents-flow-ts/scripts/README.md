@@ -28,11 +28,11 @@
 | Script | npm 命令 | 说明 |
 |--------|----------|------|
 | `smoke-acp.mjs` | `pnpm run smoke` | 默认 flow（`src/index.ts`，读 `activeFlow`） |
-| | `pnpm run smoke -- --example <name>` | 范例短名冒烟（见下表） |
-| `run-example.mjs` | `pnpm run example <name> [args]` | 本地跑范例（CLI / 交互 / ACP）；`pnpm example --list` |
+| | `pnpm run smoke -- --example <name>` | 精选范例短名冒烟 |
+| `run-example.mjs` | `pnpm run example <name> [args]` | 本地跑精选范例；`pnpm example --list` |
 | `lib/example-registry.mjs` | — | `smoke --example` 与 `pnpm example` 共用别名表 |
 
-**范例别名**（`pnpm example --list` 同步）：
+**精选范例别名**：
 
 | 别名 | 入口 |
 |------|------|
@@ -40,7 +40,6 @@
 | `travel` | `examples/travel-planner/index.ts` |
 | `pm` | `examples/project-manager/index.ts` |
 | `review` | `examples/human-in-loop/index.ts` |
-| `dev-agent` | `examples/dev-agent/index.ts` |
 | `research` | `examples/deep-research/index.ts` |
 
 ### 模型 env（`lib/smoke-env.mjs`）
@@ -75,9 +74,7 @@
 
 `--entry` 或 `AGENT_ENTRY` 可指定任意入口；`--debug --dry-run` 可在无 API key 时检查命令与 env 解析。
 
-**通过/失败**：见 `lib/smoke-outcome.mjs` —— 以 session-trace 的 `flowStatus` + 产出/流式指标为准；`interrupted` + `streamed`（HITL 首轮）与 `done` + `streamed` 均算通过；rcoder 的 `Session cancelled` 在 trace 正常时忽略。细则见 part4b-smoke-acp.md § 通过/失败判定。
-
-开发 Agent 工作流细则见 monorepo `packages/dev-agent-flow/skills/flow-builder/references/part4b-smoke-acp.md`。
+**通过/失败**：见 `lib/smoke-outcome.mjs` —— 以 session-trace 的 `flowStatus` + 产出/流式指标为准；`interrupted` + `streamed`（HITL 首轮）与 `done` + `streamed` 均算通过；rcoder 的 `Session cancelled` 在 trace 正常时忽略。设 `SMOKE_EXPECT_TOOL` 时另校验工具调用轨迹（`SMOKE_TOOL_TRACE=1` 脱敏摘要，见 `tests/session-tool-trace.test.ts`）。
 
 ## Windows 打包工具（可选）
 
@@ -101,4 +98,4 @@ pnpm run check:tools   # 检测工具是否就绪
 | `lib/tools.mjs` | CLI 工具检测 |
 | `lib/smoke-env.mjs` | smoke 模型 env 解析（与 runtime 对齐） |
 | `lib/smoke-outcome.mjs` | smoke 输出解析（session-trace 优先于 rcoder 噪音） |
-| `lib/example-registry.mjs` | 范例别名注册表 |
+| `lib/example-registry.mjs` | 精选范例别名注册表 |

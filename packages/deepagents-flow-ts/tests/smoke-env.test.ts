@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  configureExpectedToolTrace,
   hasSmokeCredential,
   hasUnresolvedPlaceholder,
   parseCompatibleModelName,
@@ -21,7 +22,7 @@ describe("smoke-env", () => {
   });
 
   it("resolveSmokeModelEnv 从 config + .env 解析 openai 模型", () => {
-    const flowConfig = { activeFlow: "interview-agent", model: { provider: "openai", name: "deepseek-chat" } };
+    const flowConfig = { activeFlow: "router-gate", model: { provider: "openai", name: "deepseek-chat" } };
     const env = {
       OPENAI_API_KEY: "sk-test",
       OPENAI_BASE_URL: "https://api.deepseek.com/v1",
@@ -33,7 +34,7 @@ describe("smoke-env", () => {
     expect(r.forward.OPENAI_MODEL).toBe("deepseek-chat");
     expect(r.forward.ANTHROPIC_MODEL).toBeUndefined();
     expect(r.skippedPlaceholderKeys).toContain("ANTHROPIC_MODEL");
-    expect(r.activeFlow).toBe("interview-agent");
+    expect(r.activeFlow).toBe("router-gate");
   });
 
   it("env OPENAI_MODEL 优先于 config", () => {
@@ -67,6 +68,15 @@ describe("smoke-env", () => {
       "default"
     );
     expect(prompts).toEqual(["JD+简历...", "你是？"]);
+  });
+
+  it("SMOKE_EXPECT_TOOL 启用专用追踪且不修改现有日志级别", () => {
+    const smokeEnv = { forward: { LOG_LEVEL: "info" } };
+    expect(configureExpectedToolTrace(smokeEnv, "search")).toBe(true);
+    expect(smokeEnv.forward).toEqual({
+      LOG_LEVEL: "info",
+      SMOKE_TOOL_TRACE: "1",
+    });
   });
 
   // ── 保真测试：锁定「NuwaClaw chat 实际下发的 env」（取自 ~/.nuwaclaw/logs agent_server.env）

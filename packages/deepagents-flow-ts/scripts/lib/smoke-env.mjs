@@ -243,3 +243,13 @@ export function resolveSmokePrompts(env, defaultPrompt) {
   if (edge && edge !== primary) prompts.push(edge);
   return prompts;
 }
+
+/**
+ * 为 SMOKE_EXPECT_TOOL 启用专用的安全工具摘要，不修改 LOG_LEVEL。
+ * 全局 debug 会关闭 runtime 日志脱敏，不能由 smoke 隐式开启。
+ */
+export function configureExpectedToolTrace(smokeEnv, expectTool) {
+  const enabled = typeof expectTool === "string" && expectTool.trim() !== "";
+  if (enabled) smokeEnv.forward.SMOKE_TOOL_TRACE = "1";
+  return enabled;
+}

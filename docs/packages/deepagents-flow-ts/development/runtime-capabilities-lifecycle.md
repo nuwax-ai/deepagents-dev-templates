@@ -53,9 +53,11 @@ flowchart TB
 
 合并优先级（**session-wins**）：
 
-1. `config/flow-agent.config.json` → `mcp.configPath`（默认 `./config/mcp.default.json`）
+1. `config/flow-agent.config.json` → `mcp.configPath`（默认 `./config/mcp.default.json`，**内置 `ask-question` fallback**）
 2. 配置内联 `mcp.servers`
-3. ACP `session/new`（或 `session/load`）下发的 `params.mcpServers`
+3. ACP `session/new`（或 `session/load`）下发的 `params.mcpServers`（**同名 session-wins 覆盖内置**）
+
+详见 [ask-question-mcp-hitl.md](./ask-question-mcp-hitl.md)。
 
 ```json
 // config/flow-agent.config.json（节选）

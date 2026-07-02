@@ -1,4 +1,9 @@
 {
-  "_comment": "默认 MCP servers（空）。联网搜索 / 文档检索等不由模板内置：开发期登记 mcpConfigs，运行期由 ACP session/new 的 mcpServers 下发并合并本文件（session-wins）。可选示例见 mcp.examples.json。",
-  "servers": {}
+  "_comment": "包内默认 MCP（fallback）。内置 ask-question；与平台 ACP mcpServers 合并，同名冲突时 session-wins（平台优先）。搜索/文档检索仍须平台登记 + ACP 下发。",
+  "servers": {
+    "ask-question": {
+      "command": "npx",
+      "args": ["-y", "nuwax-ask-question-mcp@latest"]
+    }
+  }
 }

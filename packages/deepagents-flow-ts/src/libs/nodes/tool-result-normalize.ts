@@ -99,7 +99,7 @@ export function normalizeToolResult(result: unknown): NormalizedToolResult {
  * 从 MCP CallToolResult.structuredContent 提取 ACP `tool_call.rawInput`。
  *
  * 识别规则（通用，不绑定工具名）：
- * 1. `structuredContent.input` —— 交互式 MCP server 在 outputSchema 内嵌 ACP rawInput（Nuwa 扩展）
+ * 1. `structuredContent.input` —— 交互式 MCP server 在 outputSchema 内嵌 ACP rawInput（平台扩展）
  * 2. `structuredContent` 本身 —— 若顶层已含 `ui` 或 `schemaVersion`，视为已是 ACP rawInput
  */
 export function extractMcpStructuredRawInput(

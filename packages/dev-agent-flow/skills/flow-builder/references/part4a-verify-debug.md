@@ -15,7 +15,7 @@ pnpm build && pnpm typecheck && pnpm test && pnpm graph && pnpm smoke
 
 失败 → 读完整错误 → 修复 → 重跑；至多 5 轮仍不绿则如实交回用户。
 
-**ACP 真实运行门**：目标 Agent 部署在 rcoder（云端）或 nuwaclaw（个人客户端）时，运行时均经 ACP。`pnpm smoke` 用 rcoder-cli 端到端复现（握手 → `onPrompt` → 整图 → 流式答案），是生产路径的质量门；静态四连不能替代，禁止 `--dry-run` 冒充通过。非默认入口用 `--entry` 或 `pnpm smoke -- --example <name>`。
+**ACP 真实运行门**：目标 Agent 部署在 rcoder（云端）或 nuwaclaw（个人客户端）时，运行时均经 ACP。`pnpm smoke` 用 rcoder-cli 端到端复现（握手 → `onPrompt` → 整图 → 流式答案），是生产路径的质量门；静态四连不能替代，禁止 `--dry-run` 冒充通过。精选范例用 `--example`，其他入口用 `--entry`。
 
 Scaffold 生成器自带快检（`typecheck && graph`）；**全量 completion gate 仍须上式五连**。
 
@@ -31,8 +31,8 @@ Scaffold 生成器自带快检（`typecheck && graph`）；**全量 completion g
 pnpm build
 pnpm test                    # 含 tests/layering.test.ts
 pnpm typecheck
-pnpm typecheck:examples      # 改了 examples 时
-pnpm smoke               # 强制：rcoder-cli ACP 端到端（非默认入口可用 --example 或 --entry）
+pnpm typecheck:examples      # 精选范例 + src
+pnpm smoke                   # 强制：rcoder-cli ACP 端到端（精选范例可用 --example）
 pnpm graph                   # export graph topology
 ```
 
@@ -63,7 +63,7 @@ pnpm graph                   # export graph topology
 图跑不通、节点未执行、条件边走错、HITL 不 resume、工具 `Permission denied` / 客户端卡转圈、ACP 无响应时：
 
 1. **确认** — env 含 `LOG_DIR`、`LOG_LEVEL`（HITL 用 `debug`）
-2. **复现** — Zed / `pnpm smoke` / `pnpm example` / CLI
+2. **复现** — Zed / `pnpm smoke` / `pnpm flow` / CLI
 3. **定位** — `.logs/` 最新 `.log` 或按 sessionId
 4. **过滤** — 对照 graph 顺序、节点名、tool 名、HITL 轮次
 5. **修复验证** — 改后重跑，新日志确认错误消失

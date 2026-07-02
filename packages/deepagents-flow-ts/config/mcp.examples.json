@@ -1,5 +1,5 @@
 {
-  "_comment": "可选 MCP 示例（不会被自动加载）。复制需要的 server 到 mcp.default.json 的 servers，或经平台 mcpConfigs 登记。",
+  "_comment": "可选 MCP 示例（不会被自动加载）。ask-question 已内置于 mcp.default.json；其余 server 可复制到 servers 或经平台 mcpConfigs 登记。",
   "servers": {
     "chrome-devtools": {
       "command": "npx",

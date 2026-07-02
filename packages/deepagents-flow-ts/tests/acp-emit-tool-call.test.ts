@@ -17,7 +17,7 @@ function collectUpdates() {
 }
 
 describe("emitToolCall", () => {
-  it("in_progress 发 rawInput（NuwaClaw 契约），不发 input", async () => {
+  it("in_progress 发 rawInput（平台问答卡片契约），不发 input", async () => {
     const { conn, updates } = collectUpdates();
     const args = {
       requestId: "demo_1",

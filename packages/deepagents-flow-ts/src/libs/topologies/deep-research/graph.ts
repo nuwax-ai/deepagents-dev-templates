@@ -234,5 +234,5 @@ export function createResearchGraph(
 }
 
 // createResearchFlow（StatefulFlow 包装，用 createStatefulFlow）已从此处移除：
-// createStatefulFlow 在 surfaces 层，libs 不能 import。recipe 在 ./recipe.ts；
-// example 的 createResearchFlow（createStatefulFlow 包装）在 examples/deep-research/graph.ts。
+// createStatefulFlow 在 surfaces 层，libs 不能 import。recipe 在 ./recipe.ts，
+// 由组合根 index.ts 的 materializeFlow 物化。
