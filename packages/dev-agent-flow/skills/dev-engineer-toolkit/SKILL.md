@@ -2,7 +2,7 @@
 name: dev-engineer-toolkit
 description: "当开发项目需要搜索可用工具（API）、可用技能（SKILL）、平台能力登记（Plugin/MCP/外部 API；联网搜索较常见）、或项目配置读写时使用。Keywords: API搜索, 平台能力, 工具登记, MCP, 联网搜索, 技能搜索, 项目配置"
 tags: [api-search, skill-search, project-config, dev-toolkit, agent-config, tool-discovery]
-version: "1.5.0"
+version: "1.6.0"
 ---
 
 # 开发工程师工具包
@@ -475,7 +475,7 @@ Python 环境由 `check-python.sh` 自动探测，缺失时可用 `--install`（
 
 ## 常见工作流
 
-### 工作流 A：工具采纳（搜索 → 注册 → 开发）
+### 工作流 A：工具采纳（搜索 → 注册 → 接入）
 
 当决定使用某个搜索到的工具 API 时，必须按以下两步操作：
 
@@ -483,12 +483,15 @@ Python 环境由 `check-python.sh` 自动探测，缺失时可用 `--install`（
 1. 注册工具（必须先注册才能调用）
    ./scripts/add-tool.sh --target-type "Plugin" --target-id 614
 
-2. 根据工具的 schema 进行实际开发
-   - 使用搜索结果中 schema 字段的接口定义（method, url, params 等）
-   - 保持 schema 中的 ${...} 占位符，不硬编码
+2. 注册即接入（运行期统一 MCP 下发）
+   - 已登记的 Plugin/Workflow/MCP 运行期由平台后端统一转成 MCP，
+     经 ACP session/new 的 mcpServers 下发，自动进入 runtime 工具集
+   - conversational ReAct（default flow）零代码可用；固定管道按 server/tool 名引用
+   - schema 字段仅用于理解参数含义；禁止照 schema 手写 HTTP 调用/fetch 包装
 ```
 
 > ⚠️ **注册是调用前提**：搜索到的 Plugin、Workflow、Knowledge、Skill 必须先通过 `add-tool.sh` 注册才能调用。
+> ⚠️ **注册后零包装**：禁止为已登记能力自写 `*.tool.ts` fetch（端点/envelope 一律不得猜测；`4sandbox` 系接口仅供本技能脚本使用）。
 
 ### 工作流 B：开发前资源发现
 
@@ -523,6 +526,7 @@ Python 环境由 `check-python.sh` 自动探测，缺失时可用 `--install`（
 ## Anti-patterns
 
 - ❌ **跳过注册直接调用**：搜索到工具后不执行 `add-tool.sh` 注册，直接尝试调用，导致调用失败。
+- ❌ **注册后又手写包装**：为已登记的 Plugin/Workflow 自写 fetch/`tool()` 调用（猜端点、猜响应结构、无超时）——运行期它们已统一转成 MCP 工具自动下发，手写包装必坏。
 - ❌ **绕过搜索直接造轮子**：开发新功能前不搜索是否有现成 API/技能，导致重复实现。
 - ❌ **直接修改配置文件**：手动编辑项目配置文件而非使用配置接口更新，导致配置不同步或格式错误。
 - ❌ **假设 API 存在**：不执行搜索就假设某个接口存在，直接编写调用代码。
