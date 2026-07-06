@@ -336,6 +336,57 @@ describe("createTaskTool", () => {
     expect(tokens[0]?.toolCallId).toBe("call_abc123");
   });
 
+  it("standalone invoke 无 langgraph_tool_call_id 时回退为完整 UUID", async () => {
+    const text = "ok";
+    const model = new FakeStreamingChatModel({
+      sleep: 0,
+      chunks: [...text].map((content) => new AIMessageChunk({ content })),
+    });
+    const childGraph = new StateGraph(FlowStateAnnotation)
+      .addNode("think", async (state: FlowState) => {
+        const message = await model.invoke([new HumanMessage(state.input)]);
+        return { messages: [message], output: text };
+      })
+      .addEdge(START, "think")
+      .addEdge("think", END)
+      .compile({ checkpointer: new MemorySaver() });
+    vi.mocked(createFlowGraph).mockReturnValue(childGraph as ReturnType<typeof createFlowGraph>);
+
+    const task = createTaskTool({
+      config: baseConfig,
+      parentWorkspaceRoot: process.cwd(),
+      buildTools: () => [],
+      subAgents: [
+        {
+          name: "brand-strategist",
+          description: "品牌",
+          systemPrompt: "品牌。",
+        },
+      ],
+    });
+
+    const uuidRe =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const toolCallIds: string[] = [];
+    const onToken = (_t: string, _source?: string, toolCallId?: string) => {
+      if (toolCallId) toolCallIds.push(toolCallId);
+    };
+
+    await task.invoke(
+      { subagent_type: "brand-strategist", description: "任务 A" },
+      { configurable: { onToken } }
+    );
+    await task.invoke(
+      { subagent_type: "brand-strategist", description: "任务 B" },
+      { configurable: { onToken } }
+    );
+
+    expect(new Set(toolCallIds)).toHaveLength(2);
+    for (const id of new Set(toolCallIds)) {
+      expect(id).toMatch(uuidRe);
+    }
+  });
+
   it("write_todos 的 plan 更新附带 subagent 来源和父 task id", async () => {
     const childGraph = new StateGraph(FlowStateAnnotation)
       .addNode("think", async (state: FlowState, config) => {

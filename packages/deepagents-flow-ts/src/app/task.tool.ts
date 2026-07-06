@@ -60,7 +60,7 @@ export function extractSubagentTaskOutput(
 /** 从 LangGraph tool invoke 的 runConfig 解析当前 tool_call_id（供 ACP messageId 分桶）。 */
 function resolveTaskToolCallId(
   runConfig: unknown,
-  threadId: string
+  fallbackId: string
 ): string {
   const cfg = runConfig as
     | {
@@ -82,9 +82,8 @@ function resolveTaskToolCallId(
   if (typeof fromMetadata === "string" && fromMetadata) {
     return fromMetadata;
   }
-  // 并行多 task 或 standalone invoke：用 threadId 后缀保证 messageId 唯一。
-  const suffix = threadId.split("-").pop();
-  return suffix ?? randomUUID();
+  // 并行多 task 或 standalone invoke：用本轮生成的完整 UUID，勿解析 threadId（子 agent 名可含连字符）。
+  return fallbackId;
 }
 
 export interface TaskToolDeps {
@@ -176,8 +175,9 @@ export function createTaskTool(deps: TaskToolDeps) {
       // const 块作用域否则在 finally 失效（tsc TS2304 + 运行时 ReferenceError）。
       const parentCallbacks = ((runConfig as { configurable?: Record<string, unknown> } | undefined)
         ?.configurable ?? {}) as Partial<FlowCallbacks>;
-      const threadId = `subagent-${subagent_type}-${randomUUID()}`;
-      const toolCallId = resolveTaskToolCallId(runConfig, threadId);
+      const subagentRunId = randomUUID();
+      const threadId = `subagent-${subagent_type}-${subagentRunId}`;
+      const toolCallId = resolveTaskToolCallId(runConfig, subagentRunId);
 
       try {
         const wrapToolCall: FlowCallbacks["onToolCall"] = async (e) => {

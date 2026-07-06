@@ -26,6 +26,18 @@ export class AcpPlanCoordinator {
   private parentEntries: PlanEntry[] = [];
   private readonly subagentPlans = new Map<string, SubagentPlan>();
 
+  /** 当前合并后的完整 plan 快照（发送 ACP 前读取，避免队列中固定旧快照）。 */
+  snapshot(): PlanEvent {
+    return {
+      entries: [
+        ...this.parentEntries,
+        ...Array.from(this.subagentPlans.values()).flatMap((plan) =>
+          prefixEntries(plan.source, plan.entries)
+        ),
+      ],
+    };
+  }
+
   update(event: PlanEvent): PlanEvent {
     if (event.source) {
       const key = event.toolCallId ?? `source:${event.source}`;
@@ -41,13 +53,6 @@ export class AcpPlanCoordinator {
       this.parentEntries = event.entries;
     }
 
-    return {
-      entries: [
-        ...this.parentEntries,
-        ...Array.from(this.subagentPlans.values()).flatMap((plan) =>
-          prefixEntries(plan.source, plan.entries)
-        ),
-      ],
-    };
+    return this.snapshot();
   }
 }

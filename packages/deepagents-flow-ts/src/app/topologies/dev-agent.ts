@@ -26,8 +26,21 @@ export function createDevAgentFlow(runtime: FlowRuntime): StatefulFlow {
     async run(input, threadId, callbacks) {
       // signal 透传：ACP cancel（callbacks.signal）必须进 graph.invoke 才能中止 long-running 执行，
       // 否则用户取消时 dev-agent 仍跑到模型返回（createStatefulFlow 基座已处理，手写 loop 需自补）。
+      // callbacks 双轨注入（configurable + createFlowGraph callbacks），与 createStatefulFlow 对齐，
+      // 供 write_todos / 工具审批等从 ToolRuntime.configurable 或节点工厂 callbacks 读取。
+      const flowCallbacks = {
+        onToken: callbacks?.onToken,
+        onToolCall: callbacks?.onToolCall,
+        onStage: callbacks?.onStage,
+        onPlan: callbacks?.onPlan,
+        onPermissionRequest: callbacks?.onPermissionRequest,
+        onApprovalRequest: callbacks?.onApprovalRequest,
+      };
       const config = {
-        configurable: { thread_id: threadId },
+        configurable: {
+          thread_id: threadId,
+          ...flowCallbacks,
+        },
         ...(callbacks?.signal ? { signal: callbacks.signal } : {}),
       };
       const graph = createFlowGraph({
@@ -35,7 +48,7 @@ export function createDevAgentFlow(runtime: FlowRuntime): StatefulFlow {
         checkpointer: runtime.checkpointer,
         config: runtime.config,
         systemPrompt: runtime.systemPrompt,
-        callbacks: { onToken: callbacks?.onToken, onToolCall: callbacks?.onToolCall },
+        callbacks: flowCallbacks,
       });
 
       await applyCompaction(graph, config, runtime.config);

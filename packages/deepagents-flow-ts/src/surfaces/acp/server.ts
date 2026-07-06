@@ -262,8 +262,11 @@ function buildAcpCallbacks(
       },
       onStage: (e) => streamText(conn, sessionId, formatStage(e), "thought"),
       onPlan: (e) => {
-        const snapshot = planCoordinator.update(e);
-        const queued = planSendQueue.then(() => emitPlan(conn, sessionId, snapshot));
+        planCoordinator.update(e);
+        // 发送时再 snapshot，避免并行更新入队后、emit 前状态已变却发出过期快照。
+        const queued = planSendQueue.then(() =>
+          emitPlan(conn, sessionId, planCoordinator.snapshot())
+        );
         // 后续更新不应被一次发送失败永久阻断；当前调用仍收到原始 reject。
         planSendQueue = queued.catch(() => undefined);
         return queued;

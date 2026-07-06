@@ -66,4 +66,29 @@ describe("AcpPlanCoordinator", () => {
       })
     ).toEqual({ entries: [] });
   });
+
+  it("snapshot 反映最近一次 update 后的合并状态", () => {
+    const coordinator = new AcpPlanCoordinator();
+    coordinator.update({
+      entries: [{ content: "父任务", status: "pending" }],
+    });
+    coordinator.update({
+      source: "researcher",
+      toolCallId: "task-1",
+      entries: [{ content: "步骤 A", status: "in_progress" }],
+    });
+    coordinator.update({
+      source: "researcher",
+      toolCallId: "task-2",
+      entries: [{ content: "步骤 B", status: "pending" }],
+    });
+
+    expect(coordinator.snapshot()).toEqual({
+      entries: [
+        { content: "父任务", status: "pending" },
+        { content: "[researcher] 步骤 A", status: "in_progress" },
+        { content: "[researcher] 步骤 B", status: "pending" },
+      ],
+    });
+  });
 });
