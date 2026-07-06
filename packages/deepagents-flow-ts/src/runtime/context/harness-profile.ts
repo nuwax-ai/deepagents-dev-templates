@@ -4,13 +4,13 @@
  * Agent-universal conventions (tool-selection priority + secret handling) that
  * every agent this template builds should follow.
  *
- * Injection: appended directly to the resolved system prompt in the ACP
- * session-prompt branch (`resolveSystemPrompt` when `sessionConfig.systemPrompt`
- * is set). External scenario / target-agent prompts arrive via ACP — they do
- * not carry this template's bundled conventions, so we append them here.
+ * Injection: appended at the end of the ACP session-prompt branch
+ * (`resolveSystemPrompt` when `sessionConfig.systemPrompt` is set), after the
+ * local `prompts/flow.base.md` identity and the platform session append. External
+ * session prompts do not carry harness conventions, so we append them here.
  *
- * For the bundled flow prompt (`prompts/flow.base.md`) these conventions already
- * live in the file; this constant specifically covers the ACP session-prompt path.
+ * For the non-session path the bundled flow prompt (`prompts/flow.base.md`)
+ * already includes equivalent rules; this constant covers the ACP session branch.
  */
 
 /** Harness-level rules injected into ACP-delivered prompts. Kept small — not agent identity. */

@@ -1,6 +1,6 @@
 {
   "name": "deepagents-flow-ts",
-  "version": "1.9.1",
+  "version": "1.9.2",
   "description": "Flow / workflow-orchestration agent template — the agent runs an explicit LangGraph StateGraph (not a dynamic tool loop) over ACP. Self-contained runtime; MCP via @langchain/mcp-adapters. Ships 4 curated flows (default ReAct, platform-capability sample, streaming pipeline, LLM router) plus 8 topology building blocks.",
   "type": "module",
   "main": "dist/index.js",

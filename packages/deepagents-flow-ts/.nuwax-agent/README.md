@@ -27,7 +27,7 @@
 
 ## 运行时各层如何被消费
 
-- **systemPrompt** —— `resolveSystemPrompt(appConfig, sessionConfig, root)` 优先级：`config.agent.systemPrompt` / `prompts/flow.base.md` > 内联 fallback。（IDE host 经 ACP session 注入时可临时覆盖。）
+- **systemPrompt** —— `resolveSystemPrompt(appConfig, sessionConfig, root)`：无 session 时 `config.agent.systemPrompt` / `prompts/flow.base.md` > 内联 fallback；有 ACP session 时本地身份提示词保留，host 补充指令**追加**其后（不覆盖）。
 - **mcpServers** —— runtime-context 加载 `config/mcp.default.json`；native 工具经 `@langchain/mcp-adapters` 的 `MultiServerMCPClient.getTools()` 加载。ACP session 可合并追加（`session-wins`）。
 - **model** —— `resolveModel(appConfig)` 取自 `config.model`（ACP session / env / config / defaults）。
 - **skills** —— `resolveSkillsPaths(appConfig)` 发现 `agentsDirectories` 下各 `<root>/skills/`（含 `builtin/skills/`、`.agents/skills/`）及 `config.skills.directories`。

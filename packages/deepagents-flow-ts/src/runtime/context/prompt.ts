@@ -26,7 +26,8 @@ type SystemPromptResolveSource =
 
 /**
  * Resolve system prompt with priority chain:
- *   ACP session prompt > config.agent.systemPrompt > config.agent.systemPromptPath > inline fallback
+ *   ACP session: local prompt file + session append + PLATFORM_CONVENTIONS
+ *   No session: config.agent.systemPrompt > config.agent.systemPromptPath > inline fallback
  */
 export interface SystemPromptResolveMeta {
   prompt: string;
@@ -43,13 +44,15 @@ export function resolveSystemPromptMeta(
   sessionConfig: ACPSessionConfig | undefined,
   workspaceRoot: string
 ): SystemPromptResolveMeta {
-  // ACP session prompt takes highest priority. This prompt is supplied
-  // externally (the scenario / target-agent prompt) and does not carry this
-  // template's platform conventions, so append them here. This is the one path
-  // that bypasses the bundled prompt files; for every other source the
-  // conventions already live in the prompt file (or are irrelevant).
+  // ACP session prompt is supplementary — append it to the local prompt file,
+  // not replace it. The platform's `_meta.systemPrompt.append` semantically
+  // adds platform-level instructions on top of the agent's identity prompt.
+  // Loading the configured prompt path ensures agent identity is preserved.
   if (sessionConfig?.systemPrompt) {
-    const prompt = `${sessionConfig.systemPrompt.trimEnd()}\n\n${PLATFORM_CONVENTIONS}`;
+    const basePrompt = loadPromptFromFile(config, workspaceRoot);
+    const prompt = basePrompt
+      ? `${basePrompt}\n\n${sessionConfig.systemPrompt.trimEnd()}\n\n${PLATFORM_CONVENTIONS}`
+      : `${sessionConfig.systemPrompt.trimEnd()}\n\n${PLATFORM_CONVENTIONS}`;
     return {
       prompt,
       source: "acp-session",
@@ -109,6 +112,15 @@ export function resolveSystemPromptMeta(
     promptChars: prompt.length,
     promptPreview: previewText(prompt),
   };
+}
+
+/** Load prompt from configured file path (strips H1 title line). Returns undefined if not found. */
+function loadPromptFromFile(config: AppConfig, workspaceRoot: string): string | undefined {
+  const promptPath = resolvePromptPath(config.agent.systemPromptPath, workspaceRoot);
+  if (existsSync(promptPath)) {
+    return readFileSync(promptPath, "utf-8").replace(/^# .*\r?\n/, "").trim();
+  }
+  return undefined;
 }
 
 export function resolveSystemPrompt(

@@ -28,7 +28,7 @@ pnpm exec tsx src/index.ts sessions       # 已持久化的会话
 
 `FlowRuntime`（接口 [src/runtime/flow-runtime.ts](../src/runtime/flow-runtime.ts)，装配工厂 `createFlowRuntime` 见 [src/index.ts](../src/index.ts)）在启动时把各层组装成一处，注入图节点：
 
-- **systemPrompt** — `resolveSystemPrompt`：`config.agent.systemPrompt` / `prompts/flow.base.md` > inline fallback。ACP host 在 `session/new` 注入时可临时覆盖。
+- **systemPrompt** — `resolveSystemPrompt`：无 ACP session 时 `config.agent.systemPrompt` / `prompts/flow.base.md` > inline fallback；有 ACP session 时保留本地 `prompts/flow.base.md` 身份，**追加** host 在 `session/new` 下发的补充指令，再追加 `PLATFORM_CONVENTIONS`（不覆盖本地提示词）。
 - **mcpServers** — `config/mcp.default.json`（`config.mcp.configPath`），默认内置 `ask-question`（结构化提问 fallback，图内 HITL 即 **平台问答卡片**，见 [glossary.md](./glossary.md)）；native 工具经 `@langchain/mcp-adapters`（`MultiServerMCPClient`）由 runtime-context 加载，支持 **stdio / Streamable HTTP / SSE**（有 url 时默认 Streamable HTTP，`automaticSSEFallback` 失败后再试 SSE；连接成功与否以 **tools/list** 为准，session 结束 `destroyRuntimeContext` 关闭连接）。ACP session 可合并追加（`session-wins`，平台同名覆盖内置），日常扩展改 `config/mcp.default.json` 即可。
 - **model** — `resolveModel`（env > `config.model` > 默认）。协议优先级：`API_PROTOCOL` > `LLM_PROVIDER` > 凭证启发式 > `config.model.provider`（`anthropic` | `openai`）。
 - **skills** — `discoverSkills` 发现 `agentsDirectories` 下各 `<root>/skills/`（默认含 `builtin/skills/`、`.agents/skills/`）及 `config.skills.directories` 的 SKILL.md；经 `renderSkillsSection` 注入清单，模型用 `load_skill(name)` 渐进式读正文。
