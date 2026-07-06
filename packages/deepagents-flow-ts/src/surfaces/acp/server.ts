@@ -634,6 +634,12 @@ export function createFlowHooks(options: FlowAcpOptions): DeepAgentsServerHooks 
             if ((err as Error)?.name === "AbortError" || ctx.signal?.aborted) {
               endTurn({ stopReason: "cancelled" });
               await failInflightToolsOnCancel(conn, sessionId, inflightTools);
+              if (isStateful && typeof (executor as StatefulFlow).repairCheckpoint === "function") {
+                await (executor as StatefulFlow).repairCheckpoint!(sessionId, {
+                  cancelledToolCallIds: [...inflightTools.keys()],
+                  cancelReason: "已取消（客户端 session/cancel）",
+                });
+              }
               return { stopReason: "cancelled" as StopReason };
             }
             endTurn({ stopReason: "end_turn", error: String(err) });

@@ -1,10 +1,10 @@
 /**
- * think 节点 sanitizeToolCalls —— 清除 checkpoint 中孤立的 AIMessage.tool_calls。
+ * sanitizeToolCalls —— 清除 checkpoint 中孤立的 AIMessage.tool_calls。
  */
 
 import { describe, expect, it } from "vitest";
 import { AIMessage, HumanMessage, ToolMessage, type BaseMessage } from "@langchain/core/messages";
-import { sanitizeToolCalls } from "../src/app/nodes/think.js";
+import { sanitizeToolCalls } from "../src/libs/messages/sanitize-tool-calls.js";
 
 describe("sanitizeToolCalls", () => {
   it("完整 tool_calls + ToolMessage → 不变", () => {

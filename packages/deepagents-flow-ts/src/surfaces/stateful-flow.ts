@@ -30,6 +30,7 @@ import type {
   FlowCallbacks,
 } from "../core/flow-types.js";
 import { applyCompaction } from "../libs/compaction.js";
+import { applyCheckpointMessageRepair } from "../libs/messages/repair-checkpoint.js";
 import { mapStreamChunk } from "./map-stream-chunk.js";
 import { dispatchSurfaceEvent } from "./dispatch-surface-event.js";
 
@@ -180,6 +181,9 @@ export function createStatefulFlow<S = Record<string, unknown>>(
     async run(input, threadId, callbacks): Promise<FlowRunResult> {
       const config = baseConfig(threadId, callbacks ?? {});
 
+      // 每次 run 入口修复历史 checkpoint 中的孤立 tool_calls（写回磁盘）。
+      await applyCheckpointMessageRepair(graph, config);
+
       if (options.appConfig && input.resume === undefined) {
         await applyCompaction(graph, config, options.appConfig);
       }
@@ -207,6 +211,12 @@ export function createStatefulFlow<S = Record<string, unknown>>(
       return { status: "done", answer, footer };
     },
   };
+
+  flow.repairCheckpoint = async (threadId, opts) =>
+    applyCheckpointMessageRepair(graph, baseConfig(threadId), {
+      cancelledToolCallIds: opts?.cancelledToolCallIds,
+      cancelReason: opts?.cancelReason,
+    });
 
   // 对话型不暴露 hasStarted → surface 每轮走 query（带历史累积，多轮对话）；
   // HITL 型暴露 → surface 据 checkpoint 判断 resume 续跑同一任务。

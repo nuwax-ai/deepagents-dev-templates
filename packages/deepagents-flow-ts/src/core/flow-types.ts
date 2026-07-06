@@ -172,6 +172,14 @@ export interface StatefulFlow {
    * ACP 场景下 `threadId` 即 `sessionId`（见 surfaces/acp onPrompt）。
    */
   getThreadMessages?(threadId: string): Promise<SessionThreadHistory | void>;
+  /**
+   * 修复 checkpointer 中孤立的 tool_calls（cancel 补 ToolMessage；否则 sanitize）。
+   * ACP cancel 与 run 入口共用；`threadId` 即 sessionId。
+   */
+  repairCheckpoint?(
+    threadId: string,
+    opts?: { cancelledToolCallIds?: string[]; cancelReason?: string }
+  ): Promise<boolean>;
 }
 
 /**

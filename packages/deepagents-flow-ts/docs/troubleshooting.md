@@ -90,15 +90,17 @@
 
 **根因**：会话在 `ToolNode` 执行中被取消/中断，checkpoint 留下带 `tool_calls` 的 `AIMessage` 但无对应 `ToolMessage`；此后每次 `think` 调模型都会 400。
 
-**runtime 修复**（v1.9.3+）：`think` 节点在调 LLM 前执行 `sanitizeToolCalls()`，自动剥离孤立 `tool_calls`（兼容 checkpoint 反序列化后的 plain object，非仅类实例）。
+**runtime 修复**（v1.9.4+，三层）：
 
-**线上已损坏 checkpoint 处理**：
+| 层 | 时机 | 行为 |
+|----|------|------|
+| 1 | ACP `session/cancel` | `repairCheckpoint` 为 in-flight tool_call 补 `ToolMessage` 并写回 |
+| 2 | 每次 `flow.run` 入口 | 自动 `sanitize` 孤立 tool_calls 并写回 checkpoint |
+| 3 | `think` 调 LLM 前 | 最后一道保险（含 plain object 反序列化） |
 
-| 步 | 动作 |
-|----|------|
-| 1 | 定位会话目录：`~/.flowagents/sessions/<workspace 散列>/` 或 `config.memory.dir` |
-| 2 | 删除损坏的 `pending.json`（或 `pnpm exec tsx src/index.ts sessions delete <id>`） |
-| 3 | 重新部署含 v1.9.3 的包后开新会话验证 |
+**历史坏 checkpoint**：v1.9.4 首次 `run` 会尝试自动修复（消息须有 `id` 才能写回）；仍失败时可手动删 thread 文件或 `sessions delete <id>`。
+
+**平台约定**：避免在真实 `sessionId` 就绪前用 `pending` 作 `thread_id` 持久化 checkpoint。
 
 **关联修复**：ACP `_meta.systemPrompt.append` 应追加而非覆盖 `prompts/flow.base.md`（v1.9.2 `resolveSystemPrompt`）。
 
