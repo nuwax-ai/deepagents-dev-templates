@@ -95,6 +95,24 @@
 
 ---
 
+## `task` / subagent（子智能体委派）
+
+**症状**：`(subagent 无输出)`、子 agent 调 MCP 401、并行 `task` UI 混流。
+
+**runtime 行为**（`deepagents-flow-ts` `task` 工具 + ACP）：
+
+| 项 | 说明 |
+|----|------|
+| 默认工具集 | 无 `AGENT.md tools` 时继承父级工具（含平台聚合 MCP，不含 `task`） |
+| 返回值 | `output` → 全量 AIMessage 扫描 → stream buffer 兜底 |
+| 流式分桶 | `messageId=subagent:<name>:<toolCallId>` |
+| 联网 | subagent 可直接调用当前会话已授权的搜索 MCP；`description` 仍须自包含 |
+| Todo/Plan | 复杂任务调用 `write_todos`；并行 subagent 按父 `toolCallId` 聚合为 ACP `plan` 完整快照 |
+
+**flow-builder 详表**：[dev-agent-flow Part 6](../../dev-agent-flow/skills/flow-builder/references/part6-subagent.md)
+
+---
+
 ## 相关文档
 
 - [flow-graph-rules.md](flow-graph-rules.md) — **图编排规则（R-G001+，可持续追加）**

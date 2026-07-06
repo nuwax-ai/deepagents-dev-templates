@@ -22,6 +22,7 @@ import {
   createSearchTools,
   createDemoTools,
   createSkillTool,
+  writeTodosTool,
 } from "../libs/tools/index.js";
 import { createTaskTool } from "./task.tool.js";
 
@@ -39,7 +40,7 @@ export function createFlowTools(
   const { workspaceRoot, policy, skills = [], subAgents = [] } = opts;
 
   // 与 cwd 无关的通用工具（无状态，主 agent 与子智能体共享同实例）。
-  const reused: StructuredTool[] = [httpRequestTool, jsonUtilsTool];
+  const reused: StructuredTool[] = [httpRequestTool, jsonUtilsTool, writeTodosTool];
   const skillTools = skills.length ? [createSkillTool(skills)] : [];
 
   // 按工作目录构建一套工具（bash/fs/search 沙箱受限于该 cwd）——**不含 task，防递归**。

@@ -128,12 +128,25 @@ export function createToolExecNode<S extends { messages: BaseMessage[] }>(
       }
     }
 
-    const result = (await toolNode.invoke({
-      messages:
-        rejectedToolMsgs.length > 0
-          ? [...state.messages, ...rejectedToolMsgs]
-          : state.messages,
-    })) as {
+    const result = (await toolNode.invoke(
+      {
+        messages:
+          rejectedToolMsgs.length > 0
+            ? [...state.messages, ...rejectedToolMsgs]
+            : state.messages,
+      },
+      {
+        ...config,
+        configurable: {
+          ...config?.configurable,
+          // write_todos 从 ToolRuntime.configurable 发 Plan；兼容 graph 构造期 callbacks
+          //（executeFlow）与运行期 configurable callbacks（StatefulFlow / ACP）两条注入路径。
+          onPlan: config?.configurable?.onPlan ?? callbacks?.onPlan,
+          // 单 call 时透传 id，供 task 工具 onToken 构造 ACP messageId；多 call 并行由 LangGraph 分叉。
+          langgraph_tool_call_id: calls.length === 1 ? calls[0]?.id : undefined,
+        },
+      }
+    )) as {
       messages?: ToolMessage[];
     };
     const executed = result?.messages ?? [];

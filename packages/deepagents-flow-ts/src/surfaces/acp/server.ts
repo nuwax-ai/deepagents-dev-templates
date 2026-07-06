@@ -54,6 +54,7 @@ import type {
   PermissionDecision,
 } from "../../core/flow-types.js";
 import { emitToolCall, type AcpToolConnection } from "./emit-tool-call.js";
+import { AcpPlanCoordinator } from "./plan-coordinator.js";
 import { randomUUID } from "node:crypto";
 import { buildPermissionToolCall } from "../../libs/deepagents-acp/index.js";
 import type { PermissionOption, ToolCallUpdate } from "@agentclientprotocol/sdk";
@@ -229,15 +230,20 @@ function buildAcpCallbacks(
   permissions: PermissionGateConfig,
   signal?: AbortSignal
 ): ReturnType<typeof traceFlowCallbacks> {
+  const planCoordinator = new AcpPlanCoordinator();
+  // 并行 subagent 可能同时更新 plan；串行发送快照，避免较旧网络请求后完成并覆盖新状态。
+  let planSendQueue: Promise<void> = Promise.resolve();
+
   return traceFlowCallbacks(
     {
-      onToken: (token, source) => {
+      onToken: (token, source, toolCallId) => {
         stats.streamed = true;
         stats.streamChars += token.length;
         stats.tokenChunks += 1;
-        // source（subagent name）→ 独立 messageId（清洗 : 与空白，避免 name 含 ':' 污染前缀分组）。
+        // source（subagent name）+ toolCallId → 独立 messageId；并行同名校 subagent 不再撞桶。
+        const safe = (s: string) => s.replace(/[:\s]/g, "_");
         const messageId = source
-          ? `subagent:${source.replace(/[:\s]/g, "_")}`
+          ? `subagent:${safe(source)}:${safe(toolCallId ?? "unknown")}`
           : undefined;
         return streamText(conn, sessionId, token, "agent", messageId);
       },
@@ -255,7 +261,13 @@ function buildAcpCallbacks(
         }
       },
       onStage: (e) => streamText(conn, sessionId, formatStage(e), "thought"),
-      onPlan: (e) => emitPlan(conn, sessionId, e),
+      onPlan: (e) => {
+        const snapshot = planCoordinator.update(e);
+        const queued = planSendQueue.then(() => emitPlan(conn, sessionId, snapshot));
+        // 后续更新不应被一次发送失败永久阻断；当前调用仍收到原始 reject。
+        planSendQueue = queued.catch(() => undefined);
+        return queued;
+      },
       onPermissionRequest: createAcpPermissionHandler(
         conn,
         sessionId,
@@ -320,8 +332,8 @@ async function streamText(
     sessionId,
     update: {
       sessionUpdate: kind === "thought" ? "agent_thought_chunk" : "agent_message_chunk",
-      // messageId（ACP spec）：同 messageId 的 chunks 属同一消息；subagent 用独立 messageId，
-      // 客户端据此分组区分主 agent 与各 subagent 的消息流。
+      // messageId（ACP spec）：同 messageId 的 chunks 属同一消息；subagent 用
+      // subagent:<name>:<toolCallId>，客户端据此分组区分主 agent 与各并行 task 流。
       ...(messageId ? { messageId } : {}),
       content: { type: "text", text },
     },

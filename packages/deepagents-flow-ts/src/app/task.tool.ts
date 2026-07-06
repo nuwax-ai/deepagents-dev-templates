@@ -3,7 +3,8 @@
  *
  * 框架原生实现：每个子智能体（subagent）复用默认 ReAct 图（createFlowGraph）单次 invoke——
  * 自带 systemPrompt（AGENT.md 正文）、工具子集、独立工作目录、可选独立模型。
- * LangGraph 无「声明式子智能体（subagent）」原生概念，故参考 deepagents 的 `task` 委派语义。
+ * LangGraph 无「声明式子智能体（subagent）」原生概念，故参考 deepagents 的 `task` 委派语义
+ *（对齐 LangChain 文档 Subagents-as-tools / Supervisor 模式）。
  *
  * 防递归：子智能体拿到的工具集**不含 `task` 本身**（由 createFlowTools 的 buildTools 保证）。
  * 工作目录：默认 = 父级 workspaceRoot（启动 agent 的当前目录）；AGENT.md `workdir` 指定相对子目录。
@@ -20,6 +21,71 @@ import { createFlowGraph } from "./graph.js";
 import type { FlowState } from "./state.js";
 import { extractText, STREAM_TEXT_NODES } from "../libs/nodes/index.js";
 import type { FlowCallbacks } from "../core/flow-types.js";
+
+/** 兼容 LangChain 实例与 checkpoint 反序列化后的 plain object。 */
+function messageRole(msg: unknown): string | undefined {
+  if (!msg || typeof msg !== "object") return undefined;
+  const m = msg as { _getType?: () => string; type?: string };
+  return m._getType?.() ?? m.type;
+}
+
+/** 框架级委派约定：追加到 AGENT.md 正文后，无需逐个改 builtin/agents。 */
+function subagentDelegationSuffix(tools: StructuredTool[]): string {
+  const todoInstruction = tools.some((tool) => tool.name === "write_todos")
+    ? "复杂多步骤任务应使用 write_todos 维护完整待办快照并及时更新状态，简单任务不要创建待办。"
+    : "";
+  return `\n\n完成任务后必须用自然语言给出非空最终结论；如任务需要联网或实时资料，可调用当前工具列表中已授权的搜索 MCP 工具，不得臆造或调用未提供的工具。${todoInstruction}`;
+}
+
+/**
+ * 从子图终态提取 task 返回值。
+ * 优先级：respond 写入的 output → 倒序扫描所有 AIMessage 末条非空文本 → streamBuffer。
+ */
+export function extractSubagentTaskOutput(
+  state: Pick<FlowState, "output" | "messages">,
+  streamBuffer?: string
+): string {
+  if (state.output?.trim()) return state.output.trim();
+
+  const msgs = state.messages ?? [];
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    if (messageRole(msgs[i]) !== "ai") continue;
+    const text = extractText((msgs[i] as { content?: unknown }).content).trim();
+    if (text) return text;
+  }
+
+  return streamBuffer?.trim() ?? "";
+}
+
+/** 从 LangGraph tool invoke 的 runConfig 解析当前 tool_call_id（供 ACP messageId 分桶）。 */
+function resolveTaskToolCallId(
+  runConfig: unknown,
+  threadId: string
+): string {
+  const cfg = runConfig as
+    | {
+        configurable?: Record<string, unknown>;
+        metadata?: Record<string, unknown>;
+        toolCallId?: unknown;
+        toolCall?: { id?: unknown };
+      }
+    | undefined;
+  const fromRuntime = cfg?.toolCallId ?? cfg?.toolCall?.id;
+  if (typeof fromRuntime === "string" && fromRuntime) {
+    return fromRuntime;
+  }
+  const fromConfigurable = cfg?.configurable?.langgraph_tool_call_id;
+  if (typeof fromConfigurable === "string" && fromConfigurable) {
+    return fromConfigurable;
+  }
+  const fromMetadata = cfg?.metadata?.tool_call_id;
+  if (typeof fromMetadata === "string" && fromMetadata) {
+    return fromMetadata;
+  }
+  // 并行多 task 或 standalone invoke：用 threadId 后缀保证 messageId 唯一。
+  const suffix = threadId.split("-").pop();
+  return suffix ?? randomUUID();
+}
 
 export interface TaskToolDeps {
   subAgents: DiscoveredSubAgent[];
@@ -101,12 +167,18 @@ export function createTaskTool(deps: TaskToolDeps) {
       if ("error" in modelOverride) return `Error: ${modelOverride.error}`;
       const subConfig = modelOverride.config;
 
+      const subagentSystemPrompt =
+        `${agent.systemPrompt.trimEnd()}${subagentDelegationSuffix(tools)}`;
+
       // 流式委派：subagent 的工具调用经 callbacks.onToolCall（带 [subagent] 前缀）实时透出；
       // LLM token 经 graph.stream messages 模式逐个 onToken；最终 output 取终态（替代原 invoke）。
       // parentCallbacks 提到 try 外：finally（subagent 结束边界 onStage）也引用它，
       // const 块作用域否则在 finally 失效（tsc TS2304 + 运行时 ReferenceError）。
       const parentCallbacks = ((runConfig as { configurable?: Record<string, unknown> } | undefined)
         ?.configurable ?? {}) as Partial<FlowCallbacks>;
+      const threadId = `subagent-${subagent_type}-${randomUUID()}`;
+      const toolCallId = resolveTaskToolCallId(runConfig, threadId);
+
       try {
         const wrapToolCall: FlowCallbacks["onToolCall"] = async (e) => {
           await parentCallbacks.onToolCall?.({
@@ -114,29 +186,44 @@ export function createTaskTool(deps: TaskToolDeps) {
             toolName: `[${subagent_type}] ${e.toolName}`,
           });
         };
+        const wrapPlan: FlowCallbacks["onPlan"] = async (e) => {
+          await parentCallbacks.onPlan?.({
+            entries: e.entries,
+            source: subagent_type,
+            toolCallId,
+          });
+        };
         const graph = createFlowGraph({
           allTools: tools,
           config: subConfig,
-          systemPrompt: agent.systemPrompt,
-          callbacks: { onToolCall: wrapToolCall },
+          systemPrompt: subagentSystemPrompt,
+          callbacks: {
+            onToolCall: wrapToolCall,
+            onPlan: wrapPlan,
+            onPermissionRequest: parentCallbacks.onPermissionRequest,
+          },
         });
-        const threadId = `subagent-${subagent_type}-${randomUUID()}`;
         // 透传父级 cancel signal（ACP cancel）给 subagent，避免父级取消时 subagent 仍跑完整轮。
         const parentSignal = (runConfig as { signal?: AbortSignal } | undefined)?.signal;
-        // subagent 开始边界（surface 经此知道 subagent 生命周期；后续 token 带 source=name 区分主/subagent 流）。
+        // subagent 开始边界（surface 经此知道 subagent 生命周期；后续 token 带 source + toolCallId）。
         await parentCallbacks.onStage?.({
           stage: `委派 subagent: ${subagent_type}`,
           index: 1,
           total: 1,
           detail: description.slice(0, 100),
         });
+        let streamBuffer = "";
         const stream = await graph.stream(
           { input: description, messages: [] } as unknown as FlowState,
           {
             // 子图自己会为 messages stream 安装监听器；显式隔离父图 callbacks，避免同一
             // token 同时经父图 messages 冒泡和下方 parentCallbacks.onToken 重复发送。
             callbacks: [],
-            configurable: { thread_id: threadId },
+            configurable: {
+              thread_id: threadId,
+              // write_todos 从 ToolRuntime.configurable 读取 onPlan；附带父 task id 由 wrapPlan 分桶。
+              onPlan: wrapPlan,
+            },
             recursionLimit: 50,
             streamMode: ["messages"],
             ...(parentSignal ? { signal: parentSignal } : {}),
@@ -153,23 +240,15 @@ export function createTaskTool(deps: TaskToolDeps) {
           const node = meta?.langgraph_node;
           if (node && STREAM_TEXT_NODES.has(node)) {
             const text = extractText(msg?.content);
-            if (text) await parentCallbacks.onToken?.(text, subagent_type);
+            if (text) {
+              streamBuffer += text;
+              await parentCallbacks.onToken?.(text, subagent_type, toolCallId);
+            }
           }
         }
         const finalState = (await graph.getState({ configurable: { thread_id: threadId } }))
           .values as FlowState;
-        // output 由 respond 写入；若 subagent 撞 recursionLimit/中断没到 respond，output 为空——
-        // 从末条 AIMessage 取兜底，避免「stream 已透 token 却返回(无输出)」的不一致。
-        const msgs = finalState.messages ?? [];
-        let fallback = "";
-        for (let i = msgs.length - 1; i >= 0; i--) {
-          const m = msgs[i] as { _getType?: () => string; content?: unknown };
-          if (m?._getType?.() === "ai") {
-            fallback = extractText(m.content);
-            break;
-          }
-        }
-        return finalState.output || fallback || "(subagent 无输出)";
+        return extractSubagentTaskOutput(finalState, streamBuffer) || "(subagent 无输出)";
       } catch (err) {
         return `Error: subagent "${subagent_type}" 执行失败: ${err instanceof Error ? err.message : String(err)}`;
       } finally {

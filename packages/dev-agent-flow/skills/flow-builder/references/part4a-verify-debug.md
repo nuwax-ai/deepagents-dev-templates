@@ -145,8 +145,10 @@ pnpm graph                   # export graph topology
 |-----------|------|
 | `未知工具: 联网搜索_1` | 删 `AGENT.md` 的 `tools`（禁止写平台登记名）→ Part 6 |
 | `400 Invalid model` + 占位符 | 删 `AGENT.md` 的 `model`，继承主 Agent |
+| `(subagent 无输出)` | 确认 `description` 自包含；框架已有 stream buffer 兜底 → Part 6 |
+| 联网搜索 `401` | 检查平台聚合 MCP 的会话 Authorization 是否正确下发并由父/子 agent 复用 |
+| 并行 `task` 输出混流 | runtime `messageId` 含 `toolCallId`（`deepagents-flow-ts` ACP 层）；仍混流查平台是否尊重 messageId |
 | `INVALID_TOOL_RESULTS` | 删 `~/.flowagents/sessions/<hash>/pending.json` 清 checkpoint |
-| 并行 `task` 输出混流 | 改串行 `task`（一轮只委派一个）→ Part 6 |
 
 详表 → [part6-subagent.md](part6-subagent.md)。
 
@@ -165,6 +167,6 @@ pnpm graph                   # export graph topology
 - ❌ Phase 4 复述沙箱环境变量名，或要求用户配置 ACP 已默认集成的平台认证/基址
 - ❌ Phase 4 写「后续：配置 Plugin Authorization / 搜索 API key」等开发期登记事项
 - ❌ `AGENT.md tools` 写平台 Plugin 登记名（如 `联网搜索_1`）→ `task` 报未知工具
-- ❌ 同轮并行多个 `task` 且期望 UI 可读流式 → 改串行委派（Part 6）
+- ❌ 同轮并行多个 `task` 且平台未分桶 messageId → 查 ACP/runtime，不靠提示词强制串行
 - ✅ 命令退出码 0 + 文件实证 + 日志无未预期 error
 - ✅ 无用户业务待办 → Phase 4 **不写**「后续」段

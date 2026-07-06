@@ -17,3 +17,4 @@ export { createFsTools } from "./fs.tool.js";
 export { createSearchTools } from "./search.tool.js";
 export { createDemoTools } from "./demo.tool.js";
 export { createSkillTool } from "./skill.tool.js";
+export { writeTodosTool } from "./todo.tool.js";

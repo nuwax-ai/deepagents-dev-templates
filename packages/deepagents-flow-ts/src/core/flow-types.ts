@@ -61,6 +61,10 @@ export interface PlanEntry {
 /** 结构化 Plan 更新（研究大纲 / 任务清单）。 */
 export interface PlanEvent {
   entries: PlanEntry[];
+  /** 内部来源标识；ACP 输出前用于合并并行 subagent 的计划，不直接进入协议结构。 */
+  source?: string;
+  /** 触发该 subagent 的父级 task tool_call_id；用于隔离并行计划。 */
+  toolCallId?: string;
 }
 
 /**
@@ -86,7 +90,11 @@ export interface StageEvent {
  * `graph.stream({signal})`；中止时 LangGraph 以 AbortError reject，surface 据此快速收尾。
  */
 export interface FlowCallbacks {
-  onToken?: (token: string, source?: string) => void | Promise<void>;
+  /**
+   * @param source subagent 名（有值时 ACP 用独立 messageId 分桶）
+   * @param toolCallId 父图 AIMessage.tool_calls[].id（并行 task 时区分同名校 subagent 流）
+   */
+  onToken?: (token: string, source?: string, toolCallId?: string) => void | Promise<void>;
   onToolCall?: (e: ToolCallEvent) => void | Promise<void>;
   /** Stage progress for durable stateful flows（可选）。 */
   onStage?: (e: StageEvent) => void | Promise<void>;
