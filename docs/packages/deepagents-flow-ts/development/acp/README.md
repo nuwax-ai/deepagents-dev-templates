@@ -16,6 +16,7 @@
 | 理清工具审批 vs 审批节点（HITL 总览） | [human-in-the-loop.md](./human-in-the-loop.md) |
 | 接 ACP 工具审批（`request_permission` 实现细节） | [permission.md](./permission.md) |
 | 查 `tool_call` / `tool_call_update` 字段怎么发 | [field-mapping.md](./field-mapping.md) |
+| 查 subagent 并行流式 / plan / write_todos | [../subagent-task-and-acp-plan.md](../subagent-task-and-acp-plan.md) |
 | 查 MCP + LangGraph + ACP 全栈数据流 | [dataflow-nuwaclaw.md](./dataflow-nuwaclaw.md) §MCP 标准栈 |
 | 改代码前核对清单、源码索引 | [maintenance.md](./maintenance.md) |
 | **跟进追赶方案与阶段进度** | [roadmap-progress.md](./roadmap-progress.md) |
@@ -60,6 +61,8 @@ development/acp/
 | 流式 `rawInput` 精炼 | ⏸️ 不需要；见 [phase-c-streaming-research.md](./phase-c-streaming-research.md) |
 | 双轨去重（in_progress + terminal） | ✅ C-dedupe `emittedToolCallIds` / `completedToolCallIds` |
 | per-session runtime + 会话配置解析 | ✅ `createExecutor` + `session-config.ts` / `session-diagnostics.ts` |
+| subagent 并行流式 `messageId` 分桶 | ✅ `subagent:<name>:<toolCallId>`；见 [subagent-task-and-acp-plan.md](../subagent-task-and-acp-plan.md) |
+| 会话级 `plan`（`write_todos` + 并行 subagent 合并） | ✅ `AcpPlanCoordinator` + 发送队列；见同上 |
 | `session/load` 消息回放（`getSessionHistory`） | ❌ Flow surface 未实现 |
 | `usage_update` / 模式面 | ⏸️ 暂缓（非当前范围） |
 
@@ -74,6 +77,7 @@ development/acp/
 | **开发文档总索引** | [../README.md](../README.md) |
 | ReAct 两阶段分工（think / tools） | [../react-two-phase.md](../react-two-phase.md) |
 | MCP / Skill / Subagent 生命周期 | [../runtime-capabilities-lifecycle.md](../runtime-capabilities-lifecycle.md) |
+| Subagent / Plan / 并行流式 | [../subagent-task-and-acp-plan.md](../subagent-task-and-acp-plan.md) |
 | Zed 调试（使用者） | [packages/deepagents-flow-ts/docs/zed-debug.md](../../../../../packages/deepagents-flow-ts/docs/zed-debug.md) |
 | LangGraph surface 收敛 | [../langgraph-native-convergence.md](../langgraph-native-convergence.md) |
 | app-ts ACP 测试方案 | [../../deepagents-app-ts/development/acp-test-plan.md](../../deepagents-app-ts/development/acp-test-plan.md) |

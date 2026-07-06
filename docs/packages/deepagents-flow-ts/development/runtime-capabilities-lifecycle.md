@@ -253,10 +253,15 @@ sequenceDiagram
 | checkpointer | 父 `FileCheckpointSaver` | 默认 **MemorySaver**，不进父会话 |
 | threadId | 稳定 session thread | `subagent-<name>-<uuid>` |
 | 历史 | 多轮对话 | **仅** `description`，看不到主对话 |
-| MCP | session hydrate | **复用**父 `ctx.mcpTools`（同一连接） |
-| 工具集 | 含 `task` | `buildTools(subRoot)` **不含** `task` |
-| 流式 | surface 主路径 | token / onToolCall 透传（工具名 `[name]` 前缀） |
+| MCP | session hydrate | **复用**父 `ctx.mcpTools`（同一连接）；可直接调已授权搜索 MCP |
+| 工具集 | 含 `task`、`write_todos` | `buildTools(subRoot)` **不含** `task`；含 `write_todos` 等 reused 工具 |
+| 流式 | surface 主路径 | `onToken(text, name, toolCallId)`；ACP `messageId=subagent:<name>:<id>` |
+| Plan | `write_todos` → `onPlan` | `wrapPlan` 带 `source` + 父 `toolCallId`；ACP 侧 `AcpPlanCoordinator` 合并 |
+| 返回值 | `output` | `extractSubagentTaskOutput`（output → AIMessage → streamBuffer） |
 | 取消 | ACP signal | 父 `signal` 透传 `graph.stream` |
+| 审批 | `onPermissionRequest` | 透传父级（子图内 bash 等仍走审批门控） |
+
+**并行多 `task`**：同一轮可并行委派；流式与 Plan 按父 `tool_calls[].id` 分桶，不再要求串行 `task`。详表见 [subagent-task-and-acp-plan.md](./subagent-task-and-acp-plan.md)。
 
 子图内部仍是 **think ↔ tools** ReAct，见 [react-two-phase.md §7](./react-two-phase.md#7-subagenttask与默认图的关系)。
 
@@ -321,7 +326,8 @@ sequenceDiagram
 1. **改 MCP 合并/关闭逻辑** → 同步 `runtime-context.ts`、`acp/server.ts` dispose 链、[acp/dataflow-nuwaclaw.md](./acp/dataflow-nuwaclaw.md)。
 2. **改发现路径** → `discovery.ts` + `config/flow-agent.config.json` + 包内 `capabilities.md` + `dev-agent-flow` 规则。
 3. **subagent 不要单独 hydrate MCP**；应继续复用父 `ctx.mcpTools`，否则 stdio 子进程翻倍且 dispose 边界混乱。
-4. **Skill 正文过大** → 保持 `progressiveLoading: true`，避免撑爆 system prompt。
+4. **改 subagent 流式 / plan / write_todos** → [subagent-task-and-acp-plan.md](./subagent-task-and-acp-plan.md)。
+5. **Skill 正文过大** → 保持 `progressiveLoading: true`，避免撑爆 system prompt。
 
 ---
 
@@ -330,4 +336,5 @@ sequenceDiagram
 - [README.md](./README.md) — 开发文档总索引
 - [react-two-phase.md](./react-two-phase.md) — think/tools 两阶段与三者进 ReAct 的方式
 - [acp/dataflow-nuwaclaw.md](./acp/dataflow-nuwaclaw.md) — MCP + LangGraph + ACP 数据流
+- [subagent-task-and-acp-plan.md](./subagent-task-and-acp-plan.md) — subagent 委派、write_todos、ACP plan
 - [acp/permission.md](./acp/permission.md) — tools 节点审批门控（含 MCP 工具调用）

@@ -111,6 +111,8 @@
 
 **flow-builder 详表**：[dev-agent-flow Part 6](../../dev-agent-flow/skills/flow-builder/references/part6-subagent.md)
 
+**维护者架构详表**：[development/subagent-task-and-acp-plan.md](../../../docs/packages/deepagents-flow-ts/development/subagent-task-and-acp-plan.md)
+
 ---
 
 ## 相关文档
