@@ -6,19 +6,20 @@
 
 | 路径 | 怎么做 |
 |------|--------|
-| **平台** | `search-skills.sh` → `add-tool.sh` → 按需 `download-skill.sh` |
+| **平台** | `search-skills.sh` → `add-tool.sh`（登记即接入，运行期平台下发到 `.agents/skills/`） |
 | **项目内置** | `builtin/skills/<name>/SKILL.md`（`agentsDirectories` 含 `./builtin`） |
 
 ## 开发 Agent 应做什么
 
 1. 先 `search-skills.sh`
-2. 有 → toolkit 登记 / 下载
+2. 有 → `add-tool.sh` 登记即可（**禁止**再 `download-skill.sh` 或解压到 `builtin/skills/`）
 3. 无且须随仓库交付 → `builtin/skills/<name>/SKILL.md`
 4. 更新 `project.md`
 
 ## 禁止
 
 - ❌ `.agents/skills/<name>/SKILL.md`
+- ❌ 平台登记后又下载到 `builtin/skills/`（与 Plugin 相同，登记即接入）
 - ❌ 报告中写「已在 .agents/skills 创建技能」
 
 ## checklist

@@ -49,7 +49,7 @@
 |------|------|
 | 创建/命名/通用智能体 | 主 Agent → Part 5 + `config.agent.name` |
 | 只改欢迎语 | `openingChatMsg` |
-| skill | 平台 或 `builtin/skills/`（Part 7） |
+| skill | 平台 `add-tool` 或 `builtin/skills/`（Part 7；平台技能禁止本地下载） |
 | subagent | 平台 或 `builtin/agents/`（Part 6） |
 | 歧义 | 默认主 Agent |
 
@@ -63,7 +63,7 @@
 
 经 **`dev-engineer-toolkit`** 读写：`systemPrompt`、`openingChatMsg`、`tools`、`mcpConfigs`、`skills`。
 
-**工作区**（非平台）：`builtin/`、`prompts/`、`config/`。**禁止**开发 Agent 写 `.agents/`（toolkit 下载除外）。
+**工作区**（非平台）：`builtin/`、`prompts/`、`config/`。**禁止**开发 Agent 写 `.agents/` 或 `download-skill.sh` 下载平台技能。
 
 **铁律**：
 - 改平台字段 → 必须 toolkit；禁止只改本地
