@@ -25,3 +25,6 @@
 | 2026-06-27 | **B 弹窗式审批节点（范式2）**：`createPermissionApprovalNode`（节点内同步调 `onApprovalRequest`）+ `createAcpApprovalHandler`（总弹 unless yolo）；抽 `callAcpPermission` 与 A 共用 requestPermission/race/graceful；复用 A 通道而非 interrupt 桥接（不持久化、同节点不降级对话式）；测试 +9 例；[human-in-the-loop.md §2.3](./human-in-the-loop.md) 重写 |
 | 2026-07-06 | **v1.9.0 subagent + ACP plan**：内置 `write_todos`；`task` 并行流式 `messageId=subagent:<name>:<toolCallId>`；`extractSubagentTaskOutput` 多级兜底；`AcpPlanCoordinator` 合并并行 subagent plan；子 agent 继承 MCP 搜索 + 委派后缀；`onPermissionRequest` 透传；详 [subagent-task-and-acp-plan.md](../subagent-task-and-acp-plan.md) |
 | 2026-07-06 | **v1.9.1 加固**：`toolCallId` 回退用完整 UUID（非 threadId 后缀）；plan 发送队列在 `emitPlan` 前 `snapshot()`；`dev-agent` callbacks 对齐 `createStatefulFlow`（`onPlan` 等） |
+| 2026-07-06 | **v1.9.2 systemPrompt 追加**：`resolveSystemPrompt` 保留 `prompts/flow.base.md`，ACP session 补充指令追加其后（对齐 `_meta.systemPrompt.append`）；详 [checkpoint-integrity-and-prompt-resolution.md](../checkpoint-integrity-and-prompt-resolution.md) |
+| 2026-07-06 | **v1.9.3 think 清洗**：`sanitizeToolCalls` 于 think 调 LLM 前剥离孤立 `tool_calls`；兼容 checkpoint 反序列化 plain object |
+| 2026-07-06 | **v1.9.4 checkpoint 写回**：`libs/messages`；cancel 时 `repairCheckpoint` 补 ToolMessage；`flow.run` 入口自动修复；详 [checkpoint-integrity-and-prompt-resolution.md](../checkpoint-integrity-and-prompt-resolution.md) |

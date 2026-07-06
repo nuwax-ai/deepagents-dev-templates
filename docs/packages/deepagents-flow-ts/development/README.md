@@ -15,6 +15,7 @@
 | 查 MCP / Skill / Subagent 加载、运行、停止 | [runtime-capabilities-lifecycle.md](./runtime-capabilities-lifecycle.md) |
 | 理解 ask-question MCP 与 HITL 三种形态选型 | [ask-question-mcp-hitl.md](./ask-question-mcp-hitl.md) |
 | 查 subagent / write_todos / ACP plan 与并行流式 | [subagent-task-and-acp-plan.md](./subagent-task-and-acp-plan.md) |
+| 查 checkpoint 损坏 / systemPrompt 覆盖（v1.9.2–1.9.4） | [checkpoint-integrity-and-prompt-resolution.md](./checkpoint-integrity-and-prompt-resolution.md) |
 | 跟进 ACP 协议对齐与工具出站 | [acp/README.md](./acp/README.md) |
 | 查 LangGraph 原生能力收敛计划 | [langgraph-native-convergence.md](./langgraph-native-convergence.md) |
 | 查拓扑 scaffold 重构 code-review 修复计划 | [topology-scaffold-review-fixes-plan.md](./topology-scaffold-review-fixes-plan.md) |
@@ -31,6 +32,7 @@ development/
 ├── runtime-capabilities-lifecycle.md   ← MCP / Skill / Subagent 加载·运行·停止
 ├── ask-question-mcp-hitl.md              ← 内置 ask-question MCP + HITL 选型（✅ 现行）
 ├── subagent-task-and-acp-plan.md         ← subagent 委派、write_todos、ACP plan/并行流式（✅ v1.9+）
+├── checkpoint-integrity-and-prompt-resolution.md  ← systemPrompt 追加 + checkpoint 三层修复（✅ v1.9.4）
 ├── langgraph-native-convergence.md       ← LangGraph 原生对象收敛开发方案
 ├── topology-scaffold-review-fixes-plan.md  ← 拓扑积木化重构修复计划（✅ 已落地）
 ├── rag-agent-plan.md                   ← RAG 早期计划（⚠️ 已过时）
@@ -63,7 +65,8 @@ development/
 | [react-two-phase.md](./react-two-phase.md) | 现行 | 默认图 ReAct：`bindTools`（决策）与 `ToolNode`（执行）为何拆节点 |
 | [runtime-capabilities-lifecycle.md](./runtime-capabilities-lifecycle.md) | 现行 | MCP / Skill / Subagent 装配、session 生命周期与资源边界 |
 | [ask-question-mcp-hitl.md](./ask-question-mcp-hitl.md) | 现行 | 内置 ask-question MCP、图内 present_review + interrupt、与 default ReAct 边界 |
-| [subagent-task-and-acp-plan.md](./subagent-task-and-acp-plan.md) | 现行 | `write_todos`、`task` 并行流式分桶、Plan 合并、子 agent 输出兜底（v1.9+） |
+| [subagent-task-and-acp-plan.md](./subagent-task-and-acp-plan.md) | 现行 | `write_todos`、`task` 并行流式分桶、Plan 合并、子 agent 输出兜底（v1.9.0–1.9.1） |
+| [checkpoint-integrity-and-prompt-resolution.md](./checkpoint-integrity-and-prompt-resolution.md) | 现行 | ACP systemPrompt 追加、孤立 tool_calls 三层修复（v1.9.2–1.9.4） |
 | [langgraph-native-convergence.md](./langgraph-native-convergence.md) | 计划中 | surface 流式、MessagesAnnotation、compaction 等向 LangGraph 原生收敛 |
 
 ### ACP / Surface
@@ -105,6 +108,7 @@ development/
 | [docs/flow-patterns.md](../../../../packages/deepagents-flow-ts/docs/flow-patterns.md) | 进阶 LangGraph 模式 |
 | [docs/capabilities.md](../../../../packages/deepagents-flow-ts/docs/capabilities.md) | 能力分层与 builtin / `.agents` 契约 |
 | [docs/zed-debug.md](../../../../packages/deepagents-flow-ts/docs/zed-debug.md) | Zed ACP 调试配置 |
+| [docs/troubleshooting.md](../../../../packages/deepagents-flow-ts/docs/troubleshooting.md) | 排错索引（checkpoint 400、systemPrompt、subagent） |
 
 ---
 

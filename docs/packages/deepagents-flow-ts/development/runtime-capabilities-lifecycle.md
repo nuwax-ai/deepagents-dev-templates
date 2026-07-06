@@ -307,7 +307,20 @@ sequenceDiagram
 
 ---
 
-## 5. 与 system prompt 清单的三段
+## 5. system prompt 解析与清单段
+
+### 5.1 Base prompt（身份层）
+
+[`resolveSystemPrompt`](../../../../packages/deepagents-flow-ts/src/runtime/context/prompt.ts)（经 `createFlowRuntime`）决定 **base** 文本：
+
+| 条件 | 结果 |
+| --- | --- |
+| ACP `sessionConfig.systemPrompt` 有值（v1.9.2+） | `flow.base.md`（或 `systemPromptPath`）+ session 补充 + `PLATFORM_CONVENTIONS` |
+| 无 session | `config.agent.systemPrompt` > `systemPromptPath` 文件 > inline fallback |
+
+ACP 侧如何把 params 归一为 `sessionConfig.systemPrompt` → [acp/dataflow-nuwaclaw.md §会话配置](./acp/dataflow-nuwaclaw.md#会话配置sessionnewload--per-session-runtime)。**勿**把 session 提示词当作完整替换本地身份（v1.9.2 前曾导致线上 Agent 人设丢失）。
+
+### 5.2 运行时清单三段
 
 `createFlowRuntime` 在 base prompt 后追加（有内容才拼）：
 
@@ -327,7 +340,9 @@ sequenceDiagram
 2. **改发现路径** → `discovery.ts` + `config/flow-agent.config.json` + 包内 `capabilities.md` + `dev-agent-flow` 规则。
 3. **subagent 不要单独 hydrate MCP**；应继续复用父 `ctx.mcpTools`，否则 stdio 子进程翻倍且 dispose 边界混乱。
 4. **改 subagent 流式 / plan / write_todos** → [subagent-task-and-acp-plan.md](./subagent-task-and-acp-plan.md)。
-5. **Skill 正文过大** → 保持 `progressiveLoading: true`，避免撑爆 system prompt。
+5. **改 systemPrompt 优先级 / ACP 追加语义** → `prompt.ts`、`session-config.ts`、[checkpoint-integrity-and-prompt-resolution.md](./checkpoint-integrity-and-prompt-resolution.md)。
+6. **checkpoint 孤立 tool_calls / cancel 写回** → `libs/messages/*`、`stateful-flow.ts`、`server.ts` cancel 分支；同上 checkpoint 文档。
+7. **Skill 正文过大** → 保持 `progressiveLoading: true`，避免撑爆 system prompt。
 
 ---
 
@@ -337,4 +352,5 @@ sequenceDiagram
 - [react-two-phase.md](./react-two-phase.md) — think/tools 两阶段与三者进 ReAct 的方式
 - [acp/dataflow-nuwaclaw.md](./acp/dataflow-nuwaclaw.md) — MCP + LangGraph + ACP 数据流
 - [subagent-task-and-acp-plan.md](./subagent-task-and-acp-plan.md) — subagent 委派、write_todos、ACP plan
+- [checkpoint-integrity-and-prompt-resolution.md](./checkpoint-integrity-and-prompt-resolution.md) — systemPrompt 追加、checkpoint 三层修复
 - [acp/permission.md](./acp/permission.md) — tools 节点审批门控（含 MCP 工具调用）

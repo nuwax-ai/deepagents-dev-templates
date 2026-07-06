@@ -149,7 +149,36 @@ HumanMessage
 
 ---
 
-## 8. 与 factory / 其他拓扑
+## 8. Cancel 与 checkpoint 完整性（think ↔ tools 窗口）
+
+ReAct 两阶段在 **① think 已写出 `tool_calls`、② tools 尚未完成** 时存在脆弱窗口：
+
+```mermaid
+sequenceDiagram
+  participant Think as think ①
+  participant CP as checkpointer
+  participant Tools as tools ②
+  participant ACP as session/cancel
+
+  Think->>CP: AIMessage(tool_calls) 落盘
+  Think->>Tools: toolsCondition → tools
+  ACP-->>Tools: AbortError（用户取消）
+  Note over CP: 若无 ToolMessage → 下一轮 400 INVALID_TOOL_RESULTS
+```
+
+**v1.9.4 三层防御**（详 [checkpoint-integrity-and-prompt-resolution.md](./checkpoint-integrity-and-prompt-resolution.md)）：
+
+| 层 | 位置 | 作用 |
+| --- | --- | --- |
+| 1 | ACP `server.ts` cancel | `repairCheckpoint` 补 synthetic `ToolMessage` 并写回 |
+| 2 | `stateful-flow.ts` `run` 入口 | `applyCheckpointMessageRepair` 读盘修复 |
+| 3 | `think.ts` 调 LLM 前 | `sanitizeToolCalls` 内存剥离孤立 `tool_calls`（不替代 1/2） |
+
+ACP `failInflightToolsOnCancel` 只更新 **UI** `tool_call_update`（failed）；磁盘 checkpoint 须走层 1/2。
+
+---
+
+## 9. 与 factory / 其他拓扑
 
 - 其他 flow（RAG、travel、HITL 等）在各自 `graph.ts` 里组合节点；凡 ReAct 段仍遵循同一分工。
 - `createToolExecNode` 是默认 `tools` 节点的泛化 factory；[`node-kit.md`](../../../../packages/deepagents-flow-ts/docs/node-kit.md) 有 API 说明。
@@ -157,7 +186,7 @@ HumanMessage
 
 ---
 
-## 9. 常见误解
+## 10. 常见误解
 
 | 误解 | 事实 |
 | --- | --- |
@@ -168,11 +197,12 @@ HumanMessage
 
 ---
 
-## 10. 维护时注意
+## 11. 维护时注意
 
 1. 改默认图连线 → 同步 `graph.ts` 顶注释、`README.md` 默认图小节、`pnpm graph` 反射结果。
 2. 新增需在 ReAct 环里执行的能力 → 加入 `createFlowTools` / `allTools`，**不要**在 `think` 里手搓工具调用。
 3. 工具审批、ACP 出站 → 改 `tools.ts` / `emit-tool-call.ts`，并更新 `acp/` 文档。
+4. **改 think 前 sanitize 或 cancel 写回** → `libs/messages/*`、`stateful-flow.ts`、`server.ts` + [checkpoint-integrity-and-prompt-resolution.md](./checkpoint-integrity-and-prompt-resolution.md)。
 
 ---
 
@@ -182,3 +212,4 @@ HumanMessage
 - [runtime-capabilities-lifecycle.md](./runtime-capabilities-lifecycle.md) — MCP / Skill / Subagent 加载·运行·停止
 - [langgraph-native-convergence.md](./langgraph-native-convergence.md) — surface 流式向 LangGraph 原生 chunk 收敛（阶段二）
 - [acp/dataflow-nuwaclaw.md](./acp/dataflow-nuwaclaw.md) — MCP 进 bindTools → ToolNode 的全栈数据流
+- [checkpoint-integrity-and-prompt-resolution.md](./checkpoint-integrity-and-prompt-resolution.md) — cancel / checkpoint 修复与 think 层 sanitize

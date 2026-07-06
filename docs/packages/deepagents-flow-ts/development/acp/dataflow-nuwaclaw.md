@@ -91,6 +91,11 @@ sequenceDiagram
 4. env `ACP_SESSION_CONFIG_JSON`（JSON）
 5. env `SYSTEM_PROMPT` / `AGENT_SYSTEM_PROMPT` / `PLATFORM_SYSTEM_PROMPT`
 
+**v1.9.2+ 与 runtime 拼接**（[`prompt.ts`](../../../../../packages/deepagents-flow-ts/src/runtime/context/prompt.ts) `resolveSystemPromptMeta`）：
+
+- ACP session 有 `systemPrompt` 时：**不覆盖** `prompts/flow.base.md`（或 `systemPromptPath`）；session 文本作为**补充段**追加在本地身份之后，再拼 `PLATFORM_CONVENTIONS`。
+- 对齐 nuwaclaw `_meta.systemPrompt = { append: "..." }` 语义；详见 [checkpoint-integrity-and-prompt-resolution.md §2](../checkpoint-integrity-and-prompt-resolution.md#2-systemprompt-解析v192)。
+
 > `mcpServers` 数组形态 `[{name,...}]` 经 `acpMcpToRecord` → Record；server 键名经 `sanitizeMcpServerRecord` 规范化（中文等 → `_`），与 runtime-context 合并一致。
 
 **session/load**：重建 `SessionState` + 触发 `configureSession(phase:"load")`（[acp-load-session-hydrate.test.ts](../../../../../packages/deepagents-flow-ts/tests/acp-load-session-hydrate.test.ts) 覆盖）。注意 Flow surface **尚未实现** `getSessionHistory` 消息回放（见 [reference-implementation.md §Agent 方法](./reference-implementation.md#agent-方法session-生命周期)）。

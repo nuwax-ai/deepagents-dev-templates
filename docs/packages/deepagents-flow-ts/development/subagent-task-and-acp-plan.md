@@ -1,6 +1,6 @@
 # Subagent 委派增强与 ACP Plan / 并行流式
 
-> **状态**：✅ 现行（`deepagents-flow-ts` **v1.9.0** 功能落地，**v1.9.1** 加固）  
+> **状态**：✅ 现行（`deepagents-flow-ts` **v1.9.1** 功能落地；**v1.9.2–v1.9.4** checkpoint / systemPrompt 见 [checkpoint-integrity-and-prompt-resolution.md](./checkpoint-integrity-and-prompt-resolution.md)）  
 > **受众**：Monorepo 维护者；改 `task` 工具、subagent 流式、`write_todos`、ACP `plan` / `messageId` 时必读。  
 > **关联源码**：[`task.tool.ts`](../../../../packages/deepagents-flow-ts/src/app/task.tool.ts)、[`todo.tool.ts`](../../../../packages/deepagents-flow-ts/src/libs/tools/todo.tool.ts)、[`plan-coordinator.ts`](../../../../packages/deepagents-flow-ts/src/surfaces/acp/plan-coordinator.ts)、[`server.ts`](../../../../packages/deepagents-flow-ts/src/surfaces/acp/server.ts)（`buildAcpCallbacks`）、[`tools.ts`](../../../../packages/deepagents-flow-ts/src/libs/nodes/tools.ts)（`langgraph_tool_call_id` 透传）  
 > **使用者排障**：[troubleshooting.md § task/subagent](../../../../packages/deepagents-flow-ts/docs/troubleshooting.md)、[dev-agent-flow Part 6](../../../../packages/dev-agent-flow/skills/flow-builder/references/part6-subagent.md)
@@ -207,7 +207,9 @@ subagent：  subagent:{safe(name)}:{safe(toolCallId)}
 | **1.9.0** | feat | `write_todos`、`AcpPlanCoordinator`、并行 messageId、subagent 输出兜底、MCP 搜索委派、文档 |
 | **1.9.1** | fix | `toolCallId` 完整 UUID 回退、plan 发送时 `snapshot()`、dev-agent callbacks 对齐 |
 
-Git：`726689a2`（feat）、`01a679d4`（fix）。
+**v1.9.2–1.9.4**（systemPrompt 追加、checkpoint 三层修复）见 [checkpoint-integrity-and-prompt-resolution.md §7](./checkpoint-integrity-and-prompt-resolution.md#7-版本摘要)。
+
+Git：`726689a2`（feat）、`01a679d4`（fix）、`ccef1f2f` / `f0ea866c` / `b58380c7`（checkpoint & prompt）。
 
 ---
 
@@ -226,5 +228,6 @@ Git：`726689a2`（feat）、`01a679d4`（fix）。
 - [runtime-capabilities-lifecycle.md §3 Subagent](./runtime-capabilities-lifecycle.md#3-subagent) — 发现路径与 session 时间线
 - [react-two-phase.md §7](./react-two-phase.md) — subagent 与默认 ReAct 图关系
 - [acp/changelog.md](./acp/changelog.md) — ACP 侧变更记录
+- [checkpoint-integrity-and-prompt-resolution.md](./checkpoint-integrity-and-prompt-resolution.md) — systemPrompt 追加与 checkpoint 修复（v1.9.2–1.9.4）
 - [acp/dataflow-nuwaclaw.md](./acp/dataflow-nuwaclaw.md) — MCP + LangGraph + ACP 全栈
 - 包内 [capabilities.md](../../../../packages/deepagents-flow-ts/docs/capabilities.md) — 能力分层
