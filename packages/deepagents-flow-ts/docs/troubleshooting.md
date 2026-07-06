@@ -84,6 +84,26 @@
 
 ---
 
+## `400 INVALID_TOOL_RESULTS` / checkpoint 损坏
+
+**症状**：ACP 或 CLI 报 `抱歉，处理您的问题时出现错误`；日志中 LLM 返回 `400 INVALID_TOOL_RESULTS`；`sessionId=pending` 的 checkpoint 反复失败。
+
+**根因**：会话在 `ToolNode` 执行中被取消/中断，checkpoint 留下带 `tool_calls` 的 `AIMessage` 但无对应 `ToolMessage`；此后每次 `think` 调模型都会 400。
+
+**runtime 修复**（v1.9.3+）：`think` 节点在调 LLM 前执行 `sanitizeToolCalls()`，自动剥离孤立 `tool_calls`（兼容 checkpoint 反序列化后的 plain object，非仅类实例）。
+
+**线上已损坏 checkpoint 处理**：
+
+| 步 | 动作 |
+|----|------|
+| 1 | 定位会话目录：`~/.flowagents/sessions/<workspace 散列>/` 或 `config.memory.dir` |
+| 2 | 删除损坏的 `pending.json`（或 `pnpm exec tsx src/index.ts sessions delete <id>`） |
+| 3 | 重新部署含 v1.9.3 的包后开新会话验证 |
+
+**关联修复**：ACP `_meta.systemPrompt.append` 应追加而非覆盖 `prompts/flow.base.md`（v1.9.2 `resolveSystemPrompt`）。
+
+---
+
 ## 工具调用长时间 EXECUTING
 
 **可能原因**：

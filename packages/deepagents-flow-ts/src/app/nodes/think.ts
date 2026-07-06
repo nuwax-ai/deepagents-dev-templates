@@ -19,6 +19,67 @@ import type { FlowState } from "../state.js";
 
 const log = logger.child("flow-think");
 
+/** 识别消息类型：类实例用 _getType()，checkpoint 反序列化对象用 type 字段。 */
+function msgType(msg: BaseMessage): string {
+  const raw = msg as unknown as Record<string, unknown>;
+  if (typeof raw._getType === "function") {
+    return (raw._getType as () => string)();
+  }
+  return typeof raw.type === "string" ? raw.type : "";
+}
+
+function msgToolCalls(
+  msg: BaseMessage
+): Array<{ id?: string; name: string; args: Record<string, unknown> }> {
+  const raw = (msg as unknown as Record<string, unknown>).tool_calls;
+  return Array.isArray(raw)
+    ? (raw as Array<{ id?: string; name: string; args: Record<string, unknown> }>)
+    : [];
+}
+
+function msgToolCallId(msg: BaseMessage): string {
+  const raw = (msg as unknown as Record<string, unknown>).tool_call_id;
+  return typeof raw === "string" ? raw : "";
+}
+
+/**
+ * 移除 AIMessage 中缺少对应 ToolMessage 的孤立 tool_calls。
+ * checkpoint 反序列化后消息可能是 plain object，不能用 instanceof 判断。
+ */
+export function sanitizeToolCalls(messages: BaseMessage[]): BaseMessage[] {
+  const toolCallIds = new Set<string>();
+  for (const msg of messages) {
+    if (msgType(msg) === "tool" && msgToolCallId(msg)) {
+      toolCallIds.add(msgToolCallId(msg));
+    }
+  }
+  const orphaned = new Set<string>();
+  for (const msg of messages) {
+    if (msgType(msg) !== "ai") continue;
+    for (const c of msgToolCalls(msg)) {
+      if (c.id && !toolCallIds.has(c.id)) {
+        orphaned.add(c.id);
+      }
+    }
+  }
+  if (orphaned.size === 0) return messages;
+  log.warn("发现孤立 tool_calls，已移除", { orphanedCount: orphaned.size, ids: [...orphaned] });
+  return messages.map((msg) => {
+    if (msgType(msg) !== "ai") return msg;
+    const raw = msg as unknown as Record<string, unknown>;
+    const calls = msgToolCalls(msg);
+    const valid = calls.filter((c) => !(c.id && orphaned.has(c.id)));
+    if (valid.length === calls.length) return msg;
+    return new AIMessage({
+      content: (raw.content as string | undefined) ?? "",
+      additional_kwargs: raw.additional_kwargs as Record<string, unknown> | undefined,
+      tool_calls: valid.length > 0 ? (valid as AIMessage["tool_calls"]) : undefined,
+      id: typeof raw.id === "string" ? raw.id : undefined,
+      name: typeof raw.name === "string" ? raw.name : undefined,
+    });
+  });
+}
+
 type BoundModel = {
   invoke: (m: BaseMessage[], options?: { signal?: AbortSignal }) => Promise<AIMessage>;
 };
@@ -103,8 +164,9 @@ export function createThinkNode(deps: ThinkNodeDeps) {
       throw new Error(`think: 模型解析失败（已配置凭证）: ${detail}`);
     }
     const { shortTimeoutMs } = resolveLlmResilience(config);
+    const cleanMessages = sanitizeToolCalls(state.messages);
     const promptForModel = withSystemPrompt(
-      state.messages,
+      cleanMessages,
       systemPrompt ?? "",
       config?.model.provider
     );
