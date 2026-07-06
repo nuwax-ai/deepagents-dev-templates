@@ -203,8 +203,9 @@
 5. **平台能力已搜已登记**（凡依赖工作区外能力时强制）— 须贴 `search-apis.sh` / `search-skills.sh` 与/或 `get-config.sh --key tools|mcpConfigs|skills` 原始输出；平台有命中须 `add-tool.sh`（conversational 零接线 / 管道按名接线）；平台确无命中须在报告写明关键词与「已搜索、无命中」后方可自写 app 工具。**联网搜索较常见**，同样适用本项。**禁止**仅以「用户待配置」代替本步
 6. **平台能力真实调用**（凡已登记）— `SMOKE_EXPECT_TOOL=<工具名子串>` + 触发式 `SMOKE_PROMPT` 跑 smoke 通过并贴工具调用轨迹；**smoke 绿但工具未真调用 = 不通过**
 7. **文档=代码**
+8. **子智能体**（有 `builtin/agents/` 或平台 subagent）— `AGENT.md` 无 `tools` 平台登记名、无 `model` 占位符；多岗**串行** `task`；smoke/ACP 至少一次 `task` 成功（见 Part 6）
 
-收尾清单与 smoke 前置条件 → `flow-builder` **Part 0** § completion gate · **Part 4a/4b**。
+收尾清单与 smoke 前置条件 → `flow-builder` **Part 0** § completion gate · **Part 4a/4b** · **Part 6**。
 </COMPLETION_GATE>
 
 <CONTEXT_DISCIPLINE>

@@ -47,6 +47,7 @@ flow-builder/
 | 设计目标 Agent 提示词 / **用户输入提炼** / 平台同步 | **[part5-prompt-design.md](references/part5-prompt-design.md)** |
 | 创建/命名目标 Agent（通用智能体） | [part5-prompt-design.md](references/part5-prompt-design.md) + `dev-engineer-toolkit`；**禁止** `AGENT.md` |
 | 子智能体 / subagent / 委派（平台或内置） | [part6-subagent.md](references/part6-subagent.md)；**禁止** `.agents/agents/` |
+| subagent 未知工具 / Invalid model / 并行混流 | [part6-subagent.md](references/part6-subagent.md) + [part4a-verify-debug.md](references/part4a-verify-debug.md) § Subagent |
 | 技能 / skill（平台或内置） | [part7-skill.md](references/part7-skill.md)；**禁止**本地写 `.agents/skills/` |
 
 > LangGraph TS API → 官方文档：见 [part0-workflow.md](references/part0-workflow.md) § LangGraph 文档。
@@ -85,6 +86,7 @@ flow-builder/
 - **用户可见大段 LLM 输出**（compose / aggregate / draft / 修订稿）→ **`createLlmStreamNode`**（`write` 读 `r.text`）；**禁止** `createLlmNode`（仅 invoke，ACP 整段兜底）。custom spec 用 `type: "llm-stream"`；**R-G009**。
 - **平台能力（外部工具/MCP/Plugin/技能）** → **写图前**必须先 `dev-engineer-toolkit` 搜平台并 `add-tool`；**登记即接入：平台工具（Plugin/Workflow/MCP）运行期统一转 MCP 经 ACP `mcpServers` 下发**，ReAct 自动 bind；**禁止**为已登记能力手写 fetch/`tool()` 包装；收工须贴搜索证据 + 工具真实调用证据（`SMOKE_EXPECT_TOOL`）；**联网搜索较常见**，见 Part 3 § 联网搜索 · § 运行期统一 MCP 下发；禁止未搜平台就写外部能力、禁止以「用户待配置」代替登记（见 Part 3 § 平台能力登记、Part 0 completion gate）。
 - **禁止写 `.agents/`**：内置能力写 `builtin/`（Part 6、Part 7）；平台能力走平台。
+- **Subagent `AGENT.md`**：默认不写 `tools` / `model`；禁止平台 Plugin 登记名进 `tools`；联网由主 Agent 搜后写入 `task.description`；多岗串行 `task`（Part 6）。
 - 有状态用 `createStatefulFlow`（**HITL durable stateful flow** 默认；`conversational: true` 为对话型；`dev-agent` **topology** `stateful-custom` 手写 run-loop 为例外，见 part2）。
 - **系统提示词非空** — 用户输入提炼进 `systemPrompt`；Part 5 § 用户输入提炼；收工 Part 0 清单
 - 未跑通 part4 禁止报 done。

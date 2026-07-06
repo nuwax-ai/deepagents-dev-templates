@@ -139,6 +139,19 @@ pnpm graph                   # export graph topology
 
 ---
 
+## 典型错误：Subagent（子智能体）
+
+| 日志/症状 | 处理 |
+|-----------|------|
+| `未知工具: 联网搜索_1` | 删 `AGENT.md` 的 `tools`（禁止写平台登记名）→ Part 6 |
+| `400 Invalid model` + 占位符 | 删 `AGENT.md` 的 `model`，继承主 Agent |
+| `INVALID_TOOL_RESULTS` | 删 `~/.flowagents/sessions/<hash>/pending.json` 清 checkpoint |
+| 并行 `task` 输出混流 | 改串行 `task`（一轮只委派一个）→ Part 6 |
+
+详表 → [part6-subagent.md](part6-subagent.md)。
+
+---
+
 ## Anti-patterns
 
 - ❌ 未跑通就声称完成
@@ -151,5 +164,7 @@ pnpm graph                   # export graph topology
 - ❌ 平台有能力却留占位未接线（如 `SEARCH_MCP = undefined`），把登记甩给「用户待操作」
 - ❌ Phase 4 复述沙箱环境变量名，或要求用户配置 ACP 已默认集成的平台认证/基址
 - ❌ Phase 4 写「后续：配置 Plugin Authorization / 搜索 API key」等开发期登记事项
+- ❌ `AGENT.md tools` 写平台 Plugin 登记名（如 `联网搜索_1`）→ `task` 报未知工具
+- ❌ 同轮并行多个 `task` 且期望 UI 可读流式 → 改串行委派（Part 6）
 - ✅ 命令退出码 0 + 文件实证 + 日志无未预期 error
 - ✅ 无用户业务待办 → Phase 4 **不写**「后续」段
