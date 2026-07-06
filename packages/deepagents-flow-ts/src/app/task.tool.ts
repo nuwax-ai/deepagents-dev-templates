@@ -133,6 +133,9 @@ export function createTaskTool(deps: TaskToolDeps) {
         const stream = await graph.stream(
           { input: description, messages: [] } as unknown as FlowState,
           {
+            // 子图自己会为 messages stream 安装监听器；显式隔离父图 callbacks，避免同一
+            // token 同时经父图 messages 冒泡和下方 parentCallbacks.onToken 重复发送。
+            callbacks: [],
             configurable: { thread_id: threadId },
             recursionLimit: 50,
             streamMode: ["messages"],
