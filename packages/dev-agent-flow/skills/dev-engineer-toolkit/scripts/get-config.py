@@ -23,11 +23,11 @@ def print_key(data: dict, key: str, full: bool = False) -> None:
     if val is None:
         return
     if key in ("tools", "skills", "mcpConfigs") and isinstance(val, list):
-        if key == "tools" and full:
-            # 完整输出（含 schema 等平台返回的全部字段），供开发期固化进 flow spec.tools（非手抄）
-            print(json.dumps(val, ensure_ascii=False, indent=2))
-            return
         if key == "tools":
+            if full:
+                # 完整输出（含 schema），供开发期固化进 flow spec.tools（非手抄）
+                print(json.dumps(val, ensure_ascii=False, indent=2))
+                return
             print(f"=== 已注册工具 ({len(val)} 个) ===")
             for item in val:
                 print(
