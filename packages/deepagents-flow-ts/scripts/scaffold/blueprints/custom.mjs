@@ -12,6 +12,22 @@
 
 export const kind = "stateful-recipe";
 
+/**
+ * custom 默认对话型：conversational:true（每轮 query 重跑整条管道 + threadId 累积历史，
+ * 多轮不会因图到 END 走 resume 而无响应）。含 approval / approval-finalize 节点的
+ * HITL custom 除外——它们要 resume interrupt，必须 false。
+ */
+export function resolveConversational(spec) {
+  const nodes = spec?.params?.nodes;
+  if (nodes && typeof nodes === "object") {
+    for (const n of Object.values(nodes)) {
+      const t = n?.type;
+      if (t === "approval" || t === "approval-finalize") return false;
+    }
+  }
+  return true;
+}
+
 const TS_TYPE = { string: "string", number: "number", boolean: "boolean", "any-last": "unknown" };
 
 /** state spec → Annotation.Root channel 行。 */

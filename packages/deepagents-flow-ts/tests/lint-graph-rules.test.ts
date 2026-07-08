@@ -212,3 +212,43 @@ describe("lint-graph-rules R-G009", () => {
     expect(index).toContain("targetId");
   });
 });
+
+describe("custom.resolveConversational", () => {
+  it("无 approval 节点 → true（默认对话型，多轮不卡）", () => {
+    const spec = parseSpec({
+      name: "conv-demo",
+      description: "",
+      topology: "custom",
+      params: {
+        state: { out: { type: "any-last" } },
+        nodes: { a: { type: "llm", params: { prompt: "()=>''", write: "(r)=>({})" } } },
+        edges: [
+          { kind: "static", from: "__start__", to: "a" },
+          { kind: "static", from: "a", to: "__end__" },
+        ],
+        input: { queryField: "q" },
+        result: { answerField: "out" },
+      },
+    });
+    expect(customBlueprint.resolveConversational(spec)).toBe(true);
+  });
+
+  it("含 approval 节点 → false（HITL 走 resume interrupt）", () => {
+    const spec = parseSpec({
+      name: "hitl-demo",
+      description: "",
+      topology: "custom",
+      params: {
+        state: { out: { type: "any-last" } },
+        nodes: { a: { type: "approval", params: { question: "()=>''", write: "(r)=>({})" } } },
+        edges: [
+          { kind: "static", from: "__start__", to: "a" },
+          { kind: "static", from: "a", to: "__end__" },
+        ],
+        input: { queryField: "q" },
+        result: { answerField: "out" },
+      },
+    });
+    expect(customBlueprint.resolveConversational(spec)).toBe(false);
+  });
+});

@@ -104,7 +104,11 @@ function main() {
     console.log(`✓ 写入 ${f.path}`);
   }
 
-  registerFlow(spec.name, bp.kind, bp.conversational);
+  registerFlow(
+    spec.name,
+    bp.kind,
+    typeof bp.resolveConversational === "function" ? bp.resolveConversational(spec) : bp.conversational
+  );
   console.log(`✓ 注册 flow "${spec.name}" 到 src/app/flows/index.ts`);
 
   // —— COMPLETION_GATE：未跑通不算完成 ——

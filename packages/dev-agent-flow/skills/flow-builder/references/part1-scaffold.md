@@ -32,7 +32,7 @@
 | `adaptive-rag` | oneshot | 自适应检索 + 路由自纠正 | `route → retrieve/web-search → grade → transform/generate`（**web_search 优先平台 Plugin**） |
 | `deep-research` | stateful-recipe | 深度研究 / **durable stateful flow** | 多阶段 + Send + 持续会话 |
 | `dev-agent` | stateful-custom | 综合助手 ReAct + 压缩 | 默认 ReAct + 多轮续接 |
-| `custom` ⭐ | stateful-recipe | 无 preset 命中 | spec 声明 state/nodes/edges → 生成 `graph.ts`；**含外部能力节点须先 Part 3 平台能力登记** |
+| `custom` ⭐ | stateful-recipe | 无 preset 命中 | spec 声明 state/nodes/edges → 生成 `graph.ts`；**默认 `conversational:true`（对话型：每轮 query 重跑整条管道 + threadId 累积，多轮不会因图到 END 走 resume 而无响应）**；含 `approval`/`approval-finalize` 节点的 HITL custom 自动 `false`（走 resume interrupt）；含外部能力节点须先 Part 3 |
 
 **`custom`**：`params` 含 `state`/`nodes`（type 见 node-catalog，**用户可见输出用 `llm-stream`**）/`edges`/`input`/`result`；回调写箭头函数字符串，生成时内联为真实 TS。局限（生成后手改）：subgraph、自定义 reducer。流式范例：`_example.translate-review`、`_example.multi-aspect-search`、`_example.router-gate`、`_example.interview-agent`（`llm-stream` + `r.text`）；非流式教学：`_example.grade-redo`；`interview-agent` 的 `prepare`/`evaluate` 仍 `llm`（无 `r.text` / 结构化 parse）。
 
