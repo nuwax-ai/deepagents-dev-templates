@@ -6,13 +6,6 @@ interface CreatePlatformStructuredToolOptions {
   descriptor: PlatformToolDescriptor;
 }
 
-interface PluginExecuteResponse {
-  success?: boolean;
-  data?: unknown;
-  error?: unknown;
-  message?: string;
-}
-
 interface SseFinalResult {
   data?: unknown;
   error?: { message?: string; code?: string; [key: string]: unknown } | null;
@@ -22,6 +15,7 @@ interface SseFinalResult {
 function parseSseFinalResult(text: string): SseFinalResult | undefined {
   // SSE 行尾可能是 \r\n / \r / \n，先规范化再按空行分块
   const blocks = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split(/\n\n+/);
+  // 先尝试标准 SSE（event: 行），无命中则回退检查 data 行中的 JSON 内嵌 type 字段
   for (let i = blocks.length - 1; i >= 0; i--) {
     const lines = blocks[i]!.split("\n");
     let event = "";
@@ -36,6 +30,23 @@ function parseSseFinalResult(text: string): SseFinalResult | undefined {
       } catch {
         return undefined;
       }
+    }
+  }
+  // 回退：逐块检查 data 行 JSON 中是否包含 "type":"FinalResult"
+  for (let i = blocks.length - 1; i >= 0; i--) {
+    const lines = blocks[i]!.split("\n");
+    const dataLines: string[] = [];
+    for (const line of lines) {
+      if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
+    }
+    if (!dataLines.length) continue;
+    try {
+      const parsed = JSON.parse(dataLines.join("\n")) as Record<string, unknown>;
+      if (parsed.type === "FinalResult") {
+        return parsed as unknown as SseFinalResult;
+      }
+    } catch {
+      // skip unparseable blocks
     }
   }
   return undefined;
@@ -84,11 +95,12 @@ export function createPlatformStructuredTool({
         params: input,
       };
       if (devAgentId) payload.devAgentId = devAgentId;
+      const acceptType = descriptor.contentType ?? "application/json; charset=utf-8";
       const resp = await fetch(url, {
         method,
         headers: {
           "Content-Type": "application/json; charset=utf-8",
-          Accept: "application/json; charset=utf-8",
+          Accept: acceptType,
           Authorization: authorization,
         },
         body: JSON.stringify(payload),
@@ -114,23 +126,35 @@ export function createPlatformStructuredTool({
         }
         return JSON.stringify(finalResult.data ?? {});
       }
-      // 非事件流：先 text 再 try JSON.parse（失败把原文当错误抛，避免网关 text/html 错误页丢失）
-      let result: PluginExecuteResponse;
+      // 非事件流：先 text 再 try JSON.parse
+      let parsed: Record<string, unknown>;
       try {
-        result = JSON.parse(respText) as PluginExecuteResponse;
+        parsed = JSON.parse(respText) as Record<string, unknown>;
       } catch {
         throw new Error(
           `[${descriptor.toolName}] 非 JSON 响应 (${contentType}): ${respText.slice(0, 200)}`
         );
       }
-      if (!result?.success) {
-        const msg =
-          (typeof result?.message === "string" && result.message) ||
-          (typeof result?.error === "string" && result.error) ||
-          "platform execute failed";
+      // 平台 Plugin 响应格式多样：{success,data} / {code:"200",data} / 裸数据
+      // 先检查 error 字段，再检查 success/code，最后视为成功数据
+      const errVal = parsed.error;
+      if (errVal && typeof errVal === "object" && Object.keys(errVal as object).length > 0) {
+        const errObj = errVal as { message?: string; code?: string };
+        throw new Error(
+          `[${descriptor.toolName}] ${errObj.message ?? errObj.code ?? JSON.stringify(errObj)}`
+        );
+      }
+      if (typeof errVal === "string" && errVal.length > 0) {
+        throw new Error(`[${descriptor.toolName}] ${errVal}`);
+      }
+      if (parsed.code !== undefined && String(parsed.code) !== "200" && String(parsed.code) !== "0000") {
+        throw new Error(`[${descriptor.toolName}] code=${parsed.code}`);
+      }
+      if (parsed.success !== undefined && !parsed.success) {
+        const msg = (typeof parsed.message === "string" && parsed.message) || "platform execute failed";
         throw new Error(`[${descriptor.toolName}] ${msg}`);
       }
-      return JSON.stringify(result.data ?? {});
+      return JSON.stringify(parsed.data ?? parsed);
     }
   })();
 }

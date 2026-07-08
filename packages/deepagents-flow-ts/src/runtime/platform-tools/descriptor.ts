@@ -49,6 +49,8 @@ export function createPlatformToolDescriptors(refs: PlatformToolRef[]): Platform
       url: typeof parsedSchema?.url === "string" ? parsedSchema.url : ref.url,
       auth:
         typeof parsedSchema?.authorization === "string" ? parsedSchema.authorization : ref.auth,
+      contentType:
+        typeof parsedSchema?.contentType === "string" ? parsedSchema.contentType : undefined,
     });
   }
   return descriptors;

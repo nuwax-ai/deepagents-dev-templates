@@ -24,4 +24,5 @@ export interface PlatformToolDescriptor {
   method?: string;
   url?: string;
   auth?: unknown;
+  contentType?: string;
 }
