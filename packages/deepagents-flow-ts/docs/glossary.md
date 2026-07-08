@@ -31,7 +31,7 @@
 | seam | **接入层（seam）** | surface 与具体图解耦的接缝。 |
 | surface seam | **surface seam（接入层）** | 同上，强调在 surface 侧。 |
 | plumbing | **接入逻辑**（plumbing） | surface 侧 ACP/CLI 复用的连接代码；统一用“接入逻辑”，勿用“运行时胶水代码 / plumbing”混写。 |
-| re-export shim | **re-export 转发层** | dedup 后指向 `libs/topologies` 的转发文件。 |
+| app/flows | **可运行 flow 挂载点** | 唯一 app 层注册入口（内置 + scaffold）；积木图逻辑在 `libs/topologies`。 |
 
 ## 3. 打包 / 平台
 

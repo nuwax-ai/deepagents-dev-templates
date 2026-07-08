@@ -1,5 +1,5 @@
 /**
- * dev-agent 拓扑（app 层，stateful-custom）—— 综合 ReAct + 多轮续接 + 上下文压缩。
+ * dev-agent 拓扑（app/flows，stateful-custom）—— 综合 ReAct + 多轮续接 + 上下文压缩。
  *
  * 与其他拓扑不同：dev-agent 复用**默认 ReAct 图**（src/app/graph.ts）+ 手写 run-loop +
  * applyCompaction，**不经 createStatefulFlow**。因依赖 app/graph（默认图），故落 app 层
@@ -9,12 +9,12 @@
  * 拓扑反射 = 默认图（prepare → think ↔ tools → respond）。
  * 子图（subgraph）需求见 libs/nodes 的 createSubgraphNode（docs/node-kit.md）。
  */
-import type { FlowRuntime } from "../../runtime/flow-runtime.js";
-import type { StatefulFlow } from "../../core/flow-types.js";
-import { createFlowGraph } from "../graph.js";
-import { applyCompaction } from "../../libs/compaction.js";
-import { getFlowTopology } from "../topology.js";
-import type { FlowState } from "../state.js";
+import type { FlowRuntime } from "../../../runtime/flow-runtime.js";
+import type { StatefulFlow } from "../../../core/flow-types.js";
+import { createFlowGraph } from "../../graph.js";
+import { applyCompaction } from "../../../libs/compaction.js";
+import { getFlowTopology } from "../../topology.js";
+import type { FlowState } from "../../state.js";
 
 /**
  * dev-agent StatefulFlow：复用默认 ReAct 图，多轮用同一 threadId 续接。

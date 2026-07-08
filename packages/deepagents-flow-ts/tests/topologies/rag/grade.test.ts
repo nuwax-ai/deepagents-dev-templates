@@ -1,7 +1,7 @@
 /**
  * Grade 节点 + 条件路由 单测（纯函数，无 mock）
  *
- * 这是工作流编排的"连线规则"本体：grade 判定 + routeAfterGrade 决定走哪条边。
+ * 这是工作流编排的「连线规则」本体：grade 判定 + routeAfterGrade 决定走哪条边。
  */
 
 import { describe, it, expect } from "vitest";
@@ -9,8 +9,8 @@ import {
   gradeNode,
   routeAfterGrade,
   MAX_RETRIEVE_ATTEMPTS,
-} from "../nodes/grade.js";
-import type { RAGState } from "../nodes/types.js";
+  type RAGState,
+} from "../../../src/libs/topologies/rag/index.js";
 
 describe("gradeNode", () => {
   it("空检索 → insufficient", () => {

@@ -33,4 +33,4 @@ LangGraph 限制：**节点名不能与 state channel 同名**。判定字段叫
 
 ## 参考
 
-`src/app/graph.ts`（默认图）、`libs/topologies/rag`（线性+条件重试）、`libs/topologies/travel-planner`（并行+HITL）、`libs/topologies/project-manager`（评估循环+HITL）、`src/app/topologies/dev-agent.ts`（全能力）、`libs/topologies/adaptive-rag`（路由 + 检索/生成双自纠正，conversational）。
+`src/app/graph.ts`（默认图）、`libs/topologies/rag`（线性+条件重试）、`libs/topologies/travel-planner`（并行+HITL）、`libs/topologies/project-manager`（评估循环+HITL）、`src/app/flows/dev-agent`（全能力）、`libs/topologies/adaptive-rag`（路由 + 检索/生成双自纠正，conversational）。

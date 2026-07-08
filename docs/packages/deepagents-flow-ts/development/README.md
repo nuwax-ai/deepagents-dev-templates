@@ -122,7 +122,7 @@ development/
 
 1. **新增开发/方案文档** → 放在本目录（或 `acp/` 子目录），并在本页「文档地图」与「按主题分类」登记。
 2. **使用者向文档** → 留在包内 `docs/`，在本页「包内文档」交叉引用即可，不迁入 `development/`。
-3. **模板包边界** → `packages/deepagents-flow-ts` 的 `src/`、`docs/`、`prompts/`、`examples/`、`scripts/` **不得**引用本 `development/` 路径；维护记录、code-review、方案演进只写在本目录。
+3. **模板包边界** → `packages/deepagents-flow-ts` 的 `src/`、`docs/`、`prompts/`、`scripts/` **不得**引用本 `development/` 路径；维护记录、code-review、方案演进只写在本目录。
 4. **ACP 相关改动** → 同步更新 `acp/` 下对应文档；见 [acp/README.md §维护约定](./acp/README.md#维护约定)。
 5. **方案已落地或过时** → 在文档头部标状态（✅ / ⚠️），本索引表同步更新。
 

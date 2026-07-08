@@ -10,18 +10,34 @@ loadDotenv();
 import { describe, it, expect } from "vitest";
 import { randomUUID } from "node:crypto";
 import {
-  createPMFlow,
+  createPMGraph,
   routeAfterEvaluate,
   MAX_REPLAN,
   type PMStateType,
-} from "../graph.js";
+} from "../../../src/libs/topologies/project-manager/index.js";
 import { loadFlowConfig } from "../../../src/runtime/flow-config.js";
+import { materializeRecipe } from "../_helpers.js";
 
 const hasCreds = ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "OPENAI_API_KEY"].some(
   (k) => Boolean(process.env[k])
 );
 
 const runIntegration = process.env.RUN_INTEGRATION === "1" && hasCreds;
+
+function createPMFlow(
+  appConfig?: ReturnType<typeof loadFlowConfig>["appConfig"],
+  opts: { checkpointer?: import("@langchain/langgraph").BaseCheckpointSaver } = {}
+) {
+  return materializeRecipe<PMStateType>(
+    {
+      buildGraph: (cp) => createPMGraph(appConfig, cp),
+      toInput: (query) => ({ goal: query }),
+      toResult: (v) => ({ answer: v.output ?? "" }),
+    },
+    appConfig,
+    opts.checkpointer
+  );
+}
 
 describe("routeAfterEvaluate (条件边, 纯函数, 无凭证)", () => {
   const s = (o: Partial<PMStateType>): PMStateType => ({

@@ -255,7 +255,7 @@ parentGraph.addNode("research", researcher);   // 编译后的子图直接当节
 ```
 
 - 子图独立 state,经共享 channel(如 `messages`)与父图映射。
-- 例:[dev-agent](../src/app/topologies/dev-agent.ts) 的 researcher subgraph。
+- 例:[dev-agent](../src/app/flows/dev-agent) 的 researcher subgraph。
 
 ---
 

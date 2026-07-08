@@ -1,7 +1,7 @@
 /**
  * 深度研究报告生成器 ——【durable stateful flow 示例：多阶段流水线 + 多轮 HITL + 双层 reflection + 并行调研 + 持续会话】
  *
- * 这是模板里最复杂的示例，演示现有 examples 从不覆盖的"durable stateful flow 编排"维度：
+ * 这是模板里最复杂的示例，演示 durable 编排维度（原 examples 已收敛进本积木）："durable stateful flow 编排"维度：
  *  - 多阶段流水线：选题确认 → 大纲规划 → 并行调研 → 初稿生成 → 质量评审 → 报告
  *  - 多轮 HITL：2 个一次性确认门（确认主题、确认大纲）+ 报告后的持续会话回路
  *  - 双层 reflection 循环：大纲评审重试 + 初稿质量评审重试

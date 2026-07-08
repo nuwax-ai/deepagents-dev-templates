@@ -181,7 +181,7 @@ subagent：  subagent:{safe(name)}:{safe(toolCallId)}
 
 ## 7. `dev-agent` 拓扑对齐（v1.9.1）
 
-[`src/app/topologies/dev-agent.ts`](../../../../packages/deepagents-flow-ts/src/app/topologies/dev-agent.ts) 手写 `invoke` 循环，此前只传 `onToken` / `onToolCall`。
+[`src/app/flows/dev-agent`](../../../../packages/deepagents-flow-ts/src/app/flows/dev-agent) 手写 `invoke` 循环，此前只传 `onToken` / `onToolCall`。
 
 现与 `createStatefulFlow` 一致：`onPlan` / `onStage` / `onPermissionRequest` / `onApprovalRequest` 同时写入 `configurable` 与 `createFlowGraph({ callbacks })`，保证 `write_todos` 在 dev-agent scaffold 路径可达 ACP。
 

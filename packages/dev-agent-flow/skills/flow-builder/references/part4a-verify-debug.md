@@ -15,7 +15,7 @@ pnpm build && pnpm typecheck && pnpm test && pnpm graph && pnpm smoke
 
 失败 → 读完整错误 → 修复 → 重跑；至多 5 轮仍不绿则如实交回用户。
 
-**真实运行门**：`pnpm smoke` 用 rcoder-cli 端到端复现完整运行路径，是生产路径的质量门；静态四连不能替代，禁止 `--dry-run` 冒充通过。精选范例用 `--example`，其他入口用 `--entry`。
+**真实运行门**：`pnpm smoke` 用 rcoder-cli 端到端复现完整运行路径，是生产路径的质量门；静态四连不能替代，禁止 `--dry-run` 冒充通过。默认读 `activeFlow`；其他入口用 `--entry`。
 
 Scaffold 生成器自带快检（`typecheck && graph`）；**全量 completion gate 仍须上式五连**。
 
@@ -29,10 +29,9 @@ Scaffold 生成器自带快检（`typecheck && graph`）；**全量 completion g
 
 ```bash
 pnpm build
-pnpm test                    # 含 tests/layering.test.ts
+pnpm test                    # 含 tests/layering.test.ts、tests/topologies/
 pnpm typecheck
-pnpm typecheck:examples      # 精选范例 + src
-pnpm smoke                   # 强制：rcoder-cli 端到端（精选范例可用 --example）
+pnpm smoke                   # 强制：rcoder-cli 端到端（可加 --entry）
 pnpm graph                   # export graph topology
 ```
 

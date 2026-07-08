@@ -79,12 +79,11 @@
 ### Topology 参考实现
 
 `src/libs/topologies/`：`rag` · `adaptive-rag` · `travel-planner` · `project-manager` ·
-`human-in-loop` · `deep-research`；`dev-agent` 在 `src/app/topologies/dev-agent.ts`，
+`human-in-loop` · `deep-research`；`dev-agent` 在 `src/app/flows/dev-agent/`，
 `react-tools` 复用默认图。
 
-`examples/` 仅保留 5 个互补的可运行 seam 范例：`rag` · `travel-planner` ·
-`project-manager` · `human-in-loop` · `deep-research`。先读 `examples/README.md` 选型；
-不要把 re-export shim 当成第二份图实现。
+场景示范：`scripts/scaffold/specs/_example.*.flow.json` → scaffold 生成到 `src/app/flows/`；
+不要把 scaffold 薄封装当成第二份图实现。
 
 ---
 

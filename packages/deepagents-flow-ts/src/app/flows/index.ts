@@ -5,15 +5,16 @@
  * scaffold 生成的场景 flow 落在 `src/app/flows/<name>/`，并在下方 `flows` 表注册一行
  * —— generator 在 SCAFFOLD-REGISTRY 标记区自动插入 import + 表项，勿手动打乱标记。
  *
- * 内置示例刻意精简为 4 个（宁缺毋滥，各代表一类形态）：
+ * 内置示例（各代表一类形态）：
  *  - default          conversational ReAct 泛化底座（多数对话型需求 = 零图路径：default + 平台能力 + systemPrompt）
+ *  - dev-agent        stateful-custom：默认 ReAct + 手写 run-loop + 上下文压缩（本目录内置，非 scaffold）
  *  - search-aggregator conversational + 平台能力样板（复用默认图，演示「登记即接入」，见其 index.ts）
  *  - translate-review  one-shot 流式管道教学（custom 拓扑）
  *  - router-gate       LLM 路由教学（custom 拓扑）
- * 更多形态见 `src/libs/topologies/`（8 积木）；场景 spec 范例在 `scripts/scaffold/specs/`。
+ * 更多形态见 `src/libs/topologies/`（积木）；场景 spec 范例在 `scripts/scaffold/specs/`。
  *
- * 选图：config 顶层自定义键 `activeFlow`（经 loadFlowConfig 的 `raw` 读取，缺省 "default"，
- * 机制同 examples 读 `raw.rag`）。组合根 index.ts 按 `resolveFlow(activeFlow)` 取 executor / topology。
+ * 选图：config 顶层自定义键 `activeFlow`（经 loadFlowConfig 的 `raw` 读取，缺省 "default"）。
+ * 组合根 index.ts 按 `resolveFlow(activeFlow)` 取 executor / topology。
  * 不改 runtime 的 AppConfig schema（保护区），零侵入。
  */
 
@@ -21,6 +22,7 @@ import type { FlowRuntime } from "../../runtime/flow-runtime.js";
 import type { StatefulFlow } from "../../core/flow-types.js";
 import { recipe as defaultRecipe } from "../default-flow.js";
 import { getFlowTopology, type FlowTopology } from "../topology.js";
+import * as devAgentFlow from "./dev-agent/index.js";
 import * as routerGateFlow from "./router-gate/index.js";
 import * as searchAggregatorFlow from "./search-aggregator/index.js";
 import * as translateReviewFlow from "./translate-review/index.js";
@@ -67,6 +69,13 @@ export const flows: Record<string, FlowDef> = {
     conversational: true,
     recipe: defaultRecipe,
     getTopology: () => getFlowTopology(),
+  },
+  // 内置 stateful-custom（非 scaffold 生成，放在 SCAFFOLD-REGISTRY 之外）
+  "dev-agent": {
+    name: "dev-agent",
+    kind: "stateful-custom",
+    createExecutor: (runtime) => devAgentFlow.createDevAgentFlow(runtime),
+    getTopology: () => devAgentFlow.getDevAgentTopology(),
   },
   // --- SCAFFOLD-REGISTRY-START (generator 自动维护，勿手改此区) ---
   "router-gate": {

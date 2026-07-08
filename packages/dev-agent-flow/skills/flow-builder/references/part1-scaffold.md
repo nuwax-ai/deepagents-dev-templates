@@ -18,7 +18,7 @@
 4. 自动注册 `src/app/flows/index.ts`（`SCAFFOLD-REGISTRY` 区，勿手改）；
 5. 自带门禁：`pnpm typecheck && pnpm graph`（临时切换 `activeFlow` 反射新 flow）。
 
-8 preset 图逻辑权威在 `src/libs/topologies/<name>/`（dev-agent 在 `src/app/topologies/`）；**`custom`** 图逻辑渲染进 `src/app/flows/<name>/graph.ts`。
+8 preset 图逻辑权威在 `src/libs/topologies/<name>/`（dev-agent 在 `src/app/flows/dev-agent/`）；**`custom`** 图逻辑渲染进 `src/app/flows/<name>/graph.ts`。
 
 ## 9 topologies（8 presets + `custom`）
 

@@ -2,7 +2,7 @@
  * Flow CLI — 命令行跑工作流（与具体图解耦）。
  *
  * 主入口（`src/index.ts` → materializeFlow）只传入 **StatefulFlow**（checkpointer + 多轮续跑）。
- * 仍兼容 examples 直连时传入的 legacy function executor（新 flow 请用 createStatefulFlow）。
+ * 仍兼容直连时传入的 legacy function executor（新 flow 请用 createStatefulFlow）。
  *
  * 用法：
  *   tsx src/index.ts flow "你的输入"
@@ -52,7 +52,7 @@ export async function runFlowCli(
 ): Promise<void> {
   const sessionId = options.threadId ?? randomUUID();
   setLogSession(sessionId);
-  // StatefulFlow（有 run）走 HITL / conversational 驱动；function 仅 examples legacy 兼容。
+  // StatefulFlow（有 run）走 HITL / conversational 驱动；function 仅 legacy 兼容。
   if (typeof flow !== "function") {
     return runStatefulCli(flow, { ...options, threadId: sessionId });
   }

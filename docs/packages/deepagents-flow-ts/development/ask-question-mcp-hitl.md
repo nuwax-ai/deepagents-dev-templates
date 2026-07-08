@@ -63,7 +63,7 @@ START → compose → present_review → review(interrupt) → finalize → END
 
 **为何必须两节点**：MCP 节点完成后写入 checkpoint；下一轮 `resume` 只重跑 `review`，避免重复弹表单。
 
-范例：[`examples/human-in-loop/`](../../../../packages/deepagents-flow-ts/examples/human-in-loop/)、拓扑权威 [`libs/topologies/human-in-loop/`](../../../../packages/deepagents-flow-ts/src/libs/topologies/human-in-loop/)。
+范例：[`tests/topologies/human-in-loop/`](../../../../packages/deepagents-flow-ts/tests/topologies/human-in-loop/)（原 `examples/` 已移除）、拓扑权威 [`libs/topologies/human-in-loop/`](../../../../packages/deepagents-flow-ts/src/libs/topologies/human-in-loop/)。
 
 ### 2.1 ACP 出站要求
 
@@ -120,7 +120,7 @@ START → compose → present_review → review(interrupt) → finalize → END
 ```bash
 cd packages/deepagents-flow-ts
 pnpm test tests/mcp-config-path.test.ts tests/default-flow-acp-mcp.test.ts
-pnpm test examples/human-in-loop/tests/review.test.ts
+pnpm test tests/topologies/human-in-loop/review.test.ts
 pnpm test tests/session-tool-trace.test.ts   # SMOKE_EXPECT_TOOL 脱敏摘要
 ```
 

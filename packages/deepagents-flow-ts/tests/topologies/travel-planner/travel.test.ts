@@ -10,13 +10,15 @@ loadDotenv();
 import { describe, it, expect } from "vitest";
 import { randomUUID } from "node:crypto";
 import {
-  createTravelFlow,
+  createTravelGraph,
   gatherNode,
   fanoutToResearch,
   type TravelStateType,
-} from "../graph.js";
+  type TravelSearchMcp,
+} from "../../../src/libs/topologies/travel-planner/index.js";
 import { loadFlowConfig } from "../../../src/runtime/flow-config.js";
 import type { ToolCallEvent } from "../../../src/surfaces/flow-types.js";
+import { materializeRecipe } from "../_helpers.js";
 
 const hasCreds = ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "OPENAI_API_KEY"].some(
   (k) => Boolean(process.env[k])
@@ -35,6 +37,25 @@ const st = (o: Partial<TravelStateType>): TravelStateType => ({
   output: "",
   ...o,
 });
+
+function createTravelFlow(
+  appConfig?: ReturnType<typeof loadFlowConfig>["appConfig"],
+  opts: {
+    checkpointer?: import("@langchain/langgraph").BaseCheckpointSaver;
+    searchMcp?: TravelSearchMcp;
+  } = {}
+) {
+  return materializeRecipe<TravelStateType>(
+    {
+      buildGraph: (cp) =>
+        createTravelGraph(appConfig, cp, undefined, opts.searchMcp),
+      toInput: (query) => ({ query }),
+      toResult: (v) => ({ answer: v.output ?? "" }),
+    },
+    appConfig,
+    opts.checkpointer
+  );
+}
 
 describe("travel gather / fanout (纯函数, 无凭证)", () => {
   it("gather 解析目的地 + 天数", () => {
@@ -60,7 +81,6 @@ describe("travel gather / fanout (纯函数, 无凭证)", () => {
   });
 });
 
-// 真实接入：平台搜索 MCP + LLM 整理。需凭证 + 已配置 searchMcp。
 describe.skipIf(!runIntegration)(
   "travel-planner flow (真实 MCP 搜索 + LLM, map-reduce + HITL)",
   () => {
@@ -78,7 +98,6 @@ describe.skipIf(!runIntegration)(
       expect(res.status).toBe("interrupted");
       if (res.status === "interrupted") expect(res.question).toContain("东京");
 
-      // map-reduce：4 个 aspect 各发一次搜索（onToolCall 并发，每个工具一进一出）。
       expect(events.filter((e) => e.status === "in_progress")).toHaveLength(4);
       expect(
         events.filter((e) => e.status === "completed" || e.status === "failed")

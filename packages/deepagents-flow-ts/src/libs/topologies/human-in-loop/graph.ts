@@ -12,7 +12,7 @@
  *
  * ⚠️ 节点名不能与 state channel 同名：channel 有 draft，所以「写草稿」的节点叫 compose。
  * 零 surface 依赖（仅 langgraph + runtime + libs/nodes）——可放 libs 层；createStatefulFlow
- * 包装由组合根 root / examples 各自做（recipe 在 recipe.ts）。
+ * 包装由组合根 root / scaffold 各自做（recipe 在 recipe.ts）。
  */
 import {
   StateGraph,

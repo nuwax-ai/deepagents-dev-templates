@@ -32,7 +32,7 @@ pnpm exec tsx src/index.ts sessions       # 已持久化的会话
 - **mcpServers** — `config/mcp.default.json`（`config.mcp.configPath`），默认内置 `ask-question`（结构化提问 fallback，图内 HITL 即 **平台问答卡片**，见 [glossary.md](./glossary.md)）；native 工具经 `@langchain/mcp-adapters`（`MultiServerMCPClient`）由 runtime-context 加载，支持 **stdio / Streamable HTTP / SSE**（有 url 时默认 Streamable HTTP，`automaticSSEFallback` 失败后再试 SSE；连接成功与否以 **tools/list** 为准，session 结束 `destroyRuntimeContext` 关闭连接）。ACP session 可合并追加（`session-wins`，平台同名覆盖内置），日常扩展改 `config/mcp.default.json` 即可。
 - **model** — `resolveModel`（env > `config.model` > 默认）。协议优先级：`API_PROTOCOL` > `LLM_PROVIDER` > 凭证启发式 > `config.model.provider`（`anthropic` | `openai`）。
 - **skills** — `discoverSkills` 发现 `agentsDirectories` 下各 `<root>/skills/`（默认含 `builtin/skills/`、`.agents/skills/`）及 `config.skills.directories` 的 SKILL.md；经 `renderSkillsSection` 注入清单，模型用 `load_skill(name)` 渐进式读正文。
-- **subagents** — `discoverSubAgents` 发现 `agentsDirectories` 下各 `<root>/agents/`（默认含 `builtin/agents/`、`.agents/agents/`）；默认 ReAct 图经 `task({ subagent_type, description })` 委派。自定义图可用 subgraph（见 [app/topologies/dev-agent.ts](../src/app/topologies/dev-agent.ts)）。
+- **subagents** — `discoverSubAgents` 发现 `agentsDirectories` 下各 `<root>/agents/`（默认含 `builtin/agents/`、`.agents/agents/`）；默认 ReAct 图经 `task({ subagent_type, description })` 委派。自定义图可用 subgraph（见 [app/flows/dev-agent](../src/app/flows/dev-agent)）。
 - **builtInTools** — `createFlowTools(ctx)`（[src/app/flow-tools.ts](../src/app/flow-tools.ts)）组装 http/json + bash/fs/grep·glob + `load_skill`/`task` + native MCP + demo，`bindTools` 绑给模型、`ToolNode` 执行。`http_request` 默认拦截私有/loopback/链路本地/云元数据端点（防 SSRF）+ 响应字节上限（防 OOM）；需访问内网改用 `createHttpRequestTool({ allowPrivateNetwork: true })`。
 - **compaction** — [src/libs/compaction.ts](../src/libs/compaction.ts)，消费 `config.compaction`。
 - **sessionStore** — `FileCheckpointSaver`（继承 `MemorySaver`），默认持久化到 `~/.flowagents/<workspace 散列>/`（`resolveSessionDir` 按 workspace 隔离）；设 `config.memory.dir` 为相对路径可 opt-out 回项目内。CLI：`sessions` 列出、`sessions delete <id>` 删除。
@@ -46,7 +46,7 @@ pnpm exec tsx src/index.ts sessions       # 已持久化的会话
 - **加 Subagent**：
   - **项目内置**：`builtin/agents/<name>/AGENT.md`。
   - **工作区扩展**：`.agents/agents/<name>/AGENT.md`。
-  - **代码级复用** → subgraph（见 [app/topologies/dev-agent.ts](../src/app/topologies/dev-agent.ts)）。
+  - **代码级复用** → subgraph（见 [app/flows/dev-agent](../src/app/flows/dev-agent)）。
 - **改系统提示词**：编辑 `prompts/flow.base.md`，或设 `config.agent.systemPrompt` / `config.agent.systemPromptPath`。
 - **换模型**：改 `config.model` 或设 `ANTHROPIC_MODEL` / `OPENAI_MODEL`（见 [`.env.example`](../.env.example)）。
 - **换协议**：设 `API_PROTOCOL=anthropic|openai`，或 `LLM_PROVIDER`（同义别名）。`loadConfig` 会打 `platformModelEnv` / `resolveModelProvider` 诊断日志（密钥脱敏）；未替换的 `{MODEL_PROVIDER_*}` 占位符会 `warn`。

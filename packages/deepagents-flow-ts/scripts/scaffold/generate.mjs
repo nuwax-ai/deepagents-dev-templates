@@ -40,6 +40,16 @@ const BLUEPRINTS = {
 const SCAFFOLD_DIR = dirname(fileURLToPath(import.meta.url));
 const PKG_ROOT = resolve(SCAFFOLD_DIR, "../..");
 
+/**
+ * 内置 flow 名（SCAFFOLD-REGISTRY 之外或不可被 scaffold 覆盖）。
+ * 与 src/app/flows/index.ts 内置项对齐：default / 手写权威实现。
+ * name=这些会直接 writeFileSync 盖掉 SSOT（尤其是 app/flows/dev-agent/）。
+ */
+const RESERVED_FLOW_NAMES = new Set([
+  "default",
+  "dev-agent",
+]);
+
 const camel = (s) => s.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
 
 /** 把生成的 flow 注册进 src/app/flows/index.ts（import + 表项，幂等）。 */
@@ -89,6 +99,16 @@ function main() {
   const raw = JSON.parse(readFileSync(specPath, "utf-8"));
   const spec = parseSpec(raw);
   assertGraphRules(spec);
+
+  // 写盘前硬拒保留名：合并目录后 scaffold 与内置 SSOT 同路径，否则会盖掉手写实现。
+  if (RESERVED_FLOW_NAMES.has(spec.name)) {
+    console.error(
+      `flow name "${spec.name}" 为内置保留名，禁止 scaffold 覆盖。` +
+        ` 请改用其他 kebab-case 名（topology 仍可用 "dev-agent"，见 scripts/scaffold/specs/_example.coding-agent.flow.json）。` +
+        ` 保留名: ${[...RESERVED_FLOW_NAMES].join(", ")}`
+    );
+    process.exit(1);
+  }
 
   const bp = BLUEPRINTS[spec.topology];
   if (!bp) {

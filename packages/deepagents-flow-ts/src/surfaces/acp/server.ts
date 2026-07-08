@@ -3,7 +3,7 @@
  *
  * 关键 seam：deepagents-acp 的 `onPrompt` 钩子在 agent 运行前触发，
  * 返回 `{ stopReason }` 即短路 agent。主入口经 materializeFlow 传入 StatefulFlow；
- * examples 仍可能传入 legacy function executor。
+ * legacy 仍可能传入 legacy function executor。
  * 把回答经 `conn` 流式推给客户端，然后短路——deep agent 永不进入请求路径。
  *
  * per-session 配置（D）：`createExecutor` 工厂 + `configureSession` 钩子让 ACP `session/new`
@@ -375,7 +375,7 @@ export interface SessionExecutor {
 
 export interface FlowAcpOptions {
   /**
-   * 单 executor 模式：StatefulFlow（主路径）；legacy function executor 仅 examples 兼容。
+   * 单 executor 模式：StatefulFlow（主路径）；legacy function executor 仅 legacy function 兼容。
    * 与 createExecutor 二选一；createExecutor 优先。
    */
   executor?: FlowExecutor | StatefulFlow;

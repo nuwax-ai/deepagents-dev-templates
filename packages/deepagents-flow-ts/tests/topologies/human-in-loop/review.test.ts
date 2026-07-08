@@ -9,22 +9,45 @@ loadDotenv();
 
 import { describe, it, expect, vi } from "vitest";
 import { randomUUID } from "node:crypto";
-import { createReviewFlow } from "../graph.js";
+import { MemorySaver } from "@langchain/langgraph";
+import type { StructuredTool } from "@langchain/core/tools";
 import { loadFlowConfig } from "../../../src/runtime/flow-config.js";
 import { isApproval } from "../../../src/libs/nodes/index.js";
 import {
   createAskQuestionPresentationNode,
+  createReviewGraph,
   findAskQuestionTool,
   getReviewTopology,
   normalizeReviewFeedback,
+  type ReviewStateType,
 } from "../../../src/libs/topologies/human-in-loop/index.js";
-import type { StructuredTool } from "@langchain/core/tools";
+import { materializeRecipe } from "../_helpers.js";
 
 const hasCreds = ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "OPENAI_API_KEY"].some(
   (k) => Boolean(process.env[k])
 );
 
 const runIntegration = process.env.RUN_INTEGRATION === "1" && hasCreds;
+
+/** 测试用 createReviewFlow：直接物化图 recipe，不经 examples 包装。 */
+function createReviewFlow(
+  appConfig?: ReturnType<typeof loadFlowConfig>["appConfig"],
+  opts: {
+    checkpointer?: import("@langchain/langgraph").BaseCheckpointSaver;
+    askQuestionTool?: StructuredTool;
+  } = {}
+) {
+  return materializeRecipe<ReviewStateType>(
+    {
+      buildGraph: (cp) =>
+        createReviewGraph(appConfig, cp, undefined, opts.askQuestionTool),
+      toInput: (query) => ({ query }),
+      toResult: (v) => ({ answer: v.output ?? "" }),
+    },
+    appConfig,
+    opts.checkpointer
+  );
+}
 
 describe("isApproval (纯函数, 无凭证)", () => {
   it("空回复 / 通过词 → 通过", () => {
@@ -169,7 +192,10 @@ describe("createReviewFlow + askQuestionTool 注入", () => {
       name: "ask-question__nuwax_ask_question",
       invoke: async () => ({ structuredContent: { status: "pending" } }),
     } as unknown as StructuredTool;
-    const flow = createReviewFlow(appConfig, { askQuestionTool: askQuestion });
+    const flow = createReviewFlow(appConfig, {
+      askQuestionTool: askQuestion,
+      checkpointer: new MemorySaver(),
+    });
     const topology = await getReviewTopology();
     expect(topology.nodes.map((n) => n.id)).toEqual(
       expect.arrayContaining(["present_review", "review"])

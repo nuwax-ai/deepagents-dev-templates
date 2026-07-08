@@ -18,7 +18,6 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { config as loadDotenv } from "dotenv";
 import { commandExists } from "./lib/tools.mjs";
-import { resolveExample } from "./lib/example-registry.mjs";
 import {
   configureExpectedToolTrace,
   hasSmokeCredential,
@@ -44,14 +43,11 @@ function parseFlags(argv) {
     const arg = argv[i];
     if (arg === "--entry" && argv[i + 1]) {
       entry = argv[++i];
-    } else if (arg === "--example" && argv[i + 1]) {
-      const exampleName = argv[++i];
-      const spec = resolveExample(exampleName);
-      if (!spec) {
-        console.error(`Unknown example: ${exampleName}`);
-        process.exit(1);
-      }
-      entry = spec.entry;
+    } else if (arg === "--example") {
+      console.error(
+        "Removed: --example. Scaffold a flow into src/app/flows/, set activeFlow, then use --entry src/index.ts."
+      );
+      process.exit(1);
     }
   }
 
@@ -200,7 +196,6 @@ function usage() {
 
 Options:
   --entry PATH     Agent entry TS file (default: src/index.ts; also AGENT_ENTRY env)
-  --example NAME   Shorthand for a curated example (rag | travel | pm | review | research)
   --debug       Log resolved paths, env (masked), and command (also SMOKE_DEBUG=1)
   --dry-run     Print plan and exit 0 without calling rcoder-cli (also SMOKE_DRY_RUN=1)
   -h, --help    Show help

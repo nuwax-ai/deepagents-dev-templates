@@ -4,9 +4,7 @@
  * 把默认 flow 的显式 StateGraph 反射成结构化 `{ nodes, edges }`(+ Mermaid 源),
  * 供 inspector / 文档 / 调试器直接消费:**不运行图、不需要模型凭证**。
  *
- * 数据来自 LangGraph 编译图的 `getGraphAsync()`(新版推荐入口,`getGraph()` 已 deprecated)。
- * 静态边总是与 graph.ts 一致；返回 Command 的路由节点须声明 addNode 的 ends 才能反射其 goto 边
- * (漏 ends 则丢边),其余不与手抄的节点列表漂移。
+ * 映射逻辑复用 libs/topologies/reflect.ts（与各积木 topology 同一实现）。
  *
  * 用法:
  *   import { getFlowTopology } from "./topology.js"; // 工作区内
@@ -15,15 +13,12 @@
  */
 
 import { createFlowGraph, type CreateFlowGraphConfig } from "./graph.js";
+import { reflectTopology } from "../libs/topologies/reflect.js";
 
 // 拓扑类型契约下沉 core/flow-types.ts（app + libs/topologies 共享；libs 不能 import app）。
-// 本模块 import 供下方 getFlowTopology 使用，并 re-export 维持公开 npm 子路径 `/topology`（见 package.json exports）。
-import type {
-  FlowTopology,
-  FlowTopologyNode,
-  FlowTopologyEdge,
-} from "../core/flow-types.js";
+// re-export 维持公开 npm 子路径 `/topology`（见 package.json exports）。
 export type { FlowTopology, FlowTopologyNode, FlowTopologyEdge } from "../core/flow-types.js";
+import type { FlowTopology } from "../core/flow-types.js";
 
 /**
  * 提取默认 flow 图的拓扑(静态:只构建图结构,不执行节点,无需凭证)。
@@ -32,20 +27,5 @@ export type { FlowTopology, FlowTopologyNode, FlowTopologyEdge } from "../core/f
 export async function getFlowTopology(
   config: CreateFlowGraphConfig = {}
 ): Promise<FlowTopology> {
-  const compiled = createFlowGraph(config);
-  // reid(): 用可读节点名替代内部 id(prepare/think/…,外加 __start__/__end__)。
-  const g = (await compiled.getGraphAsync({})).reid();
-
-  const nodes: FlowTopologyNode[] = Object.values(g.nodes).map((n) => ({
-    id: n.id,
-    label: n.name || n.id,
-  }));
-  const edges: FlowTopologyEdge[] = g.edges.map((e) => ({
-    source: e.source,
-    target: e.target,
-    conditional: e.conditional ?? false,
-    ...(e.data ? { label: e.data } : {}),
-  }));
-
-  return { nodes, edges, mermaid: g.drawMermaid() };
+  return reflectTopology(createFlowGraph(config));
 }

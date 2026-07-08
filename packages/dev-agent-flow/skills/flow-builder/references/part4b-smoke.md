@@ -166,7 +166,7 @@ smoke runner 会 **跳过占位符**，并用 `.env` + `flow-agent.config.json` 
 | `pnpm smoke -- --example research` | 深度研究 |
 | `pnpm smoke -- --entry <path>` | 指定其他 TS 入口 |
 
-本地手测注册 flow 用 `pnpm flow "<prompt>"`；精选范例用 `pnpm example <name>`。
+本地手测注册 flow 用 `pnpm flow "<prompt>"`；场景 flow 设好 `activeFlow` 后用 `pnpm smoke` / `pnpm smoke -- --entry src/index.ts`。
 
 ---
 

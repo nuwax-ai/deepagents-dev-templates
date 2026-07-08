@@ -1,8 +1,8 @@
 /**
  * 拓扑反射助手 —— 把任意编译图反射成 FlowTopology（不 invoke、不需凭证）。
  *
- * 镜像 src/app/topology.ts 的 getFlowTopology 映射逻辑；供各 libs/topologies/<name>/topology.ts
- * 复用，避免每个拓扑重复抄一遍 getGraphAsync().reid() → {nodes,edges,mermaid} 的样板。
+ * 供各 libs/topologies/<name>/topology.ts 与 app/topology.ts（默认图公开导出）复用，
+ * 避免 getGraphAsync().reid() → {nodes,edges,mermaid} 映射样板重复。
  */
 import type {
   FlowTopology,

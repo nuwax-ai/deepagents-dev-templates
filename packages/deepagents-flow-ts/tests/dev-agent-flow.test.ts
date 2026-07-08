@@ -4,7 +4,7 @@ import { MemorySaver, StateGraph, START, END } from "@langchain/langgraph";
 import type { PlanEvent } from "../src/core/flow-types.js";
 import { FlowStateAnnotation, type FlowState } from "../src/app/state.js";
 import { createFlowGraph } from "../src/app/graph.js";
-import { createDevAgentFlow } from "../src/app/topologies/dev-agent.js";
+import { createDevAgentFlow } from "../src/app/flows/dev-agent/index.js";
 import type { FlowRuntime } from "../src/runtime/flow-runtime.js";
 import { writeTodosTool } from "../src/libs/tools/todo.tool.js";
 

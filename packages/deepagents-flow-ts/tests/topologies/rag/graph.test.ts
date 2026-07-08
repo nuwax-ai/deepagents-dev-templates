@@ -1,12 +1,11 @@
 /**
- * 工作流图集成测试
+ * RAG 工作流图集成测试
  *
  * 跑真实编译后的 LangGraph 图（executeRAG），只 mock：
- *  - ../../../src/runtime/index.js 的 resolveModel → 假模型、resolveApiKey → 测试凭证
- *    （rewrite 经 requireModel 取模型，requireModel 先校验 resolveApiKey 再调 resolveModel）
+ *  - resolveModel / resolveApiKey
  *  - retrieve 节点 → 受控检索结果（不 spawn MCP）
  *
- * 验证：条件边的"重试一次后收敛"与"足够则不重试且带来源"。
+ * 验证：条件边的「重试一次后收敛」与「足够则不重试且带来源」。
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
@@ -16,7 +15,7 @@ const h = vi.hoisted(() => {
   const fakeModel = {
     invoke: async (messages: Array<{ content?: unknown }>) => {
       const sys = String(messages?.[0]?.content ?? "");
-      // rewrite 节点的 system prompt 含"查询分析专家"
+      // rewrite 节点的 system prompt 含「查询分析专家」
       if (sys.includes("查询分析专家")) {
         counters.rewrite++;
         return {
@@ -26,7 +25,6 @@ const h = vi.hoisted(() => {
       counters.generate++;
       return { content: "基于上下文生成的回答。" };
     },
-    // 测试不传 onToken，走 invoke 分支；stream 仅占位
     stream: async function* () {
       yield { content: "x" };
     },
@@ -40,7 +38,6 @@ vi.mock("../../../src/runtime/index.js", async (importOriginal) => {
   return { ...actual, resolveModel: () => h.fakeModel, resolveApiKey: () => "test-key" };
 });
 
-// retrieve 已提升至 src/libs/topologies/rag/nodes/retrieve.ts；mock 指向新位置。
 vi.mock("../../../src/libs/topologies/rag/nodes/retrieve.js", () => ({
   retrieveNode: async (state: { attempts?: number }) => ({
     raw_results: h.retrieve.results,
@@ -48,8 +45,11 @@ vi.mock("../../../src/libs/topologies/rag/nodes/retrieve.js", () => ({
   }),
 }));
 
-import { executeRAG, type CreateRAGGraphConfig } from "../graph.js";
-import { DEFAULT_RAG_CONFIG } from "../nodes/types.js";
+import {
+  executeRAG,
+  type CreateRAGGraphConfig,
+  DEFAULT_RAG_CONFIG,
+} from "../../../src/libs/topologies/rag/index.js";
 
 function makeConfig(): CreateRAGGraphConfig {
   return {
@@ -70,11 +70,11 @@ beforeEach(() => {
 
 describe("executeRAG workflow graph", () => {
   it("检索不足时重试 rewrite 恰好一次后收敛到 generate", async () => {
-    h.retrieve.results = []; // 始终空 → insufficient
+    h.retrieve.results = [];
     const res = await executeRAG("空检索问题", { config: makeConfig() });
 
-    expect(h.counters.rewrite).toBe(2); // 1 次初始 + 1 次重试（受 MAX_RETRIEVE_ATTEMPTS 限制）
-    expect(h.counters.generate).toBe(1); // 达上限后仍进入 generate
+    expect(h.counters.rewrite).toBe(2);
+    expect(h.counters.generate).toBe(1);
     expect(typeof res.answer).toBe("string");
     expect(res.answer.length).toBeGreaterThan(0);
   });
@@ -85,7 +85,7 @@ describe("executeRAG workflow graph", () => {
     ];
     const res = await executeRAG("有结果的问题", { config: makeConfig() });
 
-    expect(h.counters.rewrite).toBe(1); // 无重试
+    expect(h.counters.rewrite).toBe(1);
     expect(h.counters.generate).toBe(1);
     expect(res.sources.length).toBeGreaterThan(0);
   });

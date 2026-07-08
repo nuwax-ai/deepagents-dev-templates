@@ -3,7 +3,7 @@
  * （in_progress → completed/failed）。默认图 tools 节点的泛化版（包 prebuilt ToolNode）。
  *
  * 也提供 runTool：执行单个工具 fn 并三态透出（供自定义工具节点 / MCP 检索节点用，
- * 如 examples 的 research/search 节点）。
+ * 如 topologies 的 research/search 节点）。
  */
 
 import { randomUUID } from "node:crypto";

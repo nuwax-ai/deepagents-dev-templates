@@ -139,7 +139,7 @@ export function createMyFlow(appConfig?, opts: { checkpointer?: BaseCheckpointSa
 > 与 `src/surfaces/stateful-flow.ts` 的 `conversational` 选项。
 
 > **Context compaction**（long-running flows）：多轮消息超阈值时 `compactHistory` 摘要，再经
-> `compactionUpdate`（`RemoveMessage` 替换模式）写回 channel。见 [dev-agent](../src/app/topologies/dev-agent.ts) 的 run-loop
+> `compactionUpdate`（`RemoveMessage` 替换模式）写回 channel。见 [dev-agent](../src/app/flows/dev-agent) 的 run-loop
 > 与 `src/libs/compaction.ts`（`config.compaction` 控制触发）。
 
 ---
@@ -159,7 +159,7 @@ export function createMyFlow(appConfig?, opts: { checkpointer?: BaseCheckpointSa
 | 条件边循环（评估重试） | [libs/topologies/project-manager](../src/libs/topologies/project-manager/)、默认图 `reflect` |
 | 多阶段流水线 + 多轮 HITL + 双层 reflection + 并行调研 + **持续会话** | [libs/topologies/deep-research](../src/libs/topologies/deep-research/)（选题确认 → 大纲 → Send 并行调研 → 初稿 → 质量评审 → converse↔respond 持续会话） |
 | **Durable stateful flow**（cross-restart resume + stage progress + recursion guard） | `createStatefulFlow` + `durableCheckpointer`（`src/surfaces/stateful-flow.ts`）—— deep-research / travel / pm / human-in-loop |
-| **Context compaction**（`RemoveMessage` 替换历史） | [app/topologies/dev-agent.ts](../src/app/topologies/dev-agent.ts) + `src/libs/compaction.ts` |
+| **Context compaction**（`RemoveMessage` 替换历史） | [app/flows/dev-agent](../src/app/flows/dev-agent) + `src/libs/compaction.ts` |
 | 条件边路由 + 检索/生成**双自纠正循环**（对齐官方 Adaptive RAG） | [libs/topologies/adaptive-rag](../src/libs/topologies/adaptive-rag/)（spec 范例 `_example.adaptive-knowledge-qa.flow.json`） |
 | **conversational 多轮对话**（不暴露 `hasStarted` + 稳定 threadId + checkpointer 累积历史 + 图层流式） | `createStatefulFlow`（`conversational: true`）：default / search-aggregator |
 

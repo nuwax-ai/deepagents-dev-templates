@@ -28,19 +28,9 @@
 | Script | npm 命令 | 说明 |
 |--------|----------|------|
 | `smoke-acp.mjs` | `pnpm run smoke` | 默认 flow（`src/index.ts`，读 `activeFlow`） |
-| | `pnpm run smoke -- --example <name>` | 精选范例短名冒烟 |
-| `run-example.mjs` | `pnpm run example <name> [args]` | 本地跑精选范例；`pnpm example --list` |
-| `lib/example-registry.mjs` | — | `smoke --example` 与 `pnpm example` 共用别名表 |
+| | `pnpm run smoke -- --entry <path>` | 指定入口（也可用 `AGENT_ENTRY`） |
 
-**精选范例别名**：
-
-| 别名 | 入口 |
-|------|------|
-| `rag` | `examples/rag/index.ts` |
-| `travel` | `examples/travel-planner/index.ts` |
-| `pm` | `examples/project-manager/index.ts` |
-| `review` | `examples/human-in-loop/index.ts` |
-| `research` | `examples/deep-research/index.ts` |
+场景 flow 示范：对照 `src/libs/topologies/`，用 `scripts/scaffold/specs/` + scaffold 生成到 `src/app/flows/`，设 `activeFlow` 后跑 `pnpm smoke`。
 
 ### 模型 env（`lib/smoke-env.mjs`）
 
@@ -98,4 +88,3 @@ pnpm run check:tools   # 检测工具是否就绪
 | `lib/tools.mjs` | CLI 工具检测 |
 | `lib/smoke-env.mjs` | smoke 模型 env 解析（与 runtime 对齐） |
 | `lib/smoke-outcome.mjs` | smoke 输出解析（session-trace 优先于 rcoder 噪音） |
-| `lib/example-registry.mjs` | 精选范例别名注册表 |

@@ -9,7 +9,7 @@
  * finalize 保留 bespoke（isApproval 短路 + 确定性甘特排期）。
  *
  * systemPrompt 注入主节点 plan（替换角色开场，保留 JSON 契约指令）；其余节点领域默认。
- * 零 surface 依赖 —— 可放 libs；createStatefulFlow 包装由 root / examples 各自做。
+ * 零 surface 依赖 —— 可放 libs；createStatefulFlow 包装由 root / scaffold 各自做。
  */
 import {
   StateGraph,

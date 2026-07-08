@@ -60,7 +60,7 @@
 目标文件：
 
 - `src/app/state.ts`
-- `examples/dev-agent/researcher.ts`
+- `（历史路径；现见 src/app/flows/dev-agent + libs/nodes createSubgraphNode）`
 
 只替换真正的 `messages` channel：
 
@@ -82,7 +82,7 @@ export const FlowStateAnnotation = Annotation.Root({
 
 不要机械替换这些字段：
 
-- `examples/rag/graph.ts` 的 `history: Annotation<BaseMessage[]>`：它是 RAG 输入历史，不是 LangGraph 主 `messages` channel。
+- `libs/topologies/rag/graph.ts（历史 examples 路径已移除）` 的 `history: Annotation<BaseMessage[]>`：它是 RAG 输入历史，不是 LangGraph 主 `messages` channel。
 - travel / pm / review / deep-research 里的业务状态：这些图没有通用 `messages` reducer，不能强行展开 `MessagesAnnotation.spec`。
 - tests 里的 toy state：测试通常在覆盖局部语义，除非确实手写了 `messagesStateReducer`。
 
@@ -137,8 +137,8 @@ const recent = await trimMessages(messages, {
 
 目标范围：
 
-- `examples/deep-research/graph.ts` 的 LLM 节点。
-- 后续再看 `examples/travel-planner/graph.ts`、RAG 检索节点等。
+- `libs/topologies/deep-research/graph.ts（历史 examples 路径已移除）` 的 LLM 节点。
+- 后续再看 `libs/topologies/travel-planner/graph.ts（历史 examples 路径已移除）`、RAG 检索节点等。
 
 先做一个最小 spike：
 
@@ -325,7 +325,7 @@ pnpm graph
 
 ```bash
 pnpm typecheck:examples
-pnpm test -- examples/deep-research
+pnpm test -- tests/topologies/deep-research
 ```
 
 阶段 B：

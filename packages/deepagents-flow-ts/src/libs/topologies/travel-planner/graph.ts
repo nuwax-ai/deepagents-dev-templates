@@ -9,7 +9,7 @@
  * research（真实 MCP 检索 + rateLimited）、finalize（isApproval 短路）。
  *
  * systemPrompt 注入主节点 aggregate（角色开场）；research/confirm/finalize 领域默认。
- * 零 surface 依赖 —— 可放 libs；createStatefulFlow 包装由 root / examples 各自做。
+ * 零 surface 依赖 —— 可放 libs；createStatefulFlow 包装由 root / scaffold 各自做。
  */
 import {
   StateGraph,
