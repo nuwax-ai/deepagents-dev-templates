@@ -5,7 +5,7 @@
 
 ## completion gate（完成闸门）
 
-本地 ACP 验证**优先** `pnpm smoke`（rcoder-cli 真实 ACP 会话；与模板 README 快速开始一致）。`pnpm start:acp` 等非 smoke 路径不能替代 completion gate。
+本地真实运行验证**优先** `pnpm smoke`（rcoder-cli 端到端会话；与当前项目 README 快速开始一致）。非 smoke 路径不能替代 completion gate。
 
 报告「完成 / done」前必须在本轮真实执行并贴出原始输出：
 
@@ -15,13 +15,13 @@ pnpm build && pnpm typecheck && pnpm test && pnpm graph && pnpm smoke
 
 失败 → 读完整错误 → 修复 → 重跑；至多 5 轮仍不绿则如实交回用户。
 
-**ACP 真实运行门**：目标 Agent 部署在 rcoder（云端）或 nuwaclaw（个人客户端）时，运行时均经 ACP。`pnpm smoke` 用 rcoder-cli 端到端复现（握手 → `onPrompt` → 整图 → 流式答案），是生产路径的质量门；静态四连不能替代，禁止 `--dry-run` 冒充通过。精选范例用 `--example`，其他入口用 `--entry`。
+**真实运行门**：`pnpm smoke` 用 rcoder-cli 端到端复现完整运行路径，是生产路径的质量门；静态四连不能替代，禁止 `--dry-run` 冒充通过。精选范例用 `--example`，其他入口用 `--entry`。
 
 Scaffold 生成器自带快检（`typecheck && graph`）；**全量 completion gate 仍须上式五连**。
 
 **收尾清单**（系统提示词非空、R-G009、**平台能力搜索证据**等）→ [part0-workflow.md](part0-workflow.md) § completion gate 收尾清单。
 
-**smoke 细则**（`.env` 模型解析、`activeFlow`、`SMOKE_PROMPT*`、占位符）→ [part4b-smoke-acp.md](part4b-smoke-acp.md)。
+**smoke 细则**（`.env` 模型解析、`activeFlow`、`SMOKE_PROMPT*`、占位符）→ [part4b-smoke.md](part4b-smoke.md)。
 
 ---
 
@@ -32,7 +32,7 @@ pnpm build
 pnpm test                    # 含 tests/layering.test.ts
 pnpm typecheck
 pnpm typecheck:examples      # 精选范例 + src
-pnpm smoke                   # 强制：rcoder-cli ACP 端到端（精选范例可用 --example）
+pnpm smoke                   # 强制：rcoder-cli 端到端（精选范例可用 --example）
 pnpm graph                   # export graph topology
 ```
 
@@ -54,13 +54,13 @@ pnpm graph                   # export graph topology
 - `runtime:flow-graph` — 图调度、边路由
 - `runtime:<flow名>` — flow 生命周期
 - `error` / `warn` / `interrupt` / `onPrompt`
-- `permission 门控` / `requestPermission` — 工具审批放行/弹窗/降级（`flow-acp` 子 logger）
+- `permission 门控` / `requestPermission` — 工具审批放行/弹窗/降级
 
 ---
 
-## 读日志六步（编排 / ACP / HITL）
+## 读日志六步（编排 / 客户端 / HITL）
 
-图跑不通、节点未执行、条件边走错、HITL 不 resume、工具 `Permission denied` / 客户端卡转圈、ACP 无响应时：
+图跑不通、节点未执行、条件边走错、HITL 不 resume、工具 `Permission denied` / 客户端卡转圈、客户端无响应时：
 
 1. **确认** — env 含 `LOG_DIR`、`LOG_LEVEL`（HITL 用 `debug`）
 2. **复现** — Zed / `pnpm smoke` / `pnpm flow` / CLI
@@ -73,7 +73,7 @@ pnpm graph                   # export graph topology
 
 ## 典型错误：`LLM 未返回 JSON`
 
-**规则**：[flow-graph-rules-pointer.md](flow-graph-rules-pointer.md) → 目标项目 **R-G001 / R-G002**。完整六步亦见目标项目 `docs/troubleshooting.md`。
+**规则**：[flow-graph-rules-pointer.md](flow-graph-rules-pointer.md) → 当前工作目录 **R-G001 / R-G002**。完整六步亦见当前工作目录 `docs/troubleshooting.md`。
 
 | 步 | 动作 |
 |----|------|
@@ -84,22 +84,22 @@ pnpm graph                   # export graph topology
 | 5 | 若入口节点：改 prompt 支持非预期输入（打招呼、格式错误），不强求 JSON |
 | 6 | **同步** `scripts/scaffold/specs/<name>.flow.json`（手改 graph 后 regenerate 会覆盖修复） |
 
-详表见目标项目 `docs/troubleshooting.md` § `LLM 未返回 JSON`。
+详表见当前工作目录 `docs/troubleshooting.md` § `LLM 未返回 JSON`。
 
 ---
 
 ## 典型错误：无流式 / 回答一次性整段出现
 
-**规则**：[flow-graph-rules-pointer.md](flow-graph-rules-pointer.md) → 目标项目 **R-G009**；Part 2 § 流式输出。
+**规则**：[flow-graph-rules-pointer.md](flow-graph-rules-pointer.md) → 当前工作目录 **R-G009**；Part 2 § 流式输出。
 
 | 步 | 动作 |
 |----|------|
-| 1 | 确认症状：ACP/客户端长时间无字，最后一次性出全文（`streamed=false` 兜底） |
+| 1 | 确认症状：客户端长时间无字，最后一次性出全文（`streamed=false` 兜底） |
 | 2 | 打开 `src/app/flows/<name>/graph.ts`，查用户可见节点（compose / aggregate / draft / finalize 修订） |
 | 3 | 若用 `createLlmNode` → 改为 **`createLlmStreamNode`**，`write` 从 `r.content` 改为 **`r.text`**，补 `timeoutMs: resolveLlmResilience(appConfig).longTimeoutMs` |
 | 4 | 若来自 scaffold：查 `scripts/scaffold/specs/<name>.flow.json` 是否 `type: "llm-stream"` 且 `write` 用 `r.text` |
 | 5 | **同步** spec 与 graph（**R-G003**）；重跑 `pnpm smoke` 观察逐 token |
-| 6 | 仍不流式：确认模型支持 `.stream()`；查目标项目 README § 流式输出检查清单 L2/L3 降级 |
+| 6 | 仍不流式：确认模型支持 `.stream()`；查当前工作目录 README § 流式输出检查清单 L2/L3 降级 |
 
 **与工具 EXECUTING 的关系**：图在 LLM 节点抛错未走完时，并行调试命令可能长时间显示 EXECUTING；先修图错误再判工具层。
 
@@ -107,14 +107,14 @@ pnpm graph                   # export graph topology
 
 ## 典型错误：平台能力未登记 / 误用内置工具 / 未搜平台就报完成
 
-**规则**：Part 3 § 平台能力登记 · § **ACP MCP 下发**（**联网搜索较常见**，见 § 联网搜索）；收工举证见 Part 0 § completion gate 收尾清单。
+**规则**：Part 3 § 平台能力登记 · § **平台能力登记**（**联网搜索较常见**，见 § 联网搜索）；收工举证见 Part 0 § completion gate 收尾清单。
 
 ### completion gate 判定（需平台能力时 · 通用）
 
 | 条件 | 结果 |
 |------|------|
 | 已贴 `search-apis` / `search-skills` / `get-config` 输出，平台无命中 | 可完成；可自写 app 工具或图内降级（须记录关键词） |
-| 平台有命中，已 `add-tool` 并接线（`flow-tools.ts` / `searchMcp` / MCP） | 可完成 |
+| 平台有命中，已 `add-tool`，并按需对齐节点或接入 `flow-tools.ts` | 可完成 |
 | **未执行**平台搜索就写外部能力 | **不可报完成**（即使 smoke 绿） |
 | 平台有命中但未 `add-tool` / 未接线 | **不可报完成** |
 | 以「用户待配置」代替开发期登记 | **不可报完成** |
@@ -123,18 +123,18 @@ pnpm graph                   # export graph topology
 
 | 条件 | 结果 |
 |------|------|
-| 已贴搜索关键词 + `mcpConfigs` 输出，平台无搜索能力 | 可完成；`searchMcp` 可缺省降级 |
-| 平台有搜索 MCP/API 且已接线 | 可完成 |
-| 未执行 `search-apis --kw 搜索` 或未查 `mcpConfigs` | **不可报完成** |
-| `SEARCH_MCP = undefined` 且平台有命中 | **不可报完成** |
+| 已贴搜索关键词 + `tools` 输出，平台无搜索能力 | 可完成；图内可写降级文案 |
+| 平台有搜索工具/API 且已接线 | 可完成 |
+| 未执行 `search-apis --kw 搜索` 或未查 `tools` | **不可报完成** |
+| 平台有命中但仍留搜索占位配置 | **不可报完成** |
 
 | 步 | 动作 |
 |----|------|
 | 1 | 确认需**工作区外**能力（非仅 `grep`/`glob`） |
-| 2 | 是否已 `search-apis.sh --kw "<能力词>"` / `search-skills.sh` / `get-config.sh --key tools|mcpConfigs|skills`？ |
-| 3 | 命中是否已 `add-tool.sh` 并注册 `flow-tools.ts` 或 MCP 接线？ |
-| 4 | **联网**：另查 `mcpConfigs`、`searchMcp`；运行期须经 **ACP `mcpServers`** 注入；禁止 bash+curl 自写搜索 API；禁止 `mcp.default.json` 内置搜索 server |
-| 5 | `pnpm exec tsx src/index.ts capabilities` 核对工具/MCP 列表 |
+| 2 | 是否已 `search-apis.sh --kw "<能力词>"` / `search-skills.sh` / `get-config.sh --key tools|skills`？ |
+| 3 | 命中是否已 `add-tool.sh`，并按需在节点 `params` 指定 `toolName` / `tools` 或接入 `flow-tools.ts`？ |
+| 4 | **联网**：另查 `tools` 与平台搜索工具登记状态；禁止 bash+curl 自写搜索 API；禁止把搜索能力硬编码进当前项目默认配置 |
+| 5 | `pnpm exec tsx src/index.ts capabilities` 核对工具列表 |
 | 6 | 仍不生效：查工具名、`.logs/` 中 `onToolCall` |
 
 ---
@@ -146,8 +146,8 @@ pnpm graph                   # export graph topology
 | `未知工具: 联网搜索_1` | 删 `AGENT.md` 的 `tools`（禁止写平台登记名）→ Part 6 |
 | `400 Invalid model` + 占位符 | 删 `AGENT.md` 的 `model`，继承主 Agent |
 | `(subagent 无输出)` | 确认 `description` 自包含；框架已有 stream buffer 兜底 → Part 6 |
-| 联网搜索 `401` | 检查平台聚合 MCP 的会话 Authorization 是否正确下发并由父/子 agent 复用 |
-| 并行 `task` 输出混流 | runtime `messageId` 含 `toolCallId`（`deepagents-flow-ts` ACP 层）；仍混流查平台是否尊重 messageId |
+| 联网搜索 `401` | 检查平台搜索能力 的会话 Authorization 是否正确下发并由父/子 agent 复用 |
+| 并行 `task` 输出混流 | runtime `messageId` 含 `toolCallId`（runtime 层）；仍混流查平台是否尊重 messageId |
 | `INVALID_TOOL_RESULTS` | 删 `~/.flowagents/sessions/<hash>/pending.json` 清 checkpoint |
 
 详表 → [part6-subagent.md](part6-subagent.md)。
@@ -157,16 +157,16 @@ pnpm graph                   # export graph topology
 ## Anti-patterns
 
 - ❌ 未跑通就声称完成
-- ❌ 不看 `.logs/` 就猜 ACP/HITL 行为
+- ❌ 不看 `.logs/` 就猜客户端/HITL 行为
 - ❌ 把 `.log` 全文贴进对话或提交 git
 - ❌ 见 JSON 解析错就加更严 prompt，不检查 `write` 是否真需要 `r.parsed`
-- ❌ 用户反馈「不流式」却只改 ACP/客户端，不检查节点是否误用 `createLlmNode`
+- ❌ 用户反馈「不流式」却只改客户端，不检查节点是否误用 `createLlmNode`
 - ❌ 需外部能力却未 `search-apis` / `get-config` / `add-tool` 就以 smoke 通过报完成
 - ❌ 用户要业务 API/联网却只用内置 `grep`/`search`，或未搜平台就自写工具
-- ❌ 平台有能力却留占位未接线（如 `SEARCH_MCP = undefined`），把登记甩给「用户待操作」
-- ❌ Phase 4 复述沙箱环境变量名，或要求用户配置 ACP 已默认集成的平台认证/基址
+- ❌ 平台有能力却留占位未接线，把登记甩给「用户待操作」
+- ❌ Phase 4 复述沙箱环境变量名，或要求用户配置平台已默认集成的认证/基址
 - ❌ Phase 4 写「后续：配置 Plugin Authorization / 搜索 API key」等开发期登记事项
 - ❌ `AGENT.md tools` 写平台 Plugin 登记名（如 `联网搜索_1`）→ `task` 报未知工具
-- ❌ 同轮并行多个 `task` 且平台未分桶 messageId → 查 ACP/runtime，不靠提示词强制串行
+- ❌ 同轮并行多个 `task` 且平台未分桶 messageId → 查 runtime，不靠提示词强制串行
 - ✅ 命令退出码 0 + 文件实证 + 日志无未预期 error
 - ✅ 无用户业务待办 → Phase 4 **不写**「后续」段

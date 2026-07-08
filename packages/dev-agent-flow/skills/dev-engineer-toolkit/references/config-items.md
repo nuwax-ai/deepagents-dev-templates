@@ -61,9 +61,8 @@
 
 ```json
 [
-  {"name": "file_search", "enabled": true},
-  {"name": "code_execution", "enabled": true},
-  {"name": "web_fetch", "enabled": false}
+  {"targetType": "Plugin", "targetId": 614, "name": "token价格查询"},
+  {"targetType": "Knowledge", "targetId": 528, "name": "知识库"}
 ]
 ```
 

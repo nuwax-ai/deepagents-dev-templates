@@ -170,6 +170,11 @@ GET /api/v1/4sandbox/agent/dev/config/{devAgentId}
 # 基址、Authorization 与 devAgentId 由 get-config.sh 自动处理
 ```
 
+```bash
+# 摘要查看
+./scripts/get-config.sh --key tools
+```
+
 ### 路径参数
 
 | 参数 | 类型 | 必填 | 说明 |
@@ -216,6 +221,16 @@ GET /api/v1/4sandbox/agent/dev/config/{devAgentId}
 ```
 
 ### 子类型说明
+
+**ToolSearchResultItemDTO**（tools 列表元素）：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `targetType` | string | 目标类型：`Plugin`、`Workflow`、`Knowledge`、`Skill` |
+| `targetId` | int64 | 目标对象 ID |
+| `name` | string | 工具名称 |
+| `description` | string | 工具描述 |
+| `schema` | string | 接口定义或参数说明 |
 
 **SkillResultItemDTO**（skills 列表元素）：
 

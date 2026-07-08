@@ -2,9 +2,9 @@
 
 ## 概述
 
-本包包含 **开发 Agent（Flow 版）** 的系统提示词和 Skills 配置。开发 Agent 运行在云端开发环境，职责是帮开发者基于 `deepagents-flow-ts` 工作流编排模板创建场景 Agent。
+本包包含 **开发 Agent（Flow 版）** 的系统提示词和 Skills 配置。开发 Agent 运行在云端开发环境，职责是帮开发者基于 `nuwax-flow-ts` 工作流编排模板创建场景 Agent。
 
-与 `dev-agent`（面向 `deepagents-app-ts`，自由 tool loop）不同，本包面向 **`deepagents-flow-ts`** —— Agent 按 **preset topology**（预先设计的 node + edge 图）跑 LangGraph，而非自由 tool loop。
+与 `dev-agent`（面向 `deepagents-app-ts`，自由 tool loop）不同，本包面向 **`nuwax-flow-ts`** —— Agent 按 **preset topology**（预先设计的 node + edge 图）跑 LangGraph，而非自由 tool loop。
 
 **一句话 → 可跑 Agent**：加载 `flow-builder` **Part 1** 脚手架（**9 topologies** = **8 presets** + `custom` spec → 生成薄封装 + 自动注册 + typecheck/graph 自验），命中 preset topology 优先于 Part 2 手写。
 
@@ -12,7 +12,7 @@
 
 | | dev-agent | dev-agent-flow |
 |--|-----------|----------------|
-| 面向模板 | `deepagents-app-ts` | `deepagents-flow-ts` |
+| 面向模板 | `deepagents-app-ts` | `nuwax-flow-ts` |
 | 运行范式 | 自由 tool loop（`createDeepAgent()`） | **preset topology**（LangGraph node + edge 图） |
 | 核心抽象 | 工具注册（`createTools()`） | 图编排（graph + nodes + **surface seam（接入层）**） |
 | 目标 Agent 提示词基准 | `target-agent.base.md` | `flow.base.md`（经 `dev-engineer-toolkit` 同步 `<PLATFORM_CONFIG>`，定义见 `system-prompt.md`） |
@@ -29,6 +29,7 @@
 |------|------|------|
 | **模板本体** | `deepagents-flow-ts/` 内 `README.md`、`docs/*`（含 **`docs/glossary.md` 术语表**）、`config/`、`prompts/` | 描述**本工作目录**内的能力、配置路径、图编排规则（`flow-graph-rules.md` R-G*）、排错索引；**不**承载开发 Agent 工作流 |
 | **开发 Agent 引导** | 本包 `system-prompt.md`（**规则/约束**）+ `skills/flow-builder/`（**实现步骤**）+ `skills/dev-engineer-toolkit/` | `system-prompt` 定铁律；`flow-builder` Part 0–7 承载逐步流程（脚手架、编排、提示词提炼、completion gate 等） |
+| **改动对照** | [../../docs/packages/deepagents-flow-ts/development/platform-tool-binding-design.md](../../docs/packages/deepagents-flow-ts/development/platform-tool-binding-design.md) | 平台工具登记、schema 静态沉淀、节点 `params` 工具引用、`platform-tool` / `tool-exec` 职责边界 |
 
 **单一权威原则**：图怎么写、规则 ID、factory API → 读目标项目 `docs/`；开发流程、平台登记、**completion gate（完成闸门）** → 读本包 `flow-builder` Part*。技能内 `references/flow-graph-rules-pointer.md` 仅为**路由页**，详表永远在目标项目 `docs/flow-graph-rules.md`。**术语**（durable stateful flow / topology / 护栏分语境 等）统一以目标项目 `docs/glossary.md` 为准。
 

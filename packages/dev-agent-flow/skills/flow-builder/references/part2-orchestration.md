@@ -40,7 +40,7 @@ type MyStateType = typeof MyState.State;
 
 ## Step 3: 节点（factory 优先）
 
-`createLlmNode` / `createLlmStreamNode` / `createLlmRouterNode` / `createMcpRetrievalNode` / `createHumanApprovalNode` / `createPermissionApprovalNode` / `createApprovalFinalizeNode` / `createToolExecNode` / `createFanout` / `createSubgraphNode` 等；bespoke 才在 `src/app/nodes/` 手写并说明原因。
+`createLlmNode` / `createLlmStreamNode` / `createLlmRouterNode` / `createToolExecNode` / `createHumanApprovalNode` / `createPermissionApprovalNode` / `createApprovalFinalizeNode` / `createToolExecNode` / `createFanout` / `createSubgraphNode` 等；bespoke 才在 `src/app/nodes/` 手写并说明原因。
 
 ### 流式输出（用户可见大段 LLM 文本 · 必读）
 
@@ -49,7 +49,7 @@ type MyStateType = typeof MyState.State;
 | 对比 | `createLlmNode` | `createLlmStreamNode` |
 |------|-----------------|----------------------|
 | 模型调用 | `invoke()` 一次性 | `stream()` 逐 chunk |
-| token 透出 | ❌ 无（ACP 仅 turn 末整段兜底） | ✅ `emitTextToken` → 客户端 |
+| token 透出 | ❌ 无（客户端 仅 turn 末整段兜底） | ✅ `emitTextToken` → 客户端 |
 | write 签名 | `r.content` / `r.parsed` | **`r.text`**（+ `r.streamed`） |
 | 适用 | plan / grade / rewrite / 路由裁决 | 初稿、汇总、行程、修订稿 |
 
@@ -67,13 +67,13 @@ const aggregate = createLlmStreamNode<MyStateType>({
 - **custom spec**：`"type": "llm-stream"`，`write` 用 `r.text`（**R-G009**；`generate.mjs` 生成前静态检）
 - **`createApprovalFinalizeNode`**：`rejectedLlm.write` 同样读 **`r.text`**（框架内置 `createLlmStreamNode`）
 - **ReAct 默认图**：`think` 走 messages 白名单另一条通路；勿与 topology 的 aggregate 节点混淆
-- **降级**：无 `onToken` 或模型无 `.stream()` → 退回 invoke；ACP 终态仍整段兜底（目标项目 README § 流式输出检查清单）
+- **降级**：无 `onToken` 或模型无 `.stream()` → 退回 invoke；客户端终态仍整段兜底（当前工作目录 README § 流式输出检查清单）
 
-详表 → 目标项目 `docs/node-kit.md` § createLlmStreamNode · **R-G009** · 本 Part § 流式输出。
+详表 → 当前工作目录 `docs/node-kit.md` § createLlmStreamNode · **R-G009** · 本 Part § 流式输出。
 
 ### createLlmNode 与 parseJson
 
-**硬规则见目标项目 `docs/flow-graph-rules.md`**（**R-G001 MUST**、**R-G002 SHOULD**、**R-G003 MUST**）。flow-builder 路由页：[flow-graph-rules-pointer.md](flow-graph-rules-pointer.md)。
+**硬规则见当前工作目录 `docs/flow-graph-rules.md`**（**R-G001 MUST**、**R-G002 SHOULD**、**R-G003 MUST**）。flow-builder 路由页：[flow-graph-rules-pointer.md](flow-graph-rules-pointer.md)。
 
 摘要：
 
@@ -88,14 +88,14 @@ custom spec：`write` 含 `r.parsed` 才写 `"parse"`。范例：`_example.inter
 
 | 场景 | 机制 | Factory / 配置 |
 |------|------|----------------|
-| 副作用工具执行前（写盘 / bash / HTTP…） | ACP 弹窗，**turn 内、可多次** | 自动：`createToolExecNode` + `config/flow-agent.config.json` → `permissions` |
+| 副作用工具执行前（写盘 / bash / HTTP…） | 确认弹窗，**turn 内、可多次** | 自动：`createToolExecNode` + `config/flow-agent.config.json` → `permissions` |
 | 图内跨轮人审（纯文本：说意见或 ok） | `interrupt` + 下轮用户消息 resume | `createHumanApprovalNode` → 常配对 `createApprovalFinalizeNode` |
-| 图内跨轮人审（**固定字段表单**） | **平台问答卡片**（ask-question MCP 展示）+ `interrupt` 收回复 | `present_review`：`createAskQuestionPresentationNode`（`human-in-loop/graph.ts`）→ `review`：`createHumanApprovalNode` + `normalizeReviewFeedback` → `createApprovalFinalizeNode` |
+| 图内跨轮人审（**固定字段表单**） | **平台问答卡片**（ask-question 平台工具 展示）+ `interrupt` 收回复 | `present_review`：`createAskQuestionPresentationNode`（`human-in-loop/graph.ts`）→ `review`：`createHumanApprovalNode` + `normalizeReviewFeedback` → `createApprovalFinalizeNode` |
 | 图内秒级 yes/no（确认发布？） | 同步弹窗，**不结束 turn** | `createPermissionApprovalNode`（`onApprovalRequest`） |
 
-> **平台问答卡片** = **主平台的问答卡片**（模板术语，见目标项目 `docs/glossary.md`）。它是 UI 展示层；**durable resume 仍靠 `interrupt`**，不是 MCP 工具替代品。
+> **平台问答卡片** = **主平台的问答卡片**（当前项目术语，见当前工作目录 `docs/glossary.md`）。它是 UI 展示层；**durable resume 仍靠 `interrupt`**，不是工具执行节点的替代品。
 >
-> **两节点范式（必拆）**：`present_review`（MCP 调 ask-question，工具返回 `pending`）与 `review`（`interrupt`）必须分开——MCP 不维护 LangGraph checkpoint；resume 时只重跑 `review`，避免重复弹表单。权威：`src/libs/topologies/human-in-loop/`。
+> **两节点范式（必拆）**：`present_review`（调用平台问答工具展示表单）与 `review`（`interrupt`）必须分开——展示工具不维护 LangGraph checkpoint；resume 时只重跑 `review`，避免重复弹表单。权威：`src/libs/topologies/human-in-loop/`。
 >
 > 工具审批由部署者配 `permissions.interruptOn`；流程弹窗由开发者在图里显式放节点。详见 `docs/node-catalog.md` HITL 类。
 
@@ -142,7 +142,7 @@ function fanoutToResearch(state): Send[] {
 
 **one-shot** → `FlowExecutor`。**有状态** → `createStatefulFlow`（禁止手写 run-loop；dev-agent `stateful-custom` 例外）。
 
-**两种 StatefulFlow 用法**（详见目标项目 README § 两类 flow）：
+**两种 StatefulFlow 用法**（详见当前工作目录 README § 两类 flow）：
 
 | 模式 | 配置 | 行为 |
 |------|------|------|
@@ -151,7 +151,7 @@ function fanoutToResearch(state): Send[] {
 
 ## Step 6: Surface
 
-`bootstrapFlowAcp` / `runFlowCli` 自动分流 one-shot vs stateful。
+服务入口 / `runFlowCli` 自动分流 one-shot vs stateful。
 
 ## 编排模式速查
 
@@ -159,7 +159,7 @@ function fanoutToResearch(state): Send[] {
 |------|----------|------|
 | ReAct | `toolsCondition` + `bindTools` | 默认图（`think` 只**决策** tool_calls，`tools` 节点才**执行**；见 `docs/flow-orchestration.md`） |
 | 条件重试 | `addConditionalEdges` | `src/libs/topologies/rag` |
-| Send 并行 | `Send` + reducer | `src/libs/topologies/travel-planner`（**aggregate 用 createLlmStreamNode**；**research 接平台搜索 MCP**） |
+| Send 并行 | `Send` + reducer | `src/libs/topologies/travel-planner`（**aggregate 用 createLlmStreamNode**；**research 接平台搜索工具**） |
 | reflection | `createLlmRouterNode` 或条件边 | pm / deep-research |
 | HITL | `interrupt` + resume | `src/libs/topologies/human-in-loop`（**compose 流式初稿 + 平台问答卡片 present_review（可选）**）；纯文本门控见 travel/pm |
 | **Durable stateful flow** | `onStage` + checkpoint | `src/libs/topologies/deep-research`（**draft 流式**） |

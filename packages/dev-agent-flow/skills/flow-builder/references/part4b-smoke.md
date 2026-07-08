@@ -1,14 +1,14 @@
 # Part 4b：`pnpm smoke`（rcoder-cli 端到端）
 
 > 所属：`flow-builder` L2-D 子文档。completion gate（完成闸门）见 [part4a-verify-debug.md](part4a-verify-debug.md)。
-> **模型 env 解析**由目标项目 `scripts/lib/smoke-env.mjs` 实现（与 runtime `config-loader` 对齐）。
+> **模型 env 解析**由当前工作目录 `scripts/lib/smoke-env.mjs` 实现（与 runtime `config-loader` 对齐）。
 > **通过/失败判定**由 `scripts/lib/smoke-outcome.mjs` 实现（以 session-trace 为准，见下文）。
 
 ## 它验证什么 / 不验证什么
 
 | ✅ 验证 | ❌ 不验证 |
 |---------|-----------|
-| ACP 握手 → `onPrompt` → 当前 `activeFlow` 图跑通 | `parse` 与 `write` 语义（**R-G001**，需静态规则或边界 prompt） |
+| 真实运行 → 当前 `activeFlow` 图跑通 | `parse` 与 `write` 语义（**R-G001**，需静态规则或边界 prompt） |
 | 模型凭证 + provider/model 解析正确 | HITL **多轮 resume**（one-shot only；首轮 interrupt 见下节） |
 | 子进程未吃到 `{MODEL_PROVIDER_*}` 占位符 | 与平台在线配置完全一致（本地用 `.env`） |
 | **HITL 首轮**：`flowStatus=interrupted` 且流式出题 / `questionChars>0` | — |
@@ -148,7 +148,7 @@ pnpm smoke
 ### 占位符问题（曾导致 400 Invalid model）
 
 rcoder-cli 子进程可能继承未替换的 `ANTHROPIC_MODEL={MODEL_PROVIDER_MODEL_NAME}`。  
-`smoke-acp.mjs` 会 **跳过占位符**，并用 `.env` + `flow-agent.config.json` 解析后显式 `-e OPENAI_MODEL=...`。
+smoke runner 会 **跳过占位符**，并用 `.env` + `flow-agent.config.json` 解析后显式 `-e OPENAI_MODEL=...`。
 
 排查：`SMOKE_DEBUG=1 pnpm smoke -- --debug --dry-run`
 
@@ -183,7 +183,7 @@ rcoder-cli 子进程可能继承未替换的 `ANTHROPIC_MODEL={MODEL_PROVIDER_MO
 
 - ❌ 见 `Session cancelled` / `Prompt ended with error` 就判 smoke 失败（应先查 session-trace；HITL `interrupted` + 流式出题可通过）
 - ❌ 无任何可用模型凭证（`.env` / shell / `OPENCODE_*`）就报 smoke 完成
-- ❌ `activeFlow=default` 却声称 custom flow 已验过 ACP
+- ❌ `activeFlow=default` 却声称 custom flow 已验过 smoke
 - ❌ 手 export 一堆模型 env 覆盖 config，而不改 `.env` / config
 - ❌ 只跑 `build/test/graph`，跳过 smoke
 - ❌ 见 `400 Invalid model` 就改 config 模型名，不查占位符与 `.env`

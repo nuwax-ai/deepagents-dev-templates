@@ -10,10 +10,10 @@
 | 0 | 装依赖 | `package.json` 且无 `node_modules`/lock 变更 → `pnpm install`；`pyproject.toml` 且无 `.venv` → `uv sync --group dev` |
 | 1 | 读上下文 | `README.md`、`project.md`（无则创建，记录项目记忆与关键决策） |
 | 2 | 系统提示词基线 | `dev-engineer-toolkit` → `get-config.sh --key systemPrompt`（及 `openingChatMsg`）。若平台 **空/占位** 且用户已描述 Agent → **先于写图**走 [part5-prompt-design.md](part5-prompt-design.md) § 用户输入提炼 |
-| 3 | 读模板文档 | `docs/glossary.md` → `flow-graph-rules.md` → `node-catalog.md` → `node-kit.md` → `config/flow-agent.config.json` |
+| 3 | 读当前项目文档 | `docs/glossary.md` → `flow-graph-rules.md` → `node-catalog.md` → `node-kit.md` → `config/flow-agent.config.json` |
 | 4 | 简报 | 项目状态 + 待办，再处理用户指令 |
 
-**平台配置**：读写平台在线配置（`systemPrompt` / `tools` / `mcpConfigs` / `skills` 等）一律经 `dev-engineer-toolkit`（禁止只改本地）。
+**平台配置**：读写平台在线配置（`systemPrompt` / `tools` / `skills` 等）一律经 `dev-engineer-toolkit`（禁止只改本地）。
 
 ---
 
@@ -27,7 +27,7 @@
 | **固定输入 → 固定阶段 → 单次输出** | 「翻译这段」「审这篇」「生成一份」「给 X 打分」——流程固定、一次交付 | one-shot preset / `custom` 管道 |
 | **需人工审批 / 确认后定稿** | 「审批」「确认后发布」「人工复核」 | HITL 系（`human-in-loop` / `project-manager`） |
 
-**零图路径（conversational 首选，MVP 最快）**：`activeFlow: "default"` + `dev-engineer-toolkit` 登记平台能力（运行期统一转 MCP，自动进 `think ↔ tools`）+ Part 5 systemPrompt 定制 ≈ 交付，**不写任何图代码**。新建图必须能说明「default ReAct 为什么不够」（如：固定阶段顺序、需 Send 并行、需 HITL interrupt），说不出就走零图路径。
+**零图路径（conversational 首选，MVP 最快）**：`activeFlow: "default"` + `dev-engineer-toolkit` 登记平台能力 + Part 5 systemPrompt 定制 ≈ 交付，**不写任何图代码**。新建图必须能说明「default 为什么不够」（如：固定阶段顺序、需 Send 并行、需 HITL interrupt），说不出就走零图路径。
 
 > **反例（真实失败案例）**：「搜索聚合 Agent，支持**追问和钻取**」被误判成 fanout×4 固定管道——每轮盲搜 4 路、无法真正追问钻取。「追问」即 conversational 信号，正确落点：default ReAct + 平台搜索能力登记 + systemPrompt。
 
@@ -42,10 +42,10 @@
 
 **触发（满足任一）**：
 
-- 用户要调用外部 API、第三方数据、业务 Plugin、知识库、MCP、平台技能
+- 用户要调用外部 API、第三方数据、业务 Plugin、知识库、平台技能
 - 用户要联网 / 搜索 / 实时资讯 / 多源调研（**较常见**；另见 Part 3 § 联网搜索）
-- 计划使用：`createToolExecNode` · `createMcpRetrievalNode` · `bindTools` · `flow-tools.ts` 新增工具 · `rag`/`adaptive-rag` 检索 · ReAct 接业务工具
-- topology：`react-tools` · `dev-agent` · `rag` · `adaptive-rag` · `travel-planner` · `deep-research` · custom 含 `tool-exec` / `mcp-retrieval`
+- 计划使用：`createToolExecNode` · `bindTools` · `flow-tools.ts` 新增工具 · `rag`/`adaptive-rag` 检索 · ReAct 接业务工具
+- topology：`react-tools` · `dev-agent` · `rag` · `adaptive-rag` · `travel-planner` · `deep-research` · custom 含 `tool-exec`
 
 **豁免（仍须 Part 3 知情，但可不 add-tool）**：纯 LLM 对话、无外部 I/O；仅内置 `bash`/`read_file`/`grep`（工作区内）。
 
@@ -53,12 +53,12 @@
 |----|------|
 | 1 | 加载 `dev-engineer-toolkit` + [part3-tools-config.md](part3-tools-config.md) § 平台能力登记 |
 | 2 | 按能力拆词：`search-apis.sh --kw "<关键词>"`（可多轮）；需技能 → `search-skills.sh` |
-| 3 | `get-config.sh --key tools` / `mcpConfigs` / `skills`（按需） |
-| 4 | 命中 → `add-tool.sh`（**登记即接入**：运行期统一转 MCP 自动下发）；conversational ReAct **零接线**，固定管道图内按名接线 → `project.md` 记 targetId |
+| 3 | `get-config.sh --key tools` / `skills`（按需） |
+| 4 | 命中 → `add-tool.sh`；固定管道需要限定工具集合时在节点 `params` 写 `toolName` / `tools` → `project.md` 记 targetId / 工具名 |
 | 5 | 平台确无命中 → 记录关键词与输出，**然后**方可走优先级 3 自写 app 工具 |
 | 6 | **然后**写 spec / `graph.ts` |
 
-> **禁止**：先写占位工具 / `SEARCH_MCP = undefined` / 空 `flow-tools.ts` 再 smoke 报完成，把平台登记甩给「用户待操作」；**为已登记能力手写 fetch/`tool()` 包装**（运行期它已是 MCP 工具）。**联网搜索**是高频场景，同样不得跳过登记；**平台工具（Plugin/Workflow/MCP）运行期统一转 MCP 经 ACP `mcpServers` 下发**，模板不内置。
+> **禁止**：先写占位工具 / 空 `flow-tools.ts` 再 smoke 报完成，把平台登记甩给「用户待操作」；**为已登记能力手写 fetch/`tool()` 包装**。**联网搜索**是高频场景，同样不得跳过登记；当前项目不内置互联网搜索。
 
 ### Factory 速查（手写路径）
 
@@ -67,7 +67,6 @@
 | 用户可见大段 LLM 文本 | **`createLlmStreamNode`**（`r.text`；spec `llm-stream`） |
 | 中间 JSON / 结构化 | `createLlmNode`（`r.parsed` 时） |
 | LLM 裁决路由 | `createLlmRouterNode` |
-| MCP 检索 | `createMcpRetrievalNode` |
 | tool_calls | `createToolExecNode` |
 | HITL interrupt（纯文本） | `createHumanApprovalNode` |
 | HITL **平台问答卡片**（interrupt 前展示表单） | `createAskQuestionPresentationNode`（`human-in-loop/graph.ts`）；表单回复用 `normalizeReviewFeedback` |
@@ -105,7 +104,7 @@
 | 3 | 节点优先 factory；bespoke 须说明原因 |
 | 4 | `Annotation.Root`；Send 并行加 reducer |
 | 5 | 节点返回 Partial；禁止 mutate state |
-| 6 | 图规则 → 目标项目 `docs/flow-graph-rules.md`（**R-G001+**） |
+| 6 | 图规则 → 当前工作目录 `docs/flow-graph-rules.md`（**R-G001+**） |
 | 7 | 用户可见输出 → **R-G009** `createLlmStreamNode` + `r.text`；手改 graph 同步 spec（**R-G003**） |
 | 8 | 工具 → [part3-tools-config.md](part3-tools-config.md) → `src/app/` → `createFlowTools()` |
 | 9 | 系统提示词 → [part5](part5-prompt-design.md)；填 scaffold `systemPrompt`（若 topology 注入） |
@@ -121,9 +120,9 @@
 pnpm build && pnpm typecheck && pnpm test && pnpm graph && pnpm smoke
 ```
 
-- **ACP 真实运行门**：本地优先 `pnpm smoke`（rcoder-cli）；禁止 `--dry-run` 冒充通过
+- **真实运行门**：本地优先 `pnpm smoke`；禁止 `--dry-run` 冒充通过
 - **前置**：模型凭证（`.env` / NuWaClaw `OPENCODE_*`）+ `config.activeFlow` 指向当前 flow
-- **细则**： [part4a-verify-debug.md](part4a-verify-debug.md) + [part4b-smoke-acp.md](part4b-smoke-acp.md)
+- **细则**： [part4a-verify-debug.md](part4a-verify-debug.md) + [part4b-smoke.md](part4b-smoke.md)
 - **排查**： [part4a](part4a-verify-debug.md) § 读日志六步、典型错误
 
 失败 → 修 → 重跑（至多 5 轮）→ 仍失败如实交回。
@@ -134,23 +133,23 @@ pnpm build && pnpm typecheck && pnpm test && pnpm graph && pnpm smoke
 
 1. 完成了什么（topology / 节点 / 关键图能力）
 2. **用户待操作事项、风险与后续**（见下表；**无真待办则整段省略**）
-3. `project.md` 已更新（含已登记 targetId、MCP 名、工具名）
+3. `project.md` 已更新（含已登记 targetId、工具名；固定管道含节点工具名引用）
 4. **平台 `systemPrompt` 非空且已回读**（`openingChatMsg` 若涉及）
 5. 提示词提炼来源（用户哪些输入 → 哪一字段）
-6. **需平台能力时**：`search-apis` / `search-skills` / `get-config` 结果摘要（或「已搜索、无命中」+ 关键词）；自写工具须说明平台无命中依据（**联网搜索较常见**，须单独列出搜索/MCP 关键词）
-7. **平台能力真实调用证据**：运行期下发的 MCP 工具名 + smoke 调用轨迹片段（`SMOKE_EXPECT_TOOL` 断言通过；工具被调用且未失败）
+6. **需平台能力时**：`search-apis` / `search-skills` / `get-config` 结果摘要（或「已搜索、无命中」+ 关键词）；自写工具须说明平台无命中依据（**联网搜索较常见**，须单独列出搜索关键词）
+7. **平台能力真实调用证据**：smoke 调用轨迹片段（`SMOKE_EXPECT_TOOL` 断言通过；工具被调用且未失败）
 
-### Phase 4「后续」可写 / 禁止（ACP 默认集成）
+### Phase 4「后续」可写 / 禁止（平台默认集成）
 
-本架构下 **ACP 会话 + 平台沙箱** 已默认注入开发运行时上下文（平台 API、沙箱认证、项目标识等）。**不得**在报告、对话、收工说明中复述具体环境变量名，也**不得**要求用户手动配置。
+本架构下平台沙箱已默认注入开发运行时上下文（平台 API、沙箱认证、项目标识等）。**不得**在报告、对话、收工说明中复述具体环境变量名，也**不得**要求用户手动配置。
 
 | 可写（真用户侧业务待办） | 禁止写入 Phase 4 / 对话 |
 |--------------------------|-------------------------|
 | 业务数据录入、审批、上线决策 | 任何沙箱/平台**环境变量名**（脱敏：只说「平台已集成」或不提） |
 | 用户明确要求的模型/套餐选择（非开发 Agent 代劳） | `add-tool` / `search-apis` / `get-config` / Plugin **Authorization** / API key 登记 |
-| 无待办 | 「后续」「用户需确保运行时…」等占位段；ACP/MCP/沙箱集成说明 |
+| 无待办 | 「后续」「用户需确保运行时…」等占位段；平台/沙箱集成说明 |
 
-> **禁止**：把开发期未完成的平台能力登记写成「用户后续配置」；把 ACP 默认能力写成待办事项。
+> **禁止**：把开发期未完成的平台能力登记写成「用户后续配置」；把 平台默认能力写成待办事项。
 
 ---
 
@@ -163,7 +162,7 @@ pnpm build && pnpm typecheck && pnpm test && pnpm graph && pnpm smoke
 - [ ] `.logs/` 无未预期 `error`
 - [ ] `get-config.sh --key systemPrompt` 回读**非空**；用户发过 Agent 描述 → 已按 part5 提炼并同步
 - [ ] 用户可见 LLM 节点 → `createLlmStreamNode` + `r.text`（**R-G009**）
-- [ ] **需平台能力**（见 Phase 1「平台能力门禁」）→ 已贴 `search-apis.sh` / `search-skills.sh` 与/或 `get-config.sh --key tools|mcpConfigs|skills` **原始输出**；有命中 → 已 `add-tool.sh`（conversational 零接线 / 管道已按名接线）；无命中 → 报告写明关键词与「已搜索、无命中」后方可自写工具。**联网搜索较常见**，须含 `mcpConfigs` 或搜索关键词证据。**未搜平台即报完成 = 不通过**
+- [ ] **需平台能力**（见 Phase 1「平台能力门禁」）→ 已贴 `search-apis.sh` / `search-skills.sh` 与/或 `get-config.sh --key tools|skills` **原始输出**；有命中 → 已 `add-tool.sh`；固定管道需要时节点 `params` 已写 `toolName` / `tools`；无命中 → 报告写明关键词与「已搜索、无命中」后方可自写工具。**联网搜索较常见**，须含搜索关键词证据。**未搜平台即报完成 = 不通过**
 - [ ] **平台能力真实调用**（凡已登记）→ `SMOKE_EXPECT_TOOL=<工具名子串>` + 触发式 `SMOKE_PROMPT` 跑 smoke 通过，已贴工具调用轨迹片段。**smoke 绿但工具未真调用 = 不通过**（LLM 兜底输出会假绿）
 
 ---
@@ -171,7 +170,7 @@ pnpm build && pnpm typecheck && pnpm test && pnpm graph && pnpm smoke
 ## LangGraph 文档（TS API）
 
 - 参考：<https://docs.langchain.com/oss/javascript/langgraph/overview>
-- 查 API 时 query 带 `javascript` / `typescript`；优先官方文档，勿依赖模板内置文档 MCP（须经平台登记 + ACP 下发）
+- 查 API 时 query 带 `javascript` / `typescript`；优先官方文档。
 
 ---
 
@@ -184,5 +183,3 @@ pnpm build && pnpm typecheck && pnpm test && pnpm graph && pnpm smoke
 | `http_request` / `json_utils` | HTTP / JSON |
 | `load_skill` / `task` | skill 加载 / 平台 subagent 委派 |
 | `echo` / `calculate` / `time` | demo fallback |
-
-Native MCP：`config/mcp.default.json` + ACP session `mcpServers`（无 `mcp_tool_bridge`）。

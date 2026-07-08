@@ -19,6 +19,7 @@
 | 跟进 ACP 协议对齐与工具出站 | [acp/README.md](./acp/README.md) |
 | 查 LangGraph 原生能力收敛计划 | [langgraph-native-convergence.md](./langgraph-native-convergence.md) |
 | 查拓扑 scaffold 重构 code-review 修复计划 | [topology-scaffold-review-fixes-plan.md](./topology-scaffold-review-fixes-plan.md) |
+| 查平台工具绑定、schema 静态沉淀与 `platform-tool` 节点设计 | [platform-tool-binding-design.md](./platform-tool-binding-design.md) |
 | 查 RAG 早期计划（**已过时，历史归档**） | [rag-agent-plan.md](./rag-agent-plan.md) |
 
 ---
@@ -35,6 +36,7 @@ development/
 ├── checkpoint-integrity-and-prompt-resolution.md  ← systemPrompt 追加 + checkpoint 三层修复（✅ v1.9.4）
 ├── langgraph-native-convergence.md       ← LangGraph 原生对象收敛开发方案
 ├── topology-scaffold-review-fixes-plan.md  ← 拓扑积木化重构修复计划（✅ 已落地）
+├── platform-tool-binding-design.md       ← 平台工具绑定与固定管道工具节点设计
 ├── rag-agent-plan.md                   ← RAG 早期计划（⚠️ 已过时）
 ├── acp-spec-alignment.md               ← → acp/ 的跳转页（兼容旧链接）
 └── acp/                                ← ACP 协议对齐维护手册（子索引见 acp/README.md）
@@ -68,6 +70,7 @@ development/
 | [subagent-task-and-acp-plan.md](./subagent-task-and-acp-plan.md) | 现行 | `write_todos`、`task` 并行流式分桶、Plan 合并、子 agent 输出兜底（v1.9.0–1.9.1） |
 | [checkpoint-integrity-and-prompt-resolution.md](./checkpoint-integrity-and-prompt-resolution.md) | 现行 | ACP systemPrompt 追加、孤立 tool_calls 三层修复（v1.9.2–1.9.4） |
 | [langgraph-native-convergence.md](./langgraph-native-convergence.md) | 计划中 | surface 流式、MessagesAnnotation、compaction 等向 LangGraph 原生收敛 |
+| [platform-tool-binding-design.md](./platform-tool-binding-design.md) | 现行 | 平台工具登记、schema 静态沉淀、节点 `params` 工具引用、`platform-tool` / `tool-exec` 边界 |
 
 ### ACP / Surface
 

@@ -1,8 +1,8 @@
 ---
 name: dev-engineer-toolkit
-description: "当开发项目需要搜索可用工具（API）、可用技能（SKILL）、平台能力登记（Plugin/MCP/外部 API；联网搜索较常见）、或项目配置读写时使用。Keywords: API搜索, 平台能力, 工具登记, MCP, 联网搜索, 技能搜索, 项目配置"
+description: "当开发项目需要搜索可用工具（API）、可用技能（SKILL）、或进行项目配置（系统提示词、开场白等智能体配置）时使用。这是开发工程师的基础技能包，所有涉及额外API接口查询、技能发现、项目配置读写的场景都必须使用本技能。Keywords: API搜索, 技能搜索, 项目配置, 系统提示词, 开场白, agent配置, 工具搜索, tool search, skill discovery"
 tags: [api-search, skill-search, project-config, dev-toolkit, agent-config, tool-discovery]
-version: "1.6.0"
+version: "1.7.0"
 ---
 
 # 开发工程师工具包
@@ -27,40 +27,11 @@ version: "1.6.0"
 
 **必须使用本技能的场景：**
 
-1. **需要工作区以外的任何能力时（写图前强制）** — Plugin / Workflow / Knowledge / MCP / 外部 API / 平台技能等。先 `search-apis.sh`（按能力拆词）、`search-skills.sh`（若需）、`get-config.sh`（tools / mcpConfigs / skills），命中则 `add-tool.sh`，**再**写 `graph.ts` / `flow-tools.ts`。禁止未搜平台就自写工具或以「用户待配置」甩锅。
-2. **联网搜索（较常见）** — 在场景 1 之上追加 `搜索`/`联网`/`web` 关键词并查 `mcpConfigs`（`travel-planner`、`search-aggregator`、`adaptive-rag` 等）。见下文「联网搜索登记」。
-3. **需要查找已有技能时** — `search-skills.sh` 检索是否可复用。
-4. **需要读取项目配置时** — `get-config.sh`。
-5. **需要更新项目配置时** — **必须** `update-config.sh`，不要仅改本地。
-
-### 平台能力登记（写图前 · 通用）
-
-```bash
-./scripts/search-apis.sh --kw "<能力关键词>"    # 按需求多轮，如 天气 / 通知 / 文件上传
-./scripts/search-skills.sh --kw "<关键词>"      # 可选
-./scripts/get-config.sh --key tools
-./scripts/get-config.sh --key mcpConfigs
-./scripts/get-config.sh --key skills
-# 命中后：
-./scripts/add-tool.sh --target-id <targetId>
-```
-
-- 将 `targetId`、工具名、MCP 名、接线位置记入 `project.md`
-- 平台确无命中：须在 completion gate 贴上述命令原始输出，方可自写 app 工具
-- **禁止**跳过搜索就写占位工具或未接线报完成
-
-### 联网搜索登记（常见专项 · 在通用登记之上）
-
-```bash
-./scripts/search-apis.sh --kw "搜索"
-./scripts/search-apis.sh --kw "联网"
-./scripts/get-config.sh --key mcpConfigs
-# 命中后：
-./scripts/add-tool.sh --target-id <targetId>
-```
-
-- 联网是平台能力登记中**最高频场景**；须完成通用登记 + 本段搜索/MCP 检查
-- **禁止**在 `index.ts` 写 `SEARCH_MCP = undefined` 后报完成
+1. **需要新的 API 接口时** — 开发中需要调用某个功能接口，先通过 `search-apis.sh` 搜索平台是否已有可用 API，避免重复造轮子。
+2. **需要联网搜索时** — 需求含互联网检索、实时资讯、网页搜索时，先通过 `search-apis.sh` 搜索平台搜索类 Plugin 并 `add-tool.sh` 登记，再开发。内置 `search`/`grep` 仅用于仓库内检索，不是联网搜索。
+3. **需要查找已有技能时** — 开发中需要某个领域能力（如代码审查、测试生成），先通过 `search-skills.sh` 检索是否已有对应技能可复用。
+4. **需要读取项目配置时** — 需要获取当前项目的系统提示词、开场白、模型设置等配置信息时，使用 `get-config.sh`。
+5. **需要更新项目配置时** — 用户要求修改系统提示词、开场白、或任何项目级配置时，**必须**使用 `update-config.sh` 通过接口更新，不要仅本地修改文件。
 
 所有脚本由平台沙箱运行时自动配置，直接执行即可，无需传入认证或项目标识参数。
 
@@ -390,7 +361,7 @@ Python 环境由 `check-python.sh` 自动探测，缺失时可用 `--install`（
 你好！我是你的开发助手。
 
 --- 已注册工具 (4 个) ---
-  [Plugin] #614 token价格查询_1
+  [Plugin] #614 @retrieve token价格查询_1
   [Knowledge] #528 Test
 
 --- 已注册技能 (1 个) ---
@@ -475,7 +446,7 @@ Python 环境由 `check-python.sh` 自动探测，缺失时可用 `--install`（
 
 ## 常见工作流
 
-### 工作流 A：工具采纳（搜索 → 注册 → 接入）
+### 工作流 A：工具采纳（搜索 → 注册 → 开发）
 
 当决定使用某个搜索到的工具 API 时，必须按以下两步操作：
 
@@ -483,24 +454,22 @@ Python 环境由 `check-python.sh` 自动探测，缺失时可用 `--install`（
 1. 注册工具（必须先注册才能调用）
    ./scripts/add-tool.sh --target-type "Plugin" --target-id 614
 
-2. 注册即接入（运行期统一 MCP 下发）
-   - 已登记的 Plugin/Workflow/MCP 运行期由平台后端统一转成 MCP，
-     经 ACP session/new 的 mcpServers 下发，自动进入 runtime 工具集
-   - conversational ReAct（default flow）零代码可用；固定管道按 server/tool 名引用
-   - schema 字段仅用于理解参数含义；禁止照 schema 手写 HTTP 调用/fetch 包装
+2. 根据工具的 schema 进行实际开发
+   - 使用搜索结果中 schema 字段的接口定义（method, url, params 等）
+   - 保持 schema 中的 ${...} 占位符，不硬编码
 ```
 
 > ⚠️ **注册是调用前提**：搜索到的 Plugin、Workflow、Knowledge、Skill 必须先通过 `add-tool.sh` 注册才能调用。
-> ⚠️ **注册后零包装**：禁止为已登记能力自写 `*.tool.ts` fetch（端点/envelope 一律不得猜测；`4sandbox` 系接口仅供本技能脚本使用）。
 
 ### 工作流 B：开发前资源发现
 
 ```
 1. 理解需求 → 列出需要的功能点
 2. 对每个功能点执行 search-apis.sh → 确认是否有现成 API
-3. 对每个领域问题执行 search-skills.sh → 确认是否有现成技能
-4. 对确认使用的工具执行 add-tool.sh → 注册到项目
-5. 汇总：已注册资源直接开发，缺失资源标记待开发
+3. 含联网搜索时 → search-apis.sh --kw "搜索"（及 "联网" / "web"）→ 命中 Plugin 则 add-tool.sh 登记
+4. 对每个领域问题执行 search-skills.sh → 确认是否有现成技能
+5. 对确认使用的工具执行 add-tool.sh → 注册到项目
+6. 汇总：已注册资源直接开发，缺失资源标记待开发
 ```
 
 ### 工作流 C：项目配置修改
@@ -526,7 +495,7 @@ Python 环境由 `check-python.sh` 自动探测，缺失时可用 `--install`（
 ## Anti-patterns
 
 - ❌ **跳过注册直接调用**：搜索到工具后不执行 `add-tool.sh` 注册，直接尝试调用，导致调用失败。
-- ❌ **注册后又手写包装**：为已登记的 Plugin/Workflow 自写 fetch/`tool()` 调用（猜端点、猜响应结构、无超时）——运行期它们已统一转成 MCP 工具自动下发，手写包装必坏。
+- ❌ **内置 search/grep 当联网**：内置 `search`/`grep` 仅检索仓库内文件，不能替代平台搜索 Plugin。
 - ❌ **绕过搜索直接造轮子**：开发新功能前不搜索是否有现成 API/技能，导致重复实现。
 - ❌ **直接修改配置文件**：手动编辑项目配置文件而非使用配置接口更新，导致配置不同步或格式错误。
 - ❌ **假设 API 存在**：不执行搜索就假设某个接口存在，直接编写调用代码。
@@ -537,6 +506,7 @@ Python 环境由 `check-python.sh` 自动探测，缺失时可用 `--install`（
 - ❌ **命令行内联多行中文**：应使用 `--system-prompt-file` 读 UTF-8 文件
 - ❌ **忽略返回值**：执行配置更新后不检查返回的 `code`/`success` 字段，可能导致静默失败
 - ✅ **先搜后用**：任何功能开发前，先用对应脚本检索平台已有资源。
+- ✅ **联网先搜 Plugin**：联网需求先 `search-apis.sh` 搜搜索类 Plugin，命中则 `add-tool.sh` 登记。
 - ✅ **配置走接口**：所有项目配置的读写统一通过 `get-config.sh` / `update-config.sh`（UTF-8 安全的 Python 实现）。
 - ✅ **中文用文件上传**：长系统提示词用 `--system-prompt-file` 指向 UTF-8 文件
 - ✅ **占位符原样保留**：使用搜索到的 API 时，schema 中的 `${...}` 占位符保持原样，由运行时平台解析。

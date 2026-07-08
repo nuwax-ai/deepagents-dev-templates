@@ -3,7 +3,7 @@
 > 所属：`flow-builder` L2-E。入口路由见 [SKILL.md](../SKILL.md)。
 > **写什么**在本层；**怎么存**经 `dev-engineer-toolkit`（见下方「保存与同步」）。
 
-为基于 `deepagents-flow-ts` 开发的**业务 Agent（主 Agent / 目标 Agent）** 设计系统提示词 / 开场白。产出的是目标 Agent 运行时读取的提示词，不是开发 Agent 自身提示词，**也不是** `.agents/agents/<name>/AGENT.md` 子智能体。
+为在当前工作目录开发的**业务 Agent（主 Agent / 目标 Agent）** 设计系统提示词 / 开场白。产出的是目标 Agent 运行时读取的提示词，不是开发 Agent 自身提示词，**也不是** `.agents/agents/<name>/AGENT.md` 子智能体。
 
 ## 用户输入提炼与平台同步（提示词提炼事务）
 
