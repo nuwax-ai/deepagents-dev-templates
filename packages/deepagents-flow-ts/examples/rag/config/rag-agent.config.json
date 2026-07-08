@@ -1,12 +1,12 @@
 {
   "agent": {
-    "name": "deepagents-flow-ts",
+    "name": "rag-flow-agent",
     "description": "RAG 工作流 agent — 按显式 LangGraph 节点图运行（rewrite → retrieve → grade → prepare → generate）",
     "version": "1.0.0"
   },
   "model": {
-    "provider": "anthropic",
-    "name": "claude-sonnet-4-6",
+    "provider": "deepseek",
+    "name": "deepseek-v4-flash",
     "settings": {
       "temperature": 0,
       "maxTokens": 16384

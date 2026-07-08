@@ -1,4 +1,4 @@
-# deepagents-flow-ts
+# 通用工作流编排模板
 
 **通用工作流编排模板** —— Agent 按 **preset topology**（预先设计的 node + edge 图）跑 LangGraph 工作流，而不是自由的 tool loop。
 
@@ -6,9 +6,9 @@
 > - **源码开发**（git checkout，含 `src/`、`examples/`、`tsconfig`）：本目录 `pnpm install && pnpm build` 即可改默认图、生成场景 flow、扩展能力。
 > - **平台压缩包**（`.tar.gz` / `.zip`，nuwax 打包格式）：内含已构建的 `dist/bundle.mjs`（单文件打包，不依赖 `node_modules`），由主平台直接运行，**无需 `build`**。
 
-本模板是 **工作流编排 Agent**（显式 LangGraph 图），与 Coding Agent（tool loop）产品形态不同；运行时基础能力由模板**内置底层运行时**（`src/runtime/`）承担，「大脑」是一张可设计的节点图。
+本项目是 **工作流编排 Agent**（显式 LangGraph 图），与 Coding Agent（tool loop）产品形态不同；运行时基础能力由项目内置底层运行时（`src/runtime/`）承担，「大脑」是一张可设计的节点图。
 
-> **本文档**介绍本仓库（`deepagents-flow-ts` 工作目录）的项目结构、分层规则、命令与检查清单；API 细节见源码与 `docs/`。
+> **本文档**介绍当前工作目录的项目结构、分层规则、命令与检查清单；API 细节见源码与 `docs/`。
 
 ## 快速开始
 
@@ -75,7 +75,7 @@ config/ prompts/ skills/ scripts/ docs/ tests/
 1. **脚手架优先**（一句话 / 简单场景）：写 spec → `node scripts/scaffold/generate.mjs <spec>` → 改 `config/flow-agent.config.json` 的 `activeFlow`（自带 typecheck+graph 自验）
 2. **直接改默认图**：编辑 [src/app/graph.ts](src/app/graph.ts) 连线 + [src/app/nodes/](src/app/nodes/) 节点逻辑；进阶形态对照 [src/libs/topologies/](src/libs/topologies/)，surface 接法对照 [examples/](examples/)
 
-**多 flow 选图**：`config/flow-agent.config.json` 顶层 `activeFlow`（缺省 `default`）经 [src/app/flows/index.ts](src/app/flows/index.ts) 注册表解析——`flow` / `graph` / ACP 三条入口共用。内置 flow（各代表一类形态）：`default`（conversational ReAct 泛化底座）、`search-aggregator`（conversational + 平台能力样板，**零图路径**：default 底座 + systemPrompt，平台登记的能力运行期转 MCP 自动 bind）、`translate-review`（one-shot 流式管道教学）、`router-gate`（LLM 路由教学）。更多形态见 `src/libs/topologies/`（8 积木）；场景 spec 范例在 `scripts/scaffold/specs/`。`pnpm graph` 导出**当前 activeFlow** 的 graph topology。
+**多 flow 选图**：`config/flow-agent.config.json` 顶层 `activeFlow`（缺省 `default`）经 [src/app/flows/index.ts](src/app/flows/index.ts) 注册表解析——`flow` / `graph` / ACP 三条入口共用。内置 flow（各代表一类形态）：`default`（conversational ReAct 泛化底座）、`search-aggregator`（conversational + 平台能力样板，**零图路径**：default 底座 + systemPrompt，平台登记的能力运行期进入 `allTools` 后自动 bind）、`translate-review`（one-shot 流式管道教学）、`router-gate`（LLM 路由教学）。更多形态见 `src/libs/topologies/`（8 积木）；场景 spec 范例在 `scripts/scaffold/specs/`。`pnpm graph` 导出**当前 activeFlow** 的 graph topology。
 
 **两类 flow**（[src/core/flow-types.ts](src/core/flow-types.ts)）：
 - `FlowExecutor`：one-shot，`(query, cb) => Promise<FlowResult>`。无记忆单次调用（见 `src/libs/topologies/rag`）。
@@ -199,7 +199,8 @@ pnpm graph --mermaid    # → Mermaid 源，可直接渲染
 ```
 
 ```ts
-import { getFlowTopology } from "deepagents-flow-ts/topology";
+// 工作区内
+import { getFlowTopology } from "./src/app/topology.js";
 const { nodes, edges, mermaid } = await getFlowTopology();
 ```
 
@@ -244,23 +245,23 @@ pnpm test
 
 ## 联网 / 外部检索
 
-> **需要联网搜索时**：模板**不提供**开箱即用的网页搜索。必须到**平台**查找并添加（开发 Agent 经 `dev-engineer-toolkit`：`search-apis.sh` → `add-tool.sh` / `mcpConfigs`）。**登记即接入**：平台已登记的一切工具能力（Plugin / Workflow / MCP）运行期由平台后端**统一转成 MCP**，经 **ACP `session/new` 下发的 `mcpServers`** 注入 runtime（与 `config/mcp.default.json` 合并，默认 session-wins）→ 自动进 `allTools`，conversational ReAct `think ↔ tools` 零代码可用；固定管道用 `createMcpRetrievalNode` 按名接线。禁止为已登记能力手写 fetch / `tool()` 包装；禁止用 `bash`+curl / `http_request` 替代；禁止在 `mcp.default.json` 内置搜索 server。
+> **需要联网搜索时**：当前项目**不提供**开箱即用的网页搜索。必须到**平台**查找并添加（开发 Agent 经 `dev-engineer-toolkit`：`search-apis.sh` → `add-tool.sh`）。**登记即接入**：平台已登记的工具能力（Plugin / Workflow / Knowledge 等）由平台在运行期适配为可用工具并注入 `FlowRuntime.allTools`；conversational ReAct 的 `think ↔ tools` 可零代码使用，固定管道可在节点 `params` 写工具名（`platform-tool` 用 `toolName`，`tool-exec` 用 `tools`）选择工具集合。禁止为已登记能力手写 fetch / `tool()` 包装；禁止用 `bash`+curl / `http_request` 替代；禁止在项目配置内硬编码搜索服务。
 
 | 能力 | 代码落点 | 说明 |
 |------|----------|------|
 | 工作区检索 | `grep` / `glob` 工具（`createSearchTools`） | **非**联网；ReAct 默认图经 `flow-tools.ts` 注册 |
-| **平台能力对话（零图路径）** | `src/app/flows/search-aggregator/` | default ReAct 底座 + systemPrompt；平台登记的搜索能力运行期转 MCP 自动 bind，零接线 |
-| 图内 MCP 检索（固定管道） | `createMcpRetrievalNode` | `travel-planner` 的 `searchMcp`；`deep-research` 的 `docMcp`；`rag` / custom 的 `mcpServers` |
-| 自适应 RAG 网页搜索 | `adaptive-rag` `createWebSearchNode` + `searchMcp` | 平台登记搜索能力后接入；**运行期** ACP `mcpServers` |
+| **平台能力对话（零图路径）** | `src/app/flows/search-aggregator/` | default ReAct 底座 + systemPrompt；平台登记的搜索能力运行期进入 `allTools` 后自动 bind，零接线 |
+| 固定管道工具节点 | `createPlatformToolActionNode` / `createToolExecNode` / `createMcpRetrievalNode` | 按节点 `params.toolName` / `params.tools` 引用平台工具；现有检索型 topology 仍可使用 MCP 检索节点 |
+| 自适应 RAG 网页搜索 | `adaptive-rag` `createWebSearchNode` + `searchMcp` | 平台登记搜索能力后接入；运行期由平台适配后注入工具集 |
 | 未配置搜索源 | `travel-planner` research；`search-aggregator` 提示词 | `searchMcp` 缺省 → 优雅降级（提示去平台添加）；样板无搜索工具时如实告知；须开发期已搜平台举证 |
-| **ACP 下发** | `src/surfaces/acp/server.ts` | `session/new` → `mcpServers` 合并进 `loadConfig` → runtime MCP 工具 |
+| **运行时注入** | `src/runtime/` / `src/app/flow-tools.ts` | 平台会话能力与项目配置汇总为 runtime 工具集 |
 | **真实调用验证** | `SMOKE_EXPECT_TOOL=<子串> pnpm smoke` | 轨迹须现该工具调用且 done 非空，否则 exit 1（防 LLM 兜底假绿） |
 
-云开发环境中平台 Plugin / `mcpConfigs` 登记由**开发 Agent 技能包**引导（见 README § 扩展阅读），不在本模板 `src/` 内实现。
+云开发环境中平台 Plugin / Workflow / Knowledge 等工具登记由**开发 Agent 技能包**引导（见 README § 扩展阅读），不在当前项目 `src/` 内实现。
 
 ## 扩展阅读
 
-本仓库 `docs/` **只描述模板工作目录内的能力、配置与图规则**；在云开发环境中，开发 Agent 的脚手架流程、平台登记与完成检查（技能包闸门）由**独立注入的技能包**引导（与模板源码分离，不随平台压缩包下发）。
+本仓库 `docs/` **只描述当前工作目录内的能力、配置与图规则**；在云开发环境中，开发 Agent 的脚手架流程、平台登记与完成检查（技能包闸门）由**独立注入的技能包**引导（与项目源码分离，不随平台压缩包下发）。
 
 - [docs/flow-orchestration.md](docs/flow-orchestration.md) — **编排速查**（框架优先 / 核心编排模式 / 命名坑 / 能力来源）
 - [docs/node-catalog.md](docs/node-catalog.md) — **节点选型入口**（type 目录 + 何时用哪个）

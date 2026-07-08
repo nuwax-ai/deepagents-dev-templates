@@ -1,14 +1,14 @@
 # 能力分层与配置
 
-`deepagents-flow-ts` 把本工作目录内 Agent 的每一项能力归入一个**来源层**，明确「谁能改、从哪来」。
-项目内配置文件、环境变量、模板内置各司其职。
+当前工作目录把 Agent 的每一项能力归入一个**来源层**，明确「谁能改、从哪来」。
+项目内配置文件、环境变量、内置运行时各司其职。
 
 ## 来源层
 
 | 层 | 来源 | 例子 | 可编辑 |
 | --- | --- | --- | --- |
 | `workspace-config` | 项目内配置文件 | systemPrompt、mcpServers、skills、model、subagents | ✅（改 `config/` / `prompts/` / `builtin/` / `.agents/`） |
-| `agent-builtin` | 模板包内置 | bash / 文件读写 / grep·glob / http / json / load_skill / task / compaction / demo（native MCP 见下） | ❌（改 `src/` 源码） |
+| `agent-builtin` | 项目内置 | bash / 文件读写 / grep·glob / http / json / load_skill / task / compaction / demo（native MCP 见下） | ❌（改 `src/` 源码） |
 | `env-builtin` | 环境变量 | API key、base URL、`LOG_LEVEL`、`LOG_DIR` | env / `.env` |
 | `agent-builtin-file` | 用户级会话目录（文件，无 DB） | sessionStore（默认 `~/.flowagents/sessions/<workspace 散列>/`，可经 `config.memory.dir` opt-out 回 `./.flow-sessions`） | ❌ |
 | `package-placeholder` | 打包/安装时替换 | `${INSTALL_ROOT}`、`${PACKAGE_VERSION}` | ❌ |
@@ -39,7 +39,7 @@ pnpm exec tsx src/index.ts sessions       # 已持久化的会话
 
 ## 扩展（不改 `src/libs/` 保护区）
 
-- **加 MCP / 平台能力**：`config/mcp.default.json` 内置 `ask-question`（fallback）；搜索/文档等仍须开发期平台登记（`add-tool` / `mcpConfigs`），运行期经 **ACP `session/new` 的 `mcpServers`** 注入（同名 session-wins，平台优先）。**平台已登记的一切工具能力（Plugin / Workflow / MCP）由平台后端统一转成 MCP 下发**——登记即接入，禁止为其手写 fetch / `tool()` 包装。本地调试可参考 [config/mcp.examples.json](../config/mcp.examples.json)（chrome-devtools / filesystem / bash 等），复制到 `servers` 或经 ACP 下发。
+- **加平台能力 / MCP**：搜索、文档、业务 API 等优先经平台登记（`dev-engineer-toolkit` 的 `search-apis.sh` / `add-tool.sh`）。平台已登记的 Plugin / Workflow / Knowledge 等能力运行期适配为可用工具并进入 `FlowRuntime.allTools`；图侧按节点 `params`（`platform-tool` 用 `toolName`，`tool-exec` 用 `tools`）、`createPlatformToolActionNode`、`createToolExecNode` 或现有检索 factory 选择工具集合。禁止为已登记能力手写 fetch / `tool()` 包装。本地 MCP 调试可参考 [config/mcp.examples.json](../config/mcp.examples.json)（chrome-devtools / filesystem / bash 等），复制到 `servers` 或经会话下发。
 - **加 Skill**：
   - **项目内置（推荐）**：`builtin/skills/<name>/SKILL.md`（`agentsDirectories` 含 `./builtin`）。
   - **工作区扩展**：`.agents/skills/<name>/SKILL.md`，或在 `config.skills.directories` 增加目录。
@@ -55,7 +55,7 @@ pnpm exec tsx src/index.ts sessions       # 已持久化的会话
 
 在本仓库内扩展业务能力时，按下列顺序判断（扩展方式见上文 [扩展（不改 src/libs/ 保护区）](#扩展不改-srclibs-保护区)）：
 
-1. **平台能力（登记即接入）** — 平台登记的 Plugin / Workflow / MCP 运行期统一转 MCP，经 ACP session 的 `mcpServers` 与 `config/mcp.default.json` 合并后 native 加载（session 关闭自动销毁连接）；conversational ReAct 自动 bind，固定管道 `createMcpRetrievalNode` 按名引用，**零包装代码**
+1. **平台能力（登记即接入）** — 平台登记的 Plugin / Workflow / Knowledge 等能力运行期适配为可用工具并注入 `FlowRuntime.allTools`；conversational ReAct 自动 bind，固定管道按节点 `params` 工具名引用，**零包装代码**
 2. **内置 `libs/tools`** — bash / 读写 / grep·glob / http / json / load_skill / task / demo
 3. **自写 `src/app/`** — 最后手段（仅平台确无命中的真外部 API），在 [flow-tools.ts](../src/app/flow-tools.ts) 注册
 

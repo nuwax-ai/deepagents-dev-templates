@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * deepagents-flow-ts — 通用工作流编排模板入口
+ * 通用工作流编排模板入口
  *
  * 模式：
  *   (默认) / acp        启动 ACP 服务（stdio）—— 供 nuwaclaw/Zed/JetBrains
@@ -17,7 +17,7 @@
  */
 
 import { config as loadDotenv } from "dotenv";
-import { resolve } from "node:path";
+import { basename, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { loadFlowConfig } from "./runtime/flow-config.js";
 import { destroyRuntimeContext, setLogAgent } from "./runtime/index.js";
@@ -190,17 +190,24 @@ function parseArgs(argv: string[]): ParsedArgs {
   return args;
 }
 
-const HELP = `deepagents-flow-ts — 通用工作流编排模板
+/** CLI 展示名：全局 bin 用实际命令名；tsx/node 直跑入口时展示产品名 nuwax-flow-ts。 */
+function cliDisplayName(): string {
+  const base = basename(process.argv[1] ?? "");
+  if (base === "index.ts" || base === "index.js") return "nuwax-flow-ts";
+  return base || "nuwax-flow-ts";
+}
+
+const HELP = `工作流编排模板（nuwax-flow-ts）
 
 用法:
-  deepagents-flow-ts                启动 ACP 服务（默认，stdio）
-  deepagents-flow-ts acp            同上
-  deepagents-flow-ts flow "<输入>"  命令行跑一次默认 flow
-  deepagents-flow-ts flow -i        交互模式
-  deepagents-flow-ts graph          导出默认图拓扑（JSON；加 --mermaid 出 Mermaid 源）
-  deepagents-flow-ts capabilities   输出能力分层 + 可用工具/MCP/skills（无凭证）
-  deepagents-flow-ts sessions       列出已持久化的会话（thread id）
-  deepagents-flow-ts sessions delete <id>  删除某个已持久化会话
+  ${cliDisplayName()}                启动 ACP 服务（默认，stdio）
+  ${cliDisplayName()} acp            同上
+  ${cliDisplayName()} flow "<输入>"  命令行跑一次默认 flow
+  ${cliDisplayName()} flow -i        交互模式
+  ${cliDisplayName()} graph          导出默认图拓扑（JSON；加 --mermaid 出 Mermaid 源）
+  ${cliDisplayName()} capabilities   输出能力分层 + 可用工具/MCP/skills（无凭证）
+  ${cliDisplayName()} sessions       列出已持久化的会话（thread id）
+  ${cliDisplayName()} sessions delete <id>  删除某个已持久化会话
 
 默认图经 StatefulFlow 运行（checkpointer 多轮记忆 + 可选 HITL interrupt/resume）。
 

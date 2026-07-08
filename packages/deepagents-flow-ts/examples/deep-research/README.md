@@ -17,13 +17,15 @@
 
 ## 运行
 
+在**包根目录**下执行（相对本文件为 `../..`）：
+
 ```bash
 pnpm example research "调研 LangGraph 生态"
 pnpm example research -i
 pnpm example research                         # ACP 服务
 ```
 
-固定会话以验证跨进程恢复：
+固定会话以验证跨进程恢复（仍在包根目录）：
 
 ```bash
 pnpm exec tsx examples/deep-research/index.ts research "调研主题" --thread demo

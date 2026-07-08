@@ -6,7 +6,7 @@
  *
  * 主导出（factory）：
  *  - llm：createLlmNode（一次调→文本/结构化）、createLlmStreamNode（流式）、createLlmRouterNode（LLM 裁决→Command goto）
- *  - tools：createToolExecNode（ToolNode + 三态透出）、createMcpRetrievalNode（主动 MCP 检索）
+ *  - tools：createToolExecNode（ToolNode + 三态透出）、createPlatformToolActionNode（主动工具调用）、createMcpRetrievalNode（主动 MCP 检索）
  *  - hitl：createHumanApprovalNode（前置 interrupt）、createApprovalFinalizeNode（后置定稿）
  *  - prepare：createPrepareNode（input → HumanMessage）
  *
@@ -31,6 +31,11 @@ export {
 export { createLlmRouterNode, type LlmRouterNodeOptions } from "./llm-router.js";
 export { createMcpRetrievalNode, type McpRetrievalNodeOptions } from "./mcp-retrieval.js";
 export { createToolExecNode, runTool, type ToolExecNodeOptions } from "./tools.js";
+export {
+  createPlatformToolActionNode,
+  type PlatformToolActionNodeOptions,
+  type PlatformToolActionResult,
+} from "./platform-tool.js";
 export {
   normalizeToolMessageContent,
   normalizeToolResult,

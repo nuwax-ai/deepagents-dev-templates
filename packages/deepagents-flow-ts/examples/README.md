@@ -1,6 +1,6 @@
 # Curated examples
 
-本目录面向使用模板的 AI Agent：提供少量、互补、可运行的 surface 接入范例。
+本目录面向使用 **nuwax-flow-ts** 工作流编排模板的 AI Agent：少量、互补、可运行的 surface 接入范例。
 
 ## 使用边界
 
@@ -20,7 +20,17 @@
 | `deep-research` | 多阶段、双层 reflection、并行调研与持续会话 | `src/libs/topologies/deep-research/` |
 
 `dev-agent` 不设重复示例：它复用默认 ReAct 图，权威实现是
-`src/app/topologies/dev-agent.ts`；subgraph factory 见 `docs/node-kit.md`。
+`src/app/topologies/dev-agent.ts`；subgraph factory 见 [docs/node-kit.md](../docs/node-kit.md)。
 
-运行：`pnpm example --list`、`pnpm example <name> [args]`。类型检查：
-`pnpm typecheck:examples`。
+## 运行
+
+在**包根目录**下执行（相对本目录为 `..`）：
+
+```bash
+pnpm example --list
+pnpm example <name> [args]
+```
+
+各范例详情见子目录 `README.md`。类型检查：`pnpm typecheck:examples`。
+
+Zed / 日志 env 见 [docs/zed-debug.md](../docs/zed-debug.md)（`<REPO>` = 包根目录绝对路径）。

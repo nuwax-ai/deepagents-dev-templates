@@ -126,4 +126,86 @@ describe("lint-graph-rules R-G009", () => {
     const tr = customBlueprint.render(loadSpec("_example.translate-review.flow.json"));
     expect(tr.find((f) => f.path.endsWith("graph.ts"))!.content).not.toMatch(/rejectedLlm[\s\S]*r\.content/);
   });
+
+  it("custom blueprint 支持 tool-exec 节点级工具绑定", () => {
+    const spec = parseSpec({
+      name: "tool-node-demo",
+      description: "tool node binding demo",
+      topology: "custom",
+      tools: [{ builtin: "quote_price" }],
+      params: {
+        state: {
+          messages: { type: "any-last" },
+        },
+        nodes: {
+          retrieve: {
+            type: "tool-exec",
+            params: {
+              tools: ["quote_price"],
+            },
+          },
+        },
+        edges: [{ kind: "static", from: "__start__", to: "retrieve" }, { kind: "static", from: "retrieve", to: "__end__" }],
+        input: { queryField: "input" },
+        result: { answerField: "output" },
+      },
+    });
+    const files = customBlueprint.render(spec);
+    const graph = files.find((f) => f.path.endsWith("graph.ts"))!.content;
+    const index = files.find((f) => f.path.endsWith("index.ts"))!.content;
+
+    expect(graph).toContain("createToolExecNode");
+    expect(graph).toContain("pickTools(allTools, [\"quote_price\"])");
+    expect(index).toContain("buildGraph(runtime.config, cp, runtime.allTools)");
+  });
+
+  it("custom blueprint 支持 platform-tool 主动调用（按 toolName 定位工具）", () => {
+    const spec = parseSpec({
+      name: "platform-tool-demo",
+      description: "platform tool action demo",
+      topology: "custom",
+      tools: [
+        {
+          targetType: "Plugin",
+          targetId: 309,
+          name: "联网搜索",
+          description: "在互联网上搜索相关信息",
+          schema: {
+            input: {
+              type: "object",
+              properties: {
+                query: { type: "string" },
+              },
+            },
+          },
+          toolNames: ["web_search"],
+        },
+      ],
+      params: {
+        state: {
+          query: { type: "string" },
+          searchResult: { type: "any-last" },
+        },
+        nodes: {
+          web_search: {
+            type: "platform-tool",
+            params: {
+              toolName: "web_search",
+              args: "(s) => ({ query: s.query })",
+              write: "(r) => ({ searchResult: r.raw })",
+            },
+          },
+        },
+        edges: [{ kind: "static", from: "__start__", to: "web_search" }, { kind: "static", from: "web_search", to: "__end__" }],
+        input: { queryField: "query" },
+        result: { answerField: "searchResult" },
+      },
+    });
+    const files = customBlueprint.render(spec);
+    const graph = files.find((f) => f.path.endsWith("graph.ts"))!.content;
+
+    expect(graph).toContain("createPlatformToolActionNode");
+    expect(graph).toContain("tools: allTools");
+    expect(graph).toContain("toolName: \"web_search\"");
+  });
 });

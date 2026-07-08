@@ -186,7 +186,7 @@ export interface StatefulFlow {
  * 图拓扑反射的结构化产物（getFlowTopology / 各拓扑 getXxxTopology 返回）。
  *
  * 放 core（纯契约）：app/topology 与 libs/topologies 都要产出/消费它，libs 不能 import app，
- * 故契约下沉 core。app/topology.ts re-export 以维持公开 `deepagents-flow-ts/topology` 子路径。
+ * 故契约下沉 core。app/topology.ts re-export 以维持公开 npm 子路径 `/topology`。
  */
 export interface FlowTopologyNode {
   id: string;

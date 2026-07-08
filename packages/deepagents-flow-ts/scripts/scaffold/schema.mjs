@@ -11,12 +11,35 @@
 import { z } from "zod";
 
 /** 工具引用：外部已配置工具（Plugin/Workflow/Knowledge）或内置工具名。 */
+const toolStaticFields = {
+  /** 开发期从平台取回并静态沉淀；运行期不再查平台接口。 */
+  name: z.string().optional(),
+  description: z.string().optional(),
+  schema: z.unknown().optional(),
+  inputSchema: z.unknown().optional(),
+  outputSchema: z.unknown().optional(),
+  mode: z.string().optional(),
+  method: z.string().optional(),
+  url: z.string().optional(),
+  auth: z.unknown().optional(),
+};
+
 const toolRefSchema = z.union([
-  z.object({ builtin: z.string() }),
   z.object({
-    type: z.enum(["Plugin", "Workflow", "Knowledge"]),
+    builtin: z.string(),
+    /** 运行时工具名别名；平台工具名无法从 targetId 推断时可显式声明。 */
+    names: z.array(z.string()).optional(),
+    toolNames: z.array(z.string()).optional(),
+    ...toolStaticFields,
+  }).passthrough(),
+  z.object({
+    targetType: z.enum(["Plugin", "Workflow", "Knowledge"]),
     targetId: z.number(),
-  }),
+    /** 运行时工具名别名；用于把平台工具配置映射到实际 StructuredTool。 */
+    names: z.array(z.string()).optional(),
+    toolNames: z.array(z.string()).optional(),
+    ...toolStaticFields,
+  }).passthrough(),
 ]);
 
 /** 所有拓扑共有的基础字段。 */
@@ -40,13 +63,15 @@ const customChannelSchema = z.object({
   default: z.unknown().optional(),
 });
 const customNodeSchema = z.object({
-  // custom blueprint 渲染支持的节点 type（tool-exec/subgraph 暂不支持 → 用别的 type 或生成后手改）
+  // custom blueprint 渲染支持的节点 type。
   type: z.enum([
     "llm",
     "llm-stream",
     "llm-router",
     "approval",
     "approval-finalize",
+    "platform-tool",
+    "tool-exec",
     "mcp-retrieval",
     "prepare",
     "passthrough",

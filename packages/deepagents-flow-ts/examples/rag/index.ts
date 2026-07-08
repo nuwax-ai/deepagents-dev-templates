@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * RAG 示例入口 —— 用 deepagents-flow-ts 的通用 surface 跑检索增强工作流。
+ * RAG 示例入口 —— 用模板的通用 surface 跑检索增强工作流。
  *
  *   1. 图 + 节点在 libs/topologies/rag（本目录 re-export）
  *   2. createRagFlow → createStatefulFlow（conversational）

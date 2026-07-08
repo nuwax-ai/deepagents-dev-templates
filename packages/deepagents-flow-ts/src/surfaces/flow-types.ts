@@ -3,7 +3,7 @@
  *
  * 本文件保留为 surface 层的 re-export shim：examples 与对外消费者历史上从
  * `src/surfaces/flow-types.js` import 这些类型，此处原样转发，零破坏。
- * 新代码请直接 import `../core/flow-types.js`（或 `deepagents-flow-ts/core`）。
+ * 新代码请直接 import `../core/flow-types.js`（或 npm 子路径 `/core`，见 package.json exports）。
  *
  * 注：surfaces→core 为合法下行依赖，无需 layering 守卫 allowlist。
  */

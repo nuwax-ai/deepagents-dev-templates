@@ -1,6 +1,6 @@
 # Scripts
 
-`deepagents-flow-ts` 的构建、打包与冒烟测试脚本。全部为 **纯 Node `.mjs`**，可在 Windows PowerShell、macOS 与 Linux 下运行。
+本项目的构建、打包与冒烟测试脚本。全部为 **纯 Node `.mjs`**，可在 Windows PowerShell、macOS 与 Linux 下运行。
 
 ## Version sync
 

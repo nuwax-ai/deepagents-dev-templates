@@ -197,7 +197,7 @@ export const EvictionConfigSchema = z.object({
 
 export const AppConfigSchema = z.object({
   agent: z.object({
-    name: z.string().default("deepagents-flow-ts"),
+    name: z.string().default("flow-agent"),
     description: z.string().default("AI application agent"),
     // 惰性默认值：仅当 config 未提供 version 时才读 package.json，避免每次启动都做一次文件读取。
     version: z.string().default(() => getPackageVersion() ?? "0.0.0"),

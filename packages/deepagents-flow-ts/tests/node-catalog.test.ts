@@ -22,6 +22,8 @@ const CUSTOM_NODE_TYPES = [
   "llm-router",
   "approval",
   "approval-finalize",
+  "platform-tool",
+  "tool-exec",
   "mcp-retrieval",
   "prepare",
   "passthrough",

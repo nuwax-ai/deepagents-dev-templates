@@ -9,7 +9,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 /**
- * 从模块 URL 定位 deepagents-flow-ts 包根（含 config/flow-agent.config.json）。
+ * 从模块 URL 定位 nuwax-flow-ts 包根（含 config/flow-agent.config.json）。
  *
  * 路径规则：
  * - dist/bundle.mjs：包根 = dist 的上一级

@@ -9,15 +9,15 @@
  * (漏 ends 则丢边),其余不与手抄的节点列表漂移。
  *
  * 用法:
- *   import { getFlowTopology } from "deepagents-flow-ts/topology";
+ *   import { getFlowTopology } from "./topology.js"; // 工作区内
  *   const { nodes, edges, mermaid } = await getFlowTopology();
- * 或命令行:`deepagents-flow-ts graph`(JSON) / `deepagents-flow-ts graph --mermaid`。
+ * 或命令行: `pnpm graph`（JSON）/ `pnpm graph --mermaid`；平台安装包为 `nuwax-flow-ts graph`。
  */
 
 import { createFlowGraph, type CreateFlowGraphConfig } from "./graph.js";
 
 // 拓扑类型契约下沉 core/flow-types.ts（app + libs/topologies 共享；libs 不能 import app）。
-// 本模块 import 供下方 getFlowTopology 使用，并 re-export 维持公开 `deepagents-flow-ts/topology` 子路径。
+// 本模块 import 供下方 getFlowTopology 使用，并 re-export 维持公开 npm 子路径 `/topology`（见 package.json exports）。
 import type {
   FlowTopology,
   FlowTopologyNode,

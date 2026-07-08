@@ -42,7 +42,12 @@
         "glob",
         "http_request",
         "json_utils",
-        "mcp_tool_bridge"
+        "load_skill",
+        "task",
+        "write_todos",
+        "echo",
+        "calculate",
+        "time"
       ]
     },
     "compaction": { "source": "agent-builtin" },

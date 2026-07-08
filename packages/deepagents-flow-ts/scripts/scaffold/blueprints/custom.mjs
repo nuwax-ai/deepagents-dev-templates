@@ -6,8 +6,8 @@
  * 因此被 tsc 静态检查、可读、可被 inspector 可视化、可手改。生成的 flow 自包含，
  * 不依赖 libs/topologies/custom 运行时解释器（已废弃）。
  *
- * 支持节点 type：llm / llm-stream / llm-router / approval / approval-finalize / mcp-retrieval / prepare / passthrough。
- * 支持边 kind：static / conditional / fanout。tool-exec / subgraph 暂不支持 → 生成后手改。
+ * 支持节点 type：llm / llm-stream / llm-router / approval / approval-finalize / platform-tool / tool-exec / mcp-retrieval / prepare / passthrough。
+ * 支持边 kind：static / conditional / fanout。subgraph 暂不支持 → 生成后手改。
  */
 
 export const kind = "stateful-recipe";
@@ -83,6 +83,23 @@ function renderNode(name, node) {
         timeoutMs: resolveLlmResilience(appConfig).longTimeoutMs,
       },
     })`;
+    case "tool-exec":
+      return `createToolExecNode<StateShape & { messages: BaseMessage[] }>({
+      tools: pickTools(allTools, ${JSON.stringify(p.tools ?? [])}),${p.write ? `\n      write: ${p.write},` : ""}
+    })`;
+    case "platform-tool":
+      if (!p.toolName || !p.args || !p.write) {
+        throw new Error(
+          `custom: platform-tool 节点 "${name}" 缺 toolName/args/write（必填：params.toolName = "<工具名>", params.args = (s) => ({...}), params.write = (r,s) => ({...})）`
+        );
+      }
+      return `createPlatformToolActionNode<StateShape>({
+      tools: allTools,
+      toolName: ${JSON.stringify(p.toolName)},
+      args: ${p.args},
+      write: ${p.write},
+      label: ${q},
+    })`;
     case "mcp-retrieval":
       return `createMcpRetrievalNode<StateShape>({
       mcpServers: ${JSON.stringify(p.mcpServers ?? {})},
@@ -97,7 +114,7 @@ function renderNode(name, node) {
       return `((${p.write ?? "() => ({})"}) as (s: StateShape) => Partial<StateShape>)`;
     default:
       throw new Error(
-        `custom 渲染不支持节点类型 "${node.type}"（tool-exec/subgraph 请生成后手改）`
+        `custom 渲染不支持节点类型 "${node.type}"（subgraph 请生成后手改）`
       );
   }
 }
@@ -134,6 +151,8 @@ function collectImports(params) {
     "llm-router": "createLlmRouterNode",
     approval: "createHumanApprovalNode",
     "approval-finalize": "createApprovalFinalizeNode",
+    "platform-tool": "createPlatformToolActionNode",
+    "tool-exec": "createToolExecNode",
     "mcp-retrieval": "createMcpRetrievalNode",
     prepare: "createPrepareNode",
   };
@@ -171,8 +190,16 @@ function collectImports(params) {
   if (/\bSystemMessage\s*\(/.test(text)) msgs.push("SystemMessage");
   if (/\bHumanMessage\s*\(/.test(text)) msgs.push("HumanMessage");
   if (/\bAIMessage\s*\(/.test(text)) msgs.push("AIMessage");
+  if (nodeTypes.has("tool-exec")) msgs.push("type BaseMessage");
 
-  return { langgraph: lg, messages: msgs, nodes: [...nodes], needsLlmResilience };
+  return {
+    langgraph: lg,
+    messages: msgs,
+    nodes: [...nodes],
+    needsLlmResilience,
+    needsToolBindings: nodeTypes.has("tool-exec") || nodeTypes.has("platform-tool"),
+    needsPickTools: nodeTypes.has("tool-exec"),
+  };
 }
 
 /** @param {{name:string,description:string,params:{state:object,nodes:object,edges:array,input:object,result:object,recursionLimit?:number}}} spec */
@@ -181,6 +208,7 @@ export function render(spec) {
   const imp = collectImports(P);
   // 无 llm/llm-router/approval-finalize 节点时 appConfig 不被引用 → 加 _ 前缀避免 noUnusedParameters
   const appConfigParam = imp.nodes.includes("requireModel") ? "appConfig" : "_appConfig";
+  const allToolsParam = imp.needsToolBindings ? "allTools" : "_allTools";
 
   const nodeLines = Object.entries(P.nodes)
     .map(([name, node]) => {
@@ -207,8 +235,10 @@ import {
   type BaseCheckpointSaver,
 } from "@langchain/langgraph";${imp.messages.length ? `\nimport { ${imp.messages.join(", ")} } from "@langchain/core/messages";` : ""}
 import type { AppConfig } from "../../../runtime/index.js";
+import type { StructuredTool } from "@langchain/core/tools";
 ${imp.needsLlmResilience ? `import { resolveLlmResilience } from "../../../runtime/services/llm-resilience.js";\n` : ""}${imp.nodes.length ? `import { ${imp.nodes.join(", ")} } from "../../../libs/nodes/index.js";\n` : ""}import { reflectTopology } from "../../../libs/topologies/reflect.js";
 import type { FlowTopology } from "../../../core/flow-types.js";
+${imp.needsPickTools ? `import { pickTools } from "../../tool-bindings.js";\n` : ""}
 
 const State = Annotation.Root({
 ${renderState(P.state)}
@@ -216,7 +246,7 @@ ${renderState(P.state)}
 export type StateShape = typeof State.State;
 
 /** 按 spec 构造图（编译后）。被 index.ts 的 recipe.buildGraph 调用。 */
-export function buildGraph(${appConfigParam}: AppConfig | undefined, checkpointer: BaseCheckpointSaver = new MemorySaver()) {
+export function buildGraph(${appConfigParam}: AppConfig | undefined, checkpointer: BaseCheckpointSaver = new MemorySaver(), ${allToolsParam}: StructuredTool[] = []) {
   return new StateGraph(State)
 ${nodeLines}
 ${edgeLines}
@@ -248,7 +278,7 @@ import type { StatefulTopologyRecipe } from "../../../libs/topologies/types.js";
 import { buildGraph, getTopology as _getTopology } from "./graph.js";
 
 export const recipe = (runtime: FlowRuntime): StatefulTopologyRecipe => ({
-  buildGraph: (cp) => buildGraph(runtime.config, cp),
+  buildGraph: (cp) => buildGraph(runtime.config, cp, runtime.allTools),
   toInput: (query) => ({ ${JSON.stringify(P.input.queryField)}: query${extra} }),
   toResult: (v) => {
     const answer = String((v as Record<string, unknown>)[${JSON.stringify(P.result.answerField)}] ?? "");${footer}

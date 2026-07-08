@@ -7,11 +7,11 @@
  *
  * **平台能力接入（登记即接入）**：
  *   1. 开发期：dev-engineer-toolkit → search-apis.sh --kw "搜索" → add-tool.sh 登记；
- *   2. 运行期：平台后端把已登记工具（Plugin/Workflow/MCP）**统一转成 MCP**，经 ACP
- *      session/new 的 mcpServers 下发 → runtime 合并进 allTools → think 自动 bindTools。
+ *   2. 运行期：平台把已登记工具（Plugin/Workflow/Knowledge 等）适配为 runtime 工具，
+ *      合并进 allTools → think 自动 bindTools。
  *   全程**零包装代码**。禁止照 Plugin schema 手写 fetch（猜端点/猜 envelope/无超时 = 运行期卡住）。
  *
- * 本文件不硬编码任何 MCP 工具名（平台转换后的命名以运行期下发为准；bindTools 是发现式的，
+ * 本文件不硬编码任何平台工具名（运行期工具命名以下发为准；bindTools 是发现式的，
  * 模型按工具描述自选）。未登记搜索能力时，systemPrompt 要求模型如实告知，不编造检索结果。
  *
  * 验证（completion gate）：SMOKE_PROMPT 须触发搜索（如「搜索并总结今天的 AI 新闻」），
@@ -24,7 +24,7 @@ import { createFlowGraph } from "../../graph.js";
 import { getFlowTopology } from "../../topology.js";
 import type { FlowState } from "../../state.js";
 
-/** 搜索聚合行为基座；平台 systemPrompt（ACP 下发）作为补充要求叠加在后。 */
+/** 搜索聚合行为基座；平台 systemPrompt 作为补充要求叠加在后。 */
 const SEARCH_AGGREGATOR_PROMPT = `你是一个搜索聚合助手。用户提出问题后，你负责检索多个信息面并综合作答。
 
 ## 工作方式

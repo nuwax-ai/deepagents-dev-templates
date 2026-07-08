@@ -138,13 +138,14 @@ Q4 结构类?
 
 ## type 词表(节点级 DSL `node.type` 单一权威)
 
-**custom DSL 支持的 8 个 node.type**(`scripts/scaffold/schema.mjs` 的 `custom` enum,`tests/node-catalog.test.ts` 断言一致):
+**custom DSL 支持的 10 个 node.type**(`scripts/scaffold/schema.mjs` 的 `custom` enum,`tests/node-catalog.test.ts` 断言一致):
 
 ```
-llm | llm-stream | llm-router | approval | approval-finalize | mcp-retrieval | prepare | passthrough
+llm | llm-stream | llm-router | approval | approval-finalize | platform-tool | tool-exec | mcp-retrieval | prepare | passthrough
 ```
 
-**factory 类型但暂未进 custom DSL**(手写图直接用 factory;custom 里生成后手改):`tool-exec`(createToolExecNode,需 tools)、`permission-approval`(createPermissionApprovalNode)、`subgraph`(createSubgraphNode)。
+**factory 类型但暂未进 custom DSL**(手写图直接用 factory;custom 里生成后手改):`permission-approval`(createPermissionApprovalNode)、`subgraph`(createSubgraphNode)。
+注:`platform-tool` 主动调用已对齐到该节点的工具；`tool-exec` 执行上一条 AIMessage 的 `tool_calls`。
 注:`fanout` 在 DSL 里是 **edge kind**(`{kind:"fanout"}`),非 node.type。
 
 ---

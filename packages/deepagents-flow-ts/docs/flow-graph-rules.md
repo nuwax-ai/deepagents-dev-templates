@@ -1,7 +1,7 @@
 # Flow 图编排规则（Flow Graph Rules）
 
 > **单一权威**：凡「图怎么写才对 / 常见坑怎么避」的硬性约定，**优先落本文件**，按规则 ID 追加。
-> **范围**：仅适用于本仓库（`deepagents-flow-ts` 工作目录）内的 `graph.ts` / `*.flow.json` 开发与验证。
+> **范围**：仅适用于本工作目录内的 `graph.ts` / `*.flow.json` 开发与验证。
 > 其他**本包**文档（[node-kit](node-kit.md)、[troubleshooting](troubleshooting.md)、[node-catalog](node-catalog.md) 等）只摘要 + 链到对应规则，避免多处漂移。
 >
 > **受众**：在本仓库内维护 `graph.ts`、`*.flow.json` 或运行验证的读者（含在本目录工作的自动化工具）；**开发流程与平台侧约束**由开发环境注入的技能包另行提供，不在本文档重复。

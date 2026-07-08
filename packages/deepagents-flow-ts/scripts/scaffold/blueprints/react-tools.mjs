@@ -10,6 +10,9 @@
  * 系统提示词优先级：spec.systemPrompt（场景提示词）> runtime.systemPrompt（框架兜底，spec 空时用）。
  * 场景节点用 scene 提示词；runtime.systemPrompt（= resolveSystemPrompt，恒非空）不覆盖 scene，
  * 否则 spec.systemPrompt 永不生效（resolveSystemPrompt 有 inline 兜底恒返回非空）。
+ *
+ * 工具：think 节点绑定 runtime.allTools 全量（平台工具经运行环境注入）；
+ * spec.tools 仅作开发期登记记录，运行时不读。
  */
 
 /** 拓扑 kind：复用默认 ReAct 图，conversational stateful-recipe（多轮记忆）。 */

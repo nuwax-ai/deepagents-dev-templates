@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent.nuwax.com/schemas/nuwax-agent-package-config.v1.json",
   "schemaVersion": "nuwax.agent.package-config.v1",
-  "packageId": "deepagents-flow-ts",
+  "packageId": "nuwax-flow-ts",
   "version": "${PACKAGE_VERSION}",
   "artifactTypes": ["npm-tgz", "nuwax-tar", "nuwax-zip"],
   "dependencyStrategy": "esbuild-bundle",

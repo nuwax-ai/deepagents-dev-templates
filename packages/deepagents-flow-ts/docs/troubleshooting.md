@@ -1,6 +1,6 @@
 # 排错索引
 
-> **范围**：本仓库（`deepagents-flow-ts` 工作目录）内 flow 的运行时排错。
+> **范围**：本工作目录内 flow 的运行时排错。
 > 先查 `.logs/`（`LOG_DIR=<REPO>/.logs`，`LOG_LEVEL=debug`；配置见 [zed-debug.md](zed-debug.md)）。
 > **图编排硬规则**（按 ID 追加）：[flow-graph-rules.md](flow-graph-rules.md)。
 
@@ -121,7 +121,7 @@
 
 **症状**：`(subagent 无输出)`、子 agent 调 MCP 401、并行 `task` UI 混流。
 
-**runtime 行为**（`deepagents-flow-ts` `task` 工具 + ACP）：
+**runtime 行为**（内置 `task` 工具 + ACP）：
 
 | 项 | 说明 |
 |----|------|
@@ -130,10 +130,6 @@
 | 流式分桶 | `messageId=subagent:<name>:<toolCallId>` |
 | 联网 | subagent 可直接调用当前会话已授权的搜索 MCP；`description` 仍须自包含 |
 | Todo/Plan | 复杂任务调用 `write_todos`；并行 subagent 按父 `toolCallId` 聚合为 ACP `plan` 完整快照 |
-
-**flow-builder 详表**：[dev-agent-flow Part 6](../../dev-agent-flow/skills/flow-builder/references/part6-subagent.md)
-
-**维护者架构详表**：[development/subagent-task-and-acp-plan.md](../../../docs/packages/deepagents-flow-ts/development/subagent-task-and-acp-plan.md)
 
 ---
 

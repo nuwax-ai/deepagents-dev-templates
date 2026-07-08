@@ -9,7 +9,7 @@
     },
     {
       "name": "INSTALL_ROOT",
-      "description": "Absolute path to the installed deepagents-flow-ts agent package.",
+      "description": "Absolute path to the installed nuwax-flow-ts agent package.",
       "requiredAt": "install"
     },
     {
