@@ -1,5 +1,8 @@
 # 平台工具登记与节点直接引用设计
 
+> ⚠️ 已过时：本文基于“`spec.tools` 仅开发期记录、运行时不读”的旧方案。  
+> 现行方案见：[`platform-tool-schema-driven-runtime.md`](./platform-tool-schema-driven-runtime.md)
+
 ## 目标
 
 本文说明平台工具（Plugin / Workflow / Knowledge）从「开发期搜索登记」到「运行期节点调用」的完整链路，以及各层职责边界。

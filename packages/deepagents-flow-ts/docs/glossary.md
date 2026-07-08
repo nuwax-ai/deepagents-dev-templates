@@ -20,6 +20,7 @@
 | 上下文压缩 | **context compaction** | `compactHistory` + `RemoveMessage` 替换历史。 |
 | 多轮 HITL | **multi-turn HITL** | 多轮人审循环。 |
 | 完成闸门 | **completion gate**（完成闸门） | 强制验证门；首次出现中英并列。 |
+| ReAct、工具回路 | **ReAct** | 指“先推理再调用工具并回写上下文”的交替范式。默认图采用两阶段实现：`think` 负责决策（`bindTools`），`tools` 负责执行（`ToolNode`），再回到 `think` 直到可 `respond`。 |
 
 ## 2. 架构 / 接入层 —— 中文译名 + 英文括注
 

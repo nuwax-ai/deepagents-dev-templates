@@ -62,3 +62,7 @@ export {
   type AcpPromptCycle,
 } from "./session-trace.js";
 export { getPackageVersion } from "./version.js";
+export type { PlatformToolRef, PlatformToolDescriptor } from "./platform-tools/types.js";
+export { createPlatformToolDescriptors } from "./platform-tools/descriptor.js";
+export { schemaToZodInput } from "./platform-tools/schema-to-zod.js";
+export { createPlatformStructuredTool } from "./platform-tools/create-platform-structured-tool.js";

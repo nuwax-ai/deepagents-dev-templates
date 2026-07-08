@@ -46,6 +46,11 @@ import { runSessions } from "./surfaces/cli/sessions.js";
 import { resolveFlow, type FlowDef } from "./app/flows/index.js";
 import { createStatefulFlow } from "./surfaces/stateful-flow.js";
 import type { StatefulFlow } from "./core/flow-types.js";
+import {
+  createPlatformStructuredTool,
+  createPlatformToolDescriptors,
+  type PlatformToolRef,
+} from "./runtime/index.js";
 
 /**
  * createFlowRuntime —— 组合根(原 `compose/flow-runtime.ts` 折入入口)。
@@ -54,7 +59,7 @@ import type { StatefulFlow } from "./core/flow-types.js";
  */
 export async function createFlowRuntime(
   appConfig: AppConfig,
-  options: { sessionConfig?: ACPSessionConfig; workspaceRoot?: string } = {}
+  options: { sessionConfig?: ACPSessionConfig; workspaceRoot?: string; platformToolRefs?: PlatformToolRef[] } = {}
 ): Promise<FlowRuntime> {
   const workspaceRoot = options.workspaceRoot ?? process.cwd();
   const ctx = await createRuntimeContextAsync(appConfig, options.sessionConfig, workspaceRoot);
@@ -65,12 +70,19 @@ export async function createFlowRuntime(
   const subAgents = discoverSubAgents(appConfig, workspaceRoot);
   const progressiveSkills = appConfig.skills.progressiveLoading;
 
+  const platformToolRefs = options.platformToolRefs ?? [];
+  const platformToolDescriptors = createPlatformToolDescriptors(platformToolRefs);
+  const platformTools = platformToolDescriptors.map((descriptor) =>
+    createPlatformStructuredTool({ descriptor })
+  );
+
   // skills → load_skill 工具;subAgents → task 委派工具(沙箱按 workspaceRoot / 各自 workdir)。
   const allTools = createFlowTools(ctx, {
     workspaceRoot,
     policy: sandbox,
     skills: progressiveSkills ? skills : [],
     subAgents,
+    platformTools,
   });
 
   // 系统提示词追加「Available Skills」「Subagents」「MCP Servers」清单。
@@ -101,6 +113,8 @@ export async function createFlowRuntime(
     config: appConfig,
     ctx,
     allTools,
+    platformToolRefs,
+    platformToolDescriptors,
     systemPrompt,
     skillsPaths,
     skills,
@@ -263,10 +277,15 @@ async function main(): Promise<void> {
       workspaceRoot,
       sessionConfig,
     });
-    const runtime = await createFlowRuntime(appConfig, { sessionConfig, workspaceRoot });
     const activeFlow =
       typeof raw.activeFlow === "string" ? raw.activeFlow : undefined;
-    const executor = materializeFlow(resolveFlow(activeFlow), runtime);
+    const flowDef = resolveFlow(activeFlow);
+    const runtime = await createFlowRuntime(appConfig, {
+      sessionConfig,
+      workspaceRoot,
+      platformToolRefs: flowDef.platformToolRefs,
+    });
+    const executor = materializeFlow(flowDef, runtime);
     await runFlowCli(executor, {
       query: args.query,
       interactive: args.interactive,
@@ -287,10 +306,15 @@ async function main(): Promise<void> {
         workspaceRoot,
         sessionConfig,
       });
-      const runtime = await createFlowRuntime(appConfig, { sessionConfig, workspaceRoot });
       const activeFlow = typeof raw.activeFlow === "string" ? raw.activeFlow : undefined;
+      const flowDef = resolveFlow(activeFlow);
+      const runtime = await createFlowRuntime(appConfig, {
+        sessionConfig,
+        workspaceRoot,
+        platformToolRefs: flowDef.platformToolRefs,
+      });
       return {
-        executor: materializeFlow(resolveFlow(activeFlow), runtime),
+        executor: materializeFlow(flowDef, runtime),
         dispose: async () => {
           await destroyRuntimeContext(runtime.ctx).catch(() => {
             /* best-effort teardown of MCP stdio procs */

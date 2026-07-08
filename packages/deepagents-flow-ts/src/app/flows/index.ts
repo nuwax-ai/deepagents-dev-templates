@@ -26,6 +26,7 @@ import * as searchAggregatorFlow from "./search-aggregator/index.js";
 import * as translateReviewFlow from "./translate-review/index.js";
 import { logger } from "../../runtime/index.js";
 import type { StatefulTopologyRecipe } from "../../libs/topologies/types.js";
+import type { PlatformToolRef } from "../../runtime/platform-tools/types.js";
 
 /**
  * 一个可挂载到 surface 的 flow 定义（discriminated union on `kind`）。
@@ -48,12 +49,14 @@ export type FlowDef =
        * surface 每轮走 query + 稳定 threadId 累积历史（见 surfaces/stateful-flow.ts）。
        */
       conversational?: boolean;
+      platformToolRefs?: PlatformToolRef[];
       getTopology: () => Promise<FlowTopology>;
     }
   | {
       name: string;
       kind: "stateful-custom";
       createExecutor: (runtime: FlowRuntime) => StatefulFlow;
+      platformToolRefs?: PlatformToolRef[];
       getTopology: () => Promise<FlowTopology>;
     };
 
@@ -66,9 +69,28 @@ export const flows: Record<string, FlowDef> = {
     getTopology: () => getFlowTopology(),
   },
   // --- SCAFFOLD-REGISTRY-START (generator 自动维护，勿手改此区) ---
-  "router-gate": { name: "router-gate", kind: "stateful-recipe", recipe: routerGateFlow.recipe, getTopology: routerGateFlow.getTopology },
-  "search-aggregator": { name: "search-aggregator", kind: "stateful-recipe", conversational: true, recipe: searchAggregatorFlow.recipe, getTopology: searchAggregatorFlow.getTopology },
-  "translate-review": { name: "translate-review", kind: "stateful-recipe", recipe: translateReviewFlow.recipe, getTopology: translateReviewFlow.getTopology },
+  "router-gate": {
+    name: "router-gate",
+    kind: "stateful-recipe",
+    recipe: routerGateFlow.recipe,
+    platformToolRefs: (routerGateFlow as { platformToolRefs?: PlatformToolRef[] }).platformToolRefs,
+    getTopology: routerGateFlow.getTopology,
+  },
+  "search-aggregator": {
+    name: "search-aggregator",
+    kind: "stateful-recipe",
+    conversational: true,
+    recipe: searchAggregatorFlow.recipe,
+    platformToolRefs: (searchAggregatorFlow as { platformToolRefs?: PlatformToolRef[] }).platformToolRefs,
+    getTopology: searchAggregatorFlow.getTopology,
+  },
+  "translate-review": {
+    name: "translate-review",
+    kind: "stateful-recipe",
+    recipe: translateReviewFlow.recipe,
+    platformToolRefs: (translateReviewFlow as { platformToolRefs?: PlatformToolRef[] }).platformToolRefs,
+    getTopology: translateReviewFlow.getTopology,
+  },
   // --- SCAFFOLD-REGISTRY-END ---
 };
 

@@ -44,4 +44,20 @@ export interface StatefulTopologyRecipe<S = Record<string, unknown>> {
   configurable?: Record<string, unknown>;
   /** 递归上限（防 reflection 回边死循环）。 */
   recursionLimit?: number;
+  /** 由 spec.tools 传入的平台工具引用（schema source of truth）。 */
+  platformToolRefs?: Array<{
+    targetType: "Plugin" | "Workflow" | "Knowledge";
+    targetId: number;
+    name?: string;
+    description?: string;
+    schema?: unknown;
+    inputSchema?: unknown;
+    outputSchema?: unknown;
+    mode?: string;
+    method?: string;
+    url?: string;
+    auth?: unknown;
+    names?: string[];
+    toolNames?: string[];
+  }>;
 }

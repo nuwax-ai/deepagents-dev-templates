@@ -204,6 +204,9 @@ function collectImports(params) {
 
 /** @param {{name:string,description:string,params:{state:object,nodes:object,edges:array,input:object,result:object,recursionLimit?:number}}} spec */
 export function render(spec) {
+  const platformToolRefs = (spec.tools ?? []).filter(
+    (tool) => tool && typeof tool === "object" && "targetType" in tool && "targetId" in tool
+  );
   const P = spec.params;
   const imp = collectImports(P);
   // 无 llm/llm-router/approval-finalize 节点时 appConfig 不被引用 → 加 _ 前缀避免 noUnusedParameters
@@ -277,6 +280,8 @@ import type { FlowRuntime } from "../../../runtime/flow-runtime.js";
 import type { StatefulTopologyRecipe } from "../../../libs/topologies/types.js";
 import { buildGraph, getTopology as _getTopology } from "./graph.js";
 
+export const platformToolRefs = ${JSON.stringify(platformToolRefs, null, 2)};
+
 export const recipe = (runtime: FlowRuntime): StatefulTopologyRecipe => ({
   buildGraph: (cp) => buildGraph(runtime.config, cp, runtime.allTools),
   toInput: (query) => ({ ${JSON.stringify(P.input.queryField)}: query${extra} }),
@@ -284,6 +289,7 @@ export const recipe = (runtime: FlowRuntime): StatefulTopologyRecipe => ({
     const answer = String((v as Record<string, unknown>)[${JSON.stringify(P.result.answerField)}] ?? "");${footer}
     return ${ret};
   },${P.recursionLimit ? `\n  recursionLimit: ${P.recursionLimit},` : ""}
+  platformToolRefs,
 });
 
 export const getTopology = _getTopology;

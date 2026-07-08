@@ -35,13 +35,18 @@ export function createFlowTools(
     skills?: DiscoveredSkill[];
     /** 已发现的声明式 subagent → 暴露 task 委派工具。 */
     subAgents?: DiscoveredSubAgent[];
+    /** 基于 spec.tools(schema) 动态创建的平台 StructuredTool。 */
+    platformTools?: StructuredTool[];
   }
 ): StructuredTool[] {
-  const { workspaceRoot, policy, skills = [], subAgents = [] } = opts;
+  const { workspaceRoot, policy, skills = [], subAgents = [], platformTools = [] } = opts;
 
   // 与 cwd 无关的通用工具（无状态，主 agent 与子智能体共享同实例）。
   const reused: StructuredTool[] = [httpRequestTool, jsonUtilsTool, writeTodosTool];
   const skillTools = skills.length ? [createSkillTool(skills)] : [];
+
+  const platformToolNameSet = new Set(platformTools.map((tool) => tool.name));
+  const mcpTools = ctx.mcpTools.filter((tool) => !platformToolNameSet.has(tool.name));
 
   // 按工作目录构建一套工具（bash/fs/search 沙箱受限于该 cwd）——**不含 task，防递归**。
   // 主 agent 用 workspaceRoot；子智能体（task.tool）按各自 workdir 重建。
@@ -51,7 +56,8 @@ export function createFlowTools(
     ...createFsTools({ workspaceRoot: wsRoot, policy }),
     ...createSearchTools({ workspaceRoot: wsRoot, policy }),
     ...createDemoTools(),
-    ...ctx.mcpTools,
+    ...mcpTools,
+    ...platformTools,
     ...skillTools,
   ];
 

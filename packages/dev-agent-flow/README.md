@@ -29,7 +29,7 @@
 |------|------|------|
 | **模板本体** | `deepagents-flow-ts/` 内 `README.md`、`docs/*`（含 **`docs/glossary.md` 术语表**）、`config/`、`prompts/` | 描述**本工作目录**内的能力、配置路径、图编排规则（`flow-graph-rules.md` R-G*）、排错索引；**不**承载开发 Agent 工作流 |
 | **开发 Agent 引导** | 本包 `system-prompt.md`（**规则/约束**）+ `skills/flow-builder/`（**实现步骤**）+ `skills/dev-engineer-toolkit/` | `system-prompt` 定铁律；`flow-builder` Part 0–7 承载逐步流程（脚手架、编排、提示词提炼、completion gate 等） |
-| **改动对照** | [../../docs/packages/deepagents-flow-ts/development/platform-tool-binding-design.md](../../docs/packages/deepagents-flow-ts/development/platform-tool-binding-design.md) | 平台工具登记、schema 静态沉淀、节点 `params` 工具引用、`platform-tool` / `tool-exec` 职责边界 |
+| **能力与工具对照** | [../deepagents-flow-ts/docs/capabilities.md](../deepagents-flow-ts/docs/capabilities.md) | 平台工具 schema 来源、运行时装配、节点工具引用与 allTools 合并规则 |
 
 **单一权威原则**：图怎么写、规则 ID、factory API → 读目标项目 `docs/`；开发流程、平台登记、**completion gate（完成闸门）** → 读本包 `flow-builder` Part*。技能内 `references/flow-graph-rules-pointer.md` 仅为**路由页**，详表永远在目标项目 `docs/flow-graph-rules.md`。**术语**（durable stateful flow / topology / 护栏分语境 等）统一以目标项目 `docs/glossary.md` 为准。
 

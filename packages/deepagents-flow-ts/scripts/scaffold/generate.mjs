@@ -69,8 +69,8 @@ function registerFlow(name, kind, conversational = false) {
   // 物化时透传 createStatefulFlow → 多轮记忆 + 图层流式（见 src/app/default-flow.ts）。
   const entry =
     kind === "stateful-recipe"
-      ? `  "${name}": { name: "${name}", kind: "stateful-recipe",${conversational ? " conversational: true," : ""} recipe: ${alias}.recipe, getTopology: ${alias}.getTopology },`
-      : `  "${name}": { name: "${name}", kind: "${kind}", createExecutor: ${alias}.createExecutor, getTopology: ${alias}.getTopology },`;
+      ? `  "${name}": { name: "${name}", kind: "stateful-recipe",${conversational ? " conversational: true," : ""} recipe: ${alias}.recipe, platformToolRefs: ${alias}.platformToolRefs, getTopology: ${alias}.getTopology },`
+      : `  "${name}": { name: "${name}", kind: "${kind}", createExecutor: ${alias}.createExecutor, platformToolRefs: ${alias}.platformToolRefs, getTopology: ${alias}.getTopology },`;
   src = src
     .replace(importAnchor, `${importAnchor}\n${importLine}`)
     .replace(regAnchor, `${regAnchor}\n${entry}`);

@@ -18,6 +18,7 @@ import type {
 } from "./index.js";
 import type { FlowSandboxPolicy } from "./fs/sandbox.js";
 import type { FileCheckpointSaver } from "./services/file-checkpoint-saver.js";
+import type { PlatformToolDescriptor, PlatformToolRef } from "./platform-tools/types.js";
 
 export interface FlowRuntime {
   config: AppConfig;
@@ -25,6 +26,10 @@ export interface FlowRuntime {
   ctx: RuntimeContext;
   /** 全部工具（内置通用 + flow 自补 + native MCP）—— 供 think 节点 bindTools。 */
   allTools: StructuredTool[];
+  /** flow spec.tools 中声明的平台工具引用（schema 源）。 */
+  platformToolRefs: PlatformToolRef[];
+  /** 由 platformToolRefs 展开后的可执行 descriptor（一 toolName 一条）。 */
+  platformToolDescriptors: PlatformToolDescriptor[];
   /** 解析后的系统提示词（ACP > config > prompts/ 文件 > fallback）。 */
   systemPrompt: string;
   /** 已发现的 skills 目录（deepagents progressive skills）。 */

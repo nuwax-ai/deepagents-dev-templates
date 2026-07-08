@@ -39,7 +39,7 @@ pnpm exec tsx src/index.ts sessions       # 已持久化的会话
 
 ## 扩展（不改 `src/libs/` 保护区）
 
-- **加平台能力 / MCP**：搜索、文档、业务 API 等优先经平台登记（`dev-engineer-toolkit` 的 `search-apis.sh` / `add-tool.sh`）。平台已登记的 Plugin / Workflow / Knowledge 等能力运行期适配为可用工具并进入 `FlowRuntime.allTools`；图侧按节点 `params`（`platform-tool` 用 `toolName`，`tool-exec` 用 `tools`）、`createPlatformToolActionNode`、`createToolExecNode` 或现有检索 factory 选择工具集合。禁止为已登记能力手写 fetch / `tool()` 包装。本地 MCP 调试可参考 [config/mcp.examples.json](../config/mcp.examples.json)（chrome-devtools / filesystem / bash 等），复制到 `servers` 或经会话下发。
+- **加平台能力 / MCP**：搜索、文档、业务 API 等优先经平台登记（`dev-engineer-toolkit` 的 `search-apis.sh` / `add-tool.sh`）。平台工具在 flow 里统一由 `spec.tools` 声明 `targetType/targetId/toolNames/schema`，runtime 按 schema 动态构建 `StructuredTool` 并注入 `FlowRuntime.allTools`；图侧按节点 `params`（`platform-tool` 用 `toolName`，`tool-exec` 用 `tools`）选择即可。`spec.tools` 是平台工具 schema 的唯一来源，不再依赖运行时额外发现或手工注入。本地 MCP 调试可参考 [config/mcp.examples.json](../config/mcp.examples.json)（chrome-devtools / filesystem / bash 等），复制到 `servers` 或经会话下发。
 - **加 Skill**：
   - **项目内置（推荐）**：`builtin/skills/<name>/SKILL.md`（`agentsDirectories` 含 `./builtin`）。
   - **工作区扩展**：`.agents/skills/<name>/SKILL.md`，或在 `config.skills.directories` 增加目录。
@@ -55,7 +55,7 @@ pnpm exec tsx src/index.ts sessions       # 已持久化的会话
 
 在本仓库内扩展业务能力时，按下列顺序判断（扩展方式见上文 [扩展（不改 src/libs/ 保护区）](#扩展不改-srclibs-保护区)）：
 
-1. **平台能力（登记即接入）** — 平台登记的 Plugin / Workflow / Knowledge 等能力运行期适配为可用工具并注入 `FlowRuntime.allTools`；conversational ReAct 自动 bind，固定管道按节点 `params` 工具名引用，**零包装代码**
+1. **平台能力（schema 声明即接入）** — `spec.tools` 声明的平台 Plugin / Workflow / Knowledge 会在 runtime 按 schema 转成可执行工具并注入 `FlowRuntime.allTools`；conversational ReAct 自动 bind，固定管道按节点 `params` 工具名引用，**零包装代码**
 2. **内置 `libs/tools`** — bash / 读写 / grep·glob / http / json / load_skill / task / demo
 3. **自写 `src/app/`** — 最后手段（仅平台确无命中的真外部 API），在 [flow-tools.ts](../src/app/flow-tools.ts) 注册
 

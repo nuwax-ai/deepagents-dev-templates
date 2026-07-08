@@ -39,7 +39,7 @@
 
 ### 工具登记与节点引用
 
-平台登记只负责启用工具。`spec.tools` 是**开发期登记记录**（`targetType` / `targetId` / `name` / `schema` / `toolNames`），运行时不读——平台工具由运行环境（MCP）注入 `allTools`，节点直接按工具名引用。
+平台登记负责启用工具；`spec.tools` 同时是**运行时 schema 唯一来源**。运行时会把 `spec.tools` 里的 `targetType` / `targetId` / `toolNames` / `schema`（或 `inputSchema`）动态转换为 `StructuredTool` 并注入 `allTools`，节点再按工具名引用。
 
 固定管道要让某个节点用平台工具时，在**节点 `params`** 里写工具名，不再使用 `tools[].bindTo` 能力位：
 
@@ -59,7 +59,7 @@
 
 - `toolNames` 记录该平台工具对应的运行时工具名；节点 `params` 引用此名字。
 - `platform-tool` 节点用 `params.toolName`（单工具，必填）；`tool-exec` 节点用 `params.tools: ["工具名"]`（工具集合，缺省=全部）。
-- 从 `search-apis.sh` 搜索结果取 `targetType` / `targetId` / `name` / `description` / `schema` 静态写入 `spec.tools`；`get-config.sh --key tools` 只用于确认工具已登记，运行期不再查平台接口。
+- 从 `search-apis.sh` 搜索结果取 `targetType` / `targetId` / `name` / `description` / `schema` 静态写入 `spec.tools`；`get-config.sh --key tools` 用于确认工具已登记。运行时不再查平台配置接口，而是直接消费 `spec.tools` 动态建工具。
 - schema 中的 `${...}` 占位符必须保持原样；禁止硬编码 URL、密钥或鉴权值。
 
 ### 固定管道主动工具节点
@@ -95,6 +95,7 @@
 
 - `platform-tool`：节点主动从 state 构造参数，按 `params.toolName`（必填）从运行时工具集定位并调用，适合固定管道。
 - `tool-exec`：只执行上一条 `AIMessage.tool_calls`，适合 ReAct/tool-calling 回路；用 `params.tools: ["工具名"]` 限定可调用工具集合（缺省=全部）。
+- 默认 ReAct：`think.bindTools(runtime.allTools)` 会自动拿到这些 schema-driven 平台工具。
 - URL / 鉴权值不写入业务代码；schema 与 env key 可静态记录，真实密钥由运行环境注入。
 
 ### 完成闸门
