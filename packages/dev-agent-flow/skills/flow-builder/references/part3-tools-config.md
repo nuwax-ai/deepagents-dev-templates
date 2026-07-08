@@ -50,6 +50,7 @@
       "targetType": "Plugin",
       "targetId": 614,
       "name": "token价格查询",
+      "description": "查询代币的实时价格",
       "schema": "{...get-config --full 拉取的接口 schema 原文...}"
     }
   ]

@@ -61,6 +61,7 @@ export function createPlatformStructuredTool({
     name = descriptor.toolName;
     description =
       descriptor.description ??
+      descriptor.displayName ??
       `Execute platform ${descriptor.targetType} tool (${descriptor.targetId}) via schema-driven runtime`;
     schema = schema;
 
