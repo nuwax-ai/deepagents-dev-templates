@@ -53,8 +53,8 @@
 |----|------|
 | 1 | 加载 `dev-engineer-toolkit` + [part3-tools-config.md](part3-tools-config.md) § 平台能力登记 |
 | 2 | 按能力拆词：`search-apis.sh --kw "<关键词>"`（可多轮）；需技能 → `search-skills.sh` |
-| 3 | `get-config.sh --key tools` / `skills`（按需） |
-| 4 | 命中 → `add-tool.sh`；固定管道需要限定工具集合时在节点 `params` 写 `toolName` / `tools` → `project.md` 记 targetId / 工具名 |
+| 3 | 命中 → `add-tool.sh` |
+| 4 | `get-config.sh --key tools --full` 拉取已注册工具真实配置（含 schema）固化进 `spec.tools`（**禁止**手抄）；固定管道在节点 `params` 写 `toolName` / `tools` → `project.md` 记 targetId / 工具名 |
 | 5 | 平台确无命中 → 记录关键词与输出，**然后**方可走优先级 3 自写 app 工具 |
 | 6 | **然后**写 spec / `graph.ts` |
 

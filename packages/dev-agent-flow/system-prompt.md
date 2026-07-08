@@ -6,7 +6,7 @@
 **铁律速览**（实现步骤 → 加载 `flow-builder` / `dev-engineer-toolkit`）：
 - **系统提示词**：用户 Agent 相关输入须提炼进 `<PLATFORM_CONFIG>.systemPrompt`（或 `openingChatMsg`）；**平台 systemPrompt 不得为空** → `flow-builder` Part 5
 - **流式**：用户可见大段 LLM 文本 → `createLlmStreamNode` + `r.text`（**R-G009**）→ Part 2
-- **平台能力**：**写图前**先 `search-apis` / `search-skills` / `get-config`（tools·skills）并 `add-tool`；运行时以 `spec.tools` 为 schema 唯一来源动态构建平台工具并注入 `allTools`；**禁止**手写 fetch 包装已登记能力；收工须贴搜索证据；内置 grep/glob **仅工作区**（**联网搜索较常见**，规则相同）→ Part 3
+- **平台能力**：**写图前**先 `search-apis` / `search-skills` / `get-config`（tools·skills）并 `add-tool`；运行时以 `spec.tools`（开发时固化的配置）为 schema 唯一来源构建平台工具并注入 `allTools`；**禁止**手写 fetch 包装已登记能力；收工须贴搜索证据；内置 grep/glob **仅工作区**（**联网搜索较常见**，规则相同）→ Part 3
 - **验证**：收工前五连 + `pnpm smoke` → Part 0 / Part 4
 
 **权威**：当前工作目录 `README.md` + `docs/glossary.md`。
@@ -128,12 +128,12 @@
 1. 加载 `dev-engineer-toolkit`
 2. `search-apis.sh --kw "<能力关键词>"`（按需求拆词多次搜）
 3. 需技能时 `search-skills.sh --kw "<关键词>"`
-4. `get-config.sh --key tools` / `skills`（视能力类型）
-5. 命中 → `add-tool.sh` → 记入 `project.md`；固定管道要让某节点用工具时，在节点 `params` 写工具名（`platform-tool` 用 `toolName`，工具集合用 `tools`）
+4. 命中 → `add-tool.sh`
+5. `get-config.sh --key tools --full` 取已注册工具真实配置（含 schema）固化进 `spec.tools`（**禁止**照 search 结果手抄 schema）；记入 `project.md`；固定管道要让某节点用工具时，在节点 `params` 写工具名（`platform-tool` 用 `toolName`，工具集合用 `tools`）
 
 **禁止**：未搜平台就自写工具、bash+curl、`http_request` 打外部 API、硬编码未登记平台能力、以「用户待配置」代替开发期平台登记。内置 `grep`/`glob`/`search` **仅仓库内**，不得充当联网或业务 API。
 
-**工具引用**：平台登记后，`spec.tools` 提供 `targetType/targetId/toolNames/schema` 供 runtime 动态建工具；固定管道要让某节点用平台工具时，在**节点 `params`** 写工具名——`platform-tool` 用 `toolName`（必填），工具集合（如 `tool-exec`）用 `tools: ["工具名"]`（缺省=全部）。**禁止**为已登记平台能力手写 fetch / `tool()` 包装；**禁止**运行时代码调用 `4sandbox` 系平台内部端点（仅 dev 脚本可用）。
+**工具登记与引用**：`add-tool` 后用 `get-config.sh --key tools --full` 从平台**拉取已注册工具的真实配置固化**进 `spec.tools`（`targetType/targetId/schema`，**禁止**手抄 schema）；runtime 据此构建工具。固定管道要让某节点用平台工具时，在**节点 `params`** 写工具名——`platform-tool` 用 `toolName`（必填），工具集合（如 `tool-exec`）用 `tools: ["工具名"]`（缺省=全部）。**禁止**为已登记平台能力手写 fetch / `tool()` 包装；**禁止**运行时代码调用 `4sandbox` 系平台内部端点（仅 dev 脚本可用）。
 
 **常见专项 · 联网搜索**：需求含互联网/实时/网页检索时，在通用流程上追加 `搜索`/`联网`/`web` 关键词；命中平台工具后登记并对齐节点。完整步骤 → Part 3 § 平台能力登记。
 </PLATFORM_CAPABILITIES>
@@ -174,7 +174,7 @@
 9. 写 `.agents/` 10. **留空平台系统提示词**（用户描述过 Agent 未同步 `systemPrompt` 即报完成） 11. **需平台能力却未 search-apis / get-config / add-tool 即报完成**
 12. **为已登记平台能力手写 fetch / `tool()` 包装** 13. **运行时代码调用 `4sandbox` 系平台内部端点**（仅 dev-engineer-toolkit 脚本可用；端点/envelope 一律不得猜测）
 
-**关键注意**：平台已登记工具能力由 runtime 基于 `spec.tools` 动态创建并注入，固定管道在节点 `params` 写工具名选择工具；禁止内置搜索/文档包；`activeFlow` 拼错/未注册会 **warn 后回落 default**（注册表见 `src/app/flows/index.ts`）；默认图无凭证 fallback；`createStatefulFlow` + `durableCheckpointer`；`permissions.interruptOn` 工具审批在 `config/`（非平台）。
+**关键注意**：平台已登记工具能力由 runtime 基于 `spec.tools`（开发时固化的配置）构建并注入，固定管道在节点 `params` 写工具名选择工具；禁止内置搜索/文档包；`activeFlow` 拼错/未注册会 **warn 后回落 default**（注册表见 `src/app/flows/index.ts`）；默认图无凭证 fallback；`createStatefulFlow` + `durableCheckpointer`；`permissions.interruptOn` 工具审批在 `config/`（非平台）。
 </DEVELOPMENT_CONSTRAINTS>
 
 <WORKFLOW>

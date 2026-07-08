@@ -39,7 +39,7 @@ pnpm exec tsx src/index.ts sessions       # 已持久化的会话
 
 ## 扩展（不改 `src/libs/` 保护区）
 
-- **加平台能力 / MCP**：搜索、文档、业务 API 等优先经平台登记（`dev-engineer-toolkit` 的 `search-apis.sh` / `add-tool.sh`）。平台工具在 flow 里统一由 `spec.tools` 声明 `targetType/targetId/toolNames/schema`，runtime 按 schema 动态构建 `StructuredTool` 并注入 `FlowRuntime.allTools`；图侧按节点 `params`（`platform-tool` 用 `toolName`，`tool-exec` 用 `tools`）选择即可。`spec.tools` 是平台工具 schema 的唯一来源，不再依赖运行时额外发现或手工注入。本地 MCP 调试可参考 [config/mcp.examples.json](../config/mcp.examples.json)（chrome-devtools / filesystem / bash 等），复制到 `servers` 或经会话下发。
+- **加平台能力 / MCP**：搜索、文档、业务 API 等优先经平台登记（`dev-engineer-toolkit` 的 `search-apis.sh` / `add-tool.sh`）。平台工具在 flow 里统一由 `spec.tools` 声明 `targetType/targetId/schema`（工具名运行时按 `targetType_targetId` 自动拼），runtime 按这份**固化** schema 构建 `StructuredTool` 并注入 `FlowRuntime.allTools`；图侧按节点 `params`（`platform-tool` 用 `toolName`，`tool-exec` 用 `tools`）选择即可。`spec.tools` 是平台工具 schema 的唯一来源，不再依赖运行时额外发现或手工注入。本地 MCP 调试可参考 [config/mcp.examples.json](../config/mcp.examples.json)（chrome-devtools / filesystem / bash 等），复制到 `servers` 或经会话下发。
 - **加 Skill**：
   - **项目内置（推荐）**：`builtin/skills/<name>/SKILL.md`（`agentsDirectories` 含 `./builtin`）。
   - **工作区扩展**：`.agents/skills/<name>/SKILL.md`，或在 `config.skills.directories` 增加目录。

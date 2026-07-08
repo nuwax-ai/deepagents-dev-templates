@@ -179,7 +179,6 @@ describe("lint-graph-rules R-G009", () => {
               },
             },
           },
-          toolNames: ["web_search"],
         },
       ],
       params: {
@@ -191,7 +190,7 @@ describe("lint-graph-rules R-G009", () => {
           web_search: {
             type: "platform-tool",
             params: {
-              toolName: "web_search",
+              toolName: "Plugin_309",
               args: "(s) => ({ query: s.query })",
               write: "(r) => ({ searchResult: r.raw })",
             },
@@ -208,7 +207,7 @@ describe("lint-graph-rules R-G009", () => {
 
     expect(graph).toContain("createPlatformToolActionNode");
     expect(graph).toContain("tools: allTools");
-    expect(graph).toContain("toolName: \"web_search\"");
+    expect(graph).toContain("toolName: \"Plugin_309\"");
     expect(index).toContain("export const platformToolRefs = [");
     expect(index).toContain("targetId");
   });

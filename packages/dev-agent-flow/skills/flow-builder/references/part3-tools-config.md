@@ -30,16 +30,16 @@
 ### 工作流（必须 · 写代码前）
 
 1. 加载 `dev-engineer-toolkit`
-2. `search-apis.sh --kw "<能力关键词>"`（按需求拆词，可多轮）
+2. `search-apis.sh --kw "<能力关键词>"`（按需求拆词，可多轮）—— 仅用于发现 `targetType` / `targetId`
 3. 需领域技能 → `search-skills.sh --kw "<关键词>"`
-4. `get-config.sh --key tools` / `skills`（按需）
-5. 命中 → `add-tool.sh --target-type <type> --target-id <id>`
+4. 命中 → `add-tool.sh --target-type <type> --target-id <id>`
+5. `get-config.sh --key tools --full` 取该工具**已注册的真实配置**（含 schema），固化进 `spec.tools`；**禁止**照 search 结果手抄 schema
 6. 记入 `project.md`（targetId、工具名、验证方式；固定管道在节点 `params` 写工具名）
 7. 平台**确无**命中 → 记录搜索输出 → **然后**方可走优先级 3 自写 app 工具
 
 ### 工具登记与节点引用
 
-平台登记负责启用工具；`spec.tools` 同时是**运行时 schema 唯一来源**。运行时会把 `spec.tools` 里的 `targetType` / `targetId` / `toolNames` / `schema`（或 `inputSchema`）动态转换为 `StructuredTool` 并注入 `allTools`，节点再按工具名引用。
+平台登记负责启用工具；`spec.tools` 是**开发时固化的工具配置**（`targetType` / `targetId` / `schema`）。运行时按这份固化配置构建 `StructuredTool` 并注入 `allTools`（执行依赖运行时 env），节点再按工具名引用。
 
 固定管道要让某个节点用平台工具时，在**节点 `params`** 里写工具名，不再使用 `tools[].bindTo` 能力位：
 
@@ -50,16 +50,15 @@
       "targetType": "Plugin",
       "targetId": 614,
       "name": "token价格查询",
-      "schema": "{...平台返回的接口 schema 原文...}",
-      "toolNames": ["query_token_price"]
+      "schema": "{...get-config --full 拉取的接口 schema 原文...}"
     }
   ]
 }
 ```
 
-- `toolNames` 记录该平台工具对应的运行时工具名；节点 `params` 引用此名字。
+- 运行时工具名按 `${targetType}_${targetId}` 自动拼（如 `Plugin_309`；get-config 不返回工具名）；节点 `params.toolName` 用这个名字。
 - `platform-tool` 节点用 `params.toolName`（单工具，必填）；`tool-exec` 节点用 `params.tools: ["工具名"]`（工具集合，缺省=全部）。
-- 从 `search-apis.sh` 搜索结果取 `targetType` / `targetId` / `name` / `description` / `schema` 静态写入 `spec.tools`；`get-config.sh --key tools` 用于确认工具已登记。运行时不再查平台配置接口，而是直接消费 `spec.tools` 动态建工具。
+- `spec.tools` 的工具配置（`targetType` / `targetId` / `name` / `description` / `schema` / `toolNames`）须用 `get-config.sh --key tools --full` 从平台**拉取已注册工具的真实配置固化**，**禁止**照 `search-apis.sh` 结果手抄 schema。运行时直接消费 `spec.tools` 里固化的配置构建工具，不再查平台配置接口。
 - schema 中的 `${...}` 占位符必须保持原样；禁止硬编码 URL、密钥或鉴权值。
 
 ### 固定管道主动工具节点
@@ -74,8 +73,7 @@
       "targetId": 309,
       "name": "联网搜索",
       "description": "在互联网上搜索相关信息",
-      "schema": "{...平台返回的接口 schema 原文...}",
-      "toolNames": ["web_search"]
+      "schema": "{...get-config --full 拉取的接口 schema 原文...}"
     }
   ],
   "params": {
@@ -83,7 +81,7 @@
       "web_search": {
         "type": "platform-tool",
         "params": {
-          "toolName": "web_search",
+          "toolName": "Plugin_309",
           "args": "(s) => ({ query: s.query, freshness: 'noLimit' })",
           "write": "(r) => ({ searchResult: r.raw })"
         }

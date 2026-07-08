@@ -10,14 +10,14 @@
 
 - 开发期先做平台搜索与注册（`dev-engineer-toolkit`）
 - 运行期只用 `spec.tools` 作为 schema 与元数据来源
-- runtime 动态创建 LangGraph `StructuredTool` 并统一注入 `FlowRuntime.allTools`
+- runtime 按固化的 schema 创建 LangGraph `StructuredTool` 并统一注入 `FlowRuntime.allTools`
 - 同时覆盖 `platform-tool`、`tool-exec`、默认 ReAct `bindTools`
 
 ## 端到端流程
 
 1. 平台搜索工具（`search-apis.sh` / `search-skills.sh`）
 2. 平台注册工具（`add-tool.sh`），`get-config.sh --key tools` 验证已启用
-3. 将 `targetType/targetId/toolNames/schema` 写入 flow `spec.tools`
+3. 将 `targetType/targetId/schema` 写入 flow `spec.tools`（工具名运行时按 `targetType_targetId` 自动拼）
 4. scaffold 把 `spec.tools` 透传到 flow 导出的 `platformToolRefs`
 5. `createFlowRuntime` 读取 `platformToolRefs`，展开为 `platformToolDescriptors`
 6. runtime 通过 `schema -> zod` 构建 `StructuredTool`
@@ -62,6 +62,6 @@
 ## 与旧方案差异
 
 - 旧：`spec.tools` 仅开发期记录，运行时不读
-- 新：`spec.tools` 直达 runtime，驱动 `StructuredTool` 动态创建
+- 新：`spec.tools`（开发时固化的配置）直达 runtime，按 schema 构建 `StructuredTool`
 - 旧：平台工具主要依赖外部注入
 - 新：以 flow 内 schema 声明为准，runtime 内可重复、可测试、可追踪

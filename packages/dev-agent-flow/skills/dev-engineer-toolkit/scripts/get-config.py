@@ -18,11 +18,15 @@ from dev_http import (
 VALID_KEYS = ("systemPrompt", "openingChatMsg", "tools", "skills", "mcpConfigs")
 
 
-def print_key(data: dict, key: str) -> None:
+def print_key(data: dict, key: str, full: bool = False) -> None:
     val = data.get(key)
     if val is None:
         return
     if key in ("tools", "skills", "mcpConfigs") and isinstance(val, list):
+        if key == "tools" and full:
+            # 完整输出（含 schema 等平台返回的全部字段），供开发期固化进 flow spec.tools（非手抄）
+            print(json.dumps(val, ensure_ascii=False, indent=2))
+            return
         if key == "tools":
             print(f"=== 已注册工具 ({len(val)} 个) ===")
             for item in val:
@@ -86,6 +90,11 @@ def main() -> None:
 
     p = argparse.ArgumentParser(description="获取智能体项目配置")
     p.add_argument("--key", default="")
+    p.add_argument(
+        "--full",
+        action="store_true",
+        help="配合 --key tools 输出完整工具配置（含 schema），用于固化进 flow spec.tools",
+    )
     args = p.parse_args()
 
     if args.key and args.key not in VALID_KEYS:
@@ -99,7 +108,7 @@ def main() -> None:
     data = payload.get("data") or {}
 
     if args.key:
-        print_key(data, args.key)
+        print_key(data, args.key, args.full)
     else:
         print_all(data, aid)
 

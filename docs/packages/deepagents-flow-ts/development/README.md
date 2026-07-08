@@ -72,7 +72,7 @@ development/
 | [subagent-task-and-acp-plan.md](./subagent-task-and-acp-plan.md) | 现行 | `write_todos`、`task` 并行流式分桶、Plan 合并、子 agent 输出兜底（v1.9.0–1.9.1） |
 | [checkpoint-integrity-and-prompt-resolution.md](./checkpoint-integrity-and-prompt-resolution.md) | 现行 | ACP systemPrompt 追加、孤立 tool_calls 三层修复（v1.9.2–1.9.4） |
 | [langgraph-native-convergence.md](./langgraph-native-convergence.md) | 计划中 | surface 流式、MessagesAnnotation、compaction 等向 LangGraph 原生收敛 |
-| [platform-tool-schema-driven-runtime.md](./platform-tool-schema-driven-runtime.md) | 现行 | `spec.tools` 作为 schema 唯一来源，runtime 动态创建工具并注入 `allTools` |
+| [platform-tool-schema-driven-runtime.md](./platform-tool-schema-driven-runtime.md) | 现行 | `spec.tools`（开发时固化）作为 schema 唯一来源，runtime 按其构建工具并注入 `allTools` |
 | [platform-tool-binding-design.md](./platform-tool-binding-design.md) | ⚠️ 过时 | 旧方案：`spec.tools` 仅开发期记录、运行时不读 |
 
 ### ACP / Surface

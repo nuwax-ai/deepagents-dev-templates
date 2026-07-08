@@ -11,17 +11,20 @@
  * 场景节点用 scene 提示词；runtime.systemPrompt（= resolveSystemPrompt，恒非空）不覆盖 scene，
  * 否则 spec.systemPrompt 永不生效（resolveSystemPrompt 有 inline 兜底恒返回非空）。
  *
- * 工具：think 节点绑定 runtime.allTools 全量（平台工具经运行环境注入）；
- * spec.tools 仅作开发期登记记录，运行时不读。
+ * 工具：think 节点绑定 runtime.allTools 全量；spec.tools 经 platformToolRefs 由 runtime
+ * 基于 schema 动态建平台工具后注入 allTools（schema-driven runtime）。
  */
 
 /** 拓扑 kind：复用默认 ReAct 图，conversational stateful-recipe（多轮记忆）。 */
 export const kind = "stateful-recipe";
 export const conversational = true;
 
-/** @param {{name:string,description:string,systemPrompt:string}} spec */
+/** @param {{name:string,description:string,systemPrompt:string,tools?:object[]}} spec */
 export function render(spec) {
   const fallback = spec.systemPrompt ? JSON.stringify(spec.systemPrompt) : "undefined";
+  const platformToolRefs = (spec.tools ?? []).filter(
+    (tool) => tool && typeof tool === "object" && "targetType" in tool && "targetId" in tool
+  );
   const content = `/**
  * ${spec.name} — react-tools 拓扑（scaffold 生成，可手改）
  * ${spec.description || "标准 ReAct：prepare → think ↔ tools → respond"}
@@ -38,6 +41,9 @@ import { getFlowTopology } from "../../topology.js";
 
 /** 场景系统提示词（spec.systemPrompt）；spec 空时回退 runtime.systemPrompt（框架）。 */
 const FALLBACK_SYSTEM_PROMPT = ${fallback};
+
+/** spec.tools 声明的平台工具引用（开发期 get-config 拉取固化）；runtime 据此动态建工具注入 allTools。 */
+export const platformToolRefs = ${JSON.stringify(platformToolRefs, null, 2)};
 
 export function recipe(runtime: FlowRuntime): StatefulTopologyRecipe {
   return {

@@ -2,7 +2,7 @@
 name: flow-builder
 description: "在当前工作目录开发 LangGraph Flow 时使用。覆盖：Part0 端到端流程与 completion gate；Part1 一句话脚手架；Part2 StateGraph 编排（HITL/流式/问答卡片）；Part3 工具与平台能力绑定（写图前须配合 dev-engineer-toolkit 搜索登记，含联网搜索）；Part4 验证调试与 pnpm smoke；Part5 系统提示词与用户输入提炼；Part6 子智能体委派；Part7 技能集成。适用于新建/修改 flow、零图多轮对话路径、图规则 R-G001+、跑不通或 Invalid model 排查。禁止写 .agents/；LangGraph TS API 查官方文档。Keywords: flow开发, scaffold, StateGraph, LangGraph, HITL, smoke, 工具绑定, subagent, systemPrompt, 平台能力, 联网搜索, flow-builder"
 tags: [flow, scaffold, orchestration, tools, prompt, subagent, stategraph, hitl, debug]
-version: "3.1.0"
+version: "3.1.1"
 ---
 
 # Flow 开发（当前工作目录）
@@ -84,7 +84,7 @@ flow-builder/
 - **文档分工**：图规则 / factory API / 配置路径 / **术语** → 当前工作目录 `docs/`（**术语权威**：`docs/glossary.md`）；脚手架流程 / 平台登记 / **completion gate（完成闸门）** → 本技能 Part*（见 [README.md](../../../README.md) § 文档分工）。
 - 图是契约；factory 优先；**Bespoke nodes** 不硬塞 factory；`examples/` 只读且只参考 surface seam，topology 单一权威看 `src/libs/topologies/`；保护区不改。
 - **用户可见大段 LLM 输出**（compose / aggregate / draft / 修订稿）→ **`createLlmStreamNode`**（`write` 读 `r.text`）；**禁止** `createLlmNode`（仅 invoke）。custom spec 用 `type: "llm-stream"`；**R-G009**。
-- **平台能力（外部工具/Plugin/技能）** → **写图前**必须先 `dev-engineer-toolkit` 搜平台并 `add-tool`；固定管道要让某节点用工具时在节点 `params` 写工具名（`platform-tool` 用 `toolName`，工具集合用 `tools`）；**禁止**为已登记能力手写 fetch/`tool()` 包装；收工须贴搜索证据 + 工具真实调用证据（`SMOKE_EXPECT_TOOL`）；**联网搜索较常见**，见 Part 3 § 联网搜索；禁止未搜平台就写外部能力、禁止以「用户待配置」代替登记（见 Part 3 § 平台能力登记、Part 0 completion gate）。
+- **平台能力（外部工具/Plugin/技能）** → **写图前**必须先 `dev-engineer-toolkit` 搜平台并 `add-tool`，再用 `get-config --key tools --full` 拉取已注册工具配置固化进 `spec.tools`（**禁止**手抄 schema）；固定管道要让某节点用工具时在节点 `params` 写工具名（`platform-tool` 用 `toolName`，工具集合用 `tools`）；**禁止**为已登记能力手写 fetch/`tool()` 包装；收工须贴搜索证据 + 工具真实调用证据（`SMOKE_EXPECT_TOOL`）；**联网搜索较常见**，见 Part 3 § 联网搜索；禁止未搜平台就写外部能力、禁止以「用户待配置」代替登记（见 Part 3 § 平台能力登记、Part 0 completion gate）。
 - **禁止写 `.agents/`**：内置能力写 `builtin/`（Part 6、Part 7）；平台能力走平台。
 - **Subagent `AGENT.md`**：默认不写 `tools` / `model`；禁止平台 Plugin 登记名进 `tools`；联网由主 Agent 搜后写入 `task.description`；多岗串行 `task`（Part 6）。
 - 有状态用 `createStatefulFlow`（**HITL durable stateful flow** 默认；`conversational: true` 为对话型；`dev-agent` **topology** `stateful-custom` 手写 run-loop 为例外，见 part2）。

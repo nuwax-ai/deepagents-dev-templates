@@ -2,7 +2,7 @@
 name: dev-engineer-toolkit
 description: "当开发项目需要搜索可用工具（API）、可用技能（SKILL）、或进行项目配置（系统提示词、开场白等智能体配置）时使用。这是开发工程师的基础技能包，所有涉及额外API接口查询、技能发现、项目配置读写的场景都必须使用本技能。Keywords: API搜索, 技能搜索, 项目配置, 系统提示词, 开场白, agent配置, 工具搜索, tool search, skill discovery"
 tags: [api-search, skill-search, project-config, dev-toolkit, agent-config, tool-discovery]
-version: "1.7.0"
+version: "1.7.1"
 ---
 
 # 开发工程师工具包
@@ -330,8 +330,11 @@ Python 环境由 `check-python.sh` 自动探测，缺失时可用 `--install`（
 # 只看系统提示词
 ./scripts/get-config.sh --key systemPrompt
 
-# 只看已注册工具列表
+# 只看已注册工具列表（摘要）
 ./scripts/get-config.sh --key tools
+
+# 取已注册工具的完整配置（含 schema），固化进 flow spec.tools
+./scripts/get-config.sh --key tools --full
 
 # 只看已注册技能列表（含下载链接）
 ./scripts/get-config.sh --key skills
@@ -346,6 +349,7 @@ Python 环境由 `check-python.sh` 自动探测，缺失时可用 `--install`（
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `--key` | string | - | 只查看指定配置：`systemPrompt`、`openingChatMsg`、`tools`、`skills`、`mcpConfigs`；不填返回全部 |
+| `--full` | flag | - | 配合 `--key tools` 输出完整工具配置（含 schema），用于固化进 flow `spec.tools` |
 
 **返回示例（完整配置）：**
 
@@ -446,20 +450,24 @@ Python 环境由 `check-python.sh` 自动探测，缺失时可用 `--install`（
 
 ## 常见工作流
 
-### 工作流 A：工具采纳（搜索 → 注册 → 开发）
+### 工作流 A：工具采纳（搜索 → 注册 → 取配置固化 → 开发）
 
-当决定使用某个搜索到的工具 API 时，必须按以下两步操作：
+当决定使用某个搜索到的工具 API 时，必须按以下三步操作：
 
 ```
 1. 注册工具（必须先注册才能调用）
    ./scripts/add-tool.sh --target-type "Plugin" --target-id 614
 
-2. 根据工具的 schema 进行实际开发
-   - 使用搜索结果中 schema 字段的接口定义（method, url, params 等）
+2. 取已注册工具的真实配置，固化进 flow spec.tools（非手抄 search 结果）
+   ./scripts/get-config.sh --key tools --full
+   - 用返回的 targetType / targetId / schema 等固化进 spec.tools
+
+3. 根据固化配置开发图节点
    - 保持 schema 中的 ${...} 占位符，不硬编码
 ```
 
 > ⚠️ **注册是调用前提**：搜索到的 Plugin、Workflow、Knowledge、Skill 必须先通过 `add-tool.sh` 注册才能调用。
+> ⚠️ **配置来自 get-config**：`spec.tools` 的工具配置须用 `get-config --key tools --full` 拉取已注册的真实配置固化，**禁止**照 `search-apis.sh` 结果手抄 schema。
 
 ### 工作流 B：开发前资源发现
 
