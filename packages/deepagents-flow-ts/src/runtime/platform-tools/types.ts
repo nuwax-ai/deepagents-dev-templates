@@ -5,7 +5,6 @@ export interface PlatformToolRef {
   description?: string;
   schema?: unknown;
   inputSchema?: unknown;
-  outputSchema?: unknown;
   mode?: string;
   method?: string;
   url?: string;
@@ -22,7 +21,6 @@ export interface PlatformToolDescriptor {
   description?: string;
   rawSchema?: unknown;
   inputSchema?: unknown;
-  outputSchema?: unknown;
   method?: string;
   url?: string;
   auth?: unknown;

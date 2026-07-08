@@ -1,33 +1,24 @@
 import type { PlatformToolDescriptor, PlatformToolRef } from "./types.js";
+import { asObject } from "./schema-to-zod.js";
 
 function toObject(value: unknown): Record<string, unknown> | undefined {
   if (!value) return undefined;
   if (typeof value === "string") {
     try {
-      const parsed = JSON.parse(value);
-      return parsed && typeof parsed === "object" && !Array.isArray(parsed)
-        ? (parsed as Record<string, unknown>)
-        : undefined;
+      return asObject(JSON.parse(value));
     } catch {
       return undefined;
     }
   }
-  return typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : undefined;
+  return asObject(value);
 }
 
 /**
  * 平台工具的运行时工具名。get-config 返回的工具配置没有工具名，
- * 按 `${targetType}_${targetId}` 自动推导（如 `plugin_309`、`workflow_1309`）。
+ * 按 `${targetType}_${targetId}` 自动推导（如 `Plugin_309`、`Workflow_1309`，保留 targetType 原大小写）。
  */
 export function platformToolName(ref: { targetType: string; targetId: number | string }): string {
   return `${ref.targetType}_${ref.targetId}`;
-}
-
-/** @deprecated 用 {@link platformToolName}；保留向后兼容。 */
-export function resolvePlatformToolNames(ref: PlatformToolRef): string[] {
-  return [platformToolName(ref)];
 }
 
 /**

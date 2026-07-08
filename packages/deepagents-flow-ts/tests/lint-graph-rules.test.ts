@@ -157,7 +157,7 @@ describe("lint-graph-rules R-G009", () => {
     expect(graph).toContain("createToolExecNode");
     expect(graph).toContain("pickTools(allTools, [\"quote_price\"])");
     expect(index).toContain("buildGraph(runtime.config, cp, runtime.allTools)");
-    expect(index).toContain("export const platformToolRefs = []");
+    expect(index).toContain("export const platformToolRefs = JSON.parse(");
   });
 
   it("custom blueprint 支持 platform-tool 主动调用（按 toolName 定位工具）", () => {
@@ -208,7 +208,7 @@ describe("lint-graph-rules R-G009", () => {
     expect(graph).toContain("createPlatformToolActionNode");
     expect(graph).toContain("tools: allTools");
     expect(graph).toContain("toolName: \"Plugin_309\"");
-    expect(index).toContain("export const platformToolRefs = [");
+    expect(index).toContain("export const platformToolRefs = JSON.parse(");
     expect(index).toContain("targetId");
   });
 });

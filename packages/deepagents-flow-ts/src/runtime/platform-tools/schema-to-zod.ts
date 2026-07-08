@@ -1,6 +1,6 @@
 import { z, type ZodTypeAny } from "zod";
 
-function asObject(value: unknown): Record<string, unknown> | undefined {
+export function asObject(value: unknown): Record<string, unknown> | undefined {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : undefined;

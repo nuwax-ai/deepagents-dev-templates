@@ -280,7 +280,8 @@ import type { FlowRuntime } from "../../../runtime/flow-runtime.js";
 import type { StatefulTopologyRecipe } from "../../../libs/topologies/types.js";
 import { buildGraph, getTopology as _getTopology } from "./graph.js";
 
-export const platformToolRefs = ${JSON.stringify(platformToolRefs, null, 2)};
+const _platformToolRefsJson = ${JSON.stringify(JSON.stringify(platformToolRefs))};
+export const platformToolRefs = JSON.parse(_platformToolRefsJson);
 
 export const recipe = (runtime: FlowRuntime): StatefulTopologyRecipe => ({
   buildGraph: (cp) => buildGraph(runtime.config, cp, runtime.allTools),

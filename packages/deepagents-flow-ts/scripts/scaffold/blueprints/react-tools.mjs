@@ -43,7 +43,8 @@ import { getFlowTopology } from "../../topology.js";
 const FALLBACK_SYSTEM_PROMPT = ${fallback};
 
 /** spec.tools 声明的平台工具引用（开发期 get-config 拉取固化）；runtime 据此动态建工具注入 allTools。 */
-export const platformToolRefs = ${JSON.stringify(platformToolRefs, null, 2)};
+const _platformToolRefsJson = ${JSON.stringify(JSON.stringify(platformToolRefs))};
+export const platformToolRefs = JSON.parse(_platformToolRefsJson);
 
 export function recipe(runtime: FlowRuntime): StatefulTopologyRecipe {
   return {
