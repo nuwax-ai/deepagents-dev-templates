@@ -336,6 +336,30 @@ describe("createLlmStreamNode", () => {
     expect(out.streamed).toBe(true);
   });
 
+  it("累积全文 chunk（provider 返回前缀续写）→ 只 emit delta，避免叠词", async () => {
+    const chunks = [{ content: "你" }, { content: "你好" }, { content: "你好世界" }];
+    const tokens: string[] = [];
+    const mockStream = {
+      invoke: async () => ({ content: "" }),
+      stream: async function* () {
+        for (const c of chunks) yield c;
+      },
+    };
+    const node = createLlmStreamNode<any>({
+      model: mockStream as any,
+      prompt: () => [],
+      write: (r) => ({ text: r.text, streamed: r.streamed }),
+      timeoutMs: 5000,
+    });
+    const out = await node(
+      {},
+      { configurable: { onToken: (t: string) => tokens.push(t) } } as LangGraphRunnableConfig
+    );
+    expect(out.text).toBe("你好世界");
+    expect(out.streamed).toBe(true);
+    expect(tokens).toEqual(["你", "好", "世界"]);
+  });
+
   it("无 onToken sink → 退回 invoke(streamed:false)", async () => {
     const mock = { invoke: async () => ({ content: "full" }) };
     const node = createLlmStreamNode<any>({

@@ -24,7 +24,8 @@ import {
   MemorySaver,
   type BaseCheckpointSaver,
 } from "@langchain/langgraph";
-import { HumanMessage } from "@langchain/core/messages";
+import { HumanMessage, AIMessage, AIMessageChunk, type BaseMessage } from "@langchain/core/messages";
+import { FakeStreamingChatModel } from "@langchain/core/utils/testing";
 import { createStatefulFlow } from "../src/surfaces/stateful-flow.js";
 import { FileCheckpointSaver } from "../src/runtime/services/file-checkpoint-saver.js";
 import { createLlmStreamNode } from "../src/libs/nodes/index.js";
@@ -193,6 +194,57 @@ describe("createStatefulFlow run-loop（无凭证，确定性）", () => {
     expect(res.status).toBe("done");
     if (res.status === "done") expect(res.answer).toBe("hello");
     expect(tokens.join("")).toBe("hello");
+  });
+
+  it("messages 模式累积 chunk → consumeStream 折叠后 onToken 无叠词", async () => {
+    const StreamState = Annotation.Root({
+      query: Annotation<string>,
+      messages: Annotation<BaseMessage[]>({
+        reducer: (a, b) => a.concat(b),
+        default: () => [],
+      }),
+      output: Annotation<string>,
+    });
+    type StreamStateType = typeof StreamState.State;
+
+    const model = new FakeStreamingChatModel({
+      sleep: 0,
+      chunks: [
+        new AIMessageChunk({ content: "你" }),
+        new AIMessageChunk({ content: "你好" }),
+        new AIMessageChunk({ content: "你好世界" }),
+      ],
+    });
+
+    const buildGraph = (cp: BaseCheckpointSaver) =>
+      new StateGraph(StreamState)
+        .addNode("think", async (state: StreamStateType) => {
+          // invoke 会聚合 stream chunk（累积模式下可能叠词）；本测只验证 messages 折叠后的 onToken。
+          await model.invoke([new HumanMessage(state.query)]);
+          return {
+            messages: [new AIMessage({ content: "你好世界" })],
+            output: "你好世界",
+          };
+        })
+        .addEdge(START, "think")
+        .addEdge("think", END)
+        .compile({ checkpointer: cp });
+
+    const flow = createStatefulFlow<StreamStateType>({
+      buildGraph,
+      toInput: (query) => ({ query }),
+      toResult: (v) => ({ answer: v.output ?? "" }),
+      checkpointer: new MemorySaver(),
+    });
+
+    const tokens: string[] = [];
+    const res = await flow.run({ query: "hi" }, randomUUID(), {
+      onToken: (t) => tokens.push(t),
+    });
+
+    expect(res.status).toBe("done");
+    if (res.status === "done") expect(res.answer).toBe("你好世界");
+    expect(tokens).toEqual(["你", "好", "世界"]);
   });
 });
 

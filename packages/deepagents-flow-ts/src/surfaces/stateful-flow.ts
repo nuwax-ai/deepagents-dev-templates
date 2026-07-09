@@ -33,6 +33,7 @@ import { applyCompaction } from "../libs/compaction.js";
 import { applyCheckpointMessageRepair } from "../libs/messages/repair-checkpoint.js";
 import { mapStreamChunk } from "./map-stream-chunk.js";
 import { dispatchSurfaceEvent } from "./dispatch-surface-event.js";
+import { foldStreamTextChunk } from "../libs/nodes/stream-text-delta.js";
 
 /** LangGraph 多模式 stream 的 streamMode 列表。 */
 const STREAM_MODES = ["messages", "tools", "custom", "updates"] as const;
@@ -118,6 +119,8 @@ async function consumeStream(
 ): Promise<string | undefined> {
   let interruptQuestion: string | undefined;
   let multiMode = false;
+  /** messages 模式文本折叠态（防御 provider 返回累积全文导致叠词）。 */
+  let messagesTextFull = "";
 
   for await (const raw of stream) {
     if (isModeChunk(raw)) {
@@ -133,6 +136,14 @@ async function consumeStream(
           mode === "messages" && Array.isArray(payload)
             ? (payload[1] as { langgraph_node?: string } | undefined)
             : undefined;
+        // custom writer 的 text 已由 emitTextToken 发 delta；仅 messages 模式需折叠。
+        if (ev.type === "text" && mode === "messages") {
+          const folded = foldStreamTextChunk(messagesTextFull, ev.text);
+          messagesTextFull = folded.full;
+          if (!folded.delta) continue;
+          await dispatchSurfaceEvent({ type: "text", text: folded.delta }, callbacks, meta);
+          continue;
+        }
         await dispatchSurfaceEvent(ev, callbacks, meta);
       }
       continue;
