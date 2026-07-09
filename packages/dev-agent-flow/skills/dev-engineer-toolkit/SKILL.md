@@ -2,7 +2,7 @@
 name: dev-engineer-toolkit
 description: "当开发项目需要搜索可用工具（API）、可用技能（SKILL）、或进行项目配置（系统提示词、开场白等智能体配置）时使用。这是开发工程师的基础技能包，所有涉及额外API接口查询、技能发现、项目配置读写的场景都必须使用本技能。Keywords: API搜索, 技能搜索, 项目配置, 系统提示词, 开场白, agent配置, 工具搜索, tool search, skill discovery"
 tags: [api-search, skill-search, project-config, dev-toolkit, agent-config, tool-discovery]
-version: "1.7.2"
+version: "1.7.3"
 ---
 
 # 开发工程师工具包
@@ -37,16 +37,22 @@ version: "1.7.2"
 
 ### UTF-8 / Windows 编码（配置读写必读）
 
-`get-config.sh` / `update-config.sh` 内部调用 **`get-config.py` / `update-config.py`**（标准库，无第三方依赖），请求头带 `Content-Type: application/json; charset=utf-8`，JSON 使用 `ensure_ascii=False`，避免中文 `systemPrompt` 乱码。
+`get-config.sh` / `update-config.sh` 内部调用 **`get-config.py` / `update-config.py`**；`search-apis.sh` / `search-skills.sh` 内部调用 **`search-tools.py`**（标准库，无第三方依赖）。请求头带 `Content-Type: application/json; charset=utf-8`，JSON 使用 `ensure_ascii=False`，避免中文乱码。
 
 > 本地 **Windows** 上 Agent 命令走 **Git Bash**；`python3` 常为系统商店占位（不可用），实际可用的一般是 `python` 或 `py -3`。统一执行 `./scripts/*.sh`，**禁止** `python3` 失败后改手写 `curl`。
 
 ```bash
 # 推荐：从 UTF-8 文件上传（含中文时长文本）
 ./scripts/update-config.sh --system-prompt-file prompts/flow.base.md
+
+# 中文搜索关键词若 shell 仍乱码，用 --kw-file
+echo -n "搜索" > .tmp/kw.txt
+./scripts/search-apis.sh --kw-file .tmp/kw.txt --format table
 ```
 
 **含中文的长系统提示词**：务必用 `--system-prompt-file` 指向 **UTF-8** 文件，不要用 `--system-prompt` 在命令行内联多行中文。
+
+**含中文的搜索关键词**：优先 `--kw "关键词"`（`search-tools.py` 会自动修复 Git Bash 编码）；仍异常时用 `--kw-file` 读 UTF-8 文件。
 
 **禁止**：
 
@@ -57,7 +63,7 @@ version: "1.7.2"
 
 ### Python 环境检测（配置脚本依赖 Python 3）
 
-`get-config.sh` / `update-config.sh` 依赖 Python 3 运行 `*.py`。**更新配置前建议先检测**：
+`get-config.sh` / `update-config.sh` 依赖 Python 3 运行 `*.py`。**搜索与配置脚本更新前建议先检测**：
 
 ```bash
 ./scripts/check-python.sh
@@ -98,6 +104,7 @@ Python 环境由 `check-python.sh` 自动探测，缺失时可用 `--install`（
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `--kw` | string | - | 搜索关键词，支持模糊匹配 |
+| `--kw-file` | path | - | 从 UTF-8 文件读取关键词（中文 shell 编码异常时用） |
 | `--page` | int | 1 | 页码 |
 | `--page-size` | int | 20 | 每页数量（1-100） |
 | `--format` | json\|table | json | 输出格式 |
@@ -166,6 +173,7 @@ Python 环境由 `check-python.sh` 自动探测，缺失时可用 `--install`（
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `--kw` | string | - | 搜索关键词 |
+| `--kw-file` | path | - | 从 UTF-8 文件读取关键词（中文 shell 编码异常时用） |
 | `--page` | int | 1 | 页码 |
 | `--page-size` | int | 20 | 每页数量（1-100） |
 | `--format` | json\|table | json | 输出格式 |

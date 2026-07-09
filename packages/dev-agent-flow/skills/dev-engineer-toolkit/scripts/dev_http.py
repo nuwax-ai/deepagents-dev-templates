@@ -37,6 +37,29 @@ def dev_agent_id() -> int:
         sys.exit(1)
 
 
+def normalize_shell_text(text: str) -> str:
+    """Repair non-ASCII text mangled when passed through Git Bash on Windows."""
+    if not text or text.isascii():
+        return text
+
+    candidates: list[str] = []
+    for encoding in ("utf-8", "gbk", "cp936"):
+        try:
+            fixed = text.encode("latin-1").decode(encoding)
+        except (UnicodeDecodeError, UnicodeEncodeError):
+            continue
+        if fixed != text and fixed not in candidates:
+            candidates.append(fixed)
+
+    if not candidates:
+        return text
+
+    for candidate in candidates:
+        if any("\u4e00" <= ch <= "\u9fff" for ch in candidate):
+            return candidate
+    return candidates[0]
+
+
 def read_text_option(text: str | None, file_path: str | None, label: str) -> str:
     if text and file_path:
         print(f"[ERROR] {label} 不能同时指定文本与文件。", file=sys.stderr)
