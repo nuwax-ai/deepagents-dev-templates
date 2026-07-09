@@ -45,33 +45,77 @@ python__normalize_windows_path_for_bash() {
   printf '%s\n' "$raw"
 }
 
+python__is_windows_bash() {
+  case "${OSTYPE:-}:${OS:-}" in
+    msys*:*|cygwin*:*|*:*Windows_NT*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+python__append_path_dir() {
+  local dir="$1"
+  [[ -z "$dir" || ! -d "$dir" ]] && return 1
+  if [[ ":$PATH:" != *":$dir:"* ]]; then
+    PATH="${PATH:+$PATH:}$dir"
+    export PATH
+  fi
+  return 0
+}
+
+# 沙箱常剥离 PATH 且 ORIGINAL_PATH 不含 python；回退探测 Windows 常见安装目录。
+python__import_windows_wellknown_paths() {
+  python__is_windows_bash || return 0
+
+  local home="${USERPROFILE:-${HOME:-}}"
+  local appdata="${LOCALAPPDATA:-}"
+  home="${home//\\//}"
+  appdata="${appdata//\\//}"
+
+  local -a roots=()
+  [[ -n "$appdata" ]] && roots+=("$appdata/Programs/Python")
+  [[ -n "$home" ]] && roots+=("$home/AppData/Local/Programs/Python")
+
+  local root pydir
+  for root in "${roots[@]}"; do
+    [[ -d "$root" ]] || continue
+    python__append_path_dir "$root/Launcher"
+    for pydir in "$root"/Python*; do
+      [[ -d "$pydir" ]] || continue
+      python__append_path_dir "$pydir"
+      python__append_path_dir "$pydir/Scripts"
+    done
+  done
+}
+
 python__import_original_path_candidates() {
   [[ "$_DEV_TOOLKIT_IMPORTED_ORIGINAL_PATH" == "1" ]] && return 0
   _DEV_TOOLKIT_IMPORTED_ORIGINAL_PATH=1
 
-  [[ -n "${ORIGINAL_PATH:-}" ]] || return 0
-  case "${OSTYPE:-}:${OS:-}" in
-    msys*:*|cygwin*:*|*:*Windows_NT*) ;;
-    *)
-      return 0
-      ;;
-  esac
+  if [[ -n "${ORIGINAL_PATH:-}" ]] && python__is_windows_bash; then
+    local -a parts=()
+    local raw converted raw_lower delim
+    # nuwaclaw getAppEnv 用 POSIX `:`；部分宿主仍可能用 Windows `;`
+    if [[ "$ORIGINAL_PATH" == *";"* ]]; then
+      delim=';'
+    else
+      delim=':'
+    fi
+    IFS="$delim" read -r -a parts <<<"${ORIGINAL_PATH}"
+    for raw in "${parts[@]}"; do
+      [[ -z "$raw" ]] && continue
+      raw_lower="$(python__lower "$raw")"
+      if [[ "$raw_lower" != *python* && "$raw_lower" != *uv* ]]; then
+        continue
+      fi
+      converted="$(python__normalize_windows_path_for_bash "$raw")" || continue
+      if [[ -d "$converted" && ":$PATH:" != *":$converted:"* ]]; then
+        PATH="$converted:$PATH"
+      fi
+    done
+    export PATH
+  fi
 
-  local -a parts=()
-  local raw converted raw_lower
-  IFS=';' read -r -a parts <<<"${ORIGINAL_PATH}"
-  for raw in "${parts[@]}"; do
-    [[ -z "$raw" ]] && continue
-    raw_lower="$(python__lower "$raw")"
-    if [[ "$raw_lower" != *python* && "$raw_lower" != *uv* ]]; then
-      continue
-    fi
-    converted="$(python__normalize_windows_path_for_bash "$raw")" || continue
-    if [[ -d "$converted" && ":$PATH:" != *":$converted:"* ]]; then
-      PATH="$converted:$PATH"
-    fi
-  done
-  export PATH
+  python__import_windows_wellknown_paths
 }
 
 python_probe_usable() {
