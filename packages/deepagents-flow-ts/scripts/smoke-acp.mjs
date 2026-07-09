@@ -73,6 +73,24 @@ function resolvePnpm() {
   return "pnpm";
 }
 
+function resolveNpx() {
+  if (process.platform === "win32") {
+    for (const cmd of ["npx.cmd", "npx.exe", "npx"]) {
+      if (commandExists(cmd)) return cmd;
+    }
+  }
+  return "npx";
+}
+
+/** 默认 npx（绕过 pnpm dlx 的 minimumReleaseAge / deps 检查）；SMOKE_RCODER_LAUNCHER=pnpm 可回退 */
+function resolveRcoderCmd(chatArgs) {
+  const mode = (process.env.SMOKE_RCODER_LAUNCHER ?? "npx").trim().toLowerCase();
+  if (mode === "pnpm") {
+    return { cmd: resolvePnpm(), args: ["dlx", "rcoder-cli", ...chatArgs] };
+  }
+  return { cmd: resolveNpx(), args: ["-y", "rcoder-cli", ...chatArgs] };
+}
+
 function resolveTsx() {
   const local = path.join(PKG_DIR, "node_modules", ".bin", process.platform === "win32" ? "tsx.cmd" : "tsx");
   if (existsSync(local)) return local;
@@ -80,11 +98,9 @@ function resolveTsx() {
   return local;
 }
 
-function buildRcoderArgs({ entry, prompt, timeoutS, verbose, smokeEnv }) {
+function buildRcoderChatArgs({ entry, prompt, timeoutS, verbose, smokeEnv }) {
   const tsxBin = resolveTsx();
-  const rcoderArgs = [
-    "dlx",
-    "rcoder-cli",
+  const chatArgs = [
     "chat",
     "-c",
     tsxBin,
@@ -100,17 +116,17 @@ function buildRcoderArgs({ entry, prompt, timeoutS, verbose, smokeEnv }) {
     "yolo",
     "-q",
   ];
-  if (verbose) rcoderArgs.push("-v");
+  if (verbose) chatArgs.push("-v");
 
   for (const [name, val] of Object.entries(smokeEnv.forward)) {
-    if (val) rcoderArgs.push("-e", `${name}=${val}`);
+    if (val) chatArgs.push("-e", `${name}=${val}`);
   }
-  return rcoderArgs;
+  return chatArgs;
 }
 
-function formatCommand(pnpm, args) {
+function formatCommand(cmd, args) {
   const quote = (s) => (/\s/.test(s) ? JSON.stringify(s) : s);
-  return [pnpm, ...args].map(quote).join(" ");
+  return [cmd, ...args].map(quote).join(" ");
 }
 
 // rcoder 在 agent 空答 / Session cancelled 时仍可能 exit 0 —— 仅看退出码会把「agent 没产出答案」漏成通过。
@@ -126,14 +142,14 @@ function echoMcpSummary(combined) {
   }
 }
 
-function runPnpm(args, { debug, expectTool }) {
-  const pnpm = resolvePnpm();
+function runRcoder({ cmd, args }, { debug, expectTool }) {
   logDebug(debug, "cwd:", PKG_DIR);
-  logDebug(debug, "cmd:", formatCommand(pnpm, args));
+  logDebug(debug, "launcher:", process.env.SMOKE_RCODER_LAUNCHER ?? "npx (default)");
+  logDebug(debug, "cmd:", formatCommand(cmd, args));
 
   let result;
   try {
-    result = spawnSync(pnpm, args, {
+    result = spawnSync(cmd, args, {
       cwd: PKG_DIR,
       stdio: ["inherit", "pipe", "pipe"],
       shell: false,
@@ -143,7 +159,7 @@ function runPnpm(args, { debug, expectTool }) {
   } catch (err) {
     // 输出超 maxBuffer 等异常：回退 inherit（仅看退出码，放弃特征扫描）
     logDebug(debug, "captured run threw, fallback to inherit:", String(err));
-    const r = spawnSync(pnpm, args, { cwd: PKG_DIR, stdio: "inherit", shell: false, env: process.env });
+    const r = spawnSync(cmd, args, { cwd: PKG_DIR, stdio: "inherit", shell: false, env: process.env });
     if (expectTool) {
       // 平台能力闸门依赖输出扫描；无法捕获输出时不能假绿
       return { code: r.status ?? 1, failed: true, reason: `SMOKE_EXPECT_TOOL="${expectTool}"：输出捕获失败，无法验证工具调用` };
@@ -212,6 +228,7 @@ Env (model — 与 runtime config-loader 对齐):
   SMOKE_WARN_ACTIVE_FLOW=0  关闭 activeFlow=default 警告
   SMOKE_TIMEOUT        Timeout seconds (default: 150)
   SMOKE_VERBOSE=1      Pass -v to rcoder-cli
+  SMOKE_RCODER_LAUNCHER  npx (default) | pnpm — rcoder-cli 启动方式
   ./.env               Model credentials (see .env.example)`);
 }
 
@@ -295,8 +312,6 @@ Debug without credentials:
     process.exit(1);
   }
 
-  const pnpm = resolvePnpm();
-
   for (let i = 0; i < prompts.length; i++) {
     const prompt = prompts[i];
     const label = prompts.length > 1 ? ` [${i + 1}/${prompts.length}]` : "";
@@ -304,22 +319,24 @@ Debug without credentials:
       console.error(`[smoke:acp]${label} prompt: ${JSON.stringify(prompt)}`);
     }
 
-    const rcoderArgs = buildRcoderArgs({
-      entry: flags.entry,
-      prompt,
-      timeoutS,
-      verbose,
-      smokeEnv,
-    });
+    const rcoderCmd = resolveRcoderCmd(
+      buildRcoderChatArgs({
+        entry: flags.entry,
+        prompt,
+        timeoutS,
+        verbose,
+        smokeEnv,
+      }),
+    );
 
     if (flags.dryRun) {
       console.log(`# dry-run${label} — rcoder command:`);
-      console.log(formatCommand(pnpm, rcoderArgs));
+      console.log(formatCommand(rcoderCmd.cmd, rcoderCmd.args));
       continue;
     }
 
     // SMOKE_EXPECT_TOOL 只对主 prompt（第一条）断言；SMOKE_PROMPT_EDGE 边界输入（如「你是？」）不要求触发工具
-    const res = runPnpm(rcoderArgs, { debug: flags.debug, expectTool: i === 0 ? expectTool : undefined });
+    const res = runRcoder(rcoderCmd, { debug: flags.debug, expectTool: i === 0 ? expectTool : undefined });
     if (res.code !== 0 || res.failed) {
       const reason = res.failed ? ` — ${res.reason}` : "";
       console.error(`[smoke:acp] failed${label} (exit ${res.code})${reason}`);
