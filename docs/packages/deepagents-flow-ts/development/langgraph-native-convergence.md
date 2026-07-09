@@ -1,5 +1,8 @@
 # LangGraph 原生对象收敛开发方案
 
+> 📋 **状态**：计划中（未完全落地）  
+> ⚠️ **路径口径已过时（v1.14.0+）**：本文多处引用 `examples/`、`typecheck:examples`；现行以 [recent-changelog.md](./recent-changelog.md) §3 废弃清单为准。示范路径改为 `scripts/scaffold/specs/` + `tests/topologies/`。
+
 本文档记录 `deepagents-flow-ts` 将自造执行/事件机制逐步收敛到 LangGraph 原生对象的开发计划。
 
 核心目标：保持 **workflow-first** 架构，图本身就是请求路径。不要在图之上再造 `FlowEvent`、`Flow` 等黑盒抽象；surface 应直接 stream 编译后的 LangGraph 图，并消费原生 `[mode, chunk]`。

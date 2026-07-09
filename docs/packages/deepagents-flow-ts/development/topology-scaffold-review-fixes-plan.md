@@ -1,6 +1,8 @@
 # 拓扑积木化重构 code-review 修复计划
 
-> **日期**：2026-06-22 ｜ **分支**：`feat/topology-scaffold` ｜ **状态**：✅ 15/15 已落地并验证（typecheck + typecheck:examples + test 197 + graph 反射 + RAG streaming 端到端全绿，详见文末「执行结果」）
+> **日期**：2026-06-22 ｜ **分支**：`feat/topology-scaffold` ｜ **状态**：✅ 15/15 已落地并验证（详见文末「执行结果」）
+>
+> ⚠️ **路径口径已过时（v1.14.0+）**：本文执行记录中的 `examples/`、`typecheck:examples`、`pnpm example` 已删除。现行架构见 [recent-changelog.md](./recent-changelog.md) § v1.14。
 >
 > `feat/topology-scaffold`（vs `main`，~8.5k 行 diff）做了 flow-ts 的拓扑积木化重构 + scaffold 蓝图 + 新节点原语。一次 max-effort code-review 发现 15 个真实缺陷，本计划逐项修复。
 >

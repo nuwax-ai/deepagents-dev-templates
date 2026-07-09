@@ -11,6 +11,7 @@
 
 | 我要… | 文档 |
 | --- | --- |
+| 查近期版本功能、优化与 ⚠️ 已废弃口径 | [recent-changelog.md](./recent-changelog.md) |
 | 理解默认 ReAct 图为何 `think` + `tools` 分两节点 | [react-two-phase.md](./react-two-phase.md) |
 | 查 MCP / Skill / Subagent 加载、运行、停止 | [runtime-capabilities-lifecycle.md](./runtime-capabilities-lifecycle.md) |
 | 理解 ask-question MCP 与 HITL 三种形态选型 | [ask-question-mcp-hitl.md](./ask-question-mcp-hitl.md) |
@@ -30,6 +31,7 @@
 ```
 development/
 ├── README.md                           ← 本页（总索引）
+├── recent-changelog.md                 ← 近期功能/优化梳理 + ⚠️ 废弃口径（✅ v1.14+）
 ├── react-two-phase.md                  ← ReAct 两阶段分工（think bindTools vs tools 节点）
 ├── runtime-capabilities-lifecycle.md   ← MCP / Skill / Subagent 加载·运行·停止
 ├── ask-question-mcp-hitl.md              ← 内置 ask-question MCP + HITL 选型（✅ 现行）
@@ -66,14 +68,15 @@ development/
 
 | 文档 | 状态 | 摘要 |
 | --- | --- | --- |
-| [react-two-phase.md](./react-two-phase.md) | 现行 | 默认图 ReAct：`bindTools`（决策）与 `ToolNode`（执行）为何拆节点 |
-| [runtime-capabilities-lifecycle.md](./runtime-capabilities-lifecycle.md) | 现行 | MCP / Skill / Subagent 装配、session 生命周期与资源边界 |
-| [ask-question-mcp-hitl.md](./ask-question-mcp-hitl.md) | 现行 | 内置 ask-question MCP、图内 present_review + interrupt、与 default ReAct 边界 |
-| [subagent-task-and-acp-plan.md](./subagent-task-and-acp-plan.md) | 现行 | `write_todos`、`task` 并行流式分桶、Plan 合并、子 agent 输出兜底（v1.9.0–1.9.1） |
-| [checkpoint-integrity-and-prompt-resolution.md](./checkpoint-integrity-and-prompt-resolution.md) | 现行 | ACP systemPrompt 追加、孤立 tool_calls 三层修复（v1.9.2–1.9.4） |
-| [langgraph-native-convergence.md](./langgraph-native-convergence.md) | 计划中 | surface 流式、MessagesAnnotation、compaction 等向 LangGraph 原生收敛 |
-| [platform-tool-schema-driven-runtime.md](./platform-tool-schema-driven-runtime.md) | 现行 | `spec.tools`（开发时固化）作为 schema 唯一来源，runtime 按其构建工具并注入 `allTools` |
-| [platform-tool-binding-design.md](./platform-tool-binding-design.md) | ⚠️ 过时 | 旧方案：`spec.tools` 仅开发期记录、运行时不读 |
+| [recent-changelog.md](./recent-changelog.md) | ✅ 现行 | v1.9–v1.14 功能与优化总览；**含 ⚠️ 废弃路径/命令清单** |
+| [react-two-phase.md](./react-two-phase.md) | ✅ 现行 | 默认图 ReAct：`bindTools`（决策）与 `ToolNode`（执行）为何拆节点 |
+| [runtime-capabilities-lifecycle.md](./runtime-capabilities-lifecycle.md) | ✅ 现行 | MCP / Skill / Subagent 装配、session 生命周期与资源边界 |
+| [ask-question-mcp-hitl.md](./ask-question-mcp-hitl.md) | ✅ 现行 | 内置 ask-question MCP、图内 present_review + interrupt、与 default ReAct 边界 |
+| [subagent-task-and-acp-plan.md](./subagent-task-and-acp-plan.md) | ✅ 现行 | `write_todos`、`task` 并行流式分桶、Plan 合并、子 agent 输出兜底（v1.9.0–1.9.1） |
+| [checkpoint-integrity-and-prompt-resolution.md](./checkpoint-integrity-and-prompt-resolution.md) | ✅ 现行 | ACP systemPrompt 追加、孤立 tool_calls 三层修复（v1.9.2–v1.9.4） |
+| [langgraph-native-convergence.md](./langgraph-native-convergence.md) | 📋 计划中 | surface 流式、MessagesAnnotation、compaction 等向 LangGraph 原生收敛（文内 ⚠️ 部分 examples 路径已过时） |
+| [platform-tool-schema-driven-runtime.md](./platform-tool-schema-driven-runtime.md) | ✅ 现行 | `spec.tools`（开发时固化）作为 schema 唯一来源，runtime 按其构建工具并注入 `allTools` |
+| [platform-tool-binding-design.md](./platform-tool-binding-design.md) | ⚠️ 已过时 | 旧方案：`spec.tools` 仅开发期记录、运行时不读 |
 
 ### ACP / Surface
 
@@ -91,13 +94,15 @@ development/
 
 | 文档 | 状态 | 摘要 |
 | --- | --- | --- |
-| [topology-scaffold-review-fixes-plan.md](./topology-scaffold-review-fixes-plan.md) | ✅ 已完成 | `feat/topology-scaffold` 15 项缺陷修复计划与执行结果 |
+| [recent-changelog.md](./recent-changelog.md) § v1.14 | ✅ 现行 | examples 删除、dev-agent→app/flows、测试迁址、scaffold 保留名 |
+| [topology-scaffold-review-fixes-plan.md](./topology-scaffold-review-fixes-plan.md) | ✅ 已完成 | `feat/topology-scaffold` 15 项缺陷修复（文内 ⚠️ `examples/`、`typecheck:examples` 已过时） |
 
 ### 历史归档
 
 | 文档 | 状态 | 摘要 |
 | --- | --- | --- |
 | [rag-agent-plan.md](./rag-agent-plan.md) | ⚠️ 已过时 | RAG 内置于 app-ts 的早期方案；现状见 `src/libs/topologies/rag/` |
+| `packages/.../examples/` 目录 | ⚠️ 已删除 | v1.14.0 起；示范见 `scripts/scaffold/specs/` |
 
 ---
 
