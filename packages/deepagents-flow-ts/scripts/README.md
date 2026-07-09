@@ -57,6 +57,7 @@
 | `SMOKE_EXPECT_ACTIVE_FLOW` | 与 `activeFlow` 不一致则 exit 1 |
 | `SMOKE_WARN_ACTIVE_FLOW=0` | 关闭 `activeFlow=default` 警告 |
 | `SMOKE_TIMEOUT` | rcoder 超时秒数（默认 `150`） |
+| `SMOKE_RCODER_LAUNCHER` | 默认 PATH 全局 `rcoder-cli` → `npx -y` 兜底 |
 | `SMOKE_VERBOSE=1` | 传 `-v` 给 rcoder-cli |
 | `SMOKE_DEBUG=1` / `--debug` | 打印解析后的 provider/model/forward env |
 | `SMOKE_DRY_RUN=1` / `--dry-run` | 只打印 rcoder 命令，不调 API |

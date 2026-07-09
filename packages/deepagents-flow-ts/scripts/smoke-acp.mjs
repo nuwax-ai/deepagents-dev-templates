@@ -64,15 +64,6 @@ function maskSecret(val) {
   return `${val.slice(0, 4)}…${val.slice(-2)} (${val.length} chars)`;
 }
 
-function resolvePnpm() {
-  if (process.platform === "win32") {
-    for (const cmd of ["pnpm.cmd", "pnpm.exe", "pnpm"]) {
-      if (commandExists(cmd)) return cmd;
-    }
-  }
-  return "pnpm";
-}
-
 function resolveNpx() {
   if (process.platform === "win32") {
     for (const cmd of ["npx.cmd", "npx.exe", "npx"]) {
@@ -82,13 +73,20 @@ function resolveNpx() {
   return "npx";
 }
 
-/** 默认 npx（绕过 pnpm dlx 的 minimumReleaseAge / deps 检查）；SMOKE_RCODER_LAUNCHER=pnpm 可回退 */
+/**
+ * 全局 rcoder-cli（`npm i -g rcoder-cli`）优先；未装则 npx 兜底。
+ * SMOKE_RCODER_LAUNCHER=npx 可强制走 npx。
+ */
 function resolveRcoderCmd(chatArgs) {
-  const mode = (process.env.SMOKE_RCODER_LAUNCHER ?? "npx").trim().toLowerCase();
-  if (mode === "pnpm") {
-    return { cmd: resolvePnpm(), args: ["dlx", "rcoder-cli", ...chatArgs] };
+  const forceNpx = process.env.SMOKE_RCODER_LAUNCHER?.trim().toLowerCase() === "npx";
+  if (!forceNpx && commandExists("rcoder-cli")) {
+    return { cmd: "rcoder-cli", args: chatArgs, launcher: "rcoder-cli (global)" };
   }
-  return { cmd: resolveNpx(), args: ["-y", "rcoder-cli", ...chatArgs] };
+  return {
+    cmd: resolveNpx(),
+    args: ["-y", "rcoder-cli", ...chatArgs],
+    launcher: forceNpx ? "npx" : "npx (fallback)",
+  };
 }
 
 function resolveTsx() {
@@ -142,9 +140,9 @@ function echoMcpSummary(combined) {
   }
 }
 
-function runRcoder({ cmd, args }, { debug, expectTool }) {
+function runRcoder({ cmd, args, launcher }, { debug, expectTool }) {
   logDebug(debug, "cwd:", PKG_DIR);
-  logDebug(debug, "launcher:", process.env.SMOKE_RCODER_LAUNCHER ?? "npx (default)");
+  logDebug(debug, "launcher:", launcher ?? "auto");
   logDebug(debug, "cmd:", formatCommand(cmd, args));
 
   let result;
@@ -228,7 +226,7 @@ Env (model — 与 runtime config-loader 对齐):
   SMOKE_WARN_ACTIVE_FLOW=0  关闭 activeFlow=default 警告
   SMOKE_TIMEOUT        Timeout seconds (default: 150)
   SMOKE_VERBOSE=1      Pass -v to rcoder-cli
-  SMOKE_RCODER_LAUNCHER  npx (default) | pnpm — rcoder-cli 启动方式
+  SMOKE_RCODER_LAUNCHER  npx — 强制 npx（默认：PATH 全局 rcoder-cli → npx 兜底）
   ./.env               Model credentials (see .env.example)`);
 }
 
