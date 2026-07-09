@@ -1,7 +1,7 @@
 # deepagents-flow-ts 近期开发与优化梳理
 
 > **状态**：✅ 现行维护记录（随版本迭代更新本页）  
-> **当前包版本**：`1.14.0`（权威源：`packages/deepagents-flow-ts/package.json`）  
+> **当前包版本**：`1.15.0`（权威源：`packages/deepagents-flow-ts/package.json`）  
 > **受众**：Monorepo 维护者、code-review、发布前核对  
 > **使用者文档**：见包内 [README.md](../../../../packages/deepagents-flow-ts/README.md)
 
@@ -35,6 +35,22 @@ flowchart TB
 ---
 
 ## 2. 版本变更摘要
+
+### v1.15.0 — 平台工具执行优化 + 依赖升级（2026-07）
+
+**需求**：平台工具运行期真实可调通；修复 `deepagents@1.10.7` import `bedrockPromptCachingMiddleware` 的 SyntaxError（Agent 初始化超时）。
+
+| 变更 | 说明 |
+| --- | --- |
+| langchain 系列升级 + 锁版本 | `deepagents` 1.10.2→1.10.7、`langchain` 1.4.4→1.5.2（提供 `bedrockPromptCachingMiddleware`）、`@langchain/core` 1.1.48→1.2.1、`@langchain/langgraph` 1.4.1→1.4.7；`@langchain/*` 全部锁精确（去 `^`）防漂移 |
+| platform-tools 执行 | `createPlatformStructuredTool`：url/method/auth 从固化 schema 读 + `${...}` 占位符运行时 env 替换；body 带 `devAgentId`；SSE 解析 FinalResult（CRLF 规范化 + `type` 字段回退）；响应格式多样（error/code/success/裸数据）；`tool.invoke({callbacks:[]})` 抑制重复 onToolCall |
+| `toolName` 自动拼 | `${targetType}_${targetId}`（get-config 不返回工具名）；description 兜底 name |
+| custom 默认 conversational | 无 approval 节点 → `conversational:true`（多轮不卡），HITL custom 自动 false |
+| get-config --full | `dev-engineer-toolkit` 输出完整工具配置（含 schema），开发期固化进 `spec.tools`（非手抄） |
+
+**相关 commit**：`f6394c7b`（langchain 升级）、`b2e81896`（custom conversational）、`b24c7672`（description 兜底）
+
+---
 
 ### v1.14.0 — 拓扑分层简化（2026-07）
 
