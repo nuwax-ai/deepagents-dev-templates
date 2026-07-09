@@ -25,6 +25,9 @@
 # ============================================================
 
 set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/ensure-python.sh
+source "$SCRIPT_DIR/lib/ensure-python.sh"
 
 # ---- 默认值 ----
 TARGET_TYPE=""
@@ -101,7 +104,7 @@ if ! [[ "$DEV_AGENT_ID" =~ ^[0-9]+$ ]]; then
 fi
 
 # ---- 构建请求体 ----
-REQUEST_BODY=$(python3 -c "
+REQUEST_BODY=$(python_run -c "
 import json, sys
 body = {
     'devAgentId': int(sys.argv[1]),
@@ -137,8 +140,8 @@ if [[ "$HTTP_CODE" -ne 200 ]]; then
 fi
 
 # ---- 检查业务状态码 ----
-BIZ_CODE=$(echo "$BODY" | python3 -c "import json,sys; print(json.load(sys.stdin).get('code',''))" 2>/dev/null || echo "")
-BIZ_MSG=$(echo "$BODY" | python3 -c "import json,sys; print(json.load(sys.stdin).get('message',''))" 2>/dev/null || echo "")
+BIZ_CODE=$(echo "$BODY" | python_run -c "import json,sys; print(json.load(sys.stdin).get('code',''))" 2>/dev/null || echo "")
+BIZ_MSG=$(echo "$BODY" | python_run -c "import json,sys; print(json.load(sys.stdin).get('message',''))" 2>/dev/null || echo "")
 
 if [[ "$BIZ_CODE" != "0000" ]]; then
     echo "[ERROR] 注册失败 (code=${BIZ_CODE}): ${BIZ_MSG}" >&2
@@ -151,4 +154,4 @@ echo "[OK] 工具注册成功"
 echo "  Agent ID : ${DEV_AGENT_ID}"
 echo "  类型     : ${TARGET_TYPE}"
 echo "  目标 ID  : ${TARGET_ID}"
-echo "$BODY" | python3 -m json.tool 2>/dev/null || echo "$BODY"
+echo "$BODY" | python_run -m json.tool 2>/dev/null || echo "$BODY"

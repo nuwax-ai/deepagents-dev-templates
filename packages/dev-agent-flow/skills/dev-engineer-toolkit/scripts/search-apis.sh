@@ -27,6 +27,9 @@
 # ============================================================
 
 set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/ensure-python.sh
+source "$SCRIPT_DIR/lib/ensure-python.sh"
 
 # ---- 默认值 ----
 KW=""
@@ -93,7 +96,7 @@ if [[ "$FORMAT" != "json" && "$FORMAT" != "table" ]]; then
 fi
 
 # ---- 构建请求体 ----
-REQUEST_BODY=$(python3 -c "
+REQUEST_BODY=$(python_run -c "
 import json, sys
 body = {
     'devSpaceId': int(sys.argv[1]),
@@ -137,11 +140,11 @@ if [[ "$HTTP_CODE" -ne 200 ]]; then
 fi
 
 # ---- 检查业务状态码 ----
-BIZ_CODE=$(echo "$BODY" | python3 -c "import json,sys; print(json.load(sys.stdin).get('code',''))" 2>/dev/null || echo "")
-BIZ_SUCCESS=$(echo "$BODY" | python3 -c "import json,sys; print(json.load(sys.stdin).get('success',False))" 2>/dev/null || echo "False")
+BIZ_CODE=$(echo "$BODY" | python_run -c "import json,sys; print(json.load(sys.stdin).get('code',''))" 2>/dev/null || echo "")
+BIZ_SUCCESS=$(echo "$BODY" | python_run -c "import json,sys; print(json.load(sys.stdin).get('success',False))" 2>/dev/null || echo "False")
 
 if [[ "$BIZ_CODE" != "0000" ]]; then
-    BIZ_MSG=$(echo "$BODY" | python3 -c "import json,sys; print(json.load(sys.stdin).get('message',''))" 2>/dev/null || echo "")
+    BIZ_MSG=$(echo "$BODY" | python_run -c "import json,sys; print(json.load(sys.stdin).get('message',''))" 2>/dev/null || echo "")
     echo "[ERROR] 业务错误 (code=${BIZ_CODE}): ${BIZ_MSG}" >&2
     echo "$BODY" >&2
     exit 4
@@ -149,7 +152,7 @@ fi
 
 # ---- 输出 ----
 if [[ "$FORMAT" == "table" ]]; then
-    echo "$BODY" | python3 -c "
+    echo "$BODY" | python_run -c "
 import json, sys
 resp = json.load(sys.stdin)
 data = resp.get('data', [])

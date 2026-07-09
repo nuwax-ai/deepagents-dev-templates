@@ -25,6 +25,9 @@
 # ============================================================
 
 set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/ensure-python.sh
+source "$SCRIPT_DIR/lib/ensure-python.sh"
 
 TARGET_TYPE=""
 TARGET_ID=""
@@ -66,7 +69,7 @@ if ! [[ "${DEV_AGENT_ID:-}" =~ ^[0-9]+$ ]]; then
 fi
 
 # 构建请求
-REQUEST_BODY=$(python3 -c "
+REQUEST_BODY=$(python_run -c "
 import json,sys
 print(json.dumps({'devAgentId':int(sys.argv[1]),'targetType':sys.argv[2],'targetId':int(sys.argv[3])},ensure_ascii=False))
 " "$DEV_AGENT_ID" "$TARGET_TYPE" "$TARGET_ID")
@@ -88,9 +91,9 @@ if [[ "$HTTP_CODE" -ne 200 ]]; then
     echo "[ERROR] HTTP ${HTTP_CODE}" >&2; echo "$BODY" >&2; exit 3
 fi
 
-BIZ_CODE=$(echo "$BODY" | python3 -c "import json,sys; print(json.load(sys.stdin).get('code',''))" 2>/dev/null || echo "")
+BIZ_CODE=$(echo "$BODY" | python_run -c "import json,sys; print(json.load(sys.stdin).get('code',''))" 2>/dev/null || echo "")
 if [[ "$BIZ_CODE" != "0000" ]]; then
-    BIZ_MSG=$(echo "$BODY" | python3 -c "import json,sys; print(json.load(sys.stdin).get('message',''))" 2>/dev/null || echo "")
+    BIZ_MSG=$(echo "$BODY" | python_run -c "import json,sys; print(json.load(sys.stdin).get('message',''))" 2>/dev/null || echo "")
     echo "[ERROR] 删除失败 (code=${BIZ_CODE}): ${BIZ_MSG}" >&2; exit 4
 fi
 

@@ -19,6 +19,60 @@ RESOLVED_PYTHON=()
 PYTHON_DETECT_JSON=""
 
 _DEV_TOOLKIT_UV_PYTHON="${DEV_TOOLKIT_UV_PYTHON:-3.12}"
+_DEV_TOOLKIT_IMPORTED_ORIGINAL_PATH=0
+
+python__lower() {
+  printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
+}
+
+python__normalize_windows_path_for_bash() {
+  local raw="$1"
+  raw="${raw//\\//}"
+  [[ -z "$raw" ]] && return 1
+
+  if command -v cygpath >/dev/null 2>&1; then
+    cygpath -u "$raw" 2>/dev/null && return 0
+  fi
+
+  if [[ "$raw" =~ ^([A-Za-z]):(/.*)?$ ]]; then
+    local drive
+    drive="$(python__lower "${BASH_REMATCH[1]}")"
+    local rest="${BASH_REMATCH[2]}"
+    printf '/%s%s\n' "$drive" "$rest"
+    return 0
+  fi
+
+  printf '%s\n' "$raw"
+}
+
+python__import_original_path_candidates() {
+  [[ "$_DEV_TOOLKIT_IMPORTED_ORIGINAL_PATH" == "1" ]] && return 0
+  _DEV_TOOLKIT_IMPORTED_ORIGINAL_PATH=1
+
+  [[ -n "${ORIGINAL_PATH:-}" ]] || return 0
+  case "${OSTYPE:-}:${OS:-}" in
+    msys*:*|cygwin*:*|*:*Windows_NT*) ;;
+    *)
+      return 0
+      ;;
+  esac
+
+  local -a parts=()
+  local raw converted raw_lower
+  IFS=';' read -r -a parts <<<"${ORIGINAL_PATH}"
+  for raw in "${parts[@]}"; do
+    [[ -z "$raw" ]] && continue
+    raw_lower="$(python__lower "$raw")"
+    if [[ "$raw_lower" != *python* && "$raw_lower" != *uv* ]]; then
+      continue
+    fi
+    converted="$(python__normalize_windows_path_for_bash "$raw")" || continue
+    if [[ -d "$converted" && ":$PATH:" != *":$converted:"* ]]; then
+      PATH="$converted:$PATH"
+    fi
+  done
+  export PATH
+}
 
 python_probe_usable() {
   "$@" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 8) else 1)' >/dev/null 2>&1
@@ -43,6 +97,7 @@ python__probe_candidate() {
 }
 
 python_try_resolve() {
+  python__import_original_path_candidates
   RESOLVED_PYTHON=()
   local item
 
@@ -62,6 +117,7 @@ python_try_resolve() {
 }
 
 python_install_via_uv() {
+  python__import_original_path_candidates
   RESOLVED_PYTHON=()
   if [[ "${DEV_TOOLKIT_SKIP_UV:-}" == "1" ]]; then
     return 1
@@ -89,6 +145,7 @@ python_ensure() {
 }
 
 python_report_status() {
+  python__import_original_path_candidates
   echo "=== Python 环境检测 (dev-engineer-toolkit) ==="
   echo
 
@@ -157,5 +214,18 @@ python_exec_script() {
     exec "${RESOLVED_PYTHON[0]}" "$script" "$@"
   else
     exec "${RESOLVED_PYTHON[@]}" "$script" "$@"
+  fi
+}
+
+python_run() {
+  if ! python_ensure; then
+    echo "[ERROR] 未检测到可用的 Python 3。" >&2
+    echo "  运行 ./scripts/check-python.sh 查看详情；有 uv 时可加 --install 自动安装。" >&2
+    return 2
+  fi
+  if [[ ${#RESOLVED_PYTHON[@]} -eq 1 ]]; then
+    "${RESOLVED_PYTHON[0]}" "$@"
+  else
+    "${RESOLVED_PYTHON[@]}" "$@"
   fi
 }
