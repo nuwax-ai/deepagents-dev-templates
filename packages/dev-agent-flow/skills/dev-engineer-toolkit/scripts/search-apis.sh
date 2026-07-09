@@ -103,6 +103,11 @@ body = {
     'type': 'tool'
 }
 kw = sys.argv[2]
+if kw and not kw.isascii():
+    try:
+        kw = kw.encode('latin-1').decode('utf-8')
+    except (UnicodeDecodeError, UnicodeEncodeError):
+        pass
 page = int(sys.argv[3])
 page_size = int(sys.argv[4])
 if kw:
@@ -120,7 +125,7 @@ API_URL="${PLATFORM_BASE_URL}/api/v1/4sandbox/agent/dev/tool/search"
 RESPONSE=$(curl -s -w "\n%{http_code}" \
     -X POST \
     -H "Authorization: Bearer ${SANDBOX_ACCESS_KEY}" \
-    -H "Content-Type: application/json" \
+    -H "Content-Type: application/json; charset=utf-8" \
     -H "Accept: application/json" \
     --max-time 30 \
     -d "$REQUEST_BODY" \
