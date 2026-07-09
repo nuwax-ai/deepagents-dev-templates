@@ -2,7 +2,7 @@
 name: flow-builder
 description: "在当前工作目录开发 LangGraph Flow 时使用。覆盖：Part0 端到端流程与 completion gate；Part1 一句话脚手架；Part2 StateGraph 编排（HITL/流式/问答卡片）；Part3 工具与平台能力绑定（写图前须配合 dev-engineer-toolkit 搜索登记，含联网搜索）；Part4 验证调试与 pnpm smoke；Part5 系统提示词与用户输入提炼；Part6 子智能体委派；Part7 技能集成。适用于新建/修改 flow、零图多轮对话路径、图规则 R-G001+、跑不通或 Invalid model 排查。禁止写 .agents/；LangGraph TS API 查官方文档。Keywords: flow开发, scaffold, StateGraph, LangGraph, HITL, smoke, 工具绑定, subagent, systemPrompt, 平台能力, 联网搜索, flow-builder"
 tags: [flow, scaffold, orchestration, tools, prompt, subagent, stategraph, hitl, debug]
-version: "3.1.1"
+version: "3.1.2"
 ---
 
 # Flow 开发（当前工作目录）
