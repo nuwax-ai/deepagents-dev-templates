@@ -1,6 +1,6 @@
 {
   "name": "nuwax-flow-ts",
-  "version": "1.15.3",
+  "version": "1.15.4",
   "description": "Workflow-orchestration agent template — the agent runs an explicit LangGraph StateGraph over ACP. Ships 4 curated flows plus 8 reusable topology building blocks.",
   "engine": "nuwax-flow-ts",
   "source": {
@@ -8,8 +8,8 @@
     "endpoint": "https://s3.nuwax.com:9443",
     "bucket": "nuwax-packages",
     "region": "us-east-1",
-    "prefix": "agent-engines/nuwax-flow-ts/versions/1.15.3",
-    "version": "1.15.3",
+    "prefix": "agent-engines/nuwax-flow-ts/versions/1.15.4",
+    "version": "1.15.4",
     "forcePathStyle": true
   },
   "alternativeSources": [
@@ -17,17 +17,17 @@
       "type": "npm",
       "package": "nuwax-flow-ts",
       "registry": "https://registry.npmjs.org",
-      "version": "1.15.3"
+      "version": "1.15.4"
     },
     {
       "type": "tgz",
-      "path": "./nuwax-flow-ts-1.15.3.tgz",
-      "version": "1.15.3"
+      "path": "./nuwax-flow-ts-1.15.4.tgz",
+      "version": "1.15.4"
     },
     {
       "type": "git",
       "url": "https://github.com/nuwax-ai/deepagents-dev-templates.git",
-      "ref": "v1.15.3"
+      "ref": "v1.15.4"
     },
     {
       "type": "s3-channel",
