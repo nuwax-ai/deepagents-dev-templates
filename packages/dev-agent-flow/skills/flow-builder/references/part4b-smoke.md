@@ -77,6 +77,15 @@ smoke 加载 `.env` 时用 `override:true` —— **项目 `.env` 覆盖** NuWaC
 
 **不要手猜 `OPENAI_MODEL=...`**。按上面优先级，smoke 脚本自动解析并 `-e` 传给 rcoder：
 
+### 0. 全局安装 rcoder-cli（推荐，一次即可）
+
+```bash
+npm i -g rcoder-cli
+rcoder-cli --version
+```
+
+smoke 默认直接调 PATH 里的 `rcoder-cli`，避免每次 `npx` 冷启动。未全局安装时自动 fallback 到 `npx -y rcoder-cli`。
+
 ### 1. 复制并填写 `.env`（本地开发推荐）
 
 ```bash
@@ -124,7 +133,7 @@ pnpm build && pnpm typecheck && pnpm test && pnpm graph && pnpm smoke
 | `SMOKE_WARN_ACTIVE_FLOW=0` | 关闭 `activeFlow=default` 警告 |
 | `SMOKE_TIMEOUT` | rcoder 超时秒数（默认 `150`） |
 | `SMOKE_VERBOSE=1` | 传 `-v` 给 rcoder-cli |
-| `SMOKE_RCODER_LAUNCHER` | `npx`（默认）或 `pnpm`；默认用 `npx -y rcoder-cli`，绕过 pnpm dlx 策略/TTY 问题 |
+| `SMOKE_RCODER_LAUNCHER` | 设 `npx` 强制 npx；默认 PATH 全局 `rcoder-cli` → `npx -y` 兜底 |
 | `SMOKE_DEBUG=1` | 打印解析后的 provider/model/forward env |
 | `SMOKE_DRY_RUN=1` | 只打印 rcoder 命令，不调 API |
 | `AGENT_ENTRY` / `--entry` | 非默认入口 TS 文件 |

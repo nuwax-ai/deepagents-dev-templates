@@ -18,6 +18,7 @@
 1. **依赖** — 无 `node_modules`/lock 变更 → `pnpm install`；Python 项 → `uv sync --group dev`
 2. **平台配置** — 改 `<PLATFORM_CONFIG>` **必须**经 `dev-engineer-toolkit`；禁止只改本地
 3. **起手** — 读 `README.md`、`project.md`；**系统提示词基线**（平台 `systemPrompt` 空且用户已描述 Agent → 先于写图走 Part 5）；简报后接指令
+4. **smoke 前置** — 本地 `pnpm smoke` 须 PATH 有 `rcoder-cli`（`npm i -g rcoder-cli`）；细则 → `flow-builder` Part 4b
 
 逐步实现 → 加载 `flow-builder` → [part0-workflow.md](references/part0-workflow.md)
 </BOOTSTRAP_FIRST>
@@ -88,6 +89,8 @@
 ## 需求分类 → 脚手架
 
 收到 flow 需求先答**第 0 问**（`flow-builder` Part 0 § Phase 1）：多轮对话/**追问**/钻取/泛化 → **零图路径**（`activeFlow: "default"` + 平台能力登记 + systemPrompt，不写图）；固定管道/HITL → **Part 1**（9 topologies = 8 presets + `custom`）。**凡需平台工具/技能/Plugin 须先 Part 3 搜平台登记**（见 Part 0 § 平台能力门禁）。命中 preset **禁止**手写图；不命中先用 `custom`。系统提示词与 scaffold 并行 → Part 5。
+
+对话型多源搜索（追问/钻取）：`default` + 平台 `systemPrompt` + `add-tool` 即交付；**不必**切 `search-aggregator`（仅为样板）。
 </SCAFFOLD_FIRST>
 
 <SESSION_CLOSE>
@@ -131,6 +134,8 @@
 4. 命中 → `add-tool.sh`
 5. `get-config.sh --key tools --full` 取已注册工具真实配置（含 schema）固化进 `spec.tools`（**禁止**照 search 结果手抄 schema）；记入 `project.md`；固定管道要让某节点用工具时，在节点 `params` 写工具名（`platform-tool` 用 `toolName`，工具集合用 `tools`）
 
+**零图路径（conversational default）**：`add-tool` 后运行期自动进 `allTools`，think 自动 bind；**不必**写 `spec.tools` / 切 `search-aggregator`。
+
 **禁止**：未搜平台就自写工具、bash+curl、`http_request` 打外部 API、硬编码未登记平台能力、以「用户待配置」代替开发期平台登记。内置 `grep`/`glob`/`search` **仅仓库内**，不得充当联网或业务 API。
 
 **工具登记与引用**：`add-tool` 后用 `get-config.sh --key tools --full` 从平台**拉取已注册工具的真实配置固化**进 `spec.tools`（`targetType/targetId/schema`，**禁止**手抄 schema）；runtime 据此构建工具。固定管道要让某节点用平台工具时，在**节点 `params`** 写工具名——`platform-tool` 用 `toolName`（必填），工具集合（如 `tool-exec`）用 `tools: ["工具名"]`（缺省=全部）。**禁止**为已登记平台能力手写 fetch / `tool()` 包装；**禁止**运行时代码调用 `4sandbox` 系平台内部端点（仅 dev 脚本可用）。
@@ -141,7 +146,7 @@
 <WEB_SEARCH>
 ## 联网（约束 · 常见专项）
 
-**联网搜索是平台能力登记中最常见的场景之一；当前项目不内置互联网搜索。** 需要互联网/实时/网页搜索/多源调研时：先走 `<PLATFORM_CAPABILITIES>` 通用流程，追加 `搜索` / `联网` / `web` 关键词；命中后登记，并在节点 `params` 按需写 `toolName` / `tools`。**禁止**照 Plugin schema 手写 fetch 搜索工具（失败案例：猜端点 + 猜 envelope + 无超时 → 运行期卡住/全空）。步骤 → Part 3 § 平台能力登记 · § 联网搜索。
+**联网搜索是平台能力登记中最常见的场景之一；当前项目不内置互联网搜索。** 需要互联网/实时/网页搜索/多源调研时：先走 `<PLATFORM_CAPABILITIES>` 通用流程，追加 `搜索` / `联网` / `web` 关键词；命中后登记。**对话型**（追问/钻取）走零图路径即可，**禁止**误判为 fanout 固定管道。步骤 → Part 3 § 平台能力登记 · § 联网搜索。
 </WEB_SEARCH>
 
 <TEMPLATE_CONSTRAINTS>
