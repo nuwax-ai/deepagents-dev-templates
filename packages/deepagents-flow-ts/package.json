@@ -1,6 +1,6 @@
 {
   "name": "nuwax-flow-ts",
-  "version": "1.15.5",
+  "version": "1.15.6",
   "description": "Flow / workflow-orchestration agent template — the agent runs an explicit LangGraph StateGraph (not a dynamic tool loop) over ACP. Self-contained runtime; MCP via @langchain/mcp-adapters. Ships registered flows under app/flows (default ReAct, platform-capability sample, streaming pipeline, LLM router, dev-agent) plus libs/topologies building blocks.",
   "type": "module",
   "main": "dist/index.js",
