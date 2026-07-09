@@ -57,7 +57,7 @@
 }
 ```
 
-- 运行时工具名按 `${targetType}_${targetId}` 自动拼（如 `Plugin_309`；get-config 不返回工具名）；节点 `params.toolName` 用这个名字。
+- 运行时工具名：优先用 `toolName`（get-config 返回的工具名，若有），否则按 `${targetType}_${targetId}` 自动拼（如 `Plugin_309`）；节点 `params.toolName` 用这个名字。
 - `platform-tool` 节点用 `params.toolName`（单工具，必填）；`tool-exec` 节点用 `params.tools: ["工具名"]`（工具集合，缺省=全部）。
 - `spec.tools` 的工具配置（`targetType` / `targetId` / `name` / `description` / `schema` / `toolNames`）须用 `get-config.sh --key tools --full` 从平台**拉取已注册工具的真实配置固化**，**禁止**照 `search-apis.sh` 结果手抄 schema。运行时直接消费 `spec.tools` 里固化的配置构建工具，不再查平台配置接口。
 - schema 中的 `${...}` 占位符必须保持原样；禁止硬编码 URL、密钥或鉴权值。

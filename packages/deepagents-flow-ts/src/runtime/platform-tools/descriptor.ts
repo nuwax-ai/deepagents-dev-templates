@@ -14,11 +14,15 @@ function toObject(value: unknown): Record<string, unknown> | undefined {
 }
 
 /**
- * 平台工具的运行时工具名。get-config 返回的工具配置没有工具名，
- * 按 `${targetType}_${targetId}` 自动推导（如 `Plugin_309`、`Workflow_1309`，保留 targetType 原大小写）。
+ * 平台工具的运行时工具名。优先 ref.toolName（get-config 返回的工具名，若有）；
+ * 否则按 `${targetType}_${targetId}` 自动推导（如 `Plugin_309`、`Workflow_1309`，保留 targetType 原大小写）。
  */
-export function platformToolName(ref: { targetType: string; targetId: number | string }): string {
-  return `${ref.targetType}_${ref.targetId}`;
+export function platformToolName(ref: {
+  targetType: string;
+  targetId: number | string;
+  toolName?: string;
+}): string {
+  return ref.toolName ?? `${ref.targetType}_${ref.targetId}`;
 }
 
 /**

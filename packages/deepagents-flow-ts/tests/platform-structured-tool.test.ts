@@ -47,4 +47,21 @@ describe("platform schema-driven tooling", () => {
     expect(() => schema.parse({ query: "hello" })).not.toThrow();
     expect(() => schema.parse({ limit: 3 })).toThrow();
   });
+
+  it("ref.toolName 优先于 targetType_targetId 自动拼", () => {
+    const descriptors = createPlatformToolDescriptors([
+      {
+        targetType: "Plugin",
+        targetId: 309,
+        toolName: "web_search",
+        schema: {
+          method: "POST",
+          url: "${PLATFORM_BASE_URL}/api/v1/4sandbox/agent/plugin/execute",
+          authorization: "Bearer ${SANDBOX_ACCESS_KEY}",
+          requestBody: { params: { type: "object", properties: { query: { type: "string" } } } },
+        },
+      },
+    ]);
+    expect(descriptors[0]?.toolName).toBe("web_search");
+  });
 });
