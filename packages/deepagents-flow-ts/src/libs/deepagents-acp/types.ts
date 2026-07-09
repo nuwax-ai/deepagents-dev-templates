@@ -295,6 +295,12 @@ export interface SessionState {
   mode?: string;
 
   /**
+   * Host-synced model id via ACP `session/set_config_option` (`configId=model`).
+   * Runtime 仍以进程 env / configureSession 为准；此处仅记录 host 侧期望，便于诊断。
+   */
+  modelId?: string;
+
+  /**
    * Cached permission decisions for tools (always-allow / always-reject)
    */
   permissionDecisions?: Map<string, "allow_always" | "reject_always">;
