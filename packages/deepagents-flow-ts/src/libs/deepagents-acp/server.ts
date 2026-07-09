@@ -806,7 +806,7 @@ export class DeepAgentsServer {
       this.log("Set model for session:", sessionId, "to:", value);
       if (kind.runtimeModelMismatch) {
         this.log(
-          "WARN: session/set_config_option model differs from process env; runtime still uses env model",
+          "session/set_config_option model differs from process env; host may hot-reload runtime",
           {
             sessionId,
             requested: kind.runtimeModelMismatch.requested,
@@ -823,6 +823,12 @@ export class DeepAgentsServer {
         value,
       });
     }
+
+    await this.hooks?.onSessionConfigOption?.({
+      sessionId,
+      configId,
+      value,
+    });
 
     return {
       configOptions: buildSessionConfigOptionsSnapshot(session, {

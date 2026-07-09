@@ -1,8 +1,8 @@
 /**
  * ACP `session/set_config_option` 补丁逻辑（纯函数，便于单测）。
  *
- * flow-ts 运行时模型以 configureSession 时的进程 env 为准；此处记录 host 同步期望并返回
- * configOptions。若 host 请求的 model 与 env 不一致，仅告警（runtime 尚未热切换）。
+ * flow-ts 运行时模型以 configureSession / set_config_option 触发的 per-session 重建为准；
+ * 此处记录 host 同步期望并返回 configOptions。
  */
 import type { SessionConfigOption } from "@agentclientprotocol/sdk";
 import type { SessionState } from "./types.js";
