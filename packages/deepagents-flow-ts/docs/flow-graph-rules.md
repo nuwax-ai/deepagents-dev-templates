@@ -190,7 +190,7 @@
 |------|------|
 | 写 spec / graph 前 | 扫规则索引，确认适用 MUST |
 | scaffold 生成后 | 核对 R-G001、R-G003、R-G004、R-G009 |
-| 验证闸门 | `pnpm build && pnpm typecheck && pnpm test && pnpm graph && pnpm smoke`（`.env` 凭证 + `config.activeFlow`；可选 `SMOKE_PROMPT` / `SMOKE_PROMPT_EDGE` — 见 [scripts/README.md](../scripts/README.md) § Smoke tests） |
+| 验证闸门 | 迭代期 `pnpm smoke:fast`；收工 `pnpm build && pnpm typecheck && pnpm test && pnpm graph && pnpm smoke`（`.env` 凭证 + `config.flow.active`；旧 `activeFlow` 兼容；可选 `SMOKE_PROMPT` / `SMOKE_PROMPT_EDGE` — 见 [scripts/README.md](../scripts/README.md) § Smoke tests） |
 | 排错 | [troubleshooting.md](troubleshooting.md) 按症状 → 规则 ID |
 
 ## 相关文档

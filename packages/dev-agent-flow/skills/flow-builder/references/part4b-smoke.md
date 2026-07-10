@@ -8,7 +8,7 @@
 
 | ✅ 验证 | ❌ 不验证 |
 |---------|-----------|
-| 真实运行 → 当前 `activeFlow` 图跑通 | `parse` 与 `write` 语义（**R-G001**，需静态规则或边界 prompt） |
+| 真实运行 → 当前 `flow.active` 图跑通（旧 `activeFlow` 兼容） | `parse` 与 `write` 语义（**R-G001**，需静态规则或边界 prompt） |
 | 模型凭证 + provider/model 解析正确 | HITL **多轮 resume**（one-shot only；首轮 interrupt 见下节） |
 | 子进程未吃到 `{MODEL_PROVIDER_*}` 占位符 | 与平台在线配置完全一致（本地用 `.env`） |
 | **HITL 首轮**：`flowStatus=interrupted` 且流式出题 / `questionChars>0` | — |
@@ -95,24 +95,25 @@ cp .env.example .env
 
 默认与 `config/flow-agent.config.json` 的 `openai` + `deepseek-chat` 对齐；provider 以解析结果为准（见上表），不必与文件硬绑。
 
-### 2. 确认 `activeFlow` 指向正在开发的 flow
+### 2. 确认 `flow.active` 指向正在开发的 flow
 
 ```json
 // config/flow-agent.config.json
-{ "activeFlow": "router-gate", ... }
+{ "flow": { "active": "router-gate", "defaultInteraction": "chat", "unknownActivePolicy": "warn-default" }, ... }
 ```
 
-smoke 默认入口 `src/index.ts` 读此字段。若仍为 `default`，脚本会 **WARN**（测的是 ReAct 默认图，不是你的 custom flow）。
+smoke 默认入口 `src/index.ts` 优先读 `flow.active`；旧 `activeFlow` 仍兼容，但不要新增。`default` 是聊天助手型的正确默认，不再视为 custom 缺失。
 
 强制校验：
 
 ```bash
-SMOKE_EXPECT_ACTIVE_FLOW=router-gate pnpm smoke
+SMOKE_EXPECT_ACTIVE_FLOW=router-gate SMOKE_EXPECT_INTERACTION=pipeline pnpm smoke
 ```
 
-### 3. 运行（五连中的最后一项）
+### 3. 运行（快检 + 五连终检）
 
 ```bash
+pnpm smoke:fast
 pnpm build && pnpm typecheck && pnpm test && pnpm graph && pnpm smoke
 ```
 
@@ -128,14 +129,15 @@ pnpm build && pnpm typecheck && pnpm test && pnpm graph && pnpm smoke
 | `API_PROTOCOL` / `LLM_PROVIDER` | 显式 `openai` \| `anthropic`（最高优先） |
 | `SMOKE_PROMPT` | 主路径用户输入（默认 React 题） |
 | `SMOKE_PROMPT_EDGE` | **第二条** prompt（如 `你是？`，验入口节点 **R-G002**） |
-| `SMOKE_EXPECT_ACTIVE_FLOW` | 与 `activeFlow` 不一致 → exit 1 |
+| `SMOKE_EXPECT_ACTIVE_FLOW` | 与当前 active flow 不一致 → exit 1 |
+| `SMOKE_EXPECT_INTERACTION` | 与 flow 交互形态不一致 → exit 1（`chat` / `pipeline` / `approval`） |
 | `SMOKE_EXPECT_TOOL` | **平台能力闸门**：轨迹须出现名称含该子串的工具调用且未失败，否则 exit 1（登记了平台能力时**必设**） |
-| `SMOKE_WARN_ACTIVE_FLOW=0` | 关闭 `activeFlow=default` 警告 |
 | `SMOKE_TIMEOUT` | rcoder 超时秒数（默认 `150`） |
 | `SMOKE_VERBOSE=1` | 传 `-v` 给 rcoder-cli |
 | `SMOKE_RCODER_LAUNCHER` | 设 `npx` 强制 npx；默认 PATH 全局 `rcoder-cli` → `npx -y` 兜底 |
 | `SMOKE_DEBUG=1` | 打印解析后的 provider/model/forward env |
 | `SMOKE_DRY_RUN=1` | 只打印 rcoder 命令，不调 API |
+| `SMOKE_FAST=1` / `--fast` | 快检：短 prompt + 跳过 MCP 加载 + 默认 45s timeout |
 | `AGENT_ENTRY` / `--entry` | 非默认入口 TS 文件 |
 
 ### 按 flow 定制 prompt 示例
@@ -145,6 +147,7 @@ pnpm build && pnpm typecheck && pnpm test && pnpm graph && pnpm smoke
 SMOKE_PROMPT='帮我把这段话翻译成英文：你好世界' \
 SMOKE_PROMPT_EDGE='你是？' \
 SMOKE_EXPECT_ACTIVE_FLOW=router-gate \
+SMOKE_EXPECT_INTERACTION=pipeline \
 pnpm smoke
 
 # 登记了平台搜索能力的 conversational Agent：prompt 必须设计成触发搜索
@@ -168,7 +171,9 @@ smoke runner 会 **跳过占位符**，并用 `.env` + `flow-agent.config.json` 
 
 | 命令 | 入口 |
 |------|------|
-| `pnpm smoke` | `src/index.ts`（读 `activeFlow`） |
+| `pnpm smoke` | `src/index.ts`（读 `flow.active`；旧 `activeFlow` 兼容） |
+| `pnpm smoke:fast` | 快检：短 prompt + `--light` + 45s timeout |
+| `pnpm smoke:light` | 跳过 MCP 加载的轻量验证 |
 | `pnpm smoke -- --example rag` | RAG |
 | `pnpm smoke -- --example travel` | 旅行规划（map-reduce + HITL） |
 | `pnpm smoke -- --example pm` | 项目管理 |
@@ -183,7 +188,7 @@ smoke runner 会 **跳过占位符**，并用 `.env` + `flow-agent.config.json` 
 ## 与 completion gate（完成闸门）的关系
 
 - **必须真实跑** `pnpm smoke`（禁止 `--dry-run` 冒充通过）。
-- 开发 **custom / stateful** flow 时：先改 `activeFlow`，再设 `SMOKE_PROMPT`（+ 可选 `SMOKE_PROMPT_EDGE`）。
+- 开发 **custom / stateful** flow 时：先改 `flow.active`，再设 `SMOKE_PROMPT`（+ 可选 `SMOKE_PROMPT_EDGE` / `SMOKE_EXPECT_INTERACTION`）。
 - **凡登记了平台能力**：必设 `SMOKE_EXPECT_TOOL` + 触发式 `SMOKE_PROMPT`；报告须贴该工具调用轨迹片段（工具名 + ok）。**smoke 绿但未验证工具真调用 = 不通过**（真实失败案例：搜索全空仍报完成，因 smoke 只看了输出字符数）。
 - smoke 绿 **不能**替代 **R-G001** 静态核对；边界类 bug 靠 `SMOKE_PROMPT_EDGE` 或 `docs/flow-graph-rules.md`。
 
@@ -193,9 +198,9 @@ smoke runner 会 **跳过占位符**，并用 `.env` + `flow-agent.config.json` 
 
 - ❌ 见 `Session cancelled` / `Prompt ended with error` 就判 smoke 失败（应先查 session-trace；HITL `interrupted` + 流式出题可通过）
 - ❌ 无任何可用模型凭证（`.env` / shell / `OPENCODE_*`）就报 smoke 完成
-- ❌ `activeFlow=default` 却声称 custom flow 已验过 smoke
+- ❌ `flow.active=default` 却声称 custom flow 已验过 smoke
 - ❌ 手 export 一堆模型 env 覆盖 config，而不改 `.env` / config
 - ❌ 只跑 `build/test/graph`，跳过 smoke
 - ❌ 见 `400 Invalid model` 就改 config 模型名，不查占位符与 `.env`
 - ❌ 登记了平台能力却不设 `SMOKE_EXPECT_TOOL` / prompt 不触发该能力就报完成（LLM 兜底输出会让 smoke 假绿）
-- ✅ `.env` + `activeFlow` + `SMOKE_PROMPT*`（+ `SMOKE_EXPECT_TOOL`）+ `SMOKE_DEBUG` 干跑确认 → 真跑 smoke
+- ✅ `.env` + `flow.active` + `SMOKE_PROMPT*`（+ `SMOKE_EXPECT_TOOL` / `SMOKE_EXPECT_INTERACTION`）+ `SMOKE_DEBUG` 干跑确认 → 真跑 smoke

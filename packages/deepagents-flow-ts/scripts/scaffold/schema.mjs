@@ -50,6 +50,10 @@ const base = {
   description: z.string().default(""),
   /** flow 系统提示词（写入 prompts/，或由 ACP session 注入覆盖）。 */
   systemPrompt: z.string().default(""),
+  /** 交互形态。preset 可省略由生成器推断；custom 必填。 */
+  interaction: z.enum(["chat", "pipeline", "approval"]).optional(),
+  /** 写图理由。custom 必填，用于防止聊天助手型需求误写图。 */
+  graphReason: z.string().optional(),
   tools: z.array(toolRefSchema).default([]),
 };
 
@@ -178,6 +182,8 @@ export const specSchema = z.discriminatedUnion("topology", [
   z.object({
     ...base,
     topology: z.literal("custom"),
+    interaction: z.enum(["chat", "pipeline", "approval"]),
+    graphReason: z.string().min(1, "custom topology 必须填写 graphReason，说明 default/preset 为什么不够"),
     params: customParamsSchema,
   }),
 ]);
@@ -191,6 +197,12 @@ export function parseSpec(raw) {
   if (!r.success) {
     const msg = r.error.issues.map((i) => `  - ${i.path.join(".") || "(root)"}: ${i.message}`).join("\n");
     throw new Error(`spec 校验失败：\n${msg}`);
+  }
+  if (r.data.topology === "custom" && r.data.interaction === "chat") {
+    const reason = r.data.graphReason.trim();
+    if (!reason) {
+      throw new Error("custom chat flow 必须填写 graphReason；多数聊天助手型需求应使用 default。");
+    }
   }
   return r.data;
 }

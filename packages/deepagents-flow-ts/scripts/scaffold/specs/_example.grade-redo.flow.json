@@ -2,6 +2,8 @@
   "name": "grade-redo",
   "description": "草稿 → 评审 → 不合格重做（节点级 custom：conditional 边 + llm parse）",
   "topology": "custom",
+  "interaction": "pipeline",
+  "graphReason": "需要固定的草稿生成、质量评审与最多三次重做回边，default 聊天助手无法保证阶段顺序和递归上限。",
   "systemPrompt": "",
   "tools": [],
   "params": {

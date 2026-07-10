@@ -1,6 +1,6 @@
 ---
 name: flow-builder
-description: "在当前工作目录开发 LangGraph Flow 时使用。覆盖：Part0 端到端流程与 completion gate；Part1 一句话脚手架；Part2 StateGraph 编排（HITL/流式/问答卡片）；Part3 工具与平台能力绑定（写图前须配合 dev-engineer-toolkit 搜索登记，含联网搜索）；Part4 验证调试与 pnpm smoke；Part5 系统提示词与用户输入提炼；Part6 子智能体委派；Part7 技能集成。适用于新建/修改 flow、零图多轮对话路径、图规则 R-G001+、跑不通或 Invalid model 排查。禁止写 .agents/；LangGraph TS API 查官方文档。Keywords: flow开发, scaffold, StateGraph, LangGraph, HITL, smoke, 工具绑定, subagent, systemPrompt, 平台能力, 联网搜索, flow-builder"
+description: "在当前工作目录开发 LangGraph Flow 时使用。覆盖：Part0 端到端流程与 completion gate；Part1 固定流程型/人工确认型脚手架；Part2 StateGraph 编排（HITL/流式/问答卡片）；Part3 工具与平台能力绑定（写图前须配合 dev-engineer-toolkit 搜索登记，含联网搜索）；Part4 验证调试与 pnpm smoke；Part5 系统提示词与用户输入提炼；Part6 子智能体委派；Part7 技能集成。适用于新建/修改 flow、聊天助手型默认路径、图规则 R-G001+、跑不通或 Invalid model 排查。禁止写 .agents/；LangGraph TS API 查官方文档。Keywords: flow开发, scaffold, StateGraph, LangGraph, HITL, smoke, 工具绑定, subagent, systemPrompt, 平台能力, 联网搜索, flow-builder"
 tags: [flow, scaffold, orchestration, tools, prompt, subagent, stategraph, hitl, debug]
 version: "3.1.2"
 ---
@@ -32,7 +32,7 @@ flow-builder/
 | 场景 | 读取 |
 |------|------|
 | **会话启动 / Phase 0–4 总流程 / 收尾清单** | **[part0-workflow.md](references/part0-workflow.md)** |
-| **需求分类（对话型 vs one-shot vs HITL）/ 零图路径** | **[part0-workflow.md](references/part0-workflow.md)** § Phase 1 第 0 问 |
+| **需求分类（聊天助手型 vs 固定流程型 vs 人工确认型）** | **[part0-workflow.md](references/part0-workflow.md)** § Phase 1 第 0 问 |
 | 一句话需求 → 可跑 flow | [part1-scaffold.md](references/part1-scaffold.md) |
 | 手写 StateGraph | [part2-orchestration.md](references/part2-orchestration.md) + [flow-graph-rules-pointer.md](references/flow-graph-rules-pointer.md) |
 | 自写工具 / 平台能力 / 变量 | [part3-tools-config.md](references/part3-tools-config.md) |
@@ -56,8 +56,8 @@ flow-builder/
 
 ```
 会话启动 → part0（依赖 / 系统提示词基线 / 读 docs）
-第 0 问（part0 § Phase 1）：多轮对话 / 追问 / 泛化？→ 零图路径（default ReAct + 平台能力登记 + part5 systemPrompt，不写图）
-              └ 固定管道 / HITL？→ 继续 ↓
+第 0 问（part0 § Phase 1）：多轮对话 / 追问 / 泛化？→ 聊天助手型（flow.active=default + 平台能力登记 + part5 systemPrompt，不写图）
+              └ 固定流程型 / 人工确认型？→ 继续 ↓
 需工作区外能力（Plugin/技能/外部 API；联网搜索较常见）？→ part3 § 平台能力登记（强制，写图前）→ dev-engineer-toolkit
               └ 含联网？→ 追加 part3 § 联网搜索
               └ part1 命中？→ 生成 → part4a + part4b-smoke

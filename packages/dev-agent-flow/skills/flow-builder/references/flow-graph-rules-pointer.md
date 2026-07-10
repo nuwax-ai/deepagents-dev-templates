@@ -36,7 +36,3 @@
 | Part 3 工具 | 平台能力登记 → `dev-engineer-toolkit`；**平台能力登记**；**联网搜索**见 § 联网搜索；仓库内分层见当前工作目录 `docs/capabilities.md` |
 | Part 4 验证 | completion gate 五连；症状 → 当前工作目录 `docs/troubleshooting.md` |
 | Part 5 提示词 | R-G002；节点 `prompt` vs `systemPrompt`；禁止在入口乱加 `parseJson` |
-
-## 当前工作目录 Cursor 规则
-
-当前工作目录含 `.cursor/rules/flow-graph-rules.mdc`（编辑 `graph.ts` / `*.flow.json` 时注入 R-G* 摘要）。

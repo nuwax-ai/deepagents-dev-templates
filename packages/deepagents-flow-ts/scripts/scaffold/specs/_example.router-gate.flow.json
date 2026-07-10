@@ -2,6 +2,8 @@
   "name": "router-gate",
   "description": "LLM 裁决门：pass→done，fail→redo（节点级 custom：llm-router Command goto）",
   "topology": "custom",
+  "interaction": "pipeline",
+  "graphReason": "需要固定的 LLM 裁决路由和失败重做回边，default 聊天助手无法保证 pass/fail 路由契约。",
   "systemPrompt": "",
   "tools": [],
   "params": {

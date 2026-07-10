@@ -31,7 +31,7 @@
 | **开发 Agent 引导** | 本包 `system-prompt.md`（**规则/约束**）+ `skills/flow-builder/`（**实现步骤**）+ `skills/dev-engineer-toolkit/` | `system-prompt` 定铁律；`flow-builder` Part 0–7 承载逐步流程（脚手架、编排、提示词提炼、completion gate 等） |
 | **能力与工具对照** | [../deepagents-flow-ts/docs/capabilities.md](../deepagents-flow-ts/docs/capabilities.md) | 平台工具 schema 来源、运行时装配、节点工具引用与 allTools 合并规则 |
 
-**单一权威原则**：图怎么写、规则 ID、factory API → 读目标项目 `docs/`；开发流程、平台登记、**completion gate（完成闸门）** → 读本包 `flow-builder` Part*。技能内 `references/flow-graph-rules-pointer.md` 仅为**路由页**，详表永远在目标项目 `docs/flow-graph-rules.md`。**术语**（durable stateful flow / topology / 护栏分语境 等）统一以目标项目 `docs/glossary.md` 为准。
+**单一权威原则**：图怎么写、规则 ID、factory API → 读目标项目 `docs/`；开发流程、平台登记、**completion gate（完成闸门）** → 读本包 `flow-builder` Part*。技能内 `references/flow-graph-rules-pointer.md` 仅为**路由页**，详表永远在目标项目 `docs/flow-graph-rules.md`。**术语**（聊天助手型 / 固定流程型 / 人工确认型、flow profile、`flow.active`、durable stateful flow / topology / 护栏分语境 等）统一以目标项目 `docs/glossary.md` 为准。
 
 ```
 packages/dev-agent-flow/          # 开发 Agent 提示词 + 技能（非模板一部分）

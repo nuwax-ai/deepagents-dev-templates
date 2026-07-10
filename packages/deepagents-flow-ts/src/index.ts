@@ -43,7 +43,13 @@ import { loadSessionConfigFromEnv } from "./surfaces/acp/session-config.js";
 import { runFlowCli } from "./surfaces/cli/run.js";
 import { runCapabilities } from "./surfaces/cli/capabilities.js";
 import { runSessions } from "./surfaces/cli/sessions.js";
-import { resolveFlow, type FlowDef } from "./app/flows/index.js";
+import {
+  listFlowProfiles,
+  recommendFlows,
+  resolveFlow,
+  resolveFlowSelection,
+  type FlowDef,
+} from "./app/flows/index.js";
 import { createStatefulFlow } from "./surfaces/stateful-flow.js";
 import type { StatefulFlow } from "./core/flow-types.js";
 import {
@@ -138,7 +144,7 @@ function materializeFlow(def: FlowDef, runtime: FlowRuntime): StatefulFlow {
       ...def.recipe(runtime),
       checkpointer: runtime.checkpointer,
       appConfig: runtime.config,
-      conversational: def.conversational,
+      conversational: def.profile.interaction === "chat",
       mcpClient: runtime.ctx.mcpClient ?? undefined,
     });
   }
@@ -146,7 +152,7 @@ function materializeFlow(def: FlowDef, runtime: FlowRuntime): StatefulFlow {
 }
 
 interface ParsedArgs {
-  command: "acp" | "flow" | "graph" | "capabilities" | "sessions";
+  command: "acp" | "flow" | "graph" | "capabilities" | "sessions" | "flows";
   query?: string;
   configPath?: string;
   debug: boolean;
@@ -158,6 +164,12 @@ interface ParsedArgs {
   sessionsAction?: "list" | "delete";
   /** sessions delete 的目标 thread id */
   sessionsId?: string;
+  /** flows 子命令：list（默认）/ recommend */
+  flowsAction?: "list" | "recommend";
+  /** flows --json */
+  flowsJson?: boolean;
+  /** flows recommend --kind */
+  flowsKind?: "chat" | "pipeline" | "approval";
 }
 
 function parseArgs(argv: string[]): ParsedArgs {
@@ -176,6 +188,16 @@ function parseArgs(argv: string[]): ParsedArgs {
     else if (a === "--help" || a === "-h") args.help = true;
     else if (a === "--interactive" || a === "-i") args.interactive = true;
     else if (a === "--mermaid") args.mermaid = true;
+    else if (a === "--json") args.flowsJson = true;
+    else if (a === "--kind" && argv[i + 1]) {
+      const kind = argv[++i];
+      if (kind === "chat" || kind === "pipeline" || kind === "approval") {
+        args.flowsKind = kind;
+      } else {
+        console.error(`Unknown flow kind: ${kind}`);
+        process.exit(1);
+      }
+    }
     else if (a === "--config" && argv[i + 1]) args.configPath = argv[++i];
     else if (a.startsWith("--")) {
       console.error(`Unknown flag: ${a}`);
@@ -193,6 +215,10 @@ function parseArgs(argv: string[]): ParsedArgs {
     if (positional[1] === "delete") args.sessionsAction = "delete";
     else if (positional[1] === "list") args.sessionsAction = "list";
     args.sessionsId = positional[2];
+  } else if (first === "flows") {
+    args.command = "flows";
+    if (positional[1] === "recommend") args.flowsAction = "recommend";
+    else args.flowsAction = "list";
   } else if (first === "flow") {
     args.command = "flow";
     args.query = positional.slice(1).join(" ") || undefined;
@@ -222,6 +248,8 @@ const HELP = `工作流编排模板（nuwax-flow-ts）
   ${cliDisplayName()} capabilities   输出能力分层 + 可用工具/MCP/skills（无凭证）
   ${cliDisplayName()} sessions       列出已持久化的会话（thread id）
   ${cliDisplayName()} sessions delete <id>  删除某个已持久化会话
+  ${cliDisplayName()} flows --json   输出注册 flow 的交互形态画像
+  ${cliDisplayName()} flows recommend --kind chat|pipeline|approval
 
 默认图经 StatefulFlow 运行（checkpointer 多轮记忆 + 可选 HITL interrupt/resume）。
 
@@ -241,21 +269,41 @@ async function main(): Promise<void> {
   // graph：导出图拓扑（静态，不运行图、不需要凭证）——对接可视化 / 文档。
   if (args.command === "graph") {
     const { raw } = loadFlowConfig({ configPath: args.configPath });
-    const activeFlow = typeof raw.activeFlow === "string" ? raw.activeFlow : undefined;
-    const { nodes, edges, mermaid } = await resolveFlow(activeFlow).getTopology();
+    const selection = resolveFlowSelection(raw);
+    const { nodes, edges, mermaid } = await resolveFlow(selection.active, {
+      unknownActivePolicy: selection.unknownActivePolicy,
+    }).getTopology();
     process.stdout.write(
       args.mermaid ? mermaid + "\n" : JSON.stringify({ nodes, edges }, null, 2) + "\n"
     );
     return;
   }
 
-  // capabilities / sessions：静态查询（不加载 MCP、不需凭证）。
+  // capabilities / sessions / flows：静态查询（不加载 MCP、不需凭证）。
   if (args.command === "capabilities") {
     await runCapabilities();
     return;
   }
   if (args.command === "sessions") {
     await runSessions({ action: args.sessionsAction, id: args.sessionsId });
+    return;
+  }
+  if (args.command === "flows") {
+    const rows = args.flowsAction === "recommend"
+      ? recommendFlows(args.flowsKind ?? "chat")
+      : listFlowProfiles();
+    if (args.flowsJson || args.flowsAction === "recommend") {
+      process.stdout.write(JSON.stringify(rows, null, 2) + "\n");
+    } else {
+      for (const row of rows) {
+        const flags = [
+          row.isDefault ? "default" : "",
+          row.profile.defaultForAmbiguous ? "ambiguous-default" : "",
+          row.profile.requiresGraphReason ? "requires-graph-reason" : "",
+        ].filter(Boolean).join(", ");
+        process.stdout.write(`${row.name}\t${row.profile.interaction}\t${row.profile.userLabel}\t${flags}\n`);
+      }
+    }
     return;
   }
 
@@ -277,9 +325,10 @@ async function main(): Promise<void> {
       workspaceRoot,
       sessionConfig,
     });
-    const activeFlow =
-      typeof raw.activeFlow === "string" ? raw.activeFlow : undefined;
-    const flowDef = resolveFlow(activeFlow);
+    const selection = resolveFlowSelection(raw);
+    const flowDef = resolveFlow(selection.active, {
+      unknownActivePolicy: selection.unknownActivePolicy,
+    });
     const runtime = await createFlowRuntime(appConfig, {
       sessionConfig,
       workspaceRoot,
@@ -306,8 +355,10 @@ async function main(): Promise<void> {
         workspaceRoot,
         sessionConfig,
       });
-      const activeFlow = typeof raw.activeFlow === "string" ? raw.activeFlow : undefined;
-      const flowDef = resolveFlow(activeFlow);
+      const selection = resolveFlowSelection(raw);
+      const flowDef = resolveFlow(selection.active, {
+        unknownActivePolicy: selection.unknownActivePolicy,
+      });
       const runtime = await createFlowRuntime(appConfig, {
         sessionConfig,
         workspaceRoot,

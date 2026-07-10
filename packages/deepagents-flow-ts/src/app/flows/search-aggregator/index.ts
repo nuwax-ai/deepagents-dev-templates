@@ -1,7 +1,7 @@
 /**
  * search-aggregator — 「平台能力对话样板」（conversational ReAct + 平台搜索能力）。
  *
- * 这是**零图路径**的注册版官方样板：不写任何图代码、不写任何 fetch —— 复用默认
+ * 这是**聊天助手型**的注册版官方样板：不写任何图代码、不写任何 fetch —— 复用默认
  * ReAct 图（prepare → think ↔ tools → respond），靠 systemPrompt 定制出「多源搜索
  * 聚合、标注来源、支持追问钻取」的行为。
  *

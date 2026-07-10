@@ -18,6 +18,29 @@ function loadSpec(name: string) {
   return parseSpec(JSON.parse(readFileSync(resolve(SPECS, name), "utf-8")));
 }
 
+describe("scaffold spec flow profile", () => {
+  it("custom spec 必须声明 interaction 与 graphReason", () => {
+    expect(() =>
+      parseSpec({
+        name: "missing-interaction",
+        topology: "custom",
+        params: {
+          state: { query: { type: "string" }, output: { type: "string" } },
+          nodes: {
+            done: {
+              type: "passthrough",
+              params: { write: "() => ({ output: 'ok' })" },
+            },
+          },
+          edges: [{ kind: "static", from: "__start__", to: "done" }],
+          input: { queryField: "query" },
+          result: { answerField: "output" },
+        },
+      })
+    ).toThrow(/interaction|graphReason|custom topology/);
+  });
+});
+
 describe("lint-graph-rules R-G001", () => {
   it("writeConsumesParsed 识别 r.parsed 与解构", () => {
     expect(writeConsumesParsed("(r) => ({ x: r.parsed })")).toBe(true);
@@ -132,6 +155,8 @@ describe("lint-graph-rules R-G009", () => {
       name: "tool-node-demo",
       description: "tool node binding demo",
       topology: "custom",
+      interaction: "pipeline",
+      graphReason: "需要固定的工具执行节点来验证 tool-exec 绑定。",
       tools: [{ builtin: "quote_price" }],
       params: {
         state: {
@@ -165,6 +190,8 @@ describe("lint-graph-rules R-G009", () => {
       name: "platform-tool-demo",
       description: "platform tool action demo",
       topology: "custom",
+      interaction: "pipeline",
+      graphReason: "需要固定的平台工具节点来验证 toolName 主动调用。",
       tools: [
         {
           targetType: "Plugin",

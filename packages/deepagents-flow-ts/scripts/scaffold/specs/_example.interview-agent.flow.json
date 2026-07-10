@@ -2,6 +2,8 @@
   "name": "interview-agent",
   "description": "面试官 Agent：JD+简历 → 连环技术追问(HITL) → 能力评估报告（custom + interrupt 范例；prepare 无 parse）",
   "topology": "custom",
+  "interaction": "approval",
+  "graphReason": "需要每轮面试问题后等待候选人回答，并在多轮 HITL 后生成评估报告，default 聊天助手无法表达 interrupt/resume 流程。",
   "systemPrompt": "你是资深技术面试官，负责对候选人进行结构化技术面试。",
   "tools": [],
   "params": {

@@ -5,7 +5,7 @@
 
 ## completion gate（完成闸门）
 
-本地真实运行验证**优先** `pnpm smoke`（rcoder-cli 端到端会话；与当前项目 README 快速开始一致）。非 smoke 路径不能替代 completion gate。
+本地开发迭代优先 `pnpm smoke:fast`（或 `pnpm smoke -- --fast`），快速确认主路径能跑通；收工真实运行验证必须 `pnpm smoke`（rcoder-cli 端到端会话；与当前项目 README 快速开始一致）。fast smoke 不能替代 completion gate。
 
 报告「完成 / done」前必须在本轮真实执行并贴出原始输出：
 
@@ -15,13 +15,13 @@ pnpm build && pnpm typecheck && pnpm test && pnpm graph && pnpm smoke
 
 失败 → 读完整错误 → 修复 → 重跑；至多 5 轮仍不绿则如实交回用户。
 
-**真实运行门**：`pnpm smoke` 用 rcoder-cli 端到端复现完整运行路径，是生产路径的质量门；静态四连不能替代，禁止 `--dry-run` 冒充通过。默认读 `activeFlow`；其他入口用 `--entry`。
+**真实运行门**：`pnpm smoke` 用 rcoder-cli 端到端复现完整运行路径，是生产路径的质量门；静态四连不能替代，禁止 `--dry-run` 冒充通过。精选范例用 `--example`，其他入口用 `--entry`。
 
-Scaffold 生成器自带快检（`typecheck && graph`）；**全量 completion gate 仍须上式五连**。
+Scaffold 生成器自带快检（`typecheck && graph`）；开发中可追加 `pnpm smoke:fast`，**全量 completion gate 仍须上式五连**。
 
 **收尾清单**（系统提示词非空、R-G009、**平台能力搜索证据**等）→ [part0-workflow.md](part0-workflow.md) § completion gate 收尾清单。
 
-**smoke 细则**（`.env` 模型解析、`activeFlow`、`SMOKE_PROMPT*`、占位符）→ [part4b-smoke.md](part4b-smoke.md)。
+**smoke 细则**（`.env` 模型解析、`flow.active` / 旧 `activeFlow` 兼容、`SMOKE_PROMPT*`、占位符）→ [part4b-smoke.md](part4b-smoke.md)。
 
 ---
 
@@ -29,9 +29,11 @@ Scaffold 生成器自带快检（`typecheck && graph`）；**全量 completion g
 
 ```bash
 pnpm build
-pnpm test                    # 含 tests/layering.test.ts、tests/topologies/
+pnpm test                    # 含 tests/layering.test.ts
 pnpm typecheck
-pnpm smoke                   # 强制：rcoder-cli 端到端（可加 --entry）
+pnpm typecheck:examples      # 精选范例 + src
+pnpm smoke:fast              # 快检：短 prompt + 跳过 MCP 加载
+pnpm smoke                   # 强制：rcoder-cli 端到端（精选范例可用 --example）
 pnpm graph                   # export graph topology
 ```
 

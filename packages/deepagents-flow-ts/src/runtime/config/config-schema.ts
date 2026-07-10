@@ -157,6 +157,12 @@ export const PluginsConfigSchema = z.object({
   disabled: z.array(z.string()).default([]),
 });
 
+export const FlowSelectionConfigSchema = z.object({
+  active: z.string().default("default"),
+  defaultInteraction: z.enum(["chat", "pipeline", "approval"]).default("chat"),
+  unknownActivePolicy: z.enum(["warn-default", "default"]).default("warn-default"),
+});
+
 export const LoggingConfigSchema = z.object({
   level: z.enum(["debug", "info", "warn", "error"]).default("info"),
   structured: z.boolean().default(true),
@@ -228,6 +234,7 @@ export const AppConfigSchema = z.object({
   memory: MemoryConfigSchema.default({}),
   hooks: z.array(HookConfigSchema).default([]),
   plugins: PluginsConfigSchema.default({}),
+  flow: FlowSelectionConfigSchema.default({}),
   workspace: WorkspaceConfigSchema.default({}),
   logging: LoggingConfigSchema.default({}),
   compaction: CompactionConfigSchema.default({}),

@@ -15,7 +15,7 @@
 ```bash
 pnpm install && pnpm build
 pnpm flow "你好"          # CLI；无凭证走 fallback 也能跑
-pnpm smoke                # **推荐** ACP 验证：rcoder-cli 驱动真实 ACP 会话（握手 → onPrompt → 整图 → 流式答案）；`-- --dry-run` 仅打印命令
+# 端到端真实调试走 flow-debugger skill（packages/dev-agent-flow/skills/flow-debugger），非本地 pnpm 命令
 ```
 
 **拼你自己的 flow** = 组合 `src/libs/nodes/` 的节点 factory + 在 `src/app/graph.ts` 连线：
@@ -71,10 +71,11 @@ config/ prompts/ skills/ scripts/ docs/ tests/
 
 两种方式落地：
 
-1. **脚手架优先**（一句话 / 简单场景）：写 spec → `node scripts/scaffold/generate.mjs <spec>` → 改 `config/flow-agent.config.json` 的 `activeFlow`（自带 typecheck+graph 自验）
-2. **直接改默认图**：编辑 [src/app/graph.ts](src/app/graph.ts) 连线 + [src/app/nodes/](src/app/nodes/) 节点逻辑；进阶形态对照 [src/libs/topologies/](src/libs/topologies/)，落盘对照 [scripts/scaffold/specs/](scripts/scaffold/specs/) → `src/app/flows/`
+1. **先看交互形态**：`pnpm exec tsx src/index.ts flows --json`。聊天助手型优先 `flow.active: "default"` + systemPrompt；固定流程型 / 人工确认型才 scaffold。
+2. **脚手架优先**（固定流程 / 人工确认）：写 spec → `node scripts/scaffold/generate.mjs <spec>` → 改 `config/flow-agent.config.json` 的 `flow.active`（自带 typecheck+graph 自验）
+3. **直接改默认图**：编辑 [src/app/graph.ts](src/app/graph.ts) 连线 + [src/app/nodes/](src/app/nodes/) 节点逻辑；进阶形态对照 [src/libs/topologies/](src/libs/topologies/)，落盘对照 [scripts/scaffold/specs/](scripts/scaffold/specs/) → `src/app/flows/`
 
-**多 flow 选图**：`config/flow-agent.config.json` 顶层 `activeFlow`（缺省 `default`）经 [src/app/flows/index.ts](src/app/flows/index.ts) 注册表解析——`flow` / `graph` / ACP 三条入口共用。内置 flow（各代表一类形态）：`default`（conversational ReAct 泛化底座）、`dev-agent`（stateful-custom：ReAct + 压缩）、`search-aggregator`（conversational + 平台能力样板，**零图路径**：default 底座 + systemPrompt，平台登记的能力运行期进入 `allTools` 后自动 bind）、`translate-review`（one-shot 流式管道教学）、`router-gate`（LLM 路由教学）。更多形态见 `src/libs/topologies/`；场景 spec 范例在 `scripts/scaffold/specs/`。`pnpm graph` 导出**当前 activeFlow** 的 graph topology。
+**多 flow 选图**：`config/flow-agent.config.json` 的 `flow.active`（缺省 `default`，旧 `activeFlow` 兼容）经 [src/app/flows/index.ts](src/app/flows/index.ts) 注册表解析——`flow` / `graph` / ACP 三条入口共用。注册表带 `profile`：`chat`（聊天助手型）、`pipeline`（固定流程型）、`approval`（人工确认型）。`default` 是聊天助手型默认；`dev-agent` 是 stateful-custom 开发样板；`search-aggregator` 是平台能力对话样板；`translate-review` 是人工确认型教学；`router-gate` 是固定流程型路由教学。`pnpm graph` 导出**当前 active flow** 的 graph topology。
 
 **两类 flow**（[src/core/flow-types.ts](src/core/flow-types.ts)）：
 - `FlowExecutor`：one-shot，`(query, cb) => Promise<FlowResult>`。无记忆单次调用（见 `src/libs/topologies/rag`）。
@@ -141,7 +142,7 @@ START → prepare → think(model.bindTools) ──(toolsCondition)──┐
 ```bash
 pnpm install && pnpm build
 
-# 默认 flow：CLI（尊重 config.activeFlow）
+# 默认 flow：CLI（尊重 config.flow.active）
 pnpm flow "随便说点什么"
 pnpm exec tsx src/index.ts flow -i
 
@@ -149,21 +150,22 @@ pnpm exec tsx src/index.ts flow -i
 pnpm start:acp
 
 # Export graph topology / 能力查询 / 会话
-pnpm graph                              # 当前 activeFlow graph topology JSON；加 --mermaid 输出 Mermaid
+pnpm graph                              # 当前 active flow graph topology JSON；加 --mermaid 输出 Mermaid
 pnpm exec tsx src/index.ts capabilities # 无凭证，工具/MCP/skills/subagents
+pnpm exec tsx src/index.ts flows --json # 输出 flow profile（chat / pipeline / approval）
+pnpm exec tsx src/index.ts flows recommend --kind chat
 pnpm exec tsx src/index.ts sessions     # 已持久化会话
 pnpm exec tsx src/index.ts sessions delete <thread-id>
 
 # 可选：--config <path> 指定配置文件（默认 config/flow-agent.config.json）
 
-# 场景 flow：scaffold 生成到 app/flows → 设 activeFlow → 跑 smoke
+# 场景 flow：scaffold 生成到 app/flows → 设 flow.active → 用 flow-debugger 真实调试
 # node scripts/scaffold/generate.mjs scripts/scaffold/specs/_example.knowledge-qa.flow.json
-# （再编辑 config/flow-agent.config.json 的 activeFlow）
+# （再编辑 config/flow-agent.config.json 的 flow.active）
 
 # 验证
 pnpm test && pnpm typecheck
-pnpm smoke                          # 当前 activeFlow ACP 冒烟（-- --dry-run 仅打印）
-pnpm smoke -- --entry src/index.ts  # 显式入口
+# 端到端真实调试（平台真实链路）走 flow-debugger skill：debug.sh --message "..." --expect-tool <工具名>
 ```
 
 模型凭证见 [`.env.example`](.env.example)（ACP 模式下通常由 IDE host 注入）。
@@ -175,20 +177,20 @@ pnpm smoke -- --entry src/index.ts  # 显式入口
 | 默认 flow CLI | `pnpm flow "..."` / `pnpm exec tsx src/index.ts flow -i` |
 | Export graph topology | `pnpm graph`（JSON）/ `pnpm graph --mermaid`（Mermaid 源） |
 | 能力分层查询 | `pnpm exec tsx src/index.ts capabilities`（无凭证，工具/MCP/skills/subagents） |
+| Flow profile 查询 | `pnpm exec tsx src/index.ts flows --json` / `flows recommend --kind chat` |
 | 已持久化会话 | `pnpm exec tsx src/index.ts sessions` / `sessions delete <id>` |
-| 默认 flow ACP 冒烟（rcoder） | `pnpm smoke` |
-| 任意入口 ACP 冒烟 | `pnpm smoke -- --entry <path>` |
 | 类型检查 | `pnpm typecheck` |
+| 真实调试（flow-debugger） | `debug.sh --message "..."`（真实执行+判定）/ `session.sh`（会话管理）/ `approve.sh`（权限审批）/ `analyze-logs.sh`（日志） |
 
-`pnpm smoke` 用 rcoder-cli 端到端驱动 ACP（握手 → `onPrompt` → 整图 → 流式答案）；读 `config.activeFlow`。`--entry PATH` 或 `AGENT_ENTRY` 可指向其他入口。
-**在 Zed 里 chat 调试**当前 `activeFlow` 的 `agent_servers` 配置见 [docs/zed-debug.md](docs/zed-debug.md)。
+端到端真实调试（平台真实 agent 执行，非本地模拟）走 **flow-debugger** skill（`packages/dev-agent-flow/skills/flow-debugger`）：`debug.sh` 发消息驱动执行并判定通过/失败，执行出现在用户 agent-dev 预览会话；`--expect-tool` 断言平台能力真实调用。
+**在 Zed 里 chat 调试**当前 `flow.active` 的 `agent_servers` 配置见 [docs/zed-debug.md](docs/zed-debug.md)。
 
 ## Export graph topology（可视化对接）
 
 显式 StateGraph 的好处之一：节点连线是**静态可提取**的。`./topology` 把编译图反射成结构化数据（不运行图、不需要凭证），供 inspector / 文档 / 调试器消费：
 
 ```bash
-pnpm graph              # → 当前 activeFlow 的 { nodes, edges } JSON
+pnpm graph              # → 当前 active flow 的 { nodes, edges } JSON
 pnpm graph --mermaid    # → Mermaid 源，可直接渲染
 ```
 
@@ -202,7 +204,7 @@ const { nodes, edges, mermaid } = await getFlowTopology();
 
 ## 配置与能力分层
 
-[config/flow-agent.config.json](config/flow-agent.config.json)：标准 `agent` / `model` / `mcp` / `permissions` / `sandbox` / `skills` / `agentsDirectories` / `memory` / `compaction` / `middleware` 段，以及顶层 **`activeFlow`**（选 [src/app/flows/](src/app/flows/) 注册表中的 flow；缺省 `default`）。配置走 `loadFlowConfig` → 底层 `loadConfig`（[src/runtime/](src/runtime/)），Zod schema 校验。自定义块加在顶层、用 `loadFlowConfig().raw` 取出。
+[config/flow-agent.config.json](config/flow-agent.config.json)：标准 `agent` / `model` / `mcp` / `permissions` / `sandbox` / `skills` / `agentsDirectories` / `memory` / `compaction` / `middleware` 段，以及正式 **`flow.active`**（选 [src/app/flows/](src/app/flows/) 注册表中的 flow；缺省 `default`）。旧顶层 `activeFlow` 仍兼容，但新配置应使用 `flow.active`。配置走 `loadFlowConfig` → 底层 `loadConfig`（[src/runtime/](src/runtime/)），Zod schema 校验。自定义块加在顶层、用 `loadFlowConfig().raw` 取出。
 
 **能力分层**（工作区配置 / 内置 / 环境 / 文件持久化）见 [docs/capabilities.md](docs/capabilities.md) 与 [.nuwax-agent/capability-sources.json](.nuwax-agent/capability-sources.json)——`capabilities` 命令查询当前可用工具/MCP/skills/子智能体（subagents）。
 
@@ -244,12 +246,12 @@ pnpm test
 | 能力 | 代码落点 | 说明 |
 |------|----------|------|
 | 工作区检索 | `grep` / `glob` 工具（`createSearchTools`） | **非**联网；ReAct 默认图经 `flow-tools.ts` 注册 |
-| **平台能力对话（零图路径）** | `src/app/flows/search-aggregator/` | default ReAct 底座 + systemPrompt；平台登记的搜索能力运行期进入 `allTools` 后自动 bind，零接线 |
+| **平台能力对话（聊天助手型）** | `src/app/flows/search-aggregator/` | default ReAct 底座 + systemPrompt；平台登记的搜索能力运行期进入 `allTools` 后自动 bind，零接线 |
 | 固定管道工具节点 | `createPlatformToolActionNode` / `createToolExecNode` / `createMcpRetrievalNode` | 按节点 `params.toolName` / `params.tools` 引用平台工具；现有检索型 topology 仍可使用 MCP 检索节点 |
 | 自适应 RAG 网页搜索 | `adaptive-rag` `createWebSearchNode` + `searchMcp` | 平台登记搜索能力后接入；运行期由平台适配后注入工具集 |
 | 未配置搜索源 | `travel-planner` research；`search-aggregator` 提示词 | `searchMcp` 缺省 → 优雅降级（提示去平台添加）；样板无搜索工具时如实告知；须开发期已搜平台举证 |
 | **运行时注入** | `src/runtime/` / `src/app/flow-tools.ts` | 平台会话能力与项目配置汇总为 runtime 工具集 |
-| **真实调用验证** | `SMOKE_EXPECT_TOOL=<子串> pnpm smoke` | 轨迹须现该工具调用且 done 非空，否则 exit 1（防 LLM 兜底假绿） |
+| **真实调用验证** | flow-debugger `debug.sh --expect-tool=<子串>` | `componentExecuteResults` 须现该工具调用且 success，否则 exit 4（防 LLM 兜底假绿） |
 
 云开发环境中平台 Plugin / Workflow / Knowledge 等工具登记由**开发 Agent 技能包**引导（见 README § 扩展阅读），不在当前项目 `src/` 内实现。
 
@@ -263,7 +265,7 @@ pnpm test
 - [docs/node-kit.md](docs/node-kit.md) — **factory catalog（建 flow 必读）**
 - [docs/troubleshooting.md](docs/troubleshooting.md) — **排错索引**（`LLM 未返回 JSON` / Invalid edge / HITL / spec 漂移）
 - [docs/flow-patterns.md](docs/flow-patterns.md) — 进阶模式（Send/interrupt/Command/subgraph/checkpointer/durable stateful flow）
-- [docs/glossary.md](docs/glossary.md) — **术语对照表**（durable stateful flow / topology / **平台侧** / **平台问答卡片** 等，统一指代、防漂移）
+- [docs/glossary.md](docs/glossary.md) — **术语对照表**（聊天助手型 / 固定流程型 / 人工确认型、flow profile、`flow.active`、durable stateful flow、topology、**平台侧**、**平台问答卡片** 等，统一指代、防漂移）
 - [docs/zed-debug.md](docs/zed-debug.md) — Zed / ACP 调试
 - [scripts/scaffold/specs/](scripts/scaffold/specs/) — 场景 flow 示范（scaffold → `app/flows`）
 - **API 细节看源码**：`FlowRuntime`（[src/runtime/flow-runtime.ts](src/runtime/flow-runtime.ts)）、`FlowCallbacks`（[src/core/flow-types.ts](src/core/flow-types.ts)）、`createFlowRuntime`（[src/index.ts](src/index.ts)）、Surface Seam（[src/surfaces/](src/surfaces/)）、ACP hooks（[src/libs/deepagents-acp/](src/libs/deepagents-acp/)）、`createFlowTools`（[src/app/flow-tools.ts](src/app/flow-tools.ts)）

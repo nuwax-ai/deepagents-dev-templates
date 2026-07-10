@@ -2,6 +2,8 @@
   "name": "multi-aspect-search",
   "description": "多维度并行搜索 → 汇总（fanout + searchMcp mcp-retrieval）。联网须经平台登记；见 search-aggregator 四路并行示例。",
   "topology": "custom",
+  "interaction": "pipeline",
+  "graphReason": "需要固定的多维度 fanout 并行检索与汇总节点，default 聊天助手无法保证每轮都按指定维度并行执行。",
   "systemPrompt": "",
   "tools": [],
   "params": {

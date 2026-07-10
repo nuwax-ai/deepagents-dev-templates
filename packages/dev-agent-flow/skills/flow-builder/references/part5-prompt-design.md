@@ -64,7 +64,7 @@
 
 | 步 | 动作 | 文件 / 字段 |
 |----|------|-------------|
-| 1 | 确认 `activeFlow: "default"`（通用 ReAct；无需 scaffold） | `config/flow-agent.config.json` |
+| 1 | 确认 `flow.active: "default"`（聊天助手型；无需 scaffold） | `config/flow-agent.config.json` |
 | 2 | 写入智能体名称与简述 | `agent.name`、`agent.description` |
 | 3 | Part 5 七要素设计 systemPrompt（标题 `# [Agent 名] — …`） | `prompts/flow.base.md` |
 | 4 | 若用户要欢迎语 → 写开场白源文件 | 如 `prompts/opening.md` |

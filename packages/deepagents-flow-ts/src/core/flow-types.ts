@@ -208,3 +208,19 @@ export interface FlowTopology {
   /** 同一拓扑的 Mermaid 源，可直接渲染 / 贴进文档。 */
   mermaid: string;
 }
+
+/** 面向用户的交互形态：开发 Agent 用它决定是否需要写图。 */
+export type FlowInteractionKind = "chat" | "pipeline" | "approval";
+
+/** flow 的实现来源：默认底座、预设拓扑，或 custom 节点级编排。 */
+export type FlowImplementationKind = "default" | "preset" | "custom";
+
+/** flow 注册表的机器可读画像，供 CLI / scaffold / 开发 Agent 统一选型。 */
+export interface FlowProfile {
+  interaction: FlowInteractionKind;
+  implementation: FlowImplementationKind;
+  userLabel: string;
+  summary: string;
+  defaultForAmbiguous?: boolean;
+  requiresGraphReason?: boolean;
+}

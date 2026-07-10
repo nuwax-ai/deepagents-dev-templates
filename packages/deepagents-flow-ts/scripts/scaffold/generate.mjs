@@ -53,7 +53,7 @@ const RESERVED_FLOW_NAMES = new Set([
 const camel = (s) => s.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
 
 /** 把生成的 flow 注册进 src/app/flows/index.ts（import + 表项，幂等）。 */
-function registerFlow(name, kind, conversational = false) {
+function registerFlow(name, kind, profile) {
   const regPath = resolve(PKG_ROOT, "src/app/flows/index.ts");
   let src = readFileSync(regPath, "utf-8");
   const alias = `${camel(name)}Flow`;
@@ -75,16 +75,85 @@ function registerFlow(name, kind, conversational = false) {
     );
   }
   // kind 决定注册表项形态：stateful-recipe 用 recipe；stateful-custom 用 createExecutor。
-  // conversational（react-tools/rag/adaptive-rag 等对话型）→ 注册项加 conversational:true，
-  // 物化时透传 createStatefulFlow → 多轮记忆 + 图层流式（见 src/app/default-flow.ts）。
+  // profile.interaction 是 runtime 一等语义；chat 会在 materializeFlow 推导 conversational:true。
+  const profileLiteral = JSON.stringify(profile);
+  const conversational = profile.interaction === "chat";
   const entry =
     kind === "stateful-recipe"
-      ? `  "${name}": { name: "${name}", kind: "stateful-recipe",${conversational ? " conversational: true," : ""} recipe: ${alias}.recipe, platformToolRefs: ${alias}.platformToolRefs, getTopology: ${alias}.getTopology },`
-      : `  "${name}": { name: "${name}", kind: "${kind}", createExecutor: ${alias}.createExecutor, platformToolRefs: ${alias}.platformToolRefs, getTopology: ${alias}.getTopology },`;
+      ? `  "${name}": { name: "${name}", kind: "stateful-recipe", profile: ${profileLiteral},${conversational ? " conversational: true," : ""} recipe: ${alias}.recipe, platformToolRefs: ${alias}.platformToolRefs, getTopology: ${alias}.getTopology },`
+      : `  "${name}": { name: "${name}", kind: "${kind}", profile: ${profileLiteral}, createExecutor: ${alias}.createExecutor, platformToolRefs: ${alias}.platformToolRefs, getTopology: ${alias}.getTopology },`;
   src = src
     .replace(importAnchor, `${importAnchor}\n${importLine}`)
     .replace(regAnchor, `${regAnchor}\n${entry}`);
   writeFileSync(regPath, src, "utf-8");
+}
+
+function profileForSpec(spec) {
+  const preset = {
+    "react-tools": {
+      interaction: "chat",
+      implementation: "preset",
+      userLabel: "聊天助手型",
+      summary: "标准 ReAct：可连续追问并按需调用工具。",
+      defaultForAmbiguous: true,
+    },
+    "human-in-loop": {
+      interaction: "approval",
+      implementation: "preset",
+      userLabel: "人工确认型",
+      summary: "生成后进入人工审阅，按反馈定稿。",
+    },
+    "project-manager": {
+      interaction: "approval",
+      implementation: "preset",
+      userLabel: "人工确认型",
+      summary: "规划、评估、审批后定稿。",
+    },
+    "travel-planner": {
+      interaction: "approval",
+      implementation: "preset",
+      userLabel: "人工确认型",
+      summary: "多源调研聚合后请求用户确认。",
+    },
+    rag: {
+      interaction: "chat",
+      implementation: "preset",
+      userLabel: "聊天助手型",
+      summary: "检索增强问答，支持 follow-up 问题。",
+    },
+    "adaptive-rag": {
+      interaction: "chat",
+      implementation: "preset",
+      userLabel: "聊天助手型",
+      summary: "自适应检索问答，支持路由和自纠正。",
+    },
+    "deep-research": {
+      interaction: "approval",
+      implementation: "preset",
+      userLabel: "人工确认型",
+      summary: "多阶段深度研究，包含澄清、评审和交付。",
+    },
+    "dev-agent": {
+      interaction: "chat",
+      implementation: "preset",
+      userLabel: "聊天助手型",
+      summary: "综合工具助手：ReAct、多轮续接和压缩。",
+      defaultForAmbiguous: true,
+    },
+  }[spec.topology];
+  if (preset) return preset;
+  return {
+    interaction: spec.interaction,
+    implementation: "custom",
+    userLabel:
+      spec.interaction === "approval"
+        ? "人工确认型"
+        : spec.interaction === "pipeline"
+          ? "固定流程型"
+          : "聊天助手型",
+    summary: spec.description || spec.graphReason,
+    requiresGraphReason: true,
+  };
 }
 
 function main() {
@@ -124,23 +193,26 @@ function main() {
     console.log(`✓ 写入 ${f.path}`);
   }
 
-  registerFlow(
-    spec.name,
-    bp.kind,
-    typeof bp.resolveConversational === "function" ? bp.resolveConversational(spec) : bp.conversational
-  );
+  registerFlow(spec.name, bp.kind, profileForSpec(spec));
   console.log(`✓ 注册 flow "${spec.name}" 到 src/app/flows/index.ts`);
 
   // —— COMPLETION_GATE：未跑通不算完成 ——
   console.log("→ pnpm typecheck ...");
   execSync("pnpm typecheck", { cwd: PKG_ROOT, stdio: "inherit" });
-  // graph 验证：临时把 activeFlow 切到新 flow,验「该 flow 的拓扑真能反射」(不只是默认图没坏),
-  // 验完还原原 activeFlow。否则生成的 flow 可能在 COMPLETION_GATE 绿、激活时才崩(如节点名/channel 冲突)。
+  // graph 验证：临时把 flow.active 切到新 flow,验「该 flow 的拓扑真能反射」(不只是默认图没坏),
+  // 验完还原原配置。否则生成的 flow 可能在 COMPLETION_GATE 绿、激活时才崩(如节点名/channel 冲突)。
   const cfgPath = resolve(PKG_ROOT, "config/flow-agent.config.json");
   const origCfg = readFileSync(cfgPath, "utf-8");
   try {
-    writeFileSync(cfgPath, JSON.stringify({ ...JSON.parse(origCfg), activeFlow: spec.name }, null, 2));
-    console.log(`→ pnpm graph（反射 activeFlow=${spec.name} 的拓扑）...`);
+    const parsed = JSON.parse(origCfg);
+    writeFileSync(cfgPath, JSON.stringify({
+      ...parsed,
+      flow: {
+        ...(parsed.flow ?? {}),
+        active: spec.name,
+      },
+    }, null, 2));
+    console.log(`→ pnpm graph（反射 flow.active=${spec.name} 的拓扑）...`);
     execSync("pnpm graph", { cwd: PKG_ROOT, stdio: "inherit" });
   } finally {
     writeFileSync(cfgPath, origCfg);
@@ -152,7 +224,7 @@ function main() {
     );
   }
   console.log(`\n✅ flow "${spec.name}" 已生成并通过 typecheck + graph(反射已验)。`);
-  console.log(`   启用：把 config/flow-agent.config.json 的 "activeFlow" 设为 "${spec.name}"，`);
+  console.log(`   启用：把 config/flow-agent.config.json 的 "flow.active" 设为 "${spec.name}"，`);
   console.log(`   再 \`pnpm graph\` 查看该 flow 的拓扑、\`pnpm flow "..."\` 试跑。`);
 }
 
