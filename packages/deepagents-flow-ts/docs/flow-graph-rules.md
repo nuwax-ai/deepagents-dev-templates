@@ -4,7 +4,7 @@
 > **范围**：仅适用于本工作目录内的 `graph.ts` / `*.flow.json` 开发与验证。
 > 其他**本包**文档（[node-kit](node-kit.md)、[troubleshooting](troubleshooting.md)、[node-catalog](node-catalog.md) 等）只摘要 + 链到对应规则，避免多处漂移。
 >
-> **受众**：在本仓库内维护 `graph.ts`、`*.flow.json` 或运行验证的读者（含在本目录工作的自动化工具）；**开发流程与平台侧约束**由开发环境注入的技能包另行提供，不在本文档重复。
+> **受众**：在本仓库内维护 `graph.ts`、`*.flow.json` 或运行验证的读者。
 
 ---
 
@@ -190,7 +190,7 @@
 |------|------|
 | 写 spec / graph 前 | 扫规则索引，确认适用 MUST |
 | scaffold 生成后 | 核对 R-G001、R-G003、R-G004、R-G009 |
-| 验证闸门 | 收工 `pnpm build && pnpm typecheck && pnpm test && pnpm graph`，再 ACP/CLI 端到端验证（`config.flow.active`） |
+| 验证闸门 | 收工 `pnpm typecheck && pnpm test && pnpm exec tsx src/index.ts graph`（`config.flow.active`）；迭代期**不要** `pnpm build` |
 | 排错 | [troubleshooting.md](troubleshooting.md) 按症状 → 规则 ID |
 
 ## 相关文档

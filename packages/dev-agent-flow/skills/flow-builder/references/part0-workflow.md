@@ -39,29 +39,20 @@
 4. **命中 preset** → 写 spec → `node scripts/scaffold/generate.mjs <spec>` → 改 `flow.active` → 进 Phase 2 生成路径
 5. **不命中** → 先用 `custom`，必须写 `interaction` + `graphReason`；仍不行 → [part2-orchestration.md](part2-orchestration.md) 手写
 
-### 平台能力门禁（Phase 1 必做 · 写图前 · 通用）
+### 平台能力门禁（Phase 1 必做 · 写图前）
 
-凡 Agent 依赖**工作区以外**的能力，**必须先**完成 Part 3 § 平台能力登记，**再**写 spec / `graph.ts` / `flow-tools.ts` / 自写 `*.tool.ts`。
+凡依赖**工作区以外**的能力，**必须先**完成 [part3-tools-config.md](part3-tools-config.md) § 平台能力登记，**再**写 spec / `graph.ts`。
 
-**触发（满足任一）**：
-
-- 用户要调用外部 API、第三方数据、业务 Plugin、知识库、平台技能
-- 用户要联网 / 搜索 / 实时资讯 / 多源调研（**较常见**；另见 Part 3 § 联网搜索）
-- 计划使用：`createToolExecNode` · `bindTools` · `flow-tools.ts` 新增工具 · `rag`/`adaptive-rag` 检索 · ReAct 接业务工具
-- 交互形态 / flow profile：`chat`、`pipeline`、`approval` 中任一计划使用平台工具，或 custom 含 `tool-exec`
-
-**豁免（仍须 Part 3 知情，但可不 add-tool）**：纯 LLM 对话、无外部 I/O；仅内置 `bash`/`read_file`/`grep`（工作区内）。
+触发：外部 API / 联网搜索 / `createToolExecNode` / ReAct 业务工具 / 平台 Plugin 等。豁免：纯 LLM 对话、仅内置 bash/grep（工作区内）。
 
 | 步 | 动作 |
 |----|------|
-| 1 | 加载 `dev-engineer-toolkit` + [part3-tools-config.md](part3-tools-config.md) § 平台能力登记 |
-| 2 | 按能力拆词：`search-apis.sh --kw "<关键词>"`（可多轮）；需技能 → `search-skills.sh` |
-| 3 | 命中 → `add-tool.sh` |
-| 4 | `get-config.sh --key tools --full` 拉取已注册工具真实配置（含 schema）固化进 `spec.tools`（**禁止**手抄）；固定管道在节点 `params` 写 `toolName` / `tools` → `project.md` 记 targetId / 工具名 |
-| 5 | 平台确无命中 → 记录关键词与输出，**然后**方可走优先级 3 自写 app 工具 |
-| 6 | **然后**写 spec / `graph.ts` |
+| 1 | 加载 `dev-engineer-toolkit` + Part 3 § 平台能力登记 |
+| 2 | `search-apis.sh` / `search-skills.sh`（按关键词拆词） |
+| 3 | 命中 → `add-tool.sh` → `get-config --key tools --full` 固化 `spec.tools` |
+| 4 | 无命中 → 记录关键词与输出，方可自写 app 工具 |
 
-> **禁止**：先写占位工具 / 空 `flow-tools.ts` 再 smoke 报完成，把平台登记甩给「用户待操作」；**为已登记能力手写 fetch/`tool()` 包装**。**联网搜索**是高频场景，同样不得跳过登记；当前项目不内置互联网搜索。
+> **禁止**：未搜平台就写外部能力；为已登记能力手写 fetch 包装。联网搜索同样须先登记。
 
 ### Factory 速查（手写路径）
 
@@ -119,7 +110,7 @@
 ## Phase 3：验证（completion gate）
 
 ```bash
-pnpm build && pnpm typecheck && pnpm test && pnpm graph
+pnpm typecheck && pnpm test && pnpm exec tsx src/index.ts graph
 # 然后用 flow-debugger 真实执行：debug.sh --message "..." [--expect-tool <工具名子串>]
 ```
 
@@ -159,15 +150,15 @@ pnpm build && pnpm typecheck && pnpm test && pnpm graph
 
 ## completion gate 收尾清单
 
-报「完成 / done」前逐条贴证据（详述见 [part4a](part4a-verify-debug.md)）：
+报「完成 / done」前逐条贴证据。绝对禁止项见开发 Agent `system-prompt.md` `<DEVELOPMENT_CONSTRAINTS>`；细则见 [part4a](part4a-verify-debug.md) + [part4b](part4b-smoke.md)。
 
-- [ ] 四连命令退出 0（`build` / `typecheck` / `test` / `graph`）+ flow-debugger 真实调试通过
+- [ ] 静态三连退出 0（`typecheck` / `test` / `graph`）+ flow-debugger 真实调试通过
 - [ ] 声称改动文件经 `read_file` / `ls` 实证
 - [ ] `.logs/` 无未预期 `error`
 - [ ] `get-config.sh --key systemPrompt` 回读**非空**；用户发过 Agent 描述 → 已按 part5 提炼并同步
 - [ ] 用户可见 LLM 节点 → `createLlmStreamNode` + `r.text`（**R-G009**）
-- [ ] **需平台能力**（见 Phase 1「平台能力门禁」）→ 已贴 `search-apis.sh` / `search-skills.sh` 与/或 `get-config.sh --key tools|skills` **原始输出**；有命中 → 已 `add-tool.sh`；固定管道需要时节点 `params` 已写 `toolName` / `tools`；无命中 → 报告写明关键词与「已搜索、无命中」后方可自写工具。**联网搜索较常见**，须含搜索关键词证据。**未搜平台即报完成 = 不通过**
-- [ ] **平台能力真实调用**（凡已登记）→ `debug.sh --expect-tool <工具名子串>` + 触发式 prompt 通过，已贴工具调用轨迹片段。**未验证工具真调用 = 不通过**（LLM 兜底输出会假绿）
+- [ ] **需平台能力** → 已贴 search / get-config **原始输出**；有命中 → `add-tool.sh`；无命中 → 报告写明关键词后方可自写工具
+- [ ] **平台能力真实调用** → `debug.sh --expect-tool` 通过，已贴工具调用轨迹
 
 ---
 

@@ -4,7 +4,7 @@
  * 通用工作流编排模板入口
  *
  * 模式：
- *   (默认) / acp        启动 ACP 服务（stdio）—— 供 nuwaclaw/Zed/JetBrains
+ *   (默认) / acp        启动 ACP 服务（stdio）—— 供 NuwaClaw / 平台宿主
  *   flow "<输入>"       命令行跑一次默认 flow（测试用）
  *   flow -i             交互模式
  *   graph               导出默认图拓扑（JSON；加 --mermaid 出 Mermaid 源）
@@ -307,7 +307,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  // ACP 模式下凭证由 host(Zed/JetBrains) 注入；dotenv 仅作本地兜底。
+  // ACP 模式下凭证由平台宿主注入；dotenv 仅作本地兜底。
   loadDotenv();
 
   // server 身份用一次轻量配置解析（loadFlowConfig 不触 MCP；MCP 在 createFlowRuntime

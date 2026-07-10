@@ -11,9 +11,9 @@
 | `agent-builtin` | 项目内置 | bash / 文件读写 / grep·glob / http / json / load_skill / task / compaction / demo（native MCP 见下） | ❌（改 `src/` 源码） |
 | `env-builtin` | 环境变量 | API key、base URL、`LOG_LEVEL`、`LOG_DIR` | env / `.env` |
 | `agent-builtin-file` | 用户级会话目录（文件，无 DB） | sessionStore（默认 `~/.flowagents/sessions/<workspace 散列>/`，可经 `config.memory.dir` opt-out 回 `./.flow-sessions`） | ❌ |
-| `package-placeholder` | 打包/安装时替换 | `${INSTALL_ROOT}`、`${PACKAGE_VERSION}` | ❌ |
+| `package-placeholder` | 平台安装占位（开发期忽略） | `${INSTALL_ROOT}`、`${PACKAGE_VERSION}` | ❌ |
 
-完整映射：[.nuwax-agent/capability-sources.json](../.nuwax-agent/capability-sources.json)（压缩包元数据）。
+完整映射：[.nuwax-agent/capability-sources.json](../.nuwax-agent/capability-sources.json)（平台侧元数据；源码开发无需阅读）。
 
 ## 查询
 
@@ -39,7 +39,7 @@ pnpm exec tsx src/index.ts sessions       # 已持久化的会话
 
 ## 扩展（不改 `src/libs/` 保护区）
 
-- **加平台能力 / MCP**：搜索、文档、业务 API 等优先经平台登记（`dev-engineer-toolkit` 的 `search-apis.sh` / `add-tool.sh`）。平台工具在 flow 里统一由 `spec.tools` 声明 `targetType/targetId/schema`（工具名运行时按 `targetType_targetId` 自动拼），runtime 按这份**固化** schema 构建 `StructuredTool` 并注入 `FlowRuntime.allTools`；图侧按节点 `params`（`platform-tool` 用 `toolName`，`tool-exec` 用 `tools`）选择即可。`spec.tools` 是平台工具 schema 的唯一来源，不再依赖运行时额外发现或手工注入。本地 MCP 调试可参考 [config/mcp.examples.json](../config/mcp.examples.json)（chrome-devtools / filesystem / bash 等），复制到 `servers` 或经会话下发。
+- **加平台能力 / MCP**：搜索、文档、业务 API 等须在**平台侧**登记；在 flow 的 `spec.tools` 声明 `targetType/targetId/schema`（工具名运行时按 `targetType_targetId` 自动拼），runtime 按这份**固化** schema 构建 `StructuredTool` 并注入 `FlowRuntime.allTools`；图侧按节点 `params`（`platform-tool` 用 `toolName`，`tool-exec` 用 `tools`）选择即可。`spec.tools` 是平台工具 schema 的唯一来源，不再依赖运行时额外发现或手工注入。本地 MCP 调试可参考 [config/mcp.examples.json](../config/mcp.examples.json)（chrome-devtools / filesystem / bash 等），复制到 `servers` 或经会话下发。
 - **加 Skill**：
   - **项目内置（推荐）**：`builtin/skills/<name>/SKILL.md`（`agentsDirectories` 含 `./builtin`）。
   - **工作区扩展**：`.agents/skills/<name>/SKILL.md`，或在 `config.skills.directories` 增加目录。

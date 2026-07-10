@@ -117,7 +117,7 @@ export const flows: Record<string, FlowDef> = {
       interaction: "chat",
       implementation: "custom",
       userLabel: "聊天助手型",
-      summary: "开发 Agent 样板：ReAct、多轮续接和上下文压缩。",
+      summary: "全能力 ReAct 样板：多轮续接和上下文压缩。",
       defaultForAmbiguous: true,
     },
     createExecutor: (runtime) => devAgentFlow.createDevAgentFlow(runtime),

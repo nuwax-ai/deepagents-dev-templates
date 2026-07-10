@@ -1,7 +1,7 @@
 # deepagents-flow-ts — ACP 协议对齐维护手册
 
 > **受众**：Monorepo 维护者（改 `packages/deepagents-flow-ts` 的 surface / deepagents-acp 时必读）。  
-> **不是**模板使用者文档；终端用户请看包内 [README.md](../../../../../packages/deepagents-flow-ts/README.md) 与 [zed-debug.md](../../../../../packages/deepagents-flow-ts/docs/zed-debug.md)。
+> **不是**模板使用者文档；终端用户请看包内 [README.md](../../../../../packages/deepagents-flow-ts/README.md) 与 [troubleshooting.md](../../../../../packages/deepagents-flow-ts/docs/troubleshooting.md)。
 
 本目录记录 **Agent Client Protocol (ACP)** 官方 schema 与本仓库实现的字段映射、双路径差异、NuwaClaw 宿主契约，以及与 [nuwax-ai/claude-code-acp-ts](https://github.com/nuwax-ai/claude-code-acp-ts) 的持续对齐进度。
 
@@ -82,7 +82,7 @@ development/acp/
 | MCP / Skill / Subagent 生命周期 | [../runtime-capabilities-lifecycle.md](../runtime-capabilities-lifecycle.md) |
 | Subagent / Plan / 并行流式 | [../subagent-task-and-acp-plan.md](../subagent-task-and-acp-plan.md) |
 | Checkpoint / systemPrompt（v1.9.2–1.9.4） | [../checkpoint-integrity-and-prompt-resolution.md](../checkpoint-integrity-and-prompt-resolution.md) |
-| Zed 调试（使用者） | [packages/deepagents-flow-ts/docs/zed-debug.md](../../../../../packages/deepagents-flow-ts/docs/zed-debug.md) |
+| Zed 本地 ACP 手测（维护者） | [../zed-debug.md](../zed-debug.md) |
 | LangGraph surface 收敛 | [../langgraph-native-convergence.md](../langgraph-native-convergence.md) |
 | app-ts ACP 测试方案 | [../../deepagents-app-ts/development/acp-test-plan.md](../../deepagents-app-ts/development/acp-test-plan.md) |
 | NuwaClaw MCP ask-question | `nuwaclaw/docs/mcp-ask-question-acp-toolcall-v1.md`（仓库外） |

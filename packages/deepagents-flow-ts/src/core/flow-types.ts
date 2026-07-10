@@ -209,13 +209,13 @@ export interface FlowTopology {
   mermaid: string;
 }
 
-/** 面向用户的交互形态：开发 Agent 用它决定是否需要写图。 */
+/** 面向用户的交互形态：CLI / 注册表用它决定是否需要写图。 */
 export type FlowInteractionKind = "chat" | "pipeline" | "approval";
 
 /** flow 的实现来源：默认底座、预设拓扑，或 custom 节点级编排。 */
 export type FlowImplementationKind = "default" | "preset" | "custom";
 
-/** flow 注册表的机器可读画像，供 CLI / scaffold / 开发 Agent 统一选型。 */
+/** flow 注册表的机器可读画像，供 CLI / scaffold 统一选型。 */
 export interface FlowProfile {
   interaction: FlowInteractionKind;
   implementation: FlowImplementationKind;

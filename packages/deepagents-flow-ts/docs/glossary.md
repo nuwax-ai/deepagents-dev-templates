@@ -32,7 +32,7 @@
 | 用英文机器值或工程黑话询问固定步骤需求 | **固定流程型** | 每次按固定步骤处理；适合翻译、审稿、打分、报告。机器值为 `pipeline`，用户话术不用“管线”。 |
 | 用 HITL / interrupt 等实现术语询问确认类需求 | **人工确认型** | 生成后需要用户确认、复核、给修改意见或定稿。机器值为 `approval`；实现通常使用 interrupt / resume 或 human-in-loop preset。 |
 | flow.active | **`flow.active`** | 正式 flow 选择字段（config 的 `flow.active`，缺省 `default`）。 |
-| flow 类型、图类型 | **flow profile** | runtime 注册表中的机器可读画像：`interaction`（`chat` / `pipeline` / `approval`）、`implementation`（`default` / `preset` / `custom`）、`userLabel`、`summary` 等。开发 Agent 用 `flows --json` / `flows recommend --kind ...` 查询，不靠记忆硬背。 |
+| flow 类型、图类型 | **flow profile** | runtime 注册表中的机器可读画像：`interaction`（`chat` / `pipeline` / `approval`）、`implementation`（`default` / `preset` / `custom`）、`userLabel`、`summary` 等。用 `flows --json` / `flows recommend --kind ...` 查询，不靠记忆硬背。 |
 | 为了写图而写图 | **graphReason** | `custom` spec 必填的写图理由；用于说明 default / preset 为什么不够。聊天助手型 custom 只有在 `graphReason` 明确成立时才允许。 |
 
 | 用户可见中文 | 机器值 | 默认落点 |
@@ -52,13 +52,12 @@
 | plumbing | **接入逻辑**（plumbing） | surface 侧 ACP/CLI 复用的连接代码；统一用“接入逻辑”，勿用“运行时胶水代码 / plumbing”混写。 |
 | app/flows | **可运行 flow 挂载点** | 唯一 app 层注册入口（内置 + scaffold）；积木图逻辑在 `libs/topologies`。 |
 
-## 4. 打包 / 平台
+## 4. 平台侧术语
 
 | 不准确（弃用） | 确认用法 | 说明 |
 |---|---|---|
 | 平台面、产品口语中的厂商平台侧称呼 | **平台侧** | **技术服务用语**：指 **主平台** 一侧的元数据/接口（部署、在线配置、`mcpServers` 下发、能力登记等）。文档/注释统一称「平台侧」，即主平台一侧，勿用厂商产品名指代该侧。 |
 | 产品口语问答卡片、dockpanel、结构化审阅卡片 | **平台问答卡片** | **技术服务用语**：指 **主平台** 在 ACP 宿主侧基于 ask-question MCP（`nuwax_ask_question`）与 `rawInput.ui` 渲染的**问答卡片**（结构化提问 UI）。用于图内 HITL 的固定字段表单展示；它是展示层，不替代 `interrupt` 的跨轮 checkpoint/resume。文档/注释统一称「平台问答卡片」，即主平台的问答卡片，勿用厂商产品名指代该 UI。 |
-| 制品 | **压缩包** | 本仓打包产出（npm `.tgz` + nuwax `.tar.gz`/`.zip`）形式上**均为压缩文件**，故 `.md` 统一用“压缩包”。<br>**Nuance**：泛指构建产出物的抽象语义其实是 *artifact（制品）*；若某处强调“产出物”而非“压缩文件形态”，可保留“制品（artifact）”。 |
 | 模版 | **模板** | 错别字订正。 |
 
 ## 5. 准确的确认中文 —— 予以保留（勿机械英文化）

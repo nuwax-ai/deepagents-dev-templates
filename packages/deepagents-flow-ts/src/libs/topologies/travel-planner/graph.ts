@@ -36,7 +36,7 @@ const log = logger.child("travel");
 
 /**
  * 搜索 MCP 源（createTravelGraph 的 searchMcp 参数传入）。
- * 须经平台登记后注入（dev-engineer-toolkit → search-apis / add-tool）；未传则 research 优雅降级。
+ * 须经平台侧登记后由 runtime 注入；未传则 research 优雅降级。
  */
 export interface TravelSearchMcp {
   config: McpServerConfig;

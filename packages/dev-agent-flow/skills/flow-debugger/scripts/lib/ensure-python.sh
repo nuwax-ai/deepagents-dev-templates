@@ -19,6 +19,103 @@ RESOLVED_PYTHON=()
 PYTHON_DETECT_JSON=""
 
 _DEV_TOOLKIT_UV_PYTHON="${DEV_TOOLKIT_UV_PYTHON:-3.12}"
+_DEV_TOOLKIT_IMPORTED_ORIGINAL_PATH=0
+
+python__lower() {
+  printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
+}
+
+python__normalize_windows_path_for_bash() {
+  local raw="$1"
+  raw="${raw//\\//}"
+  [[ -z "$raw" ]] && return 1
+
+  if command -v cygpath >/dev/null 2>&1; then
+    cygpath -u "$raw" 2>/dev/null && return 0
+  fi
+
+  if [[ "$raw" =~ ^([A-Za-z]):(/.*)?$ ]]; then
+    local drive
+    drive="$(python__lower "${BASH_REMATCH[1]}")"
+    local rest="${BASH_REMATCH[2]}"
+    printf '/%s%s\n' "$drive" "$rest"
+    return 0
+  fi
+
+  printf '%s\n' "$raw"
+}
+
+python__is_windows_bash() {
+  case "${OSTYPE:-}:${OS:-}" in
+    msys*:*|cygwin*:*|*:*Windows_NT*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+python__append_path_dir() {
+  local dir="$1"
+  [[ -z "$dir" || ! -d "$dir" ]] && return 1
+  if [[ ":$PATH:" != *":$dir:"* ]]; then
+    PATH="${PATH:+$PATH:}$dir"
+    export PATH
+  fi
+  return 0
+}
+
+# 沙箱常剥离 PATH 且 ORIGINAL_PATH 不含 python；回退探测 Windows 常见安装目录。
+python__import_windows_wellknown_paths() {
+  python__is_windows_bash || return 0
+
+  local home="${USERPROFILE:-${HOME:-}}"
+  local appdata="${LOCALAPPDATA:-}"
+  home="${home//\\//}"
+  appdata="${appdata//\\//}"
+
+  local -a roots=()
+  [[ -n "$appdata" ]] && roots+=("$appdata/Programs/Python")
+  [[ -n "$home" ]] && roots+=("$home/AppData/Local/Programs/Python")
+
+  local root pydir
+  for root in "${roots[@]}"; do
+    [[ -d "$root" ]] || continue
+    python__append_path_dir "$root/Launcher"
+    for pydir in "$root"/Python*; do
+      [[ -d "$pydir" ]] || continue
+      python__append_path_dir "$pydir"
+      python__append_path_dir "$pydir/Scripts"
+    done
+  done
+}
+
+python__import_original_path_candidates() {
+  [[ "$_DEV_TOOLKIT_IMPORTED_ORIGINAL_PATH" == "1" ]] && return 0
+  _DEV_TOOLKIT_IMPORTED_ORIGINAL_PATH=1
+
+  if [[ -n "${ORIGINAL_PATH:-}" ]] && python__is_windows_bash; then
+    local -a parts=()
+    local raw converted raw_lower delim
+    if [[ "$ORIGINAL_PATH" == *";"* ]]; then
+      delim=';'
+    else
+      delim=':'
+    fi
+    IFS="$delim" read -r -a parts <<<"${ORIGINAL_PATH}"
+    for raw in "${parts[@]}"; do
+      [[ -z "$raw" ]] && continue
+      raw_lower="$(python__lower "$raw")"
+      if [[ "$raw_lower" != *python* && "$raw_lower" != *uv* ]]; then
+        continue
+      fi
+      converted="$(python__normalize_windows_path_for_bash "$raw")" || continue
+      if [[ -d "$converted" && ":$PATH:" != *":$converted:"* ]]; then
+        PATH="$converted:$PATH"
+      fi
+    done
+    export PATH
+  fi
+
+  python__import_windows_wellknown_paths
+}
 
 python_probe_usable() {
   "$@" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 8) else 1)' >/dev/null 2>&1
@@ -43,16 +140,16 @@ python__probe_candidate() {
 }
 
 python_try_resolve() {
+  python__import_original_path_candidates
   RESOLVED_PYTHON=()
   local item
 
-  # Windows 个人电脑上 python3 常为商店占位，优先尝试 python
   item="$(python__probe_candidate python python)" && RESOLVED_PYTHON=(python) && return 0
   item="$(python__probe_candidate python3 python3)" && RESOLVED_PYTHON=(python3) && return 0
   item="$(python__probe_candidate "py -3" py -3)" && RESOLVED_PYTHON=(py -3) && return 0
 
   if command -v uv >/dev/null 2>&1; then
-  if uv run --python "$_DEV_TOOLKIT_UV_PYTHON" python -c 'import sys' >/dev/null 2>&1; then
+    if uv run --python "$_DEV_TOOLKIT_UV_PYTHON" python -c 'import sys' >/dev/null 2>&1; then
       RESOLVED_PYTHON=(uv run --python "$_DEV_TOOLKIT_UV_PYTHON" python)
       return 0
     fi
@@ -62,6 +159,7 @@ python_try_resolve() {
 }
 
 python_install_via_uv() {
+  python__import_original_path_candidates
   RESOLVED_PYTHON=()
   if [[ "${DEV_TOOLKIT_SKIP_UV:-}" == "1" ]]; then
     return 1
@@ -89,6 +187,7 @@ python_ensure() {
 }
 
 python_report_status() {
+  python__import_original_path_candidates
   echo "=== Python 环境检测 (flow-debugger) ==="
   echo
 
@@ -114,7 +213,7 @@ python_report_status() {
 
   printf '  %-14s ' "uv"
   if command -v uv >/dev/null 2>&1; then
-  local uv_ver
+    local uv_ver
     uv_ver="$(uv --version 2>/dev/null | head -n1 || echo "?")"
     echo "可用 ($uv_ver)"
   else

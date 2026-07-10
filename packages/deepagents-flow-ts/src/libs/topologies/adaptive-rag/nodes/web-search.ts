@@ -1,7 +1,7 @@
 /**
  * web_search 节点 —— 经平台登记的搜索 MCP 拿外部信息（对齐官方 Adaptive RAG 的 web_search 路由）。
  *
- * 联网搜索须到**平台**查找并添加（dev-engineer-toolkit）；searchMcp 由 app 层注入（同 travel-planner）。
+ * 联网搜索须在**平台侧**登记；searchMcp 由 app 层注入（同 travel-planner）。
  * 未配置 searchMcp → 优雅降级（raw_results 为空，不崩）。
  *
  * 结果转成 RetrievalResult[]（tool="web_search"），与 retrieve 节点产物同构 —— 都汇入 prepare。

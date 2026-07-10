@@ -3,7 +3,7 @@
 > **受众**：Monorepo 维护者（改 `packages/deepagents-flow-ts` 源码、surface、拓扑、ACP 对齐时查阅）。  
 > **不是**模板使用者文档。终端用户 / 在模板内建 flow 请看包内 [README.md](../../../../packages/deepagents-flow-ts/README.md) 与 [docs/](../../../../packages/deepagents-flow-ts/docs/)。
 
-本目录收录 **维护方案、架构决策、协议对齐、重构计划** 等开发向文档。包内的 `node-kit.md`、`flow-patterns.md`、`zed-debug.md` 等属于**使用者参考**，留在 `packages/deepagents-flow-ts/docs/`。
+本目录收录 **维护方案、架构决策、协议对齐、重构计划** 等开发向文档。包内的 `node-kit.md`、`flow-patterns.md`、`troubleshooting.md` 等属于**使用者参考**，留在 `packages/deepagents-flow-ts/docs/`。
 
 ---
 
@@ -18,6 +18,7 @@
 | 查 subagent / write_todos / ACP plan 与并行流式 | [subagent-task-and-acp-plan.md](./subagent-task-and-acp-plan.md) |
 | 查 checkpoint 损坏 / systemPrompt 覆盖（v1.9.2–1.9.4） | [checkpoint-integrity-and-prompt-resolution.md](./checkpoint-integrity-and-prompt-resolution.md) |
 | 跟进 ACP 协议对齐与工具出站 | [acp/README.md](./acp/README.md) |
+| **Zed 本地 ACP 手测（维护者，不随模板）** | [zed-debug.md](./zed-debug.md) |
 | 查 LangGraph 原生能力收敛计划 | [langgraph-native-convergence.md](./langgraph-native-convergence.md) |
 | 查拓扑 scaffold 重构 code-review 修复计划 | [topology-scaffold-review-fixes-plan.md](./topology-scaffold-review-fixes-plan.md) |
 | 查平台工具绑定、schema 静态沉淀与 `platform-tool` 节点设计（旧） | [platform-tool-binding-design.md](./platform-tool-binding-design.md) |
@@ -106,6 +107,14 @@ development/
 
 ---
 
+## 维护者专用（不随模板下发）
+
+| 文档 | 用途 |
+| --- | --- |
+| [zed-debug.md](../zed-debug.md) | Zed ACP 本地手测、`agent_servers` 配置、多轮 HITL |
+
+---
+
 ## 包内文档（不迁移，仅交叉引用）
 
 以下留在 `packages/deepagents-flow-ts/`，供模板使用者与 `dev-agent-flow` 直接引用：
@@ -118,8 +127,7 @@ development/
 | [docs/flow-orchestration.md](../../../../packages/deepagents-flow-ts/docs/flow-orchestration.md) | 编排速查 |
 | [docs/flow-patterns.md](../../../../packages/deepagents-flow-ts/docs/flow-patterns.md) | 进阶 LangGraph 模式 |
 | [docs/capabilities.md](../../../../packages/deepagents-flow-ts/docs/capabilities.md) | 能力分层与 builtin / `.agents` 契约 |
-| [docs/zed-debug.md](../../../../packages/deepagents-flow-ts/docs/zed-debug.md) | Zed ACP 调试配置 |
-| [docs/troubleshooting.md](../../../../packages/deepagents-flow-ts/docs/troubleshooting.md) | 排错索引（checkpoint 400、systemPrompt、subagent） |
+| [docs/troubleshooting.md](../../../../packages/deepagents-flow-ts/docs/troubleshooting.md) | 排错索引（日志、HITL、ACP） |
 
 ---
 

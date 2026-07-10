@@ -32,7 +32,6 @@
     "clean": "rm -rf dist/",
     "dev": "tsx watch --tsconfig tsconfig.json src/index.ts",
     "start": "node dist/index.js",
-    "start:acp": "tsx src/index.ts",
     "flow": "tsx src/index.ts flow",
     "graph": "tsx src/index.ts graph",
     "typecheck": "tsc --noEmit",

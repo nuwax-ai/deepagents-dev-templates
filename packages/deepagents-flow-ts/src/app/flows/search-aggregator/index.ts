@@ -6,7 +6,7 @@
  * 聚合、标注来源、支持追问钻取」的行为。
  *
  * **平台能力接入（登记即接入）**：
- *   1. 开发期：dev-engineer-toolkit → search-apis.sh --kw "搜索" → add-tool.sh 登记；
+ *   1. 开发期：在平台侧登记搜索能力；
  *   2. 运行期：平台把已登记工具（Plugin/Workflow/Knowledge 等）适配为 runtime 工具，
  *      合并进 allTools → think 自动 bindTools。
  *   全程**零包装代码**。禁止照 Plugin schema 手写 fetch（猜端点/猜 envelope/无超时 = 运行期卡住）。

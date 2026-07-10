@@ -50,7 +50,7 @@ const reviewNode = async (state) => {
 };
 ```
 
-需要配合 checkpointer(见第 5 节)持久化暂停点,host(Zed/JetBrains)端实现"采集人类回复 → `invoke(null, { command: new Command({ resume }) })`"恢复(`Command` 见第 3 节)。
+需要配合 checkpointer（见第 5 节）持久化暂停点；**surface**（`surfaces/acp` 或 `surfaces/cli`，经 `createStatefulFlow` 包装）在下一轮把用户回复作为 `resume` 传入，经 `invoke(null, { command: new Command({ resume }) })` 恢复（`Command` 见第 3 节）。
 
 ## 3. Command:节点返回式路由 / 更新
 

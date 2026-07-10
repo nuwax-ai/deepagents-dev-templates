@@ -2,7 +2,7 @@
 name: flow-builder
 description: "在当前工作目录开发 LangGraph Flow 时使用。覆盖：Part0 端到端流程与 completion gate；Part1 固定流程型/人工确认型脚手架；Part2 StateGraph 编排（HITL/流式/问答卡片）；Part3 工具与平台能力绑定（写图前须配合 dev-engineer-toolkit 搜索登记，含联网搜索）；Part4 验证调试与 flow-debugger 真实调试；Part5 系统提示词与用户输入提炼；Part6 子智能体委派；Part7 技能集成。适用于新建/修改 flow、聊天助手型默认路径、图规则 R-G001+、跑不通或平台真实执行排查。禁止写 .agents/；LangGraph TS API 查官方文档。Keywords: flow开发, scaffold, StateGraph, LangGraph, HITL, flow-debugger, 工具绑定, subagent, systemPrompt, 平台能力, 联网搜索, flow-builder"
 tags: [flow, scaffold, orchestration, tools, prompt, subagent, stategraph, hitl, debug]
-version: "3.1.2"
+version: "3.2.0"
 ---
 
 # Flow 开发（当前工作目录）
@@ -25,7 +25,7 @@ flow-builder/
     └── part7-skill.md
 ```
 
-**渐进加载**：只打开当前任务对应的一个 `references/part*.md`。
+**渐进加载**：`load_skill` 只加载本 SKILL.md 正文；详细步骤须 `Read` 本目录下 `references/partN-*.md`，**每次只开一个 Part**。参数/API 脚本见 `dev-engineer-toolkit/references/api-docs.md`。
 
 ## When to Use
 

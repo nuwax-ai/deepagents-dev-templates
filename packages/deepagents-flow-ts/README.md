@@ -2,19 +2,17 @@
 
 **通用工作流编排模板** —— Agent 按 **preset topology**（预先设计的 node + edge 图）跑 LangGraph 工作流，而不是自由的 tool loop。
 
-> **两种获取方式**：
-> - **源码开发**（git checkout，含 `src/`、`tsconfig`）：本目录 `pnpm install && pnpm build` 即可改默认图、生成场景 flow、扩展能力。
-> - **平台压缩包**（`.tar.gz` / `.zip`，nuwax 打包格式）：内含已构建的 `dist/bundle.mjs`（单文件打包，不依赖 `node_modules`），由主平台直接运行，**无需 `build`**。
-
 本项目是 **工作流编排 Agent**（显式 LangGraph 图），与 Coding Agent（tool loop）产品形态不同；运行时基础能力由项目内置底层运行时（`src/runtime/`）承担，「大脑」是一张可设计的节点图。
+
+> **开发方式**：源码工作区直接改图、用 `tsx` 跑命令（**迭代期不要 `pnpm build`**，避免阻塞）。本地快检：`pnpm flow`；端到端在平台预览会话经 ACP surface 验证。
 
 > **本文档**介绍当前工作目录的项目结构、分层规则、命令与检查清单；API 细节见源码与 `docs/`。
 
 ## 快速开始
 
 ```bash
-pnpm install && pnpm build
-pnpm flow "你好"          # CLI；无凭证走 fallback 也能跑
+pnpm install
+pnpm flow "你好"          # 经 tsx 直跑；无凭证走 fallback 也能跑
 ```
 
 **拼你自己的 flow** = 组合 `src/libs/nodes/` 的节点 factory + 在 `src/app/graph.ts` 连线：
@@ -139,47 +137,39 @@ START → prepare → think(model.bindTools) ──(toolsCondition)──┐
 在项目根目录（本 `package.json` 所在目录）：
 
 ```bash
-pnpm install && pnpm build
+pnpm install
 
-# 默认 flow：CLI（尊重 config.flow.active）
+# 默认 flow：CLI 快检（尊重 config.flow.active；底层 tsx，无需 build）
 pnpm flow "随便说点什么"
 pnpm exec tsx src/index.ts flow -i
 
-# 默认 flow：ACP 服务（供 Zed / JetBrains 等 ACP host）
-pnpm start:acp
+# 图拓扑 / 能力 / 会话（均 tsx 直跑）
+pnpm exec tsx src/index.ts graph              # JSON；加 --mermaid 输出 Mermaid
+pnpm exec tsx src/index.ts capabilities     # 无凭证
+pnpm exec tsx src/index.ts flows --json
+pnpm exec tsx src/index.ts sessions
 
-# Export graph topology / 能力查询 / 会话
-pnpm graph                              # 当前 active flow graph topology JSON；加 --mermaid 输出 Mermaid
-pnpm exec tsx src/index.ts capabilities # 无凭证，工具/MCP/skills/subagents
-pnpm exec tsx src/index.ts flows --json # 输出 flow profile（chat / pipeline / approval）
-pnpm exec tsx src/index.ts flows recommend --kind chat
-pnpm exec tsx src/index.ts sessions     # 已持久化会话
-pnpm exec tsx src/index.ts sessions delete <thread-id>
+# 场景 flow：scaffold → 设 flow.active → pnpm flow 验证
+# node scripts/scaffold/generate.mjs scripts/scaffold/specs/_example.*.flow.json
 
-# 可选：--config <path> 指定配置文件（默认 config/flow-agent.config.json）
-
-# 场景 flow：scaffold 生成到 app/flows → 设 flow.active → ACP/CLI 验证
-# node scripts/scaffold/generate.mjs scripts/scaffold/specs/_example.knowledge-qa.flow.json
-# （再编辑 config/flow-agent.config.json 的 flow.active）
-
-# 验证
-pnpm test && pnpm typecheck
+# 静态检查（迭代友好，无 build）
+pnpm typecheck && pnpm test
 ```
 
-模型凭证见 [`.env.example`](.env.example)（ACP 模式下通常由 IDE host 注入）。
+模型凭证见 [`.env.example`](.env.example)（平台预览会话由 ACP 宿主注入；本地 CLI 可复制 `.env`）。
 
 ## 调试
 
-| 目标 | 命令 |
+| 目标 | 方式 |
 |---|---|
-| 默认 flow CLI | `pnpm flow "..."` / `pnpm exec tsx src/index.ts flow -i` |
-| Export graph topology | `pnpm graph`（JSON）/ `pnpm graph --mermaid`（Mermaid 源） |
-| 能力分层查询 | `pnpm exec tsx src/index.ts capabilities`（无凭证，工具/MCP/skills/subagents） |
-| Flow profile 查询 | `pnpm exec tsx src/index.ts flows --json` / `flows recommend --kind chat` |
-| 已持久化会话 | `pnpm exec tsx src/index.ts sessions` / `sessions delete <id>` |
+| 本地快检 | `pnpm flow "..."` / `pnpm exec tsx src/index.ts flow -i` |
+| 端到端（平台预览） | ACP surface + 平台预览会话（`config.flow.active`） |
+| 日志 | 读 `.logs/`（`LOG_DIR=<REPO>/.logs`，`LOG_LEVEL=debug`） |
+| Export graph topology | `pnpm exec tsx src/index.ts graph`（`--mermaid`） |
+| 能力 / flow profile | `capabilities` / `flows --json` |
 | 类型检查 | `pnpm typecheck` |
 
-**在 Zed 里 chat 调试**：在 Zed settings.json 配置 `agent_servers` 连 `tsx src/index.ts` 即可（`flow.active` 选图）。
+> 迭代期优先 `pnpm flow` 短 prompt；**不要**为日常调试跑 `pnpm build`。
 
 ## Export graph topology（可视化对接）
 
@@ -204,11 +194,9 @@ const { nodes, edges, mermaid } = await getFlowTopology();
 
 **能力分层**（工作区配置 / 内置 / 环境 / 文件持久化）见 [docs/capabilities.md](docs/capabilities.md) 与 [.nuwax-agent/capability-sources.json](.nuwax-agent/capability-sources.json)——`capabilities` 命令查询当前可用工具/MCP/skills/子智能体（subagents）。
 
-**版本同步**：以 `package.json` 的 `version` 为权威源；`pnpm version:sync` 同步 `agent.version` 与 `.nuwax-agent/agent-package.json` 发布元数据（`pnpm package` 前置 `version:check`）。
-
 默认模型 `openai / deepseek-chat`（见 [config/flow-agent.config.json](config/flow-agent.config.json)，已对齐国内 OpenAI 兼容端点；切回 Anthropic 把 `model.provider` 设为 `anthropic`）。各端点配置见 [`.env.example`](.env.example)。
 
-> 升级提示：会话/checkpoint 默认目录已从项目内 `./.flow-sessions` 调整为用户目录 `~/.flowagents/<workspace 散列>/`。如果需要继续读取旧会话，把 `config.memory.dir` 显式设回 `./.flow-sessions`；新项目建议保留默认值，避免会话文件混进源码包。
+> 升级提示：会话/checkpoint 默认目录已从项目内 `./.flow-sessions` 调整为用户目录 `~/.flowagents/<workspace 散列>/`。如果需要继续读取旧会话，把 `config.memory.dir` 显式设回 `./.flow-sessions`；新项目建议保留默认值，避免会话文件混进工作区。
 
 ## 测试
 
@@ -237,7 +225,7 @@ pnpm test
 
 ## 联网 / 外部检索
 
-> **需要联网搜索时**：当前项目**不提供**开箱即用的网页搜索。必须到**平台**查找并添加（开发 Agent 经 `dev-engineer-toolkit`：`search-apis.sh` → `add-tool.sh`）。**登记即接入**：平台已登记的工具能力（Plugin / Workflow / Knowledge 等）由平台在运行期适配为可用工具并注入 `FlowRuntime.allTools`；conversational ReAct 的 `think ↔ tools` 可零代码使用，固定管道可在节点 `params` 写工具名（`platform-tool` 用 `toolName`，`tool-exec` 用 `tools`）选择工具集合。禁止为已登记能力手写 fetch / `tool()` 包装；禁止用 `bash`+curl / `http_request` 替代；禁止在项目配置内硬编码搜索服务。
+> **需要联网搜索时**：当前项目**不提供**开箱即用的网页搜索。须在**平台侧**登记搜索能力（Plugin / Workflow / Knowledge 等）。**登记即接入**：平台已登记的工具能力在运行期适配为可用工具并注入 `FlowRuntime.allTools`；conversational ReAct 的 `think ↔ tools` 可零代码使用，固定管道可在节点 `params` 写工具名（`platform-tool` 用 `toolName`，`tool-exec` 用 `tools`）选择工具集合。禁止为已登记能力手写 fetch / `tool()` 包装；禁止用 `bash`+curl / `http_request` 替代；禁止在项目配置内硬编码搜索服务。
 
 | 能力 | 代码落点 | 说明 |
 |------|----------|------|
@@ -245,15 +233,15 @@ pnpm test
 | **平台能力对话（聊天助手型）** | `src/app/flows/search-aggregator/` | default ReAct 底座 + systemPrompt；平台登记的搜索能力运行期进入 `allTools` 后自动 bind，零接线 |
 | 固定管道工具节点 | `createPlatformToolActionNode` / `createToolExecNode` / `createMcpRetrievalNode` | 按节点 `params.toolName` / `params.tools` 引用平台工具；现有检索型 topology 仍可使用 MCP 检索节点 |
 | 自适应 RAG 网页搜索 | `adaptive-rag` `createWebSearchNode` + `searchMcp` | 平台登记搜索能力后接入；运行期由平台适配后注入工具集 |
-| 未配置搜索源 | `travel-planner` research；`search-aggregator` 提示词 | `searchMcp` 缺省 → 优雅降级（提示去平台添加）；样板无搜索工具时如实告知；须开发期已搜平台举证 |
+| 未配置搜索源 | `travel-planner` research；`search-aggregator` 提示词 | `searchMcp` 缺省 → 优雅降级（提示去平台侧登记）；样板无搜索工具时如实告知 |
 | **运行时注入** | `src/runtime/` / `src/app/flow-tools.ts` | 平台会话能力与项目配置汇总为 runtime 工具集 |
 | **真实调用验证** | 端到端验证须确认平台工具被真实调用 | 防 LLM 兜底假绿（仅文本回复、工具未触发） |
 
-云开发环境中平台 Plugin / Workflow / Knowledge 等工具登记由**开发 Agent 技能包**引导（见 README § 扩展阅读），不在当前项目 `src/` 内实现。
+平台 Plugin / Workflow / Knowledge 等工具登记在**平台侧**完成，不在当前项目 `src/` 内实现。
 
 ## 扩展阅读
 
-本仓库 `docs/` **只描述当前工作目录内的能力、配置与图规则**；在云开发环境中，开发 Agent 的脚手架流程、平台登记与完成检查（技能包闸门）由**独立注入的技能包**引导（与项目源码分离，不随平台压缩包下发）。
+本仓库 `docs/` 只描述当前工作目录内的能力、配置与图规则。
 
 - [docs/flow-orchestration.md](docs/flow-orchestration.md) — **编排速查**（框架优先 / 核心编排模式 / 命名坑 / 能力来源）
 - [docs/node-catalog.md](docs/node-catalog.md) — **节点选型入口**（type 目录 + 何时用哪个）

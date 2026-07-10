@@ -42,7 +42,7 @@
 ## completion gate 用法
 
 ```bash
-pnpm build && pnpm typecheck && pnpm test && pnpm graph
+pnpm typecheck && pnpm test && pnpm exec tsx src/index.ts graph
 ./scripts/debug.sh --message "<主路径 prompt>"
 ```
 
@@ -75,7 +75,7 @@ HITL / approval flow：
 
 - `debug.sh` exit 4：真实执行不通过。
 - `debug.sh` exit 5：遇权限审批或 ask-question，必须响应后续接，不可直接报完成。
-- `debug.sh` exit 3：后端 4sandbox 调试端点未就绪 / SSE 失败 / 超时。向用户说明端到端调试受后端 ready 阻塞，但静态四连仍需完成。
+- `debug.sh` exit 3：后端 4sandbox 调试端点未就绪 / SSE 失败 / 超时。向用户说明端到端调试受后端 ready 阻塞，但静态三连仍需完成。
 - 工具登记了但 `--expect-tool` 未命中。
 - LLM 兜底回答有文本，但没有真实调用应调用的平台能力。
 
@@ -98,4 +98,4 @@ runtime 仍可用：
 - ❌ 已登记平台能力但不加 `--expect-tool`。
 - ❌ 遇 exit 5 不处理 HITL，就说验证失败或完成。
 - ❌ 后端端点未 ready 时改业务代码绕过调试脚本。
-- ✅ 四连静态门 + flow-debugger 真实调试 + 必要工具断言一起作为完成证据。
+- ✅ 静态三连 + flow-debugger 真实调试 + 必要工具断言一起作为完成证据。

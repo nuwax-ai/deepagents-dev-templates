@@ -5,7 +5,7 @@
  * DeepAgents ACP Server Implementation
  *
  * This module provides an ACP (Agent Client Protocol) server that wraps
- * DeepAgents, enabling integration with IDEs like Zed, JetBrains, and others.
+ * DeepAgents, enabling integration with ACP platform hosts (e.g. NuwaClaw).
  *
  * @see https://agentclientprotocol.com
  * @see https://github.com/agentclientprotocol/typescript-sdk
@@ -126,7 +126,7 @@ const DEFAULT_COMMANDS = [
  * DeepAgents ACP Server
  *
  * Wraps DeepAgents with the Agent Client Protocol, enabling communication
- * with ACP clients like Zed, JetBrains IDEs, and other compatible tools.
+ * with ACP-compatible platform hosts.
  *
  * @example
  * ```typescript

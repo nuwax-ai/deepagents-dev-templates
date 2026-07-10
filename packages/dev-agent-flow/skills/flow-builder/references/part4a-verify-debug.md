@@ -10,15 +10,15 @@
 报告「完成 / done」前必须在本轮真实执行并贴出原始输出：
 
 ```bash
-pnpm build && pnpm typecheck && pnpm test && pnpm graph
+pnpm typecheck && pnpm test && pnpm exec tsx src/index.ts graph
 flow-debugger/scripts/debug.sh --message "..." [--expect-tool <工具名子串>]
 ```
 
 失败 → 读完整错误 → 修复 → 重跑；至多 5 轮仍不绿则如实交回用户。
 
-**真实运行门**：flow-debugger 用平台真实会话端到端复现完整运行路径，是生产路径的质量门；静态四连不能替代。执行应出现在用户 agent-dev 预览会话。
+**真实运行门**：flow-debugger 用平台真实会话端到端复现完整运行路径，是生产路径的质量门；静态三连不能替代。执行应出现在用户 agent-dev 预览会话。
 
-Scaffold 生成器自带快检（`typecheck && graph`）；开发中可追加 flow-debugger 短 prompt，**全量 completion gate 仍须四连 + flow-debugger 真实调试**。
+Scaffold 生成器自带快检（`typecheck && graph`）；开发中可追加 flow-debugger 短 prompt，**全量 completion gate 仍须三连 + flow-debugger 真实调试**。
 
 **收尾清单**（系统提示词非空、R-G009、**平台能力搜索证据**等）→ [part0-workflow.md](part0-workflow.md) § completion gate 收尾清单。
 
@@ -29,10 +29,9 @@ Scaffold 生成器自带快检（`typecheck && graph`）；开发中可追加 fl
 ## 验证命令
 
 ```bash
-pnpm build
 pnpm test                    # 含 tests/layering.test.ts
 pnpm typecheck
-pnpm graph                   # export graph topology
+pnpm exec tsx src/index.ts graph
 # flow-debugger/scripts/debug.sh --message "..." --expect-tool <工具名子串>
 ```
 
@@ -43,7 +42,7 @@ pnpm graph                   # export graph topology
 | 项 | 约定 |
 |----|------|
 | 目录 | `<REPO>/.logs/`（`LOG_DIR=<REPO>/.logs`） |
-| 配置 | `docs/zed-debug.md`：`LOG_LEVEL=debug` + `LOG_DIR` |
+| 配置 | `LOG_LEVEL=debug` + `LOG_DIR=<REPO>/.logs`（见 `.env.example`） |
 | 文件名 | `<agentName>-<sessionId>-<YYYY_MM_DD>.log` |
 | 实现 | `src/runtime/logger.ts` |
 
@@ -63,7 +62,7 @@ pnpm graph                   # export graph topology
 图跑不通、节点未执行、条件边走错、HITL 不 resume、工具 `Permission denied` / 客户端卡转圈、客户端无响应时：
 
 1. **确认** — env 含 `LOG_DIR`、`LOG_LEVEL`（HITL 用 `debug`）
-2. **复现** — Zed / flow-debugger `debug.sh` / `pnpm flow` / CLI
+2. **复现** — flow-debugger `debug.sh` / `pnpm flow` / CLI（迭代期勿 `pnpm build`）
 3. **定位** — `.logs/` 最新 `.log` 或按 sessionId
 4. **过滤** — 对照 graph 顺序、节点名、tool 名、HITL 轮次
 5. **修复验证** — 改后重跑，新日志确认错误消失
