@@ -22,7 +22,7 @@ from debug_http import (
     PERMISSION_RESPONSE_PATH,
     api_request,
     configure_stdio_utf8,
-    conversation_id,
+    resolve_conversation_id,
     ensure_http_ok,
     is_terminal_event,
     read_text_option,
@@ -430,8 +430,8 @@ def main() -> None:
     if args.ask_marker:
         message = message + f"\n<!--nuwax-mcp-ask-request-id:{args.ask_marker}-->"
 
-    # 会话：优先 --conversation，其次沙箱注入的 CONVERSATION_ID（= 用户预览会话）
-    conv = args.conversation or conversation_id() or ""
+    # 会话：--conversation > GET devConversationId > CONVERSATION_ID env
+    conv = resolve_conversation_id(args.conversation) or ""
     # ConversationChatParams：conversationId + message + debug（agent-dev 调试语义）
     body: dict = {"message": message, "debug": True}
     if conv:

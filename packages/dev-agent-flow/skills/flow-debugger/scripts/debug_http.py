@@ -55,16 +55,59 @@ def dev_agent_id() -> int:
         sys.exit(1)
 
 
-def conversation_id() -> str | None:
-    """读沙箱注入的 CONVERSATION_ID。
+def fetch_dev_conversation_id() -> str | None:
+    """GET /{devAgentId} → data.devConversationId（agent-dev 预览会话权威 ID）。"""
+    val = os.environ.get("DEV_AGENT_ID", "").strip()
+    if not val:
+        return None
+    try:
+        aid = int(val)
+    except ValueError:
+        return None
+    if not os.environ.get("PLATFORM_BASE_URL") or not os.environ.get("SANDBOX_ACCESS_KEY"):
+        return None
+    path = AGENT_CONFIG_PATH.replace("{devAgentId}", str(aid))
+    try:
+        status, payload = api_request("GET", path)
+    except SystemExit:
+        return None
+    if status != 200:
+        return None
+    code = payload.get("code", "")
+    success = payload.get("success")
+    if (code and code != "0000") or success is False:
+        return None
+    data = payload.get("data") or {}
+    raw = data.get("devConversationId")
+    if raw is None:
+        return None
+    s = str(raw).strip()
+    return s or None
 
-    该值 = dev-agent 当前所在的 DevDebug 会话 = 用户在平台 agent-dev 页面预览
-    业务 Agent 的那个会话（业务 Agent 的 devConversationId）。把它作为
-    conversationId 传给后端执行端点，执行消息会写入该会话，用户即可在预览面板看到输出。
-    本地无沙箱时返回 None（此时执行结果仅在本地输出，不会出现在预览会话）。
+
+def resolve_conversation_id(explicit: str | None = None) -> str | None:
+    """解析 conversationId：--conversation > GET devConversationId > CONVERSATION_ID env。"""
+    if explicit and str(explicit).strip():
+        return str(explicit).strip()
+    fetched = fetch_dev_conversation_id()
+    env_val = os.environ.get("CONVERSATION_ID", "").strip()
+    if fetched:
+        if env_val and env_val != fetched:
+            print(
+                f"[DEBUG] CONVERSATION_ID env={env_val} 与 agent devConversationId={fetched} 不一致，使用 devConversationId",
+                file=sys.stderr,
+            )
+        return fetched
+    return env_val or None
+
+
+def conversation_id() -> str | None:
+    """读调试会话 ID（优先 agent 配置中的 devConversationId）。
+
+    沙箱可能注入过期的 CONVERSATION_ID；发 message 应以 GET /{devAgentId} 返回的
+    devConversationId 为准，执行才会出现在用户 agent-dev 预览面板。
     """
-    val = os.environ.get("CONVERSATION_ID", "")
-    return val or None
+    return resolve_conversation_id()
 
 
 def read_text_option(text: str | None, file_path: str | None, label: str) -> str:

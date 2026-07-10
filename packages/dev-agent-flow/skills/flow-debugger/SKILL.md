@@ -2,7 +2,7 @@
 name: flow-debugger
 description: "当需要用平台真实链路端到端调试目标 Agent、验证 flow 真实跑通、断言平台能力真实调用、管理调试会话（新建/取消）、处理权限审批与 ask-question、或分析 runtime 日志时使用。严格镜像平台 agent-dev 调试会话：发 prompt 驱动平台真实 agent 执行（非本地模拟），收 SSE 结构化结果（文本 + 工具调用 trace + 错误），自动判定通过/失败；执行出现在用户 agent-dev 预览会话。Keywords: 调试, debug, 真实执行, 端到端验证, 工具调用断言, 会话管理, 权限审批, ask-question, HITL, 多轮对话, SSE, outcome, 错误定位, 日志分析, 预览会话, flow-debugger"
 tags: [debug, verify, e2e, sse, outcome, tool-assertion, multi-turn, hitl, session, smoke-replacement]
-version: "1.0.0"
+version: "1.2.0"
 ---
 
 # 真实调试（flow-debugger）
@@ -20,11 +20,11 @@ version: "1.0.0"
 
 > ask-question（`nuwax_ask_question` 工具）**无专用响应端点**——答案作为普通 chat 消息回流，用 `debug.sh --message "<答案>" --ask-marker <requestId>` 续接（见下）。
 
-所有脚本由平台沙箱运行时自动配置（`PLATFORM_BASE_URL` / `SANDBOX_ACCESS_KEY` / `DEV_AGENT_ID` / `CONVERSATION_ID`），直接执行即可。
+所有脚本由平台沙箱运行时自动配置（`PLATFORM_BASE_URL` / `SANDBOX_ACCESS_KEY` / `DEV_AGENT_ID`）；`CONVERSATION_ID` env 仅作兜底。
 
 ## 关键特性：用户预览会话可见
 
-`debug.sh` 默认读沙箱注入的 `CONVERSATION_ID`（= 用户 agent-dev 预览会话 = 业务 Agent 的 `devAgentConversationId`），作为 `conversationId` 传给后端。后端把执行挂到该会话 → **用户在 agent-dev 预览面板能实时看到调试输出**（文本/工具调用/结果）。这是与本地模拟的核心区别。
+`debug.sh` 默认 **GET `/{devAgentId}` 取 `devConversationId`**（权威调试会话 ID，如 `1555771`），作为 `conversationId` 传给后端。沙箱注入的 `CONVERSATION_ID` 若不一致会被忽略并打 `[DEBUG]` 提示。后端把执行挂到该会话 → **用户在 agent-dev 预览面板能实时看到调试输出**。
 
 ## When to Use
 
@@ -56,7 +56,7 @@ version: "1.0.0"
 | 参数 | 说明 |
 |------|------|
 | `--message` / `--message-file` | 调试 prompt（文本 / UTF-8 文件，二选一） |
-| `--conversation` | 会话 ID（默认 `CONVERSATION_ID` env） |
+| `--conversation` | 会话 ID（覆盖自动解析；默认 GET agent → `devConversationId`） |
 | `--expect-tool` | 期望被调用的工具名子串（断言 `componentExecuteResults` 命中且 success） |
 | `--auto-approve` | 自动批准权限审批（选首个 allow option） |
 | `--ask-marker` | 回答 ask-question：把 `<!--nuwax-mcp-ask-request-id:<requestId>-->` 追加到 message 末尾 |

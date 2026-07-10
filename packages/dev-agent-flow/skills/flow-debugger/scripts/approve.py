@@ -25,7 +25,7 @@ from debug_http import (
     PERMISSION_RESPONSE_PATH,
     api_request,
     configure_stdio_utf8,
-    conversation_id,
+    resolve_conversation_id,
     ensure_http_ok,
 )
 
@@ -50,9 +50,9 @@ def main() -> None:
     )
     args = p.parse_args()
 
-    cid = args.conversation or conversation_id() or ""
+    cid = resolve_conversation_id(args.conversation) or ""
     if not cid:
-        print("[ERROR] 需要 --conversation 或 CONVERSATION_ID env。", file=sys.stderr)
+        print("[ERROR] 需要 --conversation 或可通过 GET agent 解析 devConversationId。", file=sys.stderr)
         sys.exit(1)
 
     body = {

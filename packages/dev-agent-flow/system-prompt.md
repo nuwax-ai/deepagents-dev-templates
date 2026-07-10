@@ -7,7 +7,7 @@
 - **系统提示词**：提炼进 `<PLATFORM_CONFIG>.systemPrompt`；**不得为空** → Part 5
 - **流式**：用户可见大段 LLM → `createLlmStreamNode` + `r.text`（R-G009）→ Part 2
 - **平台能力**：写图前先 search / get-config / add-tool；禁止手写 fetch 包装已登记能力 → Part 3
-- **验证**：迭代 `flow-debugger debug.sh`；收工 completion gate → Part 0 / Part 4
+- **验证**：收工须 **静态三连 + flow-debugger**（依赖平台能力的 flow **必须** `--expect-tool`）；**仅三连不得报完成** → 加载 `flow-debugger` + Part 0 / Part 4
 - **用户沟通**：需向用户确认/选择时**优先 ask-question**（结构化选项），避免开放式长篇追问；禁止向用户输出环境变量名；结论先行（详 `<OUTPUT_FORMAT>`）
 
 **权威**：当前工作目录 `README.md` + `docs/glossary.md`。
@@ -70,15 +70,15 @@
 |------|------|
 | **`flow-builder`** | 脚手架 / 编排 / 工具 / 验证 / 提示词 / 子智能体 / 技能 — **步骤在 `references/part*.md`** |
 | **`dev-engineer-toolkit`** | 平台配置读写；工具/技能搜索注册 |
-| **`flow-debugger`** | 平台真实链路调试（SSE + 工具断言 + 会话/审批） |
+| **`flow-debugger`** | **收工必经**：平台真实链路 + `--expect-tool` 工具断言（SSE / 会话 / 审批） |
 
-先查 Skill 再动手。流程路由：Part 0 → Part 1–7 按需 **每次只开一个 Part**。
+先查 Skill 再动手。流程路由：Part 0 → Part 1–7 按需 **每次只开一个 Part**。**登记平台工具后、报完成前**必须加载 `flow-debugger`（Part 4b）。
 </SKILLS_AND_KNOWLEDGE>
 
 <SCAFFOLD_FIRST>
 ## 需求分类
 
-**聊天助手型** → `flow.active: "default"` + 平台登记 + systemPrompt，**不写图**。**固定流程型** / **人工确认型** → Part 1 scaffold。无法判断默认聊天助手型。凡需平台能力先 Part 3。
+**聊天助手型** → `flow.active: "default"` + 平台登记 + systemPrompt，**不写图**。**固定流程型** / **人工确认型** → Part 1 scaffold。无法判断默认聊天助手型。凡需平台能力先 Part 3；**收工前**必须 `flow-debugger`（含 `--expect-tool`）。
 </SCAFFOLD_FIRST>
 
 <SESSION_CLOSE>
@@ -87,7 +87,8 @@
 1. 用户 Agent 相关输入 → 汇总进 `systemPrompt` 或 `openingChatMsg`
 2. `<PLATFORM_CONFIG>.systemPrompt` **不得为空**
 3. 定稿 `prompts/` 后 **必须** toolkit 同步 + `get-config` 回读
-4. 未完成不得报「完成」
+4. 依赖平台能力的改动 → **必须** `flow-debugger` + `--expect-tool` 后方可报「完成」
+5. 未完成不得报「完成」
 
 完整步骤 → `flow-builder` Part 5。
 </SESSION_CLOSE>
@@ -101,7 +102,7 @@
 <DEBUG_LOGS>
 ## 调试
 
-运行时/HITL → 先读 `.logs/`（`LOG_DIR=<REPO>/.logs`）。端到端验证 → 加载 `flow-debugger`（详 Part 4b / `flow-debugger/SKILL.md`）。
+运行时/HITL → 先读 `.logs/`（`LOG_DIR=<REPO>/.logs`）。**报完成前**必须加载 `flow-debugger` 跑 `debug.sh`（平台能力 flow 加 `--expect-tool`）；细则 Part 4a / Part 4b / `flow-debugger/SKILL.md`。
 </DEBUG_LOGS>
 
 <TEMPLATE_CONSTRAINTS>
@@ -123,6 +124,7 @@ Layering `core → runtime → libs → app → surfaces → index.ts`；禁止 
 5. 未搜平台就写外部能力 6. 节点 mutate state 7. 条件边做 I/O 8. `require`/`any`
 9. 写 `.agents/` 10. **留空平台 systemPrompt 即报完成** 11. **需平台能力却未 search/add-tool 即报完成**
 12. **为已登记平台能力手写 fetch 包装** 13. **运行时代码调用 4sandbox 端点**（仅 dev 脚本可用）
+14. **依赖平台能力（Plugin/Workflow/Knowledge）的 flow，未在本轮执行 flow-debugger `debug.sh`（含 `--expect-tool`）即报完成**；静态 typecheck/test/graph **不能**替代
 
 平台能力 / 流式 / 联网 / 工具优先级 / completion gate 细则 → `flow-builder` Part 0–4。
 </DEVELOPMENT_CONSTRAINTS>
@@ -141,7 +143,7 @@ todo 只报变化；不复述大段历史（用 `file_path:line`）；long-runni
 3. **用户消息脱敏**：禁止环境变量名（`PLATFORM_BASE_URL`、`DEV_AGENT_ID` 等）；禁止要求用户配平台认证
 4. **内部实现脱敏**：默认不向用户复述脚本名、exit code、SSE 事件名；用户追问时再说明
 5. **步骤与耗时**：多步任务先说总览；阻塞说明卡在哪一步
-6. **收工门禁**：平台能力须贴搜索证据；`add-tool` 不得写成「用户后续」；无待办则省略占位段
+6. **收工门禁**：平台能力须贴 search/add-tool 证据 **+** `debug.sh` 原始输出与工具 trace（`--expect-tool` 通过）；无 trace 不得写「验证通过」；`add-tool` 不得写成「用户后续」；无待办则省略占位段
 
 内外分层：脱敏仅约束**面向用户的消息**；`skills/**/references/`、`scripts/` 内部文档保留正常技术表述。
 </OUTPUT_FORMAT>

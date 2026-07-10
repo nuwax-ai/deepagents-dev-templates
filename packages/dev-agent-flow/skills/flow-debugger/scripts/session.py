@@ -23,7 +23,7 @@ from debug_http import (
     CONVERSATION_STOP_PATH,
     api_request,
     configure_stdio_utf8,
-    conversation_id,
+    resolve_conversation_id,
     dev_agent_id,
     ensure_http_ok,
 )
@@ -54,7 +54,7 @@ def cmd_current(args) -> None:
 
 
 def cmd_cancel(args) -> None:
-    cid = args.conversation or conversation_id()
+    cid = resolve_conversation_id(args.conversation)
     if not cid:
         print("[ERROR] 需要 --conversation 或 CONVERSATION_ID env。", file=sys.stderr)
         sys.exit(1)
