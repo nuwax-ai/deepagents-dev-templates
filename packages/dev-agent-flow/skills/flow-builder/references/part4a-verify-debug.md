@@ -5,23 +5,24 @@
 
 ## completion gate（完成闸门）
 
-本地开发迭代优先 `pnpm smoke:fast`（或 `pnpm smoke -- --fast`），快速确认主路径能跑通；收工真实运行验证必须 `pnpm smoke`（rcoder-cli 端到端会话；与当前项目 README 快速开始一致）。fast smoke 不能替代 completion gate。
+本地开发迭代优先用 flow-debugger `debug.sh --message "<短 prompt>"`，快速确认主路径能在平台真实链路跑通；收工真实运行验证也必须走 flow-debugger。本地 `pnpm smoke` / rcoder-cli 已移除。
 
 报告「完成 / done」前必须在本轮真实执行并贴出原始输出：
 
 ```bash
-pnpm build && pnpm typecheck && pnpm test && pnpm graph && pnpm smoke
+pnpm build && pnpm typecheck && pnpm test && pnpm graph
+flow-debugger/scripts/debug.sh --message "..." [--expect-tool <工具名子串>]
 ```
 
 失败 → 读完整错误 → 修复 → 重跑；至多 5 轮仍不绿则如实交回用户。
 
-**真实运行门**：`pnpm smoke` 用 rcoder-cli 端到端复现完整运行路径，是生产路径的质量门；静态四连不能替代，禁止 `--dry-run` 冒充通过。精选范例用 `--example`，其他入口用 `--entry`。
+**真实运行门**：flow-debugger 用平台真实会话端到端复现完整运行路径，是生产路径的质量门；静态四连不能替代。执行应出现在用户 agent-dev 预览会话。
 
-Scaffold 生成器自带快检（`typecheck && graph`）；开发中可追加 `pnpm smoke:fast`，**全量 completion gate 仍须上式五连**。
+Scaffold 生成器自带快检（`typecheck && graph`）；开发中可追加 flow-debugger 短 prompt，**全量 completion gate 仍须四连 + flow-debugger 真实调试**。
 
 **收尾清单**（系统提示词非空、R-G009、**平台能力搜索证据**等）→ [part0-workflow.md](part0-workflow.md) § completion gate 收尾清单。
 
-**smoke 细则**（`.env` 模型解析、`flow.active` / 旧 `activeFlow` 兼容、`SMOKE_PROMPT*`、占位符）→ [part4b-smoke.md](part4b-smoke.md)。
+**flow-debugger 细则**（真实执行、工具断言、HITL、会话管理、日志分析）→ [part4b-smoke.md](part4b-smoke.md)。
 
 ---
 
@@ -31,10 +32,8 @@ Scaffold 生成器自带快检（`typecheck && graph`）；开发中可追加 `p
 pnpm build
 pnpm test                    # 含 tests/layering.test.ts
 pnpm typecheck
-pnpm typecheck:examples      # 精选范例 + src
-pnpm smoke:fast              # 快检：短 prompt + 跳过 MCP 加载
-pnpm smoke                   # 强制：rcoder-cli 端到端（精选范例可用 --example）
 pnpm graph                   # export graph topology
+# flow-debugger/scripts/debug.sh --message "..." --expect-tool <工具名子串>
 ```
 
 ---
@@ -64,7 +63,7 @@ pnpm graph                   # export graph topology
 图跑不通、节点未执行、条件边走错、HITL 不 resume、工具 `Permission denied` / 客户端卡转圈、客户端无响应时：
 
 1. **确认** — env 含 `LOG_DIR`、`LOG_LEVEL`（HITL 用 `debug`）
-2. **复现** — Zed / `pnpm smoke` / `pnpm flow` / CLI
+2. **复现** — Zed / flow-debugger `debug.sh` / `pnpm flow` / CLI
 3. **定位** — `.logs/` 最新 `.log` 或按 sessionId
 4. **过滤** — 对照 graph 顺序、节点名、tool 名、HITL 轮次
 5. **修复验证** — 改后重跑，新日志确认错误消失
@@ -99,7 +98,7 @@ pnpm graph                   # export graph topology
 | 2 | 打开 `src/app/flows/<name>/graph.ts`，查用户可见节点（compose / aggregate / draft / finalize 修订） |
 | 3 | 若用 `createLlmNode` → 改为 **`createLlmStreamNode`**，`write` 从 `r.content` 改为 **`r.text`**，补 `timeoutMs: resolveLlmResilience(appConfig).longTimeoutMs` |
 | 4 | 若来自 scaffold：查 `scripts/scaffold/specs/<name>.flow.json` 是否 `type: "llm-stream"` 且 `write` 用 `r.text` |
-| 5 | **同步** spec 与 graph（**R-G003**）；重跑 `pnpm smoke` 观察逐 token |
+| 5 | **同步** spec 与 graph（**R-G003**）；用 flow-debugger 重跑并观察流式输出 |
 | 6 | 仍不流式：确认模型支持 `.stream()`；查当前工作目录 README § 流式输出检查清单 L2/L3 降级 |
 
 **与工具 EXECUTING 的关系**：图在 LLM 节点抛错未走完时，并行调试命令可能长时间显示 EXECUTING；先修图错误再判工具层。
@@ -116,7 +115,7 @@ pnpm graph                   # export graph topology
 |------|------|
 | 已贴 `search-apis` / `search-skills` / `get-config` 输出，平台无命中 | 可完成；可自写 app 工具或图内降级（须记录关键词） |
 | 平台有命中，已 `add-tool`，并按需对齐节点或接入 `flow-tools.ts` | 可完成 |
-| **未执行**平台搜索就写外部能力 | **不可报完成**（即使 smoke 绿） |
+| **未执行**平台搜索就写外部能力 | **不可报完成**（即使真实调试绿） |
 | 平台有命中但未 `add-tool` / 未接线 | **不可报完成** |
 | 以「用户待配置」代替开发期登记 | **不可报完成** |
 
@@ -162,7 +161,7 @@ pnpm graph                   # export graph topology
 - ❌ 把 `.log` 全文贴进对话或提交 git
 - ❌ 见 JSON 解析错就加更严 prompt，不检查 `write` 是否真需要 `r.parsed`
 - ❌ 用户反馈「不流式」却只改客户端，不检查节点是否误用 `createLlmNode`
-- ❌ 需外部能力却未 `search-apis` / `get-config` / `add-tool` 就以 smoke 通过报完成
+- ❌ 需外部能力却未 `search-apis` / `get-config` / `add-tool` 就以真实调试通过报完成
 - ❌ 用户要业务 API/联网却只用内置 `grep`/`search`，或未搜平台就自写工具
 - ❌ 平台有能力却留占位未接线，把登记甩给「用户待操作」
 - ❌ Phase 4 复述沙箱环境变量名，或要求用户配置平台已默认集成的认证/基址

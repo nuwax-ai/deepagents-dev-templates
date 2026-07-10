@@ -48,7 +48,7 @@
 | 步 | 动作 |
 |----|------|
 | 1 | 确认 env 含 `LOG_DIR`、`LOG_LEVEL`（HITL 建议 `debug`） |
-| 2 | 复现：Zed / `pnpm smoke` / CLI |
+| 2 | 复现：Zed / flow-debugger `debug.sh` / CLI |
 | 3 | 打开 `.logs/` 最新 `.log` 或按 `sessionId` 定位 |
 | 4 | 过滤：`runtime:flow-graph`、`interrupt`、`onPrompt`、`permission 门控` 等 |
 | 5 | 修复后重跑，确认新日志无同类 error |
@@ -113,7 +113,7 @@
 1. 图在 LLM 节点抛错未走完，session 未正常收尾
 2. 并行调试命令与 ACP 会话交叉
 
-**建议**：先修图错误（尤其 `LLM 未返回 JSON`），再重跑 `pnpm smoke`。
+**建议**：先修图错误（尤其 `LLM 未返回 JSON`），再用 flow-debugger `debug.sh` 重跑。
 
 ---
 

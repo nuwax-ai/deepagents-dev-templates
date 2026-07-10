@@ -246,6 +246,8 @@ describe("custom.resolveConversational", () => {
       name: "conv-demo",
       description: "",
       topology: "custom",
+      interaction: "chat",
+      graphReason: "测试 resolveConversational 的纯 LLM 对话 custom 场景。",
       params: {
         state: { out: { type: "any-last" } },
         nodes: { a: { type: "llm", params: { prompt: "()=>''", write: "(r)=>({})" } } },
@@ -265,6 +267,8 @@ describe("custom.resolveConversational", () => {
       name: "hitl-demo",
       description: "",
       topology: "custom",
+      interaction: "approval",
+      graphReason: "测试含 approval 节点的 custom HITL 场景。",
       params: {
         state: { out: { type: "any-last" } },
         nodes: { a: { type: "approval", params: { question: "()=>''", write: "(r)=>({})" } } },

@@ -74,7 +74,7 @@ function resolveSessionId(ctx?: SessionTraceContext): string | undefined {
 }
 
 /**
- * SMOKE_EXPECT_TOOL 只需要工具名、状态与结果长度，不应为此开启全局 debug
+ * 工具调用断言只需要工具名、状态与结果长度，不应为此开启全局 debug
  * （debug 会关闭凭证/端点脱敏）。专用开关下以 info 输出安全摘要；正常运行仍保持 debug。
  */
 function logToolInvokeSummary(

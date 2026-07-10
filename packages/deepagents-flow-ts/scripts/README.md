@@ -23,15 +23,6 @@
 | `package-platforms.mjs` | `pnpm run package:platforms` | 按平台归档 + `platforms.json` |
 | `validate-package.mjs` | `pnpm run validate:package` | 校验压缩包完整性 |
 
-## 本地范例（example）
-
-| Script | npm 命令 | 说明 |
-|--------|----------|------|
-| `run-example.mjs` | `pnpm run example <name> [args]` | 本地跑精选范例；`pnpm example --list` |
-| `lib/example-registry.mjs` | — | 精选范例别名注册表 |
-
-**精选范例别名**：`travel` / `pm` / `review` / `research`（见 `lib/example-registry.mjs`）。
-
 ## 真实调试（flow-debugger）
 
 端到端验证已迁移到 **flow-debugger** skill（`packages/dev-agent-flow/skills/flow-debugger`）——走平台真实链路（非本地 rcoder-cli 模拟），执行出现在用户 agent-dev 预览会话。原来的本地 `pnpm smoke`（rcoder-cli）已移除。
@@ -67,4 +58,3 @@ pnpm run check:tools   # 检测工具是否就绪
 | `lib/bundle.mjs` | esbuild 打包 |
 | `lib/staging.mjs` | staging 复制与归档 |
 | `lib/tools.mjs` | CLI 工具检测 |
-| `lib/example-registry.mjs` | 精选范例别名注册表 |

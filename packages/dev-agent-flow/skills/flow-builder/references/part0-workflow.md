@@ -119,12 +119,13 @@
 ## Phase 3：验证（completion gate）
 
 ```bash
-pnpm build && pnpm typecheck && pnpm test && pnpm graph && pnpm smoke
+pnpm build && pnpm typecheck && pnpm test && pnpm graph
+# 然后用 flow-debugger 真实执行：debug.sh --message "..." [--expect-tool <工具名子串>]
 ```
 
-- **迭代快检**：开发中优先 `pnpm smoke:fast`（或 `pnpm smoke -- --fast`）；它跳过 MCP 加载，只验证主路径能跑通
-- **真实运行门**：收工前必须 `pnpm smoke`；禁止 `--dry-run` 冒充通过
-- **前置**：模型凭证（`.env` / NuWaClaw `OPENCODE_*`）+ `config.flow.active` 指向当前 flow（旧 `activeFlow` 兼容但不新增）
+- **迭代快检**：开发中用 flow-debugger `debug.sh --message "<短 prompt>"`，走平台真实链路
+- **真实运行门**：收工前必须 flow-debugger 真实调试；本地 `pnpm smoke` / rcoder-cli 已移除
+- **前置**：`config.flow.active` 指向当前 flow（旧 `activeFlow` 兼容但不新增），平台配置已同步
 - **细则**： [part4a-verify-debug.md](part4a-verify-debug.md) + [part4b-smoke.md](part4b-smoke.md)
 - **排查**： [part4a](part4a-verify-debug.md) § 读日志六步、典型错误
 
@@ -140,7 +141,7 @@ pnpm build && pnpm typecheck && pnpm test && pnpm graph && pnpm smoke
 4. **平台 `systemPrompt` 非空且已回读**（`openingChatMsg` 若涉及）
 5. 提示词提炼来源（用户哪些输入 → 哪一字段）
 6. **需平台能力时**：`search-apis` / `search-skills` / `get-config` 结果摘要（或「已搜索、无命中」+ 关键词）；自写工具须说明平台无命中依据（**联网搜索较常见**，须单独列出搜索关键词）
-7. **平台能力真实调用证据**：smoke 调用轨迹片段（`SMOKE_EXPECT_TOOL` 断言通过；工具被调用且未失败）
+7. **平台能力真实调用证据**：flow-debugger 调用轨迹片段（`debug.sh --expect-tool` 断言通过；工具被调用且 success）
 
 ### Phase 4「后续」可写 / 禁止（平台默认集成）
 
@@ -160,13 +161,13 @@ pnpm build && pnpm typecheck && pnpm test && pnpm graph && pnpm smoke
 
 报「完成 / done」前逐条贴证据（详述见 [part4a](part4a-verify-debug.md)）：
 
-- [ ] 五连命令退出 0（`build` / `typecheck` / `test` / `graph` / `smoke`）
+- [ ] 四连命令退出 0（`build` / `typecheck` / `test` / `graph`）+ flow-debugger 真实调试通过
 - [ ] 声称改动文件经 `read_file` / `ls` 实证
 - [ ] `.logs/` 无未预期 `error`
 - [ ] `get-config.sh --key systemPrompt` 回读**非空**；用户发过 Agent 描述 → 已按 part5 提炼并同步
 - [ ] 用户可见 LLM 节点 → `createLlmStreamNode` + `r.text`（**R-G009**）
 - [ ] **需平台能力**（见 Phase 1「平台能力门禁」）→ 已贴 `search-apis.sh` / `search-skills.sh` 与/或 `get-config.sh --key tools|skills` **原始输出**；有命中 → 已 `add-tool.sh`；固定管道需要时节点 `params` 已写 `toolName` / `tools`；无命中 → 报告写明关键词与「已搜索、无命中」后方可自写工具。**联网搜索较常见**，须含搜索关键词证据。**未搜平台即报完成 = 不通过**
-- [ ] **平台能力真实调用**（凡已登记）→ `SMOKE_EXPECT_TOOL=<工具名子串>` + 触发式 `SMOKE_PROMPT` 跑 smoke 通过，已贴工具调用轨迹片段。**smoke 绿但工具未真调用 = 不通过**（LLM 兜底输出会假绿）
+- [ ] **平台能力真实调用**（凡已登记）→ `debug.sh --expect-tool <工具名子串>` + 触发式 prompt 通过，已贴工具调用轨迹片段。**未验证工具真调用 = 不通过**（LLM 兜底输出会假绿）
 
 ---
 

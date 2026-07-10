@@ -74,7 +74,7 @@
 | **原因** | 用户首条消息常非业务「标准输入」；入口即 `parseJson` 最易触发 R-G001 类故障。 |
 | **反例** | 首节点 prompt：「只输出 JSON {focusAreas:...}」且 write 不读 parsed |
 | **正例** | 「若是 JD+简历则分析；否则自我介绍并引导用户提供 JD+简历；自然语言即可」 |
-| **验证** | `pnpm smoke` 或手测首条输入「你好」「你是？」 |
+| **验证** | flow-debugger `debug.sh --message "你好"` 或手测首条输入 |
 | **关联** | [node-kit § parse 契约](node-kit.md#parse-使用契约必读)；`prompts/flow.base.md`（系统级提示词） |
 
 ---
@@ -119,7 +119,7 @@
 | **原因** | 无 reducer 的 LastValue 通道并发写会 `InvalidUpdateError` 或互相覆盖。 |
 | **反例** | `findings: Annotation<string>()` + Send×N 同写 `findings` |
 | **正例** | `findings: Annotation<T[]>({ reducer: (a,b) => [...a,...b], default: () => [] })` |
-| **验证** | 并行路径集成测 / smoke |
+| **验证** | 并行路径集成测 / flow-debugger `debug.sh` |
 | **关联** | [flow-patterns.md § Send](flow-patterns.md) |
 
 ---
@@ -190,7 +190,7 @@
 |------|------|
 | 写 spec / graph 前 | 扫规则索引，确认适用 MUST |
 | scaffold 生成后 | 核对 R-G001、R-G003、R-G004、R-G009 |
-| 验证闸门 | 迭代期 `pnpm smoke:fast`；收工 `pnpm build && pnpm typecheck && pnpm test && pnpm graph && pnpm smoke`（`.env` 凭证 + `config.flow.active`；旧 `activeFlow` 兼容；可选 `SMOKE_PROMPT` / `SMOKE_PROMPT_EDGE` — 见 [scripts/README.md](../scripts/README.md) § Smoke tests） |
+| 验证闸门 | 收工 `pnpm build && pnpm typecheck && pnpm test && pnpm graph`，再用 flow-debugger `debug.sh` 真实执行验证（`config.flow.active`；旧 `activeFlow` 兼容；见 [scripts/README.md](../scripts/README.md) § 真实调试） |
 | 排错 | [troubleshooting.md](troubleshooting.md) 按症状 → 规则 ID |
 
 ## 相关文档
@@ -199,5 +199,5 @@
 - [node-kit.md](node-kit.md) — factory API
 - [troubleshooting.md](troubleshooting.md) — 症状 → 步骤
 - [flow-patterns.md](flow-patterns.md) — Send / interrupt / checkpoint
-- [scripts/README.md](../scripts/README.md) — scaffold / smoke 命令
+- [scripts/README.md](../scripts/README.md) — scaffold / 真实调试命令
 - [zed-debug.md](zed-debug.md) — 日志 env 与 ACP 调试

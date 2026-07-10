@@ -82,7 +82,7 @@
 | 2 | 写 `scripts/scaffold/specs/<name>.flow.json` |
 | 3 | `node scripts/scaffold/generate.mjs scripts/scaffold/specs/<name>.flow.json` |
 | 4 | `config/flow-agent.config.json` → `"flow": { "active": "<name>" }`（旧 `activeFlow` 只兼容，不新增） |
-| 5 | `pnpm graph` + `pnpm flow` + [part4a-verify-debug.md](part4a-verify-debug.md) 完整验证；**custom flow 必读** [part4b-smoke.md](part4b-smoke.md)（`flow.active` + `.env` + `SMOKE_PROMPT`） |
+| 5 | `pnpm graph` + `pnpm flow` + [part4a-verify-debug.md](part4a-verify-debug.md) 完整验证；**custom flow 必读** [part4b-smoke.md](part4b-smoke.md)（`flow.active` + flow-debugger 真实调试） |
 
 ## 生成物示例（human-in-loop 薄封装）
 

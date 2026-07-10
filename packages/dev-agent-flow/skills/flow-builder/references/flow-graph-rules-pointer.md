@@ -16,7 +16,7 @@
 | ID | 标题 | 级别 | 当前工作目录静态检 |
 |----|------|------|----------------|
 | R-G001 | parse 仅当 write 消费 `r.parsed` | MUST | `generate.mjs` → `lint-graph-rules.mjs` |
-| R-G002 | 入口 LLM 容忍非预期输入 | SHOULD | 手测 / `SMOKE_PROMPT_EDGE`（见 part4b-smoke） |
+| R-G002 | 入口 LLM 容忍非预期输入 | SHOULD | 手测 / flow-debugger 边界 prompt（见 part4b-smoke） |
 | R-G003 | spec 与 graph.ts 双向同步 | MUST | 人工 diff；regenerate 会覆盖 |
 | R-G004 | 条件边返回值 ∈ targets | MUST | `pnpm graph` **不**执行 condition |
 | R-G005 | Send 并行写 reducer | MUST | 代码审阅 |
@@ -34,5 +34,5 @@
 | Part 1 scaffold | R-G003、**R-G009**；`generate.mjs` 生成前跑 R-G001/R-G007/R-G009 lint；流式范例 `_example.translate-review`、`_example.multi-aspect-search` |
 | Part 2 编排 | 工厂用法；**流式输出**见 § 流式输出；硬规则以当前工作目录 R-G* 为准 |
 | Part 3 工具 | 平台能力登记 → `dev-engineer-toolkit`；**平台能力登记**；**联网搜索**见 § 联网搜索；仓库内分层见当前工作目录 `docs/capabilities.md` |
-| Part 4 验证 | completion gate 五连；症状 → 当前工作目录 `docs/troubleshooting.md` |
+| Part 4 验证 | completion gate 四连 + flow-debugger；症状 → 当前工作目录 `docs/troubleshooting.md` |
 | Part 5 提示词 | R-G002；节点 `prompt` vs `systemPrompt`；禁止在入口乱加 `parseJson` |

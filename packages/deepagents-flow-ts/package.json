@@ -39,7 +39,6 @@
     "test": "vitest run",
     "test:integration": "RUN_INTEGRATION=1 vitest run",
     "test:watch": "vitest",
-    "smoke": "node scripts/smoke-acp.mjs",
     "bundle": "node scripts/lib/bundle.mjs",
     "setup:tools": "node scripts/setup-win-tools.mjs",
     "check:tools": "node scripts/check-tools.mjs",
