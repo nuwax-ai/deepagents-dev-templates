@@ -8,13 +8,15 @@
 |------|------|------|------|
 | agent 配置（取调试会话 ID） | `GET /{devAgentId}` | —（路径参=DEV_AGENT_ID） | `data.devConversationId`（调试会话 ID） |
 | 发消息（SSE） | `POST /conversation/chat` | `{conversationId, message, debug:true, variableParams?, ...}` | SSE `Flux<AgentOutputDto>` |
-| 新建会话（刷子） | `POST /conversation/create` | `{agentId, devMode:true, variables?}` | `data.id`（新 conversationId） |
+| 新建会话（刷子，**仅 UI**） | `POST /conversation/create` | `{agentId, devMode:true, variables?}` | `data.id`（新 conversationId） |
 | 会话内容/历史 | `POST /conversation/{conversationId}` | 无 body | `data.messageList[]` |
 | 取消/停止 | `POST /conversation/chat/stop/{conversationId}` | 无 body（路径参=conversationId，**非** requestId） | — |
 | 权限审批响应 | `POST /conversation/chat/permission-request/response` | `{conversationId, toolId, option:{optionId, outcome:'selected'\|'cancelled'}}` | — |
 | 历史分页 | `POST /conversation/message/list` | `{conversationId, index, size}` | `data: MessageInfo[]` |
 
-> 调试会话 ID = `devConversationId`：`debug.sh` / `approve.sh` / `session.sh cancel` 默认 **GET `/{devAgentId}`** 取此字段；`CONVERSATION_ID` env 仅在与 API 一致或 API 不可用时兜底。`session.sh current` 显式打印该值。
+> 调试会话 ID = `devConversationId`：`debug.sh` / `approve.sh` / `session.sh cancel` 默认 **GET `/{devAgentId}`** 取此字段；`CONVERSATION_ID` env 仅在与 API 一致或 API 不可用时兜底。`session.sh refresh` / `current` 显式拉取/打印该值。
+>
+> **新会话**：flow-debugger **不调用** `POST /conversation/create`；用户须在 agent-dev 预览面板手动点「刷子」，再用 `session.sh refresh` 或 `wait --previous <旧ID>` 拉取新 `devConversationId`。
 
 ## SSE 事件（外层信封 ConversationChatResponse：`{eventType, data, error, requestId, completed}`）
 

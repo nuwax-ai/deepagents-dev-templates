@@ -22,7 +22,10 @@
 ./scripts/debug.sh --message-file prompts/test.md
 ./scripts/debug.sh --message "搜索今天的AI新闻" --expect-tool search
 ./scripts/debug.sh --message "测试" --auto-approve
-./scripts/session.sh new
+OLD=$(./scripts/session.sh refresh -q)   # 可选：记录当前 devConversationId
+# 请用户在预览面板点击「刷子」
+./scripts/session.sh wait --previous "$OLD"
+./scripts/session.sh refresh
 ./scripts/session.sh current
 ./scripts/session.sh cancel
 ./scripts/analyze-logs.sh
@@ -64,28 +67,34 @@ HITL / approval flow：
 
 ## 通过 / 失败判定
 
-通过：
+通过（**须 SSE + 日志双证**）：
 
-- `debug.sh` exit 0。
+- `debug.sh` exit 0（推荐 `--with-logs` 一步完成）。
+- `analyze-logs.sh` exit 0，stderr 含 `[结论] 日志正常`（或 `--with-logs` 时 `[结论] SSE PASS + 日志佐证通过`）。
 - 有用户可见输出，或预期的 HITL / ask-question 事件已产生并被正确续接。
 - 若设置 `--expect-tool`，工具 trace 命中且 success。
-- `.logs/` 无未解释的 runtime error。
+- 日志侧：`[flow 状态]` 无异常、`[错误]` 无未解释项、`[工具调用]` 无 failed。
 
 失败：
 
-- `debug.sh` exit 4：真实执行不通过。
+- `debug.sh` exit 4：SSE 真实执行不通过，**或 SSE 绿但日志佐证失败**（`--with-logs` 时 analyze 发现错误 / 找不到日志）。
 - `debug.sh` exit 5：遇权限审批或 ask-question，必须响应后续接，不可直接报完成。
 - `debug.sh` exit 3：后端 4sandbox 调试端点未就绪 / SSE 失败 / 超时。向用户说明端到端调试受后端 ready 阻塞，但静态三连仍需完成。
 - 工具登记了但 `--expect-tool` 未命中。
 - LLM 兜底回答有文本，但没有真实调用应调用的平台能力。
 
-## 日志联动
+## 日志佐证（收工必经）
 
 ```bash
-./scripts/analyze-logs.sh
-./scripts/analyze-logs.sh --session <id>
-./scripts/analyze-logs.sh --since 10
+# 推荐：一步双证
+./scripts/debug.sh --message "…" --expect-tool Plugin_783 --with-logs --auto-approve
+
+# 或分步
+./scripts/debug.sh --message "…" --expect-tool search
+./scripts/analyze-logs.sh --since 10 --session <devConversationId>
 ```
+
+报完成须贴 stderr 中的 **`[结论]`**、**`[flow 状态]`**、**`[工具调用]`** 摘要；缺一不可。
 
 runtime 仍可用：
 
@@ -98,4 +107,4 @@ runtime 仍可用：
 - ❌ 已登记平台能力但不加 `--expect-tool`。
 - ❌ 遇 exit 5 不处理 HITL，就说验证失败或完成。
 - ❌ 后端端点未 ready 时改业务代码绕过调试脚本。
-- ✅ 静态三连 + flow-debugger 真实调试 + 必要工具断言一起作为完成证据。
+- ✅ 静态三连 + flow-debugger（`--with-logs` 或 analyze-logs 佐证）+ 必要工具断言一起作为完成证据。

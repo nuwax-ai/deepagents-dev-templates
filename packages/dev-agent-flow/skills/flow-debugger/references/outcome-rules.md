@@ -1,6 +1,21 @@
 # 通过/失败判定规则
 
-`debug.sh` 收完 SSE 事件流后，由 `debug.py` 的 `judge_outcome()` 判定。判定逻辑借鉴
+`debug.sh` 收完 SSE 事件流后，由 `debug.py` 的 `judge_outcome()` 判定 SSE 侧成败；**收工还须 runtime 日志佐证**（`--with-logs` 或紧接 `analyze-logs.sh`）。二者缺一不得报完成。
+
+## 日志佐证门禁（收工必经）
+
+| 条件 | 判定 |
+|------|------|
+| `debug.sh` exit 0 **且** `analyze-logs` exit 0（`[结论] 日志正常`） | **可报通过** |
+| `debug.sh` exit 0 **但** `analyze-logs` exit 4（日志有错误/失败工具/flow 异常） | **FAIL**（假绿） |
+| `debug.sh` exit 0 **但** 找不到日志（analyze exit 3） | **FAIL**（无佐证） |
+| `debug.sh` exit 4 | **FAIL**（SSE 未通过；仍建议跑 analyze 辅助定位） |
+
+推荐：`debug.sh --with-logs` 在 SSE 判定后自动跑 analyze，SSE 绿但日志红 → 统一 exit 4。
+
+## SSE 判定（`judge_outcome`）
+
+判定逻辑借鉴
 旧本地 smoke 判定器（已移除）中的 `isSmokeFlowSuccess` + `evaluateExpectedTool`，
 但数据源是结构化的 `AgentExecuteResult`（非文本日志解析），更直接可靠。
 

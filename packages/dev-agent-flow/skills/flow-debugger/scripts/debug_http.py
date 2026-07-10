@@ -18,7 +18,7 @@ API_PREFIX = "/api/v1/4sandbox/agent"
 AGENT_CONFIG_PATH = "/{devAgentId}"
 # 会话接口（经沙箱重写 agent/conversation/** → 内部 /api/agent/conversation/*）
 CHAT_PATH = "/conversation/chat"                                       # POST(SSE) 发消息（conversationId 用 devConversationId）
-CONVERSATION_CREATE_PATH = "/conversation/create"                      # POST 新建会话（agent-dev「刷子」）
+CONVERSATION_CREATE_PATH = "/conversation/create"                      # 平台 UI「刷子」创建；flow-debugger **不调用**，用 GET devConversationId
 CONVERSATION_DETAIL_PATH = "/conversation/{conversationId}"            # POST 会话内容/初始历史
 CONVERSATION_STOP_PATH = "/conversation/chat/stop/{conversationId}"    # POST 取消（路径参=conversationId，无 body）
 PERMISSION_RESPONSE_PATH = "/conversation/chat/permission-request/response"  # POST 权限审批响应
@@ -99,6 +99,20 @@ def resolve_conversation_id(explicit: str | None = None) -> str | None:
             )
         return fetched
     return env_val or None
+
+
+def fetch_dev_conversation_id_strict() -> str:
+    """GET /{devAgentId} → data.devConversationId；失败或为空则 exit。"""
+    aid = dev_agent_id()
+    path = AGENT_CONFIG_PATH.replace("{devAgentId}", str(aid))
+    status, payload = api_request("GET", path)
+    ensure_http_ok(status, payload)
+    data = payload.get("data") or {}
+    cid = str(data.get("devConversationId") or "").strip()
+    if not cid:
+        print("[ERROR] agent 配置中 devConversationId 为空。", file=sys.stderr)
+        sys.exit(4)
+    return cid
 
 
 def conversation_id() -> str | None:

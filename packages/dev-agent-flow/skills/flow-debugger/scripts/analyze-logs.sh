@@ -3,6 +3,7 @@
 #
 # 真实调试的 runtime 视角诊断：读 .logs/ 提取错误/工具调用/flow状态/permission/模型问题。
 # 与 debug.sh（平台视角 SSE 结果）组成完整调试闭环：debug.sh 看平台返回，analyze-logs 看 runtime 内部。
+# 收工必经：成功与否须日志佐证；推荐 debug.sh --with-logs 一步完成双证。
 #
 # 用法:
 #   ./scripts/analyze-logs.sh                          # 分析最新日志

@@ -51,6 +51,7 @@
 | 2 | `search-apis.sh` / `search-skills.sh`（按关键词拆词） |
 | 3 | 命中 → `add-tool.sh` → `get-config --key tools --full` 固化 `spec.tools` |
 | 4 | 无命中 → 记录关键词与输出，方可自写 app 工具 |
+| 5 | **`add-tool` 完成后 → 加载 `flow-debugger`**（收工前必跑 `debug.sh --with-logs`） |
 
 > **禁止**：未搜平台就写外部能力；为已登记能力手写 fetch 包装。联网搜索同样须先登记。
 
@@ -107,32 +108,54 @@
 
 ---
 
-## Phase 3：验证（completion gate）
+## Phase 3：验证（completion gate · 顺序写死）
+
+> **未完成 Phase 3 全部步骤 → 禁止进入 Phase 4 报告、禁止标题写「完成」。** Part 4b 是收工必经，不是「跑不通才读」。
+
+### 步骤（按序执行）
+
+| 序 | 动作 | 说明 |
+|----|------|------|
+| **3.1** | 静态三连 | `pnpm typecheck && pnpm test && pnpm exec tsx src/index.ts graph`（迭代期**不要** `pnpm build`） |
+| **3.2** | 加载 `flow-debugger` | `add-tool` 后应已加载；收工前若未加载则**立即**加载 |
+| **3.3** | 平台真实调试 | `debug.sh --message "…" --with-logs`；依赖平台能力 → **必须** `--expect-tool <工具名子串>` |
+| **3.4** | 日志佐证 | `--with-logs` 自动完成；或 `analyze-logs.sh --since 10 [--session <devConversationId>]` |
+| **3.5** | 双证通过 | SSE `[OUTCOME] PASS` **且** 日志 `[结论] 日志正常`（或 `SSE PASS + 日志佐证通过`） |
 
 ```bash
 pnpm typecheck && pnpm test && pnpm exec tsx src/index.ts graph
-# 然后用 flow-debugger 真实执行：debug.sh --message "..." [--expect-tool <工具名子串>]
+# 然后（收工必经）：
+./scripts/debug.sh --message "…" --expect-tool <工具名子串> --with-logs --auto-approve
 ```
 
-- **迭代快检**：开发中用 flow-debugger `debug.sh --message "<短 prompt>"`，走平台真实链路
-- **真实运行门**：收工前必须 flow-debugger 真实调试；本地 `pnpm smoke` / rcoder-cli 已移除
-- **前置**：`config.flow.active` 指向当前 flow（旧 `activeFlow` 兼容但不新增），平台配置已同步
-- **细则**： [part4a-verify-debug.md](part4a-verify-debug.md) + [part4b-smoke.md](part4b-smoke.md)
-- **排查**： [part4a](part4a-verify-debug.md) § 读日志六步、典型错误
+### 开发快检 vs 收工门禁
 
-失败 → 修 → 重跑（至多 5 轮）→ 仍失败如实交回。
+| 命令 | 用途 | 能否作收工/端到端证据 |
+|------|------|----------------------|
+| `pnpm flow "…"` / `tsx src/index.ts flow` | 本地 CLI 快检、迭代看输出 | **否** |
+| `flow-debugger` `debug.sh --with-logs` | 平台预览会话真实链路 + 日志佐证 | **是（唯一）** |
+
+- **迭代快检**：开发中可用 `pnpm flow` 或 `debug.sh` 短 prompt 加速；**不得**据此写「端到端验证通过」
+- **真实运行门**：收工**仅认** flow-debugger；本地 `pnpm smoke` / rcoder-cli 已移除
+- **前置**：`config.flow.active` 指向当前 flow，平台配置已同步
+- **细则**：[part4a-verify-debug.md](part4a-verify-debug.md) + **[part4b-smoke.md](part4b-smoke.md)（收工必读）**
+- **排查**：[part4a](part4a-verify-debug.md) § 读日志六步
+
+失败 → 修 → 重跑（至多 5 轮）→ 仍失败如实交回。**Phase 3 未全绿不得 Phase 4。**
 
 ---
 
 ## Phase 4：报告
 
+> **门禁**：仅当 Phase 3 静态三连 + flow-debugger 双证（SSE + 日志）**均已通过**后，方可撰写本 Phase 并以「完成」收束。
+
 1. 完成了什么（交互形态 / 节点 / 关键图能力）
-2. **用户待操作事项、风险与后续**（见下表；**无真待办则整段省略**）
-3. `project.md` 已更新（含已登记 targetId、工具名；固定管道含节点工具名引用）
-4. **平台 `systemPrompt` 非空且已回读**（`openingChatMsg` 若涉及）
-5. 提示词提炼来源（用户哪些输入 → 哪一字段）
-6. **需平台能力时**：`search-apis` / `search-skills` / `get-config` 结果摘要（或「已搜索、无命中」+ 关键词）；自写工具须说明平台无命中依据（**联网搜索较常见**，须单独列出搜索关键词）
-7. **平台能力真实调用证据**：flow-debugger 调用轨迹片段（`debug.sh --expect-tool` 断言通过；工具被调用且 success）
+2. **flow-debugger 证据**（**必填**）：贴 `debug.sh --with-logs` 的 `[OUTCOME]`、`[结论]`、`[flow 状态]`、`[工具调用]` 原始摘要；平台能力 flow 须含 `--expect-tool` 命中。**无本节不得标题写「完成」。**
+3. **用户待操作事项、风险与后续**（见下表；**无真待办则整段省略**）
+4. `project.md` 已更新（含已登记 targetId、工具名；固定管道含节点工具名引用）
+5. **平台 `systemPrompt` 非空且已回读**（`openingChatMsg` 若涉及）
+6. 提示词提炼来源（用户哪些输入 → 哪一字段）
+7. **需平台能力时**：`search-apis` / `search-skills` / `get-config` 结果摘要（或「已搜索、无命中」+ 关键词）；自写工具须说明平台无命中依据（**联网搜索较常见**，须单独列出搜索关键词）
 
 ### Phase 4「后续」可写 / 禁止（平台默认集成）
 
@@ -152,9 +175,10 @@ pnpm typecheck && pnpm test && pnpm exec tsx src/index.ts graph
 
 报「完成 / done」前逐条贴证据。绝对禁止项见开发 Agent `system-prompt.md` `<DEVELOPMENT_CONSTRAINTS>`；细则见 [part4a](part4a-verify-debug.md) + [part4b](part4b-smoke.md)。
 
-- [ ] 静态三连退出 0（`typecheck` / `test` / `graph`）+ flow-debugger 真实调试通过
+- [ ] Phase 3 顺序完成：静态三连 → `load_skill flow-debugger` → `debug.sh --with-logs`（平台能力 `--expect-tool`）→ 日志 `[结论] 正常`
+- [ ] **未用 `pnpm flow` 冒充端到端**（本地 CLI 快检不得写入收工证据）
 - [ ] 声称改动文件经 `read_file` / `ls` 实证
-- [ ] `.logs/` 无未预期 `error`
+- [ ] `.logs/` 无未预期 `error`（**已跑 analyze-logs 并贴 `[结论]` 摘要**）
 - [ ] `get-config.sh --key systemPrompt` 回读**非空**；用户发过 Agent 描述 → 已按 part5 提炼并同步
 - [ ] 用户可见 LLM 节点 → `createLlmStreamNode` + `r.text`（**R-G009**）
 - [ ] **需平台能力** → 已贴 search / get-config **原始输出**；有命中 → `add-tool.sh`；无命中 → 报告写明关键词后方可自写工具

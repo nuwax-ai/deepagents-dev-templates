@@ -6,6 +6,8 @@ from __future__ import annotations
 import os
 import sys
 import unittest
+import argparse
+import io
 from unittest import mock
 
 
@@ -82,6 +84,38 @@ class ConversationIdResolveTests(unittest.TestCase):
         with mock.patch.dict(os.environ, {"CONVERSATION_ID": "env-id"}, clear=False):
             with mock.patch.object(debug_http, "fetch_dev_conversation_id", return_value=None):
                 self.assertEqual(debug_http.resolve_conversation_id(), "env-id")
+
+
+class SessionCommandTests(unittest.TestCase):
+    def test_cmd_new_exits_with_instructions(self) -> None:
+        import session  # noqa: E402
+
+        with self.assertRaises(SystemExit) as ctx:
+            session.cmd_new(None)
+        self.assertEqual(ctx.exception.code, 1)
+
+    def test_cmd_refresh_quiet(self) -> None:
+        import session  # noqa: E402
+
+        with mock.patch.object(session, "fetch_dev_conversation_id_strict", return_value="1555999"):
+            with mock.patch("sys.stdout", new_callable=io.StringIO) as out:
+                session.cmd_refresh(argparse.Namespace(quiet=True))
+        self.assertEqual(out.getvalue().strip(), "1555999")
+
+    def test_cmd_wait_detects_change(self) -> None:
+        import session  # noqa: E402
+
+        with mock.patch.object(
+            session,
+            "fetch_dev_conversation_id",
+            side_effect=["1555771", "1555888"],
+        ):
+            with mock.patch("time.sleep"):
+                with mock.patch("sys.stdout", new_callable=io.StringIO) as out:
+                    session.cmd_wait(
+                        argparse.Namespace(previous="1555771", timeout=5.0, interval=0.1, quiet=False)
+                    )
+        self.assertIn("1555888", out.getvalue())
 
 
 if __name__ == "__main__":

@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import subprocess
 import sys
 import time
 
@@ -361,6 +363,20 @@ def _handle_ask_question(event: dict, conv: str) -> None:
     sys.exit(5)
 
 
+def run_log_corroboration(conversation_id: str, since_minutes: float) -> int:
+    """调试结束后跑 analyze-logs，用 runtime 日志佐证成败。返回子进程退出码。"""
+    script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "analyze-logs.py")
+    cmd = [sys.executable, script, "--since", str(since_minutes)]
+    if conversation_id:
+        cmd.extend(["--session", conversation_id])
+    print(
+        f"\n[日志佐证] analyze-logs --since {since_minutes}"
+        + (f" --session {conversation_id}" if conversation_id else ""),
+        file=sys.stderr,
+    )
+    return subprocess.run(cmd, cwd=os.getcwd()).returncode
+
+
 # === 主流程 =================================================================
 
 
@@ -416,6 +432,17 @@ def main() -> None:
         "--ask-marker",
         default="",
         help="回答 ask-question：把 <!--nuwax-mcp-ask-request-id:<requestId>--> 追加到 message 末尾",
+    )
+    p.add_argument(
+        "--with-logs",
+        action="store_true",
+        help="调试结束后自动跑 analyze-logs 佐证成败（收工门禁推荐）",
+    )
+    p.add_argument(
+        "--log-since",
+        type=float,
+        default=0,
+        help="analyze-logs --since 分钟数（0=按本次调试时长自动推算）",
     )
     args = p.parse_args()
 
@@ -573,7 +600,32 @@ def main() -> None:
             aggregate_error_context(final_result, errors, outcome["tool_calls"]),
             file=sys.stderr,
         )
+        if args.with_logs:
+            elapsed_min = max(1.0, (time.monotonic() - start) / 60.0 + 2.0)
+            since = args.log_since if args.log_since > 0 else elapsed_min
+            log_exit = run_log_corroboration(conv, since)
+            print(f"[结论] SSE 判定 FAIL；日志佐证 exit={log_exit}", file=sys.stderr)
         sys.exit(4)
+
+    log_exit = 0
+    if args.with_logs:
+        elapsed_min = max(1.0, (time.monotonic() - start) / 60.0 + 2.0)
+        since = args.log_since if args.log_since > 0 else elapsed_min
+        log_exit = run_log_corroboration(conv, since)
+        if log_exit == 3:
+            print(
+                "[OUTCOME] FAIL — 找不到可分析的 runtime 日志，无法用日志佐证",
+                file=sys.stderr,
+            )
+            sys.exit(4)
+        if log_exit == 4:
+            print(
+                "[OUTCOME] FAIL — SSE 通过但 runtime 日志发现问题（见上方 [结论]/[错误]）",
+                file=sys.stderr,
+            )
+            sys.exit(4)
+        print("[结论] SSE PASS + 日志佐证通过", file=sys.stderr)
+
     sys.exit(0)
 
 

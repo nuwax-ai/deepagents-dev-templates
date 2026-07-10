@@ -7,7 +7,7 @@
 # 用法:
 #   ./scripts/debug.sh --message "你是谁？"
 #   ./scripts/debug.sh --message-file prompts/test.md
-#   ./scripts/debug.sh --message "搜索今天的新闻" --expect-tool search
+#   ./scripts/debug.sh --message "搜索今天的新闻" --expect-tool search --with-logs
 #   ./scripts/debug.sh --message "第二轮" --conversation <conversationId>
 #   ./scripts/debug.sh --message "测试" --show-trace
 #
