@@ -190,7 +190,7 @@
 |------|------|
 | 写 spec / graph 前 | 扫规则索引，确认适用 MUST |
 | scaffold 生成后 | 核对 R-G001、R-G003、R-G004、R-G009 |
-| 验证闸门 | 收工 `pnpm typecheck && pnpm test && pnpm exec tsx src/index.ts graph`（`config.flow.active`）；迭代期**不要** `pnpm build` |
+| 验证闸门 | 收工 `pnpm typecheck && pnpm test && pnpm graph`（`config.flow.active`）；迭代期**不要** `pnpm build` |
 | 排错 | [troubleshooting.md](troubleshooting.md) 按症状 → 规则 ID |
 
 ## 相关文档

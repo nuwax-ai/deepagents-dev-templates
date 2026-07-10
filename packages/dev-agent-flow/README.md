@@ -33,6 +33,8 @@
 
 **单一权威原则**：图怎么写、规则 ID、factory API → 读目标项目 `docs/`；开发流程、平台登记、**completion gate（完成闸门）** → 读本包 `flow-builder` Part*。技能内 `references/flow-graph-rules-pointer.md` 仅为**路由页**，详表永远在目标项目 `docs/flow-graph-rules.md`。**术语**（聊天助手型 / 固定流程型 / 人工确认型、flow profile、`flow.active`、durable stateful flow / topology / 护栏分语境 等）统一以目标项目 `docs/glossary.md` 为准。
 
+**CLI 约定**（与模板 `package.json` scripts 对齐）：profile / graph / capabilities 用 `pnpm flows` / `pnpm graph` / `pnpm capabilities`，**禁止 `pnpm exec tsx`**（pnpm 10/11 沙箱预检问题见目标项目 `docs/troubleshooting.md`）。
+
 ```
 packages/dev-agent-flow/          # 开发 Agent 提示词 + 技能（非模板一部分）
 ├── system-prompt.md

@@ -45,7 +45,7 @@ OLD=$(./scripts/session.sh refresh -q)   # 可选：记录当前 devConversation
 ## completion gate 用法
 
 ```bash
-pnpm typecheck && pnpm test && pnpm exec tsx src/index.ts graph
+pnpm typecheck && pnpm test && pnpm graph
 ./scripts/debug.sh --message "<主路径 prompt>"
 ```
 

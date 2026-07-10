@@ -2,4 +2,4 @@
 
 平台配置经 `dev-engineer-toolkit` 读写。提示词提炼与同步步骤见 `flow-builder` Part 5 § 用户输入提炼。
 
-**收工前（硬步骤，不可跳过）**：`pnpm typecheck && pnpm test && pnpm exec tsx src/index.ts graph` → **`flow-debugger` `debug.sh --with-logs`**（依赖平台能力的 flow **必须** `--expect-tool`）→ 贴「flow-debugger 证据」小节后方可报完成。**`pnpm flow` 仅开发中快检，不得作为端到端或收工证据。** 清单细则见 `flow-builder` Part 0 § completion gate。
+**收工前（硬步骤，不可跳过）**：`pnpm typecheck && pnpm test && pnpm graph` → **`flow-debugger` `debug.sh --with-logs`**（依赖平台能力的 flow **必须** `--expect-tool`）→ 贴「flow-debugger 证据」小节后方可报完成。**`pnpm flow` 仅开发中快检，不得作为端到端或收工证据。** CLI 用 `pnpm graph` / `pnpm flows` 等 scripts，**禁止 `pnpm exec tsx`**。清单细则见 `flow-builder` Part 0 § completion gate。

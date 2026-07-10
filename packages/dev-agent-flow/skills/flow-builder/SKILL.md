@@ -2,7 +2,7 @@
 name: flow-builder
 description: "在当前工作目录开发 LangGraph Flow 时使用。覆盖：Part0 端到端流程与 completion gate；Part1 固定流程型/人工确认型脚手架；Part2 StateGraph 编排（HITL/流式/问答卡片）；Part3 工具与平台能力绑定（写图前须配合 dev-engineer-toolkit 搜索登记，含联网搜索）；Part4 验证调试与 flow-debugger 真实调试；Part5 系统提示词与用户输入提炼；Part6 子智能体委派；Part7 技能集成。适用于新建/修改 flow、聊天助手型默认路径、图规则 R-G001+、跑不通或平台真实执行排查。禁止写 .agents/；LangGraph TS API 查官方文档。Keywords: flow开发, scaffold, StateGraph, LangGraph, HITL, flow-debugger, 工具绑定, subagent, systemPrompt, 平台能力, 联网搜索, flow-builder"
 tags: [flow, scaffold, orchestration, tools, prompt, subagent, stategraph, hitl, debug]
-version: "3.3.0"
+version: "3.3.1"
 ---
 
 # Flow 开发（当前工作目录）
@@ -61,7 +61,7 @@ flow-builder/
 需工作区外能力（Plugin/技能/外部 API；联网搜索较常见）？→ part3 § 平台能力登记（强制，写图前）→ dev-engineer-toolkit → add-tool 后加载 flow-debugger
               └ 含联网？→ 追加 part3 § 联网搜索
               └ part1 命中？→ 生成 → part2 实现
-开发迭代快检：pnpm flow / debug.sh 短 prompt（**非** completion gate）
+开发迭代快检：pnpm flow / pnpm flows / debug.sh 短 prompt（**非** completion gate；**禁止 pnpm exec tsx**）
 收工（顺序写死）：part0 § Phase 3 → 静态三连 → flow-debugger debug.sh --with-logs [--expect-tool] → part0 § Phase 4 报告（含「flow-debugger 证据」小节）
                     └ custom？→ part1 custom → part2 → part3（若 Phase 1 未做）→ Phase 3 收工
 系统提示词 / 用户输入提炼？→ part5（含平台同步）→ dev-engineer-toolkit
@@ -91,4 +91,4 @@ flow-builder/
 - **Subagent `AGENT.md`**：默认不写 `tools` / `model`；禁止平台 Plugin 登记名进 `tools`；联网由主 Agent 搜后写入 `task.description`；多岗串行 `task`（Part 6）。
 - 有状态用 `createStatefulFlow`（**HITL durable stateful flow** 默认；`conversational: true` 为对话型；`dev-agent` **topology** `stateful-custom` 手写 run-loop 为例外，见 part2）。
 - **系统提示词非空** — 用户输入提炼进 `systemPrompt`；Part 5 § 用户输入提炼；收工 Part 0 清单
-- **收工必经 Part 4b** — Phase 3：`静态三连 → flow-debugger --with-logs`；**`pnpm flow` = 开发快检，≠ completion gate**；未跑 part4b / 无「flow-debugger 证据」小节禁止报 done。
+- **收工必经 Part 4b** — Phase 3：`pnpm typecheck && pnpm test && pnpm graph` → `flow-debugger --with-logs`；**`pnpm flow` = 开发快检，≠ completion gate**；**禁止 `pnpm exec tsx`**；未跑 part4b / 无「flow-debugger 证据」小节禁止报 done。

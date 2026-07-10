@@ -33,7 +33,7 @@
 
 **无法判断时的固定话术**：`我先按“可追问的聊天助手”来做，这样交付最快、也最适合开放式需求；如果你后续需要固定审批或多阶段处理，再升级成流程版。`
 
-1. **先查 runtime profile**：`pnpm exec tsx src/index.ts flows --json`；推荐可用 `pnpm exec tsx src/index.ts flows recommend --kind chat|pipeline|approval`
+1. **先查 runtime profile**：`pnpm flows -- --json`；推荐 `pnpm flows -- recommend --kind chat|pipeline|approval`
 2. **脚手架优先**（第 0 问判定为固定流程型/人工确认型后）→ [part1-scaffold.md](part1-scaffold.md)（preset + `custom`）
 3. **系统提示词并行** → 用户 Agent 描述按 [part5](part5-prompt-design.md) § 用户输入提炼 **持续合并**；定稿后尽早同步平台，禁止收工仍空 `systemPrompt`
 4. **命中 preset** → 写 spec → `node scripts/scaffold/generate.mjs <spec>` → 改 `flow.active` → 进 Phase 2 生成路径
@@ -116,14 +116,14 @@
 
 | 序 | 动作 | 说明 |
 |----|------|------|
-| **3.1** | 静态三连 | `pnpm typecheck && pnpm test && pnpm exec tsx src/index.ts graph`（迭代期**不要** `pnpm build`） |
+| **3.1** | 静态三连 | `pnpm typecheck && pnpm test && pnpm graph`（迭代期**不要** `pnpm build`） |
 | **3.2** | 加载 `flow-debugger` | `add-tool` 后应已加载；收工前若未加载则**立即**加载 |
 | **3.3** | 平台真实调试 | `debug.sh --message "…" --with-logs`；依赖平台能力 → **必须** `--expect-tool <工具名子串>` |
 | **3.4** | 日志佐证 | `--with-logs` 自动完成；或 `analyze-logs.sh --since 10 [--session <devConversationId>]` |
 | **3.5** | 双证通过 | SSE `[OUTCOME] PASS` **且** 日志 `[结论] 日志正常`（或 `SSE PASS + 日志佐证通过`） |
 
 ```bash
-pnpm typecheck && pnpm test && pnpm exec tsx src/index.ts graph
+pnpm typecheck && pnpm test && pnpm graph
 # 然后（收工必经）：
 ./scripts/debug.sh --message "…" --expect-tool <工具名子串> --with-logs --auto-approve
 ```
@@ -132,7 +132,8 @@ pnpm typecheck && pnpm test && pnpm exec tsx src/index.ts graph
 
 | 命令 | 用途 | 能否作收工/端到端证据 |
 |------|------|----------------------|
-| `pnpm flow "…"` / `tsx src/index.ts flow` | 本地 CLI 快检、迭代看输出 | **否** |
+| `pnpm flow "…"` / `pnpm flow -- -i` | 本地 CLI 快检、迭代看输出 | **否** |
+| `pnpm flows` / `pnpm graph` / `pnpm capabilities` | profile / 拓扑 / 能力清单（**禁止 `pnpm exec tsx`**） | 仅静态三连组成部分 |
 | `flow-debugger` `debug.sh --with-logs` | 平台预览会话真实链路 + 日志佐证 | **是（唯一）** |
 
 - **迭代快检**：开发中可用 `pnpm flow` 或 `debug.sh` 短 prompt 加速；**不得**据此写「端到端验证通过」
@@ -176,7 +177,7 @@ pnpm typecheck && pnpm test && pnpm exec tsx src/index.ts graph
 报「完成 / done」前逐条贴证据。绝对禁止项见开发 Agent `system-prompt.md` `<DEVELOPMENT_CONSTRAINTS>`；细则见 [part4a](part4a-verify-debug.md) + [part4b](part4b-smoke.md)。
 
 - [ ] Phase 3 顺序完成：静态三连 → `load_skill flow-debugger` → `debug.sh --with-logs`（平台能力 `--expect-tool`）→ 日志 `[结论] 正常`
-- [ ] **未用 `pnpm flow` 冒充端到端**（本地 CLI 快检不得写入收工证据）
+- [ ] **未用 `pnpm flow` 冒充端到端**；**未用 `pnpm exec tsx`**（应用 `pnpm graph` / `pnpm flows` 等 scripts）
 - [ ] 声称改动文件经 `read_file` / `ls` 实证
 - [ ] `.logs/` 无未预期 `error`（**已跑 analyze-logs 并贴 `[结论]` 摘要**）
 - [ ] `get-config.sh --key systemPrompt` 回读**非空**；用户发过 Agent 描述 → 已按 part5 提炼并同步

@@ -131,6 +131,23 @@
 
 ---
 
+## `pnpm exec` / `pnpm run` 卡住（Windows 沙箱 · pnpm 10/11 混用）
+
+**症状**：`pnpm exec tsx …` 或部分 `pnpm run` 长时间 `EXECUTING`；报错 `minimumReleaseAge` / `VERIFY_DEPS_BEFORE_RUN`；`node_modules` 装完仍失败。
+
+**根因**：pnpm **10 与 11 默认策略不同**（11 默认 `minimumReleaseAge=1440`、`verifyDepsBeforeRun=install`），`pnpm exec` 会在执行前再做依赖预检/重装。
+
+**本项目约定**（见根目录 `.npmrc` + `packageManager`）：
+
+| 做法 | 说明 |
+|------|------|
+| 用 **`pnpm flow` / `pnpm graph` / `pnpm flows`** 等 scripts | **禁止** `pnpm exec tsx` |
+| `.npmrc` 已设 `minimum-release-age=0`、`verify-deps-before-run=false` | 10/11 行为对齐 |
+| `packageManager` 建议 corepack 启用 `pnpm@10.18.2` | 避免漂到 11 默认 |
+| 仍失败且 `node_modules/.bin/tsx` 存在 | fallback：`node node_modules/tsx/dist/cli.mjs src/index.ts …` |
+
+---
+
 ## 相关文档
 
 - [flow-graph-rules.md](flow-graph-rules.md) — **图编排规则（R-G001+，可持续追加）**

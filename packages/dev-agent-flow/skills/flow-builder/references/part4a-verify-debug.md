@@ -10,7 +10,7 @@
 报告「完成 / done」前必须在本轮真实执行并贴出原始输出：
 
 ```bash
-pnpm typecheck && pnpm test && pnpm exec tsx src/index.ts graph
+pnpm typecheck && pnpm test && pnpm graph
 flow-debugger/scripts/debug.sh --message "..." [--expect-tool <工具名子串>]
 ```
 
@@ -31,7 +31,7 @@ Scaffold 生成器自带快检（`typecheck && graph`）；开发中可追加 fl
 ```bash
 pnpm test                    # 含 tests/layering.test.ts
 pnpm typecheck
-pnpm exec tsx src/index.ts graph
+pnpm graph
 # flow-debugger/scripts/debug.sh --message "..." --expect-tool <工具名子串>
 ```
 
@@ -133,7 +133,7 @@ pnpm exec tsx src/index.ts graph
 | 2 | 是否已 `search-apis.sh --kw "<能力词>"` / `search-skills.sh` / `get-config.sh --key tools|skills`？ |
 | 3 | 命中是否已 `add-tool.sh`，并按需在节点 `params` 指定 `toolName` / `tools` 或接入 `flow-tools.ts`？ |
 | 4 | **联网**：另查 `tools` 与平台搜索工具登记状态；禁止 bash+curl 自写搜索 API；禁止把搜索能力硬编码进当前项目默认配置 |
-| 5 | `pnpm exec tsx src/index.ts capabilities` 核对工具列表 |
+| 5 | `pnpm capabilities` 核对工具列表 |
 | 6 | 仍不生效：查工具名、`.logs/` 中 `onToolCall` |
 
 ---

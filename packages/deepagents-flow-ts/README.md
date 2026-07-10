@@ -4,7 +4,7 @@
 
 本项目是 **工作流编排 Agent**（显式 LangGraph 图），与 Coding Agent（tool loop）产品形态不同；运行时基础能力由项目内置底层运行时（`src/runtime/`）承担，「大脑」是一张可设计的节点图。
 
-> **开发方式**：源码工作区直接改图、用 `tsx` 跑命令（**迭代期不要 `pnpm build`**，避免阻塞）。本地快检：`pnpm flow`；端到端在平台预览会话经 ACP surface 验证。
+> **开发方式**：源码工作区直接改图、用 `tsx` 跑命令（**迭代期不要 `pnpm build`**，避免阻塞）。本地快检：`pnpm flow`；查 profile：`pnpm flows -- --json`。**勿用 `pnpm exec tsx`**（pnpm 10/11 混用易卡在 exec 前预检）。端到端在平台预览会话经 ACP surface 验证。
 
 > **本文档**介绍当前工作目录的项目结构、分层规则、命令与检查清单；API 细节见源码与 `docs/`。
 
@@ -68,7 +68,7 @@ config/ prompts/ skills/ scripts/ docs/ tests/
 
 两种方式落地：
 
-1. **先看交互形态**：`pnpm exec tsx src/index.ts flows --json`。聊天助手型优先 `flow.active: "default"` + systemPrompt；固定流程型 / 人工确认型才 scaffold。
+1. **先看交互形态**：`pnpm flows -- --json`。聊天助手型优先 `flow.active: "default"` + systemPrompt；固定流程型 / 人工确认型才 scaffold。
 2. **脚手架优先**（固定流程 / 人工确认）：写 spec → `node scripts/scaffold/generate.mjs <spec>` → 改 `config/flow-agent.config.json` 的 `flow.active`（自带 typecheck+graph 自验）
 3. **直接改默认图**：编辑 [src/app/graph.ts](src/app/graph.ts) 连线 + [src/app/nodes/](src/app/nodes/) 节点逻辑；进阶形态对照 [src/libs/topologies/](src/libs/topologies/)，落盘对照 [scripts/scaffold/specs/](scripts/scaffold/specs/) → `src/app/flows/`
 
@@ -141,13 +141,13 @@ pnpm install
 
 # 默认 flow：CLI 快检（尊重 config.flow.active；底层 tsx，无需 build）
 pnpm flow "随便说点什么"
-pnpm exec tsx src/index.ts flow -i
+pnpm flow -- -i
 
-# 图拓扑 / 能力 / 会话（均 tsx 直跑）
-pnpm exec tsx src/index.ts graph              # JSON；加 --mermaid 输出 Mermaid
-pnpm exec tsx src/index.ts capabilities     # 无凭证
-pnpm exec tsx src/index.ts flows --json
-pnpm exec tsx src/index.ts sessions
+# 图拓扑 / 能力 / 会话（走 package.json scripts，避免 pnpm exec）
+pnpm graph              # JSON；加 -- --mermaid 输出 Mermaid
+pnpm capabilities     # 无凭证
+pnpm flows -- --json
+pnpm sessions
 
 # 场景 flow：scaffold → 设 flow.active → pnpm flow 验证
 # node scripts/scaffold/generate.mjs scripts/scaffold/specs/_example.*.flow.json
@@ -162,11 +162,11 @@ pnpm typecheck && pnpm test
 
 | 目标 | 方式 |
 |---|---|
-| 本地快检 | `pnpm flow "..."` / `pnpm exec tsx src/index.ts flow -i` |
+| 本地快检 | `pnpm flow "..."` / `pnpm flow -- -i` |
 | 端到端（平台预览） | ACP surface + 平台预览会话（`config.flow.active`） |
 | 日志 | 读 `.logs/`（`LOG_DIR=<REPO>/.logs`，`LOG_LEVEL=debug`） |
-| Export graph topology | `pnpm exec tsx src/index.ts graph`（`--mermaid`） |
-| 能力 / flow profile | `capabilities` / `flows --json` |
+| Export graph topology | `pnpm graph`（`pnpm graph -- --mermaid`） |
+| 能力 / flow profile | `pnpm capabilities` / `pnpm flows -- --json` |
 | 类型检查 | `pnpm typecheck` |
 
 > 迭代期优先 `pnpm flow` 短 prompt；**不要**为日常调试跑 `pnpm build`。

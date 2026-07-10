@@ -1,8 +1,9 @@
 {
   "name": "nuwax-flow-ts",
-  "version": "1.15.8",
+  "version": "1.15.9",
   "description": "Flow / workflow-orchestration agent template — the agent runs an explicit LangGraph StateGraph (not a dynamic tool loop) over ACP. Self-contained runtime; MCP via @langchain/mcp-adapters. Ships registered flows under app/flows (default ReAct, platform-capability sample, streaming pipeline, LLM router, dev-agent) plus libs/topologies building blocks.",
   "type": "module",
+  "packageManager": "pnpm@10.18.2",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
@@ -34,6 +35,9 @@
     "start": "node dist/index.js",
     "flow": "tsx src/index.ts flow",
     "graph": "tsx src/index.ts graph",
+    "flows": "tsx src/index.ts flows",
+    "capabilities": "tsx src/index.ts capabilities",
+    "sessions": "tsx src/index.ts sessions",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:integration": "RUN_INTEGRATION=1 vitest run",

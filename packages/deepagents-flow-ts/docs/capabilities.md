@@ -20,8 +20,8 @@
 在本仓库根目录执行：
 
 ```bash
-pnpm exec tsx src/index.ts capabilities   # 无凭证，输出工具/MCP/skills/能力分层
-pnpm exec tsx src/index.ts sessions       # 已持久化的会话
+pnpm capabilities   # 无凭证，输出工具/MCP/skills/能力分层
+pnpm sessions       # 已持久化的会话
 ```
 
 ## 每项能力从哪进图
