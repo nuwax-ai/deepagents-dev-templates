@@ -16,6 +16,25 @@ describe("flow selection", () => {
     });
   });
 
+  it("keeps legacy activeFlow compatible", () => {
+    expect(resolveFlowSelection({ activeFlow: "router-gate" })).toMatchObject({
+      active: "router-gate",
+      source: "activeFlow",
+    });
+  });
+
+  it("prefers flow.active over legacy activeFlow", () => {
+    expect(
+      resolveFlowSelection({
+        activeFlow: "router-gate",
+        flow: { active: "search-aggregator" },
+      })
+    ).toMatchObject({
+      active: "search-aggregator",
+      source: "flow.active",
+    });
+  });
+
   it("resolveFlow falls back to default for unknown names", () => {
     expect(resolveFlow("not-registered").name).toBe("default");
   });
@@ -34,6 +53,11 @@ describe("flow profiles", () => {
   it("recommends default first for chat", () => {
     const [first] = recommendFlows("chat");
     expect(first?.name).toBe("default");
+  });
+
+  it("marks only default as the ambiguous chat default", () => {
+    const ambiguousDefaults = listFlowProfiles().filter((f) => f.profile.defaultForAmbiguous);
+    expect(ambiguousDefaults.map((f) => f.name)).toEqual(["default"]);
   });
 
   it("marks custom teaching flows as requiring graph reason", () => {

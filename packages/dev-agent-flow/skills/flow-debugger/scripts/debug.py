@@ -23,6 +23,8 @@ from debug_http import (
     api_request,
     configure_stdio_utf8,
     conversation_id,
+    ensure_http_ok,
+    is_terminal_event,
     read_text_option,
     sse_request,
 )
@@ -203,8 +205,16 @@ def _parse_event_envelope(event: dict) -> tuple[dict, dict]:
     return envelope, event_data
 
 
+def _looks_like_permission_request(value: dict) -> bool:
+    return (
+        isinstance(value, dict)
+        and isinstance(value.get("options"), list)
+        and isinstance(value.get("toolCall") or value.get("tool_call"), dict)
+    )
+
+
 def _get_request_permission_request(event_data: dict) -> dict:
-    """提取 request_permission_request（多位置：event_data / result.input）。"""
+    """提取 request_permission_request（多位置：event_data / result.input / 直接 payload）。"""
     result = event_data.get("result") if isinstance(event_data.get("result"), dict) else {}
     result_input = result.get("input") if isinstance(result.get("input"), dict) else {}
     for c in (event_data, result_input, result):
@@ -214,6 +224,8 @@ def _get_request_permission_request(event_data: dict) -> dict:
             v = c.get(k)
             if isinstance(v, dict):
                 return v
+        if _looks_like_permission_request(c):
+            return c
     return {}
 
 
@@ -290,7 +302,7 @@ def _handle_permission(event: dict, args, conv: str) -> None:
         )
         if allow:
             opt_id = allow.get("optionId") or allow.get("option_id")
-            api_request(
+            status, payload = api_request(
                 "POST",
                 PERMISSION_RESPONSE_PATH,
                 {
@@ -299,6 +311,7 @@ def _handle_permission(event: dict, args, conv: str) -> None:
                     "option": {"optionId": opt_id, "outcome": "selected"},
                 },
             )
+            ensure_http_ok(status, payload)
             print(
                 f"[HITL] 已自动批准权限 (toolId={tool_id}, option={opt_id})",
                 file=sys.stderr,
@@ -450,6 +463,7 @@ def main() -> None:
     last_activity = start  # 最近一次"可见活动"（文本/进度输出）的时间
     event_count = 0
     timed_out = False
+    saw_normal_terminal = False
     PROGRESS_INTERVAL = 30  # 静默超过此秒则输出进度心跳
 
     for event in sse_request(CHAT_PATH, body, timeout=args.timeout):
@@ -468,6 +482,8 @@ def main() -> None:
         et = event.get("eventType", "")
         data = event.get("data")
         err = event.get("error")
+        if is_terminal_event(event):
+            saw_normal_terminal = True
 
         # HITL 人工介入（兼容后端多形态事件：subType 在顶层 / data 内 / snake_case）
         if _is_permission_event(event):
@@ -516,11 +532,15 @@ def main() -> None:
         )
         sys.exit(3)
 
-    # 流异常中断：没超时也没收到 FINAL_RESULT/ERROR → 连接意外结束
+    # completed=true / end_turn 是平台正常终止形态；若没有 FINAL_RESULT，用已收到文本做轻量判定。
+    if final_result is None and not errors and saw_normal_terminal and text_chunks:
+        final_result = {"outputText": "".join(text_chunks), "componentExecuteResults": []}
+
+    # 流异常中断：没超时也没收到任何正常终止 → 连接意外结束
     if final_result is None and not errors:
         elapsed = int(time.monotonic() - start)
         print(
-            f"[ERROR] SSE 流结束但未收到 FINAL_RESULT/ERROR（连接意外中断；{elapsed}s，"
+            f"[ERROR] SSE 流结束但未收到 FINAL_RESULT/ERROR/completed/end_turn（连接意外中断；{elapsed}s，"
             f"事件 {event_count}）。可能是后端重启/网络中断。",
             file=sys.stderr,
         )

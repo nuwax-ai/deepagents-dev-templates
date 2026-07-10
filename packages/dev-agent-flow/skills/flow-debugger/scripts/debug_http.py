@@ -144,11 +144,29 @@ def ensure_http_ok(status: int, payload: dict) -> dict:
     return payload
 
 
+def _event_sub_type(event: dict) -> str:
+    data = event.get("data")
+    nested = data if isinstance(data, dict) else {}
+    return (
+        str(event.get("subType") or event.get("sub_type") or event.get("subEventType") or "")
+        or str(nested.get("subType") or nested.get("sub_type") or nested.get("subEventType") or "")
+    )
+
+
+def is_terminal_event(event: dict) -> bool:
+    """平台 SSE 终止信号：FINAL_RESULT / ERROR / completed=true / end_turn。"""
+    if event.get("eventType") in FINAL_EVENT_TYPES:
+        return True
+    if event.get("completed") is True:
+        return True
+    return _event_sub_type(event) == "end_turn"
+
+
 def sse_request(path: str, body: dict, timeout: int = 180):
     """流式 SSE 请求，逐事件 yield 解析后的 dict。
 
     与 api_request 的差异：Accept: text/event-stream；逐行读取 `data:` 前缀的 JSON 事件；
-    遇 FINAL_RESULT / ERROR 终止。后端执行端点返回 Flux<AgentOutputDto> 的 SSE。
+    遇 FINAL_RESULT / ERROR / completed=true / end_turn 终止。后端执行端点返回 Flux<AgentOutputDto> 的 SSE。
     """
     base = require_env("PLATFORM_BASE_URL")
     token = require_env("SANDBOX_ACCESS_KEY")
@@ -178,7 +196,7 @@ def sse_request(path: str, body: dict, timeout: int = 180):
                 except json.JSONDecodeError:
                     continue
                 yield event
-                if event.get("eventType") in FINAL_EVENT_TYPES:
+                if is_terminal_event(event):
                     return
     except urllib.error.HTTPError as e:
         err_raw = e.read()

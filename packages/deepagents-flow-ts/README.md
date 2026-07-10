@@ -72,7 +72,7 @@ config/ prompts/ skills/ scripts/ docs/ tests/
 2. **脚手架优先**（固定流程 / 人工确认）：写 spec → `node scripts/scaffold/generate.mjs <spec>` → 改 `config/flow-agent.config.json` 的 `flow.active`（自带 typecheck+graph 自验）
 3. **直接改默认图**：编辑 [src/app/graph.ts](src/app/graph.ts) 连线 + [src/app/nodes/](src/app/nodes/) 节点逻辑；进阶形态对照 [src/libs/topologies/](src/libs/topologies/)，落盘对照 [scripts/scaffold/specs/](scripts/scaffold/specs/) → `src/app/flows/`
 
-**多 flow 选图**：`config/flow-agent.config.json` 的 `flow.active`（缺省 `default`）经 [src/app/flows/index.ts](src/app/flows/index.ts) 注册表解析——`flow` / `graph` / ACP 三条入口共用。注册表带 `profile`：`chat`（聊天助手型）、`pipeline`（固定流程型）、`approval`（人工确认型）。`default` 是聊天助手型默认；`dev-agent` 是 stateful-custom 开发样板；`search-aggregator` 是平台能力对话样板；`translate-review` 是人工确认型教学；`router-gate` 是固定流程型路由教学。`pnpm graph` 导出**当前 active flow** 的 graph topology。
+**多 flow 选图**：`config/flow-agent.config.json` 的 `flow.active`（缺省 `default`；旧顶层 `activeFlow` 兼容读取但不新增）经 [src/app/flows/index.ts](src/app/flows/index.ts) 注册表解析——`flow` / `graph` / ACP 三条入口共用。注册表带 `profile`：`chat`（聊天助手型）、`pipeline`（固定流程型）、`approval`（人工确认型）。`default` 是聊天助手型默认；`dev-agent` 是 stateful-custom 开发样板；`search-aggregator` 是平台能力对话样板；`translate-review` 是人工确认型教学；`router-gate` 是固定流程型路由教学。`pnpm graph` 导出**当前 active flow** 的 graph topology。
 
 **两类 flow**（[src/core/flow-types.ts](src/core/flow-types.ts)）：
 - `FlowExecutor`：one-shot，`(query, cb) => Promise<FlowResult>`。无记忆单次调用（见 `src/libs/topologies/rag`）。
@@ -190,7 +190,7 @@ const { nodes, edges, mermaid } = await getFlowTopology();
 
 ## 配置与能力分层
 
-[config/flow-agent.config.json](config/flow-agent.config.json)：标准 `agent` / `model` / `mcp` / `permissions` / `sandbox` / `skills` / `agentsDirectories` / `memory` / `compaction` / `middleware` 段，以及正式 **`flow.active`**（选 [src/app/flows/](src/app/flows/) 注册表中的 flow；缺省 `default`）。配置走 `loadFlowConfig` → 底层 `loadConfig`（[src/runtime/](src/runtime/)），Zod schema 校验。自定义块加在顶层、用 `loadFlowConfig().raw` 取出。
+[config/flow-agent.config.json](config/flow-agent.config.json)：标准 `agent` / `model` / `mcp` / `permissions` / `sandbox` / `skills` / `agentsDirectories` / `memory` / `compaction` / `middleware` 段，以及正式 **`flow.active`**（选 [src/app/flows/](src/app/flows/) 注册表中的 flow；缺省 `default`；旧 `activeFlow` 仅兼容读取）。配置走 `loadFlowConfig` → 底层 `loadConfig`（[src/runtime/](src/runtime/)），Zod schema 校验。自定义块加在顶层、用 `loadFlowConfig().raw` 取出。
 
 **能力分层**（工作区配置 / 内置 / 环境 / 文件持久化）见 [docs/capabilities.md](docs/capabilities.md) 与 [.nuwax-agent/capability-sources.json](.nuwax-agent/capability-sources.json)——`capabilities` 命令查询当前可用工具/MCP/skills/子智能体（subagents）。
 

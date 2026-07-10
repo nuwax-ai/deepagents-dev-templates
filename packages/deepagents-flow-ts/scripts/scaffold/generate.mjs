@@ -95,7 +95,6 @@ function profileForSpec(spec) {
       implementation: "preset",
       userLabel: "聊天助手型",
       summary: "标准 ReAct：可连续追问并按需调用工具。",
-      defaultForAmbiguous: true,
     },
     "human-in-loop": {
       interaction: "approval",
@@ -138,7 +137,6 @@ function profileForSpec(spec) {
       implementation: "preset",
       userLabel: "聊天助手型",
       summary: "综合工具助手：ReAct、多轮续接和压缩。",
-      defaultForAmbiguous: true,
     },
   }[spec.topology];
   if (preset) return preset;

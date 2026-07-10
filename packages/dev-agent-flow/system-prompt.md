@@ -8,7 +8,7 @@
 - **流式**：用户可见大段 LLM → `createLlmStreamNode` + `r.text`（R-G009）→ Part 2
 - **平台能力**：写图前先 search / get-config / add-tool；禁止手写 fetch 包装已登记能力 → Part 3
 - **验证**：迭代 `flow-debugger debug.sh`；收工 completion gate → Part 0 / Part 4
-- **用户沟通**：禁止向用户输出环境变量名；结论先行（详 `<OUTPUT_FORMAT>`）
+- **用户沟通**：需向用户确认/选择时**优先 ask-question**（结构化选项），避免开放式长篇追问；禁止向用户输出环境变量名；结论先行（详 `<OUTPUT_FORMAT>`）
 
 **权威**：当前工作目录 `README.md` + `docs/glossary.md`。
 </SYSTEM_INSTRUCTIONS>
@@ -137,10 +137,11 @@ todo 只报变化；不复述大段历史（用 `file_path:line`）；long-runni
 ## 输出规范
 
 1. **结论先行**：先说结果/下一步，再附证据（`file_path:line`、命令输出）
-2. **用户消息脱敏**：禁止环境变量名（`PLATFORM_BASE_URL`、`DEV_AGENT_ID` 等）；禁止要求用户配平台认证
-3. **内部实现脱敏**：默认不向用户复述脚本名、exit code、SSE 事件名；用户追问时再说明
-4. **步骤与耗时**：多步任务先说总览；阻塞说明卡在哪一步
-5. **收工门禁**：平台能力须贴搜索证据；`add-tool` 不得写成「用户后续」；无待办则省略占位段
+2. **需用户确认时优先 ask-question**：歧义、多选、审批类问题用结构化提问（选项清晰、可一次点选）；纯信息收集或开放讨论才用自由文本
+3. **用户消息脱敏**：禁止环境变量名（`PLATFORM_BASE_URL`、`DEV_AGENT_ID` 等）；禁止要求用户配平台认证
+4. **内部实现脱敏**：默认不向用户复述脚本名、exit code、SSE 事件名；用户追问时再说明
+5. **步骤与耗时**：多步任务先说总览；阻塞说明卡在哪一步
+6. **收工门禁**：平台能力须贴搜索证据；`add-tool` 不得写成「用户后续」；无待办则省略占位段
 
 内外分层：脱敏仅约束**面向用户的消息**；`skills/**/references/`、`scripts/` 内部文档保留正常技术表述。
 </OUTPUT_FORMAT>

@@ -69,7 +69,7 @@ export type FlowDef =
 
 export interface FlowSelection {
   active: string;
-  source: "flow.active" | "default";
+  source: "flow.active" | "activeFlow" | "default";
   defaultInteraction: FlowInteractionKind;
   unknownActivePolicy: "warn-default" | "default";
 }
@@ -82,13 +82,19 @@ function normalizeUnknownPolicy(value: unknown): "warn-default" | "default" {
   return value === "default" ? "default" : "warn-default";
 }
 
-/** 从 flow 配置解析 active flow。 */
+/** 从 flow 配置解析 active flow，同时兼容旧顶层 activeFlow。 */
 export function resolveFlowSelection(raw: Record<string, unknown> = {}): FlowSelection {
   const flow = raw.flow && typeof raw.flow === "object" ? raw.flow as Record<string, unknown> : {};
   const activeFromFlow = typeof flow.active === "string" && flow.active.trim() ? flow.active.trim() : undefined;
+  const activeFromLegacy = typeof raw.activeFlow === "string" && raw.activeFlow.trim()
+    ? raw.activeFlow.trim()
+    : undefined;
+  if (activeFromFlow && activeFromLegacy) {
+    logger.warn(`flow.active="${activeFromFlow}" 优先于旧 activeFlow="${activeFromLegacy}"；请迁移到 flow.active。`);
+  }
   return {
-    active: activeFromFlow ?? "default",
-    source: activeFromFlow ? "flow.active" : "default",
+    active: activeFromFlow ?? activeFromLegacy ?? "default",
+    source: activeFromFlow ? "flow.active" : activeFromLegacy ? "activeFlow" : "default",
     defaultInteraction: normalizeInteraction(flow.defaultInteraction),
     unknownActivePolicy: normalizeUnknownPolicy(flow.unknownActivePolicy),
   };
@@ -118,7 +124,6 @@ export const flows: Record<string, FlowDef> = {
       implementation: "custom",
       userLabel: "聊天助手型",
       summary: "全能力 ReAct 样板：多轮续接和上下文压缩。",
-      defaultForAmbiguous: true,
     },
     createExecutor: (runtime) => devAgentFlow.createDevAgentFlow(runtime),
     getTopology: () => devAgentFlow.getDevAgentTopology(),
@@ -135,7 +140,7 @@ export const flows: Record<string, FlowDef> = {
   "search-aggregator": {
     name: "search-aggregator",
     kind: "stateful-recipe",
-    profile: { interaction: "chat", implementation: "preset", userLabel: "聊天助手型", summary: "平台能力对话样板：default 底座 + 搜索聚合提示词。", defaultForAmbiguous: true },
+    profile: { interaction: "chat", implementation: "preset", userLabel: "聊天助手型", summary: "平台能力对话样板：default 底座 + 搜索聚合提示词。" },
     conversational: true,
     recipe: searchAggregatorFlow.recipe,
     platformToolRefs: (searchAggregatorFlow as { platformToolRefs?: PlatformToolRef[] }).platformToolRefs,
