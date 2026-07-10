@@ -57,5 +57,5 @@ reason = 错误内容。
 | 数据源 | rcoder 日志文本解析（flowStatus/outputChars） | 结构化 `AgentExecuteResult` |
 | 文本非空 | `outputChars/answerChars > 0` | `outputText` 非空 |
 | 工具断言 | `tool invoke done` + `resultChars > 0` | `componentExecuteResults[].success` + `data` 非空 |
-| HITL | flowStatus=interrupted + questionChars | v1 不支持 |
+| HITL | flowStatus=interrupted + questionChars | exit 5 + `--auto-approve`/`approve.sh`（权限）+ `--ask-marker`（ask-question 续接） |
 | 链路 | 本地 rcoder 模拟 | 平台真实 agent 执行（用户预览可见） |

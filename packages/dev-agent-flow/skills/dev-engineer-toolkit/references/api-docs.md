@@ -2,7 +2,22 @@
 
 > 基于平台 OpenAPI 规范的实际接口参考。
 >
-> **认证、基址、`devSpaceId`/`devAgentId` 均由对应 `scripts/*.sh` 自动填充，请勿手写 HTTP 调用。**
+> **认证、基址、`devSpaceId`/`devAgentId` 均由对应 `scripts/*.sh` 从环境变量读取并填充，请勿手写 HTTP 调用。**
+
+---
+
+## 环境变量
+
+所有脚本依赖以下环境变量（运行时由平台注入，脚本内部自动读取；**用户无需手动配置**）：
+
+| 环境变量 | 说明 | 使用脚本 |
+|----------|------|----------|
+| `PLATFORM_BASE_URL` | 平台 API 基础地址（必填） | 全部 |
+| `SANDBOX_ACCESS_KEY` | 沙箱认证密钥，用作 Bearer Token（必填） | 全部 |
+| `DEV_SPACE_ID` | 开发空间 ID（必填） | `search-apis.sh`、`search-skills.sh`、`download-skill.sh` |
+| `DEV_AGENT_ID` | 当前开发的 Agent ID（必填） | `add-tool.sh`、`remove-tool.sh`、`get-config.sh`、`update-config.sh` |
+
+脚本在缺失必需环境变量时输出明确错误并以 exit code `2` 退出。
 
 ---
 
@@ -25,16 +40,16 @@
 ### 请求
 
 ```
-POST /api/v1/4sandbox/agent/dev/tool/search
+POST {PLATFORM_BASE_URL}/api/v1/4sandbox/agent/dev/tool/search
 Content-Type: application/json
-# 基址与 Authorization 由 search-apis.sh / search-skills.sh 自动处理
+Authorization: Bearer {SANDBOX_ACCESS_KEY}
 ```
 
 ### 请求体
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| `devSpaceId` | int64 | ✅ | 开发空间 ID，由 `search-apis.sh` / `search-skills.sh` 自动注入 |
+| `devSpaceId` | int64 | ✅ | 开发空间 ID，从 `DEV_SPACE_ID` 环境变量获取 |
 | `type` | string | ✅ | 搜索类型：`"tool"` — 搜索工具/API（Plugin, Workflow, Knowledge 等）；`"skill"` — 搜索技能 |
 | `kw` | string | 否 | 关键词搜索 |
 | `page` | int32 | 否 | 页码 |
@@ -100,16 +115,16 @@ Content-Type: application/json
 ### 请求
 
 ```
-POST /api/v1/4sandbox/agent/dev/config/tool/add
+POST {PLATFORM_BASE_URL}/api/v1/4sandbox/agent/dev/config/tool/add
 Content-Type: application/json
-# 基址、Authorization 与 devAgentId 由 add-tool.sh 自动处理
+Authorization: Bearer {SANDBOX_ACCESS_KEY}
 ```
 
 ### 请求体
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| `devAgentId` | int64 | ✅ | 当前开发的 Agent ID，由 `add-tool.sh` 自动注入 |
+| `devAgentId` | int64 | ✅ | 当前开发的 Agent ID，从 `DEV_AGENT_ID` 环境变量获取 |
 | `targetType` | string | 否 | 目标类型：`Plugin`、`Workflow`、`Knowledge`、`Skill` |
 | `targetId` | int64 | 否 | 目标对象 ID，来自搜索结果中的 `targetId` |
 
@@ -133,16 +148,16 @@ Content-Type: application/json
 ### 请求
 
 ```
-POST /api/v1/4sandbox/agent/dev/config/tool/delete
+POST {PLATFORM_BASE_URL}/api/v1/4sandbox/agent/dev/config/tool/delete
 Content-Type: application/json
-# 基址、Authorization 与 devAgentId 由 remove-tool.sh 自动处理
+Authorization: Bearer {SANDBOX_ACCESS_KEY}
 ```
 
 ### 请求体
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| `devAgentId` | int64 | ✅ | 当前开发的 Agent ID，由 `remove-tool.sh` 自动注入 |
+| `devAgentId` | int64 | ✅ | 当前开发的 Agent ID，从 `DEV_AGENT_ID` 环境变量获取 |
 | `targetType` | string | 否 | 目标类型：`Plugin`、`Workflow`、`Knowledge`、`Skill` |
 | `targetId` | int64 | 否 | 目标对象 ID |
 
@@ -166,8 +181,8 @@ Content-Type: application/json
 ### 请求
 
 ```
-GET /api/v1/4sandbox/agent/dev/config/{devAgentId}
-# 基址、Authorization 与 devAgentId 由 get-config.sh 自动处理
+GET {PLATFORM_BASE_URL}/api/v1/4sandbox/agent/dev/config/{devAgentId}
+Authorization: Bearer {SANDBOX_ACCESS_KEY}
 ```
 
 ```bash
@@ -179,7 +194,7 @@ GET /api/v1/4sandbox/agent/dev/config/{devAgentId}
 
 | 参数 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| `devAgentId` | int64 | ✅ | 当前开发的 Agent ID，由 `get-config.sh` 自动注入 |
+| `devAgentId` | int64 | ✅ | 当前开发的 Agent ID，从 `DEV_AGENT_ID` 环境变量获取 |
 
 ### 响应
 
@@ -261,16 +276,16 @@ GET /api/v1/4sandbox/agent/dev/config/{devAgentId}
 ### 请求
 
 ```
-POST /api/v1/4sandbox/agent/dev/config/update
+POST {PLATFORM_BASE_URL}/api/v1/4sandbox/agent/dev/config/update
 Content-Type: application/json; charset=utf-8
-# 基址、Authorization 与 devAgentId 由 update-config.sh 自动处理
+Authorization: Bearer {SANDBOX_ACCESS_KEY}
 ```
 
 ### 请求体
 
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
-| `devAgentId` | int64 | ✅ | 当前开发的 Agent ID，由 `update-config.sh` 自动注入 |
+| `devAgentId` | int64 | ✅ | 当前开发的 Agent ID，从 `DEV_AGENT_ID` 环境变量获取 |
 | `systemPrompt` | string | 否 | 系统提示词，留空不修改 |
 | `openingChatMsg` | string | 否 | 开场白/欢迎语，留空不修改 |
 

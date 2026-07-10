@@ -1,7 +1,7 @@
-"""flow-debugger 共用：UTF-8 安全的 4sandbox/agent/dev HTTP + SSE 调用。
+"""flow-debugger 共用：UTF-8 安全的 4sandbox/agent HTTP + SSE 调用。
 
-端点契约集中在本文件顶部常量；后端 4sandbox 会话执行接口 ready 后若路径/字段有差异，
-只需改这里的常量即可，无需动 debug.py。
+端点契约集中在本文件顶部常量。后端会话接口经沙箱重写（application.yml: agent/conversation/**）
+转发到内部 /api/agent/conversation/*；agent 配置接口直接暴露在 4sandbox。
 """
 
 from __future__ import annotations
@@ -13,21 +13,19 @@ import urllib.error
 import urllib.request
 
 # === 端点契约（后端 ready 后只改这里）======================================
-API_PREFIX = "/api/v1/4sandbox/agent/dev"
-# 严格镜像 nuwax 前端 /api/agent/conversation/* 子路径（仅前缀换到 4sandbox）。
-# 后端把 agent 会话接口转到 4sandbox 后子路径应与 nuwax 一致；若不同只改这里。
-CHAT_PATH = "/conversation/chat"                                    # POST(SSE) 发消息
-CONVERSATION_CREATE_PATH = "/conversation/create"                   # POST 新建会话（agent-dev「刷子」）
-CONVERSATION_DETAIL_PATH = "/conversation/{conversationId}"         # POST 会话内容/初始历史
-CONVERSATION_STOP_PATH = "/conversation/chat/stop/{conversationId}" # POST 取消（路径参=conversationId，无 body）
+API_PREFIX = "/api/v1/4sandbox/agent"
+# agent 配置接口（直接暴露）：GET 返回 agent 配置，含 devConversationId = 调试会话 ID
+AGENT_CONFIG_PATH = "/{devAgentId}"
+# 会话接口（经沙箱重写 agent/conversation/** → 内部 /api/agent/conversation/*）
+CHAT_PATH = "/conversation/chat"                                       # POST(SSE) 发消息（conversationId 用 devConversationId）
+CONVERSATION_CREATE_PATH = "/conversation/create"                      # POST 新建会话（agent-dev「刷子」）
+CONVERSATION_DETAIL_PATH = "/conversation/{conversationId}"            # POST 会话内容/初始历史
+CONVERSATION_STOP_PATH = "/conversation/chat/stop/{conversationId}"    # POST 取消（路径参=conversationId，无 body）
 PERMISSION_RESPONSE_PATH = "/conversation/chat/permission-request/response"  # POST 权限审批响应
-MESSAGE_LIST_PATH = "/conversation/message/list"                    # POST 分页历史
+MESSAGE_LIST_PATH = "/conversation/message/list"                       # POST 分页历史
 FINAL_EVENT_TYPES = ("FINAL_RESULT", "ERROR")  # 收到即终止 SSE 流
-# HITL：权限审批（顶层 ACP_REQUEST_PERMISSION；也可能 PROCESSING+subEventType=REQUEST_PERMISSION）
-PERMISSION_EVENT_TYPES = ("ACP_REQUEST_PERMISSION",)
-PERMISSION_SUBEVENT_TYPES = ("REQUEST_PERMISSION",)
-# ask-question：PROCESSING 事件 + subEventType=ASK_QUESTION（nuwax_ask_question 工具，无专用响应端点）
-ASK_QUESTION_SUBEVENT_TYPES = ("ASK_QUESTION",)
+# HITL 事件识别在 debug.py（_is_permission_event / _is_ask_question_event），
+# 兼容后端多形态（subType 顶层 / data 内 / snake_case），对齐平台 parseSseEventEnvelope。
 # ===========================================================================
 
 
@@ -60,8 +58,8 @@ def dev_agent_id() -> int:
 def conversation_id() -> str | None:
     """读沙箱注入的 CONVERSATION_ID。
 
-    该值 = dev-agent 当前所在的 DevDebug 会话 = 用户在 nuwax agent-dev 页面预览
-    业务 Agent 的那个会话（业务 Agent 的 devAgentConversationId）。把它作为
+    该值 = dev-agent 当前所在的 DevDebug 会话 = 用户在平台 agent-dev 页面预览
+    业务 Agent 的那个会话（业务 Agent 的 devConversationId）。把它作为
     conversationId 传给后端执行端点，执行消息会写入该会话，用户即可在预览面板看到输出。
     本地无沙箱时返回 None（此时执行结果仅在本地输出，不会出现在预览会话）。
     """
@@ -123,7 +121,7 @@ def api_request(method: str, path: str, body: dict | None = None) -> tuple[int, 
 
 
 def ensure_http_ok(status: int, payload: dict) -> dict:
-    """检查同步 HTTP 响应：status==200 且业务成功（nuwax RequestResponse：code=="0000" 或 success==true）。"""
+    """检查同步 HTTP 响应：status==200 且业务成功（平台 RequestResponse：code=="0000" 或 success==true）。"""
     if status == 404:
         print("[ERROR] 端点未就绪或资源不存在 (404)。", file=sys.stderr)
         print(
@@ -191,7 +189,7 @@ def sse_request(path: str, body: dict, timeout: int = 180):
         if e.code == 404:
             print(
                 "[提示] 后端 4sandbox 会话执行接口可能尚未就绪 "
-                f"(POST {API_PREFIX}{EXECUTE_PATH})；请确认后端已将该 agent 会话接口转到 4sandbox。",
+                f"(POST {API_PREFIX}{CHAT_PATH})；请确认后端已将该 agent 会话接口转到 4sandbox。",
                 file=sys.stderr,
             )
         sys.exit(3)

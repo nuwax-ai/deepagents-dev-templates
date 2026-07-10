@@ -13,7 +13,7 @@
  *  - router-gate       LLM 路由教学（custom 拓扑）
  * 更多形态见 `src/libs/topologies/`（积木）；场景 spec 范例在 `scripts/scaffold/specs/`。
  *
- * 选图：正式配置 `flow.active`（旧 `activeFlow` 兼容，缺省 "default"）。
+ * 选图：配置 `flow.active`（缺省 "default"）。
  * 组合根 index.ts 按 `resolveFlowSelection(raw)` + `resolveFlow(...)` 取 executor / topology。
  */
 
@@ -69,7 +69,7 @@ export type FlowDef =
 
 export interface FlowSelection {
   active: string;
-  source: "flow.active" | "activeFlow" | "default";
+  source: "flow.active" | "default";
   defaultInteraction: FlowInteractionKind;
   unknownActivePolicy: "warn-default" | "default";
 }
@@ -82,22 +82,13 @@ function normalizeUnknownPolicy(value: unknown): "warn-default" | "default" {
   return value === "default" ? "default" : "warn-default";
 }
 
-let warnedFlowActiveCompat = false;
-
-/** 从正式 flow 配置解析 active flow，同时兼容旧顶层 activeFlow。 */
+/** 从 flow 配置解析 active flow。 */
 export function resolveFlowSelection(raw: Record<string, unknown> = {}): FlowSelection {
   const flow = raw.flow && typeof raw.flow === "object" ? raw.flow as Record<string, unknown> : {};
   const activeFromFlow = typeof flow.active === "string" && flow.active.trim() ? flow.active.trim() : undefined;
-  const activeFromLegacy = typeof raw.activeFlow === "string" && raw.activeFlow.trim()
-    ? raw.activeFlow.trim()
-    : undefined;
-  if (activeFromFlow && activeFromLegacy && !warnedFlowActiveCompat) {
-    warnedFlowActiveCompat = true;
-    logger.warn(`flow.active="${activeFromFlow}" 优先于旧 activeFlow="${activeFromLegacy}"；请迁移到 flow.active。`);
-  }
   return {
-    active: activeFromFlow ?? activeFromLegacy ?? "default",
-    source: activeFromFlow ? "flow.active" : activeFromLegacy ? "activeFlow" : "default",
+    active: activeFromFlow ?? "default",
+    source: activeFromFlow ? "flow.active" : "default",
     defaultInteraction: normalizeInteraction(flow.defaultInteraction),
     unknownActivePolicy: normalizeUnknownPolicy(flow.unknownActivePolicy),
   };

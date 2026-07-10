@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # session.sh — dev 调试会话管理（委托 session.py）
 #
-# 对应 nuwax agent-dev 调试会话操作：
+# 对应平台 agent-dev 调试会话操作：
 #   new      新建会话（页面「刷子」按钮）
 #   current  获取当前会话
 #   cancel   取消/停止会话（页面「停止」按钮）

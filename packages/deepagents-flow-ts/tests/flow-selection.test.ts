@@ -16,26 +16,6 @@ describe("flow selection", () => {
     });
   });
 
-  it("prefers flow.active over legacy activeFlow", () => {
-    expect(
-      resolveFlowSelection({
-        activeFlow: "router-gate",
-        flow: { active: "search-aggregator", defaultInteraction: "approval" },
-      })
-    ).toMatchObject({
-      active: "search-aggregator",
-      source: "flow.active",
-      defaultInteraction: "approval",
-    });
-  });
-
-  it("keeps legacy activeFlow compatible", () => {
-    expect(resolveFlowSelection({ activeFlow: "router-gate" })).toMatchObject({
-      active: "router-gate",
-      source: "activeFlow",
-    });
-  });
-
   it("resolveFlow falls back to default for unknown names", () => {
     expect(resolveFlow("not-registered").name).toBe("default");
   });

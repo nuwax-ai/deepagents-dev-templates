@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""approve.py — 权限审批响应，严格镜像 nuwax permission-request/response。
+"""approve.py — 权限审批响应，严格镜像平台 permission-request/response。
 
 当 debug.sh 执行遇到 ACP_REQUEST_PERMISSION 权限审批、未 --auto-approve 而 exit 5 时，
 用本脚本响应（option-id 来自 exit 5 时列出的 options[]）：

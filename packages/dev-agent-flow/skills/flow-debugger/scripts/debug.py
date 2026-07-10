@@ -3,8 +3,8 @@
 
 发 prompt 驱动平台真实 agent 执行（POST /conversation/chat，SSE），收事件流，
 提取 文本回复 / 工具调用 trace / 错误，判定通过/失败，聚合失败原因。
-执行挂在用户 agent-dev 预览会话（CONVERSATION_ID）上，用户可在 nuwax 预览面板看到输出。
-严格镜像 nuwax agent-dev 调试会话（事件结构/端点契约见 references/sse-events.md）。
+执行挂在用户 agent-dev 预览会话（CONVERSATION_ID）上，用户可在预览面板看到输出。
+严格镜像平台 agent-dev 调试会话（事件结构/端点契约见 references/sse-events.md）。
 
 退出码：0 通过 | 1 参数错误 | 2 平台未就绪(env 缺) | 3 HTTP/SSE 失败(含端点未就绪/超时/流中断)
        | 4 调试不通过 | 5 遇 HITL（权限审批/ask-question）待人工响应
@@ -18,11 +18,8 @@ import sys
 import time
 
 from debug_http import (
-    ASK_QUESTION_SUBEVENT_TYPES,
     CHAT_PATH,
-    PERMISSION_EVENT_TYPES,
     PERMISSION_RESPONSE_PATH,
-    PERMISSION_SUBEVENT_TYPES,
     api_request,
     configure_stdio_utf8,
     conversation_id,
@@ -185,31 +182,107 @@ def aggregate_error_context(final_result, errors: list[str], tool_calls: list[di
     return "\n".join(sections) if sections else "未定位到明确错误原因"
 
 
-def _extract_tool_id(data: dict) -> str:
-    """从 ACP_REQUEST_PERMISSION 事件提取 tool_call_id（nuwax 多位置兼容）。"""
-    req = data.get("request_permission_request") or data.get("requestPermissionRequest") or {}
-    if not isinstance(req, dict):
-        req = {}
+def _parse_event_envelope(event: dict) -> tuple[dict, dict]:
+    """解析 SSE 事件 envelope + event_data，兼容后端多种形态（镜像平台 parseSseEventEnvelope）。
+
+    后端事件形态：subType/subEventType 在顶层 / data 内 / snake_case。返回 (envelope, event_data)。
+    """
+    data = event.get("data")
+    nested = data if isinstance(data, dict) else {}
+    if any(nested.get(k) for k in ("messageType", "message_type", "subType", "sub_type", "subEventType")):
+        envelope = nested
+    else:
+        envelope = event
+    ed = envelope.get("data")
+    if isinstance(ed, dict):
+        event_data = ed
+    elif isinstance(data, dict):
+        event_data = data
+    else:
+        event_data = event
+    return envelope, event_data
+
+
+def _get_request_permission_request(event_data: dict) -> dict:
+    """提取 request_permission_request（多位置：event_data / result.input）。"""
+    result = event_data.get("result") if isinstance(event_data.get("result"), dict) else {}
+    result_input = result.get("input") if isinstance(result.get("input"), dict) else {}
+    for c in (event_data, result_input, result):
+        if not isinstance(c, dict):
+            continue
+        for k in ("request_permission_request", "requestPermissionRequest"):
+            v = c.get(k)
+            if isinstance(v, dict):
+                return v
+    return {}
+
+
+def _is_permission_event(event: dict) -> bool:
+    """权限审批事件识别（对齐平台 applyAcpPermissionSseEvent 多形态判定）。"""
+    et = event.get("eventType", "")
+    if et == "ACP_REQUEST_PERMISSION":
+        return True
+    envelope, event_data = _parse_event_envelope(event)
+    sub_type = envelope.get("subType") or envelope.get("sub_type") or ""
+    msg_type = envelope.get("messageType") or envelope.get("message_type") or ""
+    if msg_type == "acpRequestPermission" and sub_type in ("AcpRequestPermission", "request_permission"):
+        return True
+    if et == "PROCESSING":
+        sub_event = event_data.get("subEventType") or envelope.get("subEventType") or ""
+        result = event_data.get("result") if isinstance(event_data.get("result"), dict) else {}
+        name = event_data.get("name") or result.get("name") or ""
+        if sub_event == "REQUEST_PERMISSION" or "RequestPermission" in str(name):
+            return True
+        if _get_request_permission_request(event_data):
+            return True
+    return False
+
+
+def _is_ask_question_event(event: dict) -> bool:
+    """ask-question 事件识别（对齐平台 applyMcpAskToolCallSseEvent）。"""
+    if event.get("eventType") != "PROCESSING":
+        return False
+    envelope, _ = _parse_event_envelope(event)
+    sub_event = envelope.get("subEventType") or event.get("subEventType") or ""
+    return sub_event == "ASK_QUESTION"
+
+
+def _extract_tool_id(event_data: dict) -> str:
+    """从权限事件提取 tool_call_id（多位置兼容）。"""
+    req = _get_request_permission_request(event_data)
     tool_call = req.get("toolCall") or req.get("tool_call") or {}
     if not isinstance(tool_call, dict):
         tool_call = {}
+    result = event_data.get("result") if isinstance(event_data.get("result"), dict) else {}
+    result_input = result.get("input") if isinstance(result.get("input"), dict) else {}
     return (
-        data.get("tool_call_id")
-        or data.get("toolCallId")
+        event_data.get("tool_call_id")
+        or event_data.get("toolCallId")
+        or result_input.get("tool_call_id")
+        or result_input.get("toolCallId")
         or tool_call.get("toolCallId")
         or tool_call.get("tool_call_id")
         or ""
     )
 
 
+def _extract_permission_options(event_data: dict) -> list:
+    """提取权限 options（多位置）。"""
+    req = _get_request_permission_request(event_data)
+    options = req.get("options")
+    if not isinstance(options, list):
+        result = event_data.get("result") if isinstance(event_data.get("result"), dict) else {}
+        result_input = result.get("input") if isinstance(result.get("input"), dict) else {}
+        options = result_input.get("options")
+    return options if isinstance(options, list) else []
+
+
 def _handle_permission(event: dict, args, conv: str) -> None:
-    """权限审批（ACP_REQUEST_PERMISSION）。--auto-approve 自动批准首个 allow option；否则 exit 5。"""
-    data = event.get("data") if isinstance(event.get("data"), dict) else {}
-    tool_id = _extract_tool_id(data)
-    req = data.get("request_permission_request") or data.get("requestPermissionRequest") or {}
-    if not isinstance(req, dict):
-        req = {}
-    options = req.get("options") or data.get("options") or []
+    """权限审批。--auto-approve 自动批准首个 allow option；否则 exit 5。"""
+    _, event_data = _parse_event_envelope(event)
+    tool_id = _extract_tool_id(event_data)
+    req = _get_request_permission_request(event_data)
+    options = _extract_permission_options(event_data)
 
     if args.auto_approve:
         allow = next(
@@ -233,7 +306,6 @@ def _handle_permission(event: dict, args, conv: str) -> None:
             return
         print("[HITL] 权限请求无可批准的 allow option，需人工处理。", file=sys.stderr)
 
-    # 列出 options，交给 approve.sh
     print(f"[HITL] 需要权限审批 (toolId={tool_id})", file=sys.stderr)
     print(f"  内容：{json.dumps(req, ensure_ascii=False)}", file=sys.stderr)
     for o in options:
@@ -254,12 +326,17 @@ def _handle_ask_question(event: dict, conv: str) -> None:
     """ask-question（PROCESSING+subEventType=ASK_QUESTION，nuwax_ask_question 工具）。
 
     无专用响应端点——答案作为普通 chat 消息回流（message 末尾带 marker）。
-    故这里只输出 question + 提示用 debug.sh --ask-marker 续接。
     """
-    data = event.get("data") if isinstance(event.get("data"), dict) else {}
-    result = data.get("result") if isinstance(data.get("result"), dict) else {}
+    _, event_data = _parse_event_envelope(event)
+    result = event_data.get("result") if isinstance(event_data.get("result"), dict) else {}
     ask = result.get("data") if isinstance(result.get("data"), dict) else {}
-    req_id = ask.get("requestId") or result.get("executeId") or data.get("tool_call_id") or ""
+    req_id = (
+        ask.get("requestId")
+        or event_data.get("executeId")
+        or result.get("executeId")
+        or event_data.get("tool_call_id")
+        or ""
+    )
     title = ask.get("title", "")
     print(f"[HITL] ask-question (requestId={req_id}): {title}", file=sys.stderr)
     print(f"  内容：{json.dumps(ask, ensure_ascii=False)[:500]}", file=sys.stderr)
@@ -336,19 +413,19 @@ def main() -> None:
         print("[ERROR] --message 或 --message-file 必填且非空", file=sys.stderr)
         sys.exit(1)
 
-    # 回答 ask-question：nuwax 约定答案作为普通消息回流，末尾带 requestId marker
+    # 回答 ask-question：平台约定答案作为普通消息回流，末尾带 requestId marker
     if args.ask_marker:
         message = message + f"\n<!--nuwax-mcp-ask-request-id:{args.ask_marker}-->"
 
     # 会话：优先 --conversation，其次沙箱注入的 CONVERSATION_ID（= 用户预览会话）
     conv = args.conversation or conversation_id() or ""
-    # nuwax ConversationChatParams：conversationId + message + debug（agent-dev 调试语义）
+    # ConversationChatParams：conversationId + message + debug（agent-dev 调试语义）
     body: dict = {"message": message, "debug": True}
     if conv:
         body["conversationId"] = conv
     if args.variables:
         try:
-            body["variables"] = json.loads(args.variables)
+            body["variableParams"] = json.loads(args.variables)
         except json.JSONDecodeError:
             print("[ERROR] --variables 必须是合法 JSON 对象", file=sys.stderr)
             sys.exit(1)
@@ -389,20 +466,15 @@ def main() -> None:
             break
 
         et = event.get("eventType", "")
-        sub = event.get("subEventType", "")
         data = event.get("data")
         err = event.get("error")
 
-        # HITL 人工介入
-        # 1) 权限审批：ACP_REQUEST_PERMISSION，或 PROCESSING+subEventType=REQUEST_PERMISSION
-        if et in PERMISSION_EVENT_TYPES or (
-            et == "PROCESSING" and sub in PERMISSION_SUBEVENT_TYPES
-        ):
+        # HITL 人工介入（兼容后端多形态事件：subType 在顶层 / data 内 / snake_case）
+        if _is_permission_event(event):
             _handle_permission(event, args, conv)
             last_activity = time.monotonic()
             continue
-        # 2) ask-question：PROCESSING+subEventType=ASK_QUESTION（无专用端点，exit 5 提示 --ask-marker）
-        if et == "PROCESSING" and sub in ASK_QUESTION_SUBEVENT_TYPES:
+        if _is_ask_question_event(event):
             _handle_ask_question(event, conv)
             last_activity = time.monotonic()
             continue

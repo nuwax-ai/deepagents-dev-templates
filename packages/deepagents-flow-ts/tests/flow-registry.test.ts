@@ -21,7 +21,7 @@ describe("flow registry", () => {
     expect(def.kind).toBe("stateful-custom");
   });
 
-  it("未知 activeFlow 回落 default（不抛错）", () => {
+  it("未知 flow.active 回落 default（不抛错）", () => {
     const def = resolveFlow("no-such-flow");
     expect(def.name).toBe("default");
   });

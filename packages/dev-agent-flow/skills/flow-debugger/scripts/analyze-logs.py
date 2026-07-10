@@ -25,7 +25,7 @@ import time
 
 from debug_http import configure_stdio_utf8
 
-# === 正则（沿用历史本地 smoke 判定思路 + nuwax devLogParser）==============
+# === 正则（沿用历史本地 smoke 判定思路 + 平台 devLogParser）==============
 ERROR_RE = re.compile(
     r"\[ERROR\]|\[error\]|Exception|Traceback|TypeError|ReferenceError|SyntaxError|"
     r"FATAL|Module not found|Can.t resolve|ELIFECYCLE|PostCSS Error|\bFailed\b|"

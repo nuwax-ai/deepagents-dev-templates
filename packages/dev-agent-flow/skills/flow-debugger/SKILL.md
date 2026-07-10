@@ -1,6 +1,6 @@
 ---
 name: flow-debugger
-description: "当需要用平台真实链路端到端调试目标 Agent、验证 flow 真实跑通、断言平台能力真实调用、管理调试会话（新建/取消）、处理权限审批与 ask-question、或分析 runtime 日志时使用。严格镜像 nuwax agent-dev 调试会话：发 prompt 驱动平台真实 agent 执行（非本地模拟），收 SSE 结构化结果（文本 + 工具调用 trace + 错误），自动判定通过/失败；执行出现在用户 agent-dev 预览会话。Keywords: 调试, debug, 真实执行, 端到端验证, 工具调用断言, 会话管理, 权限审批, ask-question, HITL, 多轮对话, SSE, outcome, 错误定位, 日志分析, 预览会话, flow-debugger"
+description: "当需要用平台真实链路端到端调试目标 Agent、验证 flow 真实跑通、断言平台能力真实调用、管理调试会话（新建/取消）、处理权限审批与 ask-question、或分析 runtime 日志时使用。严格镜像平台 agent-dev 调试会话：发 prompt 驱动平台真实 agent 执行（非本地模拟），收 SSE 结构化结果（文本 + 工具调用 trace + 错误），自动判定通过/失败；执行出现在用户 agent-dev 预览会话。Keywords: 调试, debug, 真实执行, 端到端验证, 工具调用断言, 会话管理, 权限审批, ask-question, HITL, 多轮对话, SSE, outcome, 错误定位, 日志分析, 预览会话, flow-debugger"
 tags: [debug, verify, e2e, sse, outcome, tool-assertion, multi-turn, hitl, session, smoke-replacement]
 version: "1.0.0"
 ---
@@ -9,7 +9,7 @@ version: "1.0.0"
 
 ## 概述
 
-严格镜像 nuwax agent-dev 调试会话，提供平台真实链路的调试能力（非本地 rcoder-cli 模拟）。
+严格镜像平台 agent-dev 调试会话，提供平台真实链路的调试能力（非本地 rcoder-cli 模拟）。
 
 | 脚本 | 能力 | 对应 agent-dev 操作 |
 |------|------|---------------------|
@@ -24,7 +24,7 @@ version: "1.0.0"
 
 ## 关键特性：用户预览会话可见
 
-`debug.sh` 默认读沙箱注入的 `CONVERSATION_ID`（= 用户 nuwax agent-dev 预览会话 = 业务 Agent 的 `devAgentConversationId`），作为 `conversationId` 传给后端。后端把执行挂到该会话 → **用户在 agent-dev 预览面板能实时看到调试输出**（文本/工具调用/结果）。这是与本地模拟的核心区别。
+`debug.sh` 默认读沙箱注入的 `CONVERSATION_ID`（= 用户 agent-dev 预览会话 = 业务 Agent 的 `devAgentConversationId`），作为 `conversationId` 传给后端。后端把执行挂到该会话 → **用户在 agent-dev 预览面板能实时看到调试输出**（文本/工具调用/结果）。这是与本地模拟的核心区别。
 
 ## When to Use
 
@@ -37,7 +37,7 @@ version: "1.0.0"
 
 ## 后端依赖
 
-依赖后端把 nuwax 的 agent 会话接口转到 4sandbox 下（端点前缀 `/api/v1/4sandbox/agent/dev`，子路径与 nuwax 一致）。契约集中在 `scripts/debug_http.py` 顶部常量，后端 ready 后若路径/字段有差异只改那里。端点未就绪时退出码 3 + 提示。完整契约与给后端的约束见 `references/sse-events.md`。
+后端会话接口已就绪：前缀 `/api/v1/4sandbox/agent`，会话接口（`/conversation/*`）经沙箱重写转发到内部 `/api/agent/conversation/*`，agent 配置（`GET /{devAgentId}`）直接暴露、返回 `devConversationId`（调试会话 ID）。契约集中在 `scripts/debug_http.py` 顶部常量。完整契约见 `references/sse-events.md`。
 
 ## 完整操作
 
@@ -146,5 +146,5 @@ version: "1.0.0"
 
 ## 参考
 
-- `references/sse-events.md` — SSE 事件结构 + AgentExecuteResult + 严格 nuwax 端点契约 + 给后端约束
+- `references/sse-events.md` — SSE 事件结构 + AgentExecuteResult + 严格平台端点契约 + 给后端约束
 - `references/outcome-rules.md` — 通过/失败判定规则 + 工具断言 + 错误聚合

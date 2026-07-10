@@ -1,7 +1,7 @@
 # 排错索引
 
 > **范围**：本工作目录内 flow 的运行时排错。
-> 先查 `.logs/`（`LOG_DIR=<REPO>/.logs`，`LOG_LEVEL=debug`；配置见 [zed-debug.md](zed-debug.md)）。
+> 先查 `.logs/`（`LOG_DIR=<REPO>/.logs`，`LOG_LEVEL=debug`）。
 > **图编排硬规则**（按 ID 追加）：[flow-graph-rules.md](flow-graph-rules.md)。
 
 ## `LLM 未返回 JSON`
@@ -48,13 +48,11 @@
 | 步 | 动作 |
 |----|------|
 | 1 | 确认 env 含 `LOG_DIR`、`LOG_LEVEL`（HITL 建议 `debug`） |
-| 2 | 复现：Zed / flow-debugger `debug.sh` / CLI |
+| 2 | 复现：Zed / CLI |
 | 3 | 打开 `.logs/` 最新 `.log` 或按 `sessionId` 定位 |
 | 4 | 过滤：`runtime:flow-graph`、`interrupt`、`onPrompt`、`permission 门控` 等 |
 | 5 | 修复后重跑，确认新日志无同类 error |
 | 6 | 记录根因摘要（勿把整段 log 提交 git） |
-
-常见前缀与 Zed 配置：[zed-debug.md](zed-debug.md)。
 
 ---
 
@@ -113,7 +111,7 @@
 1. 图在 LLM 节点抛错未走完，session 未正常收尾
 2. 并行调试命令与 ACP 会话交叉
 
-**建议**：先修图错误（尤其 `LLM 未返回 JSON`），再用 flow-debugger `debug.sh` 重跑。
+**建议**：先修图错误（尤其 `LLM 未返回 JSON`），再重跑（Zed / CLI）验证。
 
 ---
 
@@ -139,4 +137,3 @@
 - [node-kit.md](node-kit.md) — factory API + parse 契约摘要
 - [node-catalog.md](node-catalog.md) — 选型决策树
 - [flow-patterns.md](flow-patterns.md) — Send / interrupt / checkpoint
-- [zed-debug.md](zed-debug.md) — 日志 env 配置

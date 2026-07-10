@@ -31,7 +31,7 @@
 | 把聊天助手需求描述成“无须写图”的模式名 | **聊天助手型**；实现落点为 **default flow** | 用户可连续追问、按需调工具；适合客服、问答、搜索总结、通用助手。默认用 `flow.active: "default"` + `systemPrompt` + 平台能力，不为“开放追问”需求新写 custom graph。 |
 | 用英文机器值或工程黑话询问固定步骤需求 | **固定流程型** | 每次按固定步骤处理；适合翻译、审稿、打分、报告。机器值为 `pipeline`，用户话术不用“管线”。 |
 | 用 HITL / interrupt 等实现术语询问确认类需求 | **人工确认型** | 生成后需要用户确认、复核、给修改意见或定稿。机器值为 `approval`；实现通常使用 interrupt / resume 或 human-in-loop preset。 |
-| activeFlow | **`flow.active`** | 正式 flow 选择字段。旧顶层 `activeFlow` 仅为兼容读取；新配置、文档和脚手架都应写 `flow.active`。 |
+| flow.active | **`flow.active`** | 正式 flow 选择字段（config 的 `flow.active`，缺省 `default`）。 |
 | flow 类型、图类型 | **flow profile** | runtime 注册表中的机器可读画像：`interaction`（`chat` / `pipeline` / `approval`）、`implementation`（`default` / `preset` / `custom`）、`userLabel`、`summary` 等。开发 Agent 用 `flows --json` / `flows recommend --kind ...` 查询，不靠记忆硬背。 |
 | 为了写图而写图 | **graphReason** | `custom` spec 必填的写图理由；用于说明 default / preset 为什么不够。聊天助手型 custom 只有在 `graphReason` 明确成立时才允许。 |
 

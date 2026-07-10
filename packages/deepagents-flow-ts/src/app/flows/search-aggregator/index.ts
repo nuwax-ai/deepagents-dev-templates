@@ -14,8 +14,7 @@
  * 本文件不硬编码任何平台工具名（运行期工具命名以下发为准；bindTools 是发现式的，
  * 模型按工具描述自选）。未登记搜索能力时，systemPrompt 要求模型如实告知，不编造检索结果。
  *
- * 验证（completion gate）：用 flow-debugger 发触发搜索的 prompt（如「搜索并总结今天的 AI 新闻」），
- * 并以 --expect-tool=<搜索工具名子串> 断言工具真实调用（见 dev-agent-flow/skills/flow-debugger）。
+ * 验证：须触发搜索（如「搜索并总结今天的 AI 新闻」），并确认搜索工具被真实调用（防 LLM 兜底假绿）。
  */
 import type { FlowRuntime } from "../../../runtime/flow-runtime.js";
 import type { StatefulTopologyRecipe } from "../../../libs/topologies/types.js";

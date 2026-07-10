@@ -23,19 +23,10 @@
 | `package-platforms.mjs` | `pnpm run package:platforms` | 按平台归档 + `platforms.json` |
 | `validate-package.mjs` | `pnpm run validate:package` | 校验压缩包完整性 |
 
-## 真实调试（flow-debugger）
+## runtime 可观测/加速开关
 
-端到端验证已迁移到 **flow-debugger** skill（`packages/dev-agent-flow/skills/flow-debugger`）——走平台真实链路（非本地 rcoder-cli 模拟），执行出现在用户 agent-dev 预览会话。原来的本地 `pnpm smoke`（rcoder-cli）已移除。
-
-| 操作 | 命令 |
-|------|------|
-| 发消息真实执行 + 通过/失败判定 | `flow-debugger/scripts/debug.sh --message "..." --expect-tool <工具名>` |
-| 新建/获取/取消会话 | `flow-debugger/scripts/session.sh new\|current\|cancel` |
-| 权限审批响应 | `flow-debugger/scripts/approve.sh --tool-id ... --option-id ... --outcome selected\|cancelled` |
-| runtime 日志分析 | `flow-debugger/scripts/analyze-logs.sh` |
-
-> runtime 仍保留两个可观测/加速开关（非 smoke 专属，flow-debugger 复用）：
-> - `SMOKE_TOOL_TRACE=1`（session-trace 输出 `tool invoke start/done/failed` 摘要，供 analyze-logs 解析工具调用）
+> runtime 提供两个 env 开关（运行时读取，与构建脚本无关）：
+> - `SMOKE_TOOL_TRACE=1`（session-trace 输出 `tool invoke start/done/failed` 工具调用摘要到日志）
 > - `AGENT_LIGHT=1`（跳过 MCP 加载，轻量验证）
 
 ## Windows 打包工具（可选）
