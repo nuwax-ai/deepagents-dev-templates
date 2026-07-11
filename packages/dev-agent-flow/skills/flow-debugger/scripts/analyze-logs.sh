@@ -12,7 +12,7 @@
 #   ./scripts/analyze-logs.sh --since 10               # 最近 10 分钟
 #   ./scripts/analyze-logs.sh --dir <日志目录>          # 指定目录
 #
-# 环境变量: LOG_DIR(日志目录，默认 <cwd>/.logs 或 ~/.flowagents/logs)
+# 环境变量: LOG_DIR(日志目录；未设时按 <cwd>/.logs > <项目根>/.logs(向上找) > ~/.flowagents/logs 依次查找)
 # 退出码: 0 正常(未发现问题) | 1 参数错 | 3 找不到日志 | 4 发现问题
 
 set -euo pipefail

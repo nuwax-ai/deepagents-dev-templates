@@ -11,7 +11,9 @@
 与 debug.sh（平台视角 SSE 结果）组成完整调试闭环：debug.sh 看平台返回的结构化结果，
 analyze-logs.sh 看 runtime 内部的详细日志，二者结合定位问题。
 
-日志目录优先级：--dir > LOG_DIR env > <cwd>/.logs > ~/.flowagents/logs
+日志目录优先级：--dir > LOG_DIR env > <cwd>/.logs > <项目根>/.logs(自 cwd 向上找) >
+                <项目根>/.logs(自脚本目录向上找) > ~/.flowagents/logs
+（开发场景 runtime 日志常落在项目根 .logs/，脚本却可能从子目录调起 → 需向上找项目根。）
 退出码：0 正常(未发现问题) | 1 参数错 | 3 找不到日志 | 4 发现问题(错误/模型/失败工具/flowStatus 异常)
 """
 
@@ -39,9 +41,14 @@ TRACE_RE = re.compile(r"(?:flow\.run done|prompt_end)\b")
 PERM_RE = re.compile(
     r"permission|requestPermission|\binterrupt\b|\bHITL\b", re.IGNORECASE
 )
+# 模型/凭证问题：只匹配**明确的失败短语**，不匹配 apiKey/api_key 这类字段名裸出现——
+# 否则会把 `[info] ... OPENAI_API_KEY=072d…` 之类正常启动日志误判为问题（历史坑）。
+# 真实凭证/模型失败都带明确措辞（Invalid API Key / 401 / Missing credentials 等）。
 MODEL_RE = re.compile(
-    r"Invalid model|Invalid API Key|401 Unauthorized|403 Forbidden|"
-    r"\bapiKey\b|api_key|Missing credentials",
+    r"Invalid model|Invalid API Key|Incorrect API key|"
+    r"401 Unauthorized|403 Forbidden|Missing credentials|"
+    r"authentication failed|invalid[ _-]?token|"
+    r"api[ _-]?key (?:is )?(?:invalid|missing|required|not set)",
     re.IGNORECASE,
 )
 # 性能：runtime 装配阶段计时（perf-trace 输出 `perf ... phase=<name> ms=<n>`）。
@@ -74,8 +81,38 @@ def _parse_field(line: str, key: str):
     return raw
 
 
+# 项目根标记：命中任一即认为该目录是项目根（用于向上定位 <项目根>/.logs）。
+_PROJECT_ROOT_MARKERS = ("package.json", ".git", "config")
+
+
+def _project_root_logs(start: str) -> str | None:
+    """从 start 逐级向上，返回首个「含项目根标记且存在 .logs/」目录的 .logs/ 绝对路径。
+
+    开发场景 runtime 把日志写在 <项目根>/.logs，而 analyze-logs 可能从子目录（子包 /
+    skill scripts 目录）被调起，`os.getcwd()` ≠ 项目根 → <cwd>/.logs 落空。此处向上兜底。
+    找到项目根标记但该层无 .logs/ 时继续向上（兼容嵌套子包），直到文件系统根。
+    """
+    cur = os.path.abspath(start)
+    while True:
+        has_marker = any(
+            os.path.exists(os.path.join(cur, m)) for m in _PROJECT_ROOT_MARKERS
+        )
+        if has_marker:
+            candidate = os.path.join(cur, ".logs")
+            if os.path.isdir(candidate):
+                return os.path.abspath(candidate)
+        parent = os.path.dirname(cur)
+        if parent == cur:  # 到达文件系统根，停止
+            return None
+        cur = parent
+
+
 def find_log_dir(explicit: str | None = None) -> str | None:
-    """按优先级找日志目录：--dir > LOG_DIR env > <cwd>/.logs > ~/.flowagents/logs。"""
+    """按优先级找日志目录。
+
+    优先级：--dir > LOG_DIR env > <cwd>/.logs > <项目根>/.logs(自 cwd 向上) >
+            <项目根>/.logs(自脚本目录向上) > ~/.flowagents/logs。
+    """
     candidates = []
     if explicit:
         candidates.append(explicit)
@@ -83,6 +120,10 @@ def find_log_dir(explicit: str | None = None) -> str | None:
     if env_dir:
         candidates.append(env_dir)
     candidates.append(os.path.join(os.getcwd(), ".logs"))
+    # cwd 不是项目根时（子包 / skill scripts 目录调起）向上找 <项目根>/.logs。
+    candidates.append(_project_root_logs(os.getcwd()))
+    # cwd 与项目完全无关时，再从脚本自身目录向上兜底。
+    candidates.append(_project_root_logs(os.path.dirname(os.path.abspath(__file__))))
     candidates.append(os.path.expanduser("~/.flowagents/logs"))
     for c in candidates:
         if c and os.path.isdir(c):
@@ -227,12 +268,13 @@ def main() -> None:
             log_dir = find_log_dir()
             if not log_dir:
                 print(
-                    "[ERROR] 找不到日志目录（按优先级查找：LOG_DIR env > <cwd>/.logs > ~/.flowagents/logs）。",
+                    "[ERROR] 找不到日志目录（按优先级查找：LOG_DIR env > <cwd>/.logs > "
+                    "<项目根>/.logs(自 cwd/脚本目录向上找) > ~/.flowagents/logs）。",
                     file=sys.stderr,
                 )
                 print(
-                    "[提示] 若 runtime 未写日志，确认 flow-ts 已设置 LOG_DIR 或默认 ~/.flowagents/logs 有产出；"
-                    "或用 --dir 显式指定。",
+                    "[提示] 开发场景 runtime 日志常落在 <项目根>/.logs；确认该目录有产出，"
+                    "或设置 LOG_DIR / 用 --dir 显式指定。",
                     file=sys.stderr,
                 )
                 sys.exit(3)
