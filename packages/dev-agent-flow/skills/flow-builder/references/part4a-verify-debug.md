@@ -77,11 +77,11 @@ pnpm graph
 | 步 | 动作 |
 |----|------|
 | 1 | 日志搜 `LLM 未返回 JSON` 或节点 `label`（如 `prepare`） |
-| 2 | 打开 `src/app/flows/<name>/graph.ts` 对应节点，查是否有 `parse: parseJson` |
+| 2 | 打开 `src/app/graph.ts`（或自建 flow 的 `src/app/flows/<name>/graph.ts`）对应节点，查是否有 `parse: parseJson` |
 | 3 | 查 `write` 是否使用 `r.parsed` — **未使用则删 `parse`** |
 | 4 | 若必须结构化：加强 prompt JSON schema / 加 `fallback` 或换 `createLlmRouterNode` + `routeFallback` |
 | 5 | 若入口节点：改 prompt 支持非预期输入（打招呼、格式错误），不强求 JSON |
-| 6 | **同步** `scripts/scaffold/specs/<name>.flow.json`（手改 graph 后 regenerate 会覆盖修复） |
+| 6 | 改图后同步 `docs/` 相关范式说明（**R-G003**，SHOULD） |
 
 详表见当前工作目录 `docs/troubleshooting.md` § `LLM 未返回 JSON`。
 
@@ -94,10 +94,10 @@ pnpm graph
 | 步 | 动作 |
 |----|------|
 | 1 | 确认症状：客户端长时间无字，最后一次性出全文（`streamed=false` 兜底） |
-| 2 | 打开 `src/app/flows/<name>/graph.ts`，查用户可见节点（compose / aggregate / draft / finalize 修订） |
+| 2 | 打开 `src/app/graph.ts`（或自建 flow 的 `src/app/flows/<name>/graph.ts`），查用户可见节点（compose / aggregate / draft / finalize 修订） |
 | 3 | 若用 `createLlmNode` → 改为 **`createLlmStreamNode`**，`write` 从 `r.content` 改为 **`r.text`**，补 `timeoutMs: resolveLlmResilience(appConfig).longTimeoutMs` |
-| 4 | 若来自 scaffold：查 `scripts/scaffold/specs/<name>.flow.json` 是否 `type: "llm-stream"` 且 `write` 用 `r.text` |
-| 5 | **同步** spec 与 graph（**R-G003**）；用 flow-debugger 重跑并观察流式输出 |
+| 4 | 确认该节点 `write` 用 `r.text`（**R-G009**），非 `r.content` |
+| 5 | 改图后同步 `docs/` 相关说明（**R-G003**，SHOULD）；用 flow-debugger 重跑并观察流式输出 |
 | 6 | 仍不流式：确认模型支持 `.stream()`；查当前工作目录 README § 流式输出检查清单 L2/L3 降级 |
 
 **与工具 EXECUTING 的关系**：图在 LLM 节点抛错未走完时，并行调试命令可能长时间显示 EXECUTING；先修图错误再判工具层。
