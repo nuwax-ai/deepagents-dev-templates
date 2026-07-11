@@ -31,7 +31,7 @@
 | 按需调平台 / MCP 工具 | 登记后宿主注入；默认图 `think.bindTools(runtime.allTools)` | 否 |
 | **必须**固定阶段顺序（先 A 再 B 再 C） | **固定流程型**：手写 `src/app/graph.ts`（Part 1 + Part 2） | 是 |
 | **必须** Send 并行、多源聚合、条件重试 | 手写图或子图（Part 2 + `docs/flow-patterns.md`） | 是 |
-| **必须**跨 turn 人审 / 审批 / 定稿 | HITL interrupt+resume（Part 1/2） | 是 |
+| **必须** multi-turn HITL（人审 / 审批 / 定稿） | interrupt/resume（Part 1/2） | 是 |
 
 **聊天助手型默认路径（MVP 最快）**：`flow.active: "default"` + `dev-engineer-toolkit` 登记平台能力 + Part 5 systemPrompt ≈ 交付，**不写任何图代码**。
 

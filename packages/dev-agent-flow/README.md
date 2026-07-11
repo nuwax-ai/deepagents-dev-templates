@@ -6,7 +6,7 @@
 
 与 `dev-agent`（面向 `deepagents-app-ts`，自由 tool loop）不同，本包面向 **`nuwax-flow-ts`** —— Agent 按 **LangGraph node + edge 图**跑（框架内置**默认 ReAct**，可手写扩展），而非自由 tool loop。
 
-**交付路径**：先判定 **default 是否够用**（权威：目标项目 `docs/examples.md` § 先判定）。说不清「为什么不够」→ `flow.active: "default"` + 平台能力登记 + systemPrompt，**不写图**（已含 ReAct + 多轮记忆）。**必须**固定阶段顺序、Send 并行/多源聚合/条件重试、或跨 turn HITL 时，才加载 `flow-builder` Part 1/Part 2 手写 `src/app/graph.ts`（框架无脚手架、无 `src/libs/topologies/`、注册表仅 `default`）。**勿把改图当菜单推销**；命中能力门槛再升级。
+**交付路径**：先判定 **default 是否够用**（权威：目标项目 `docs/examples.md` § 先判定）。说不清「为什么不够」→ `flow.active: "default"` + 平台能力登记 + systemPrompt，**不写图**（已含 ReAct + 多轮记忆）。**必须**固定阶段顺序、Send 并行/多源聚合/条件重试、或 multi-turn HITL 时，才加载 `flow-builder` Part 1/Part 2 手写 `src/app/graph.ts`（框架无脚手架、无 `src/libs/topologies/`、注册表仅 `default`）。**勿把改图当菜单推销**；命中能力门槛再升级。
 
 ## 与 dev-agent 的关系
 
