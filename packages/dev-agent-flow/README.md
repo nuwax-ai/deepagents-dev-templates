@@ -31,7 +31,7 @@
 | **开发 Agent 引导** | 本包 `system-prompt.md`（**规则/约束**）+ `skills/flow-builder/`（**实现步骤**）+ `skills/dev-engineer-toolkit/` | `system-prompt` 定铁律；`flow-builder` Part 0–7 承载逐步流程（图选型落地、编排、提示词提炼、completion gate 等） |
 | **能力与工具对照** | [../deepagents-flow-ts/docs/capabilities.md](../deepagents-flow-ts/docs/capabilities.md) | 平台工具 schema 来源、运行时装配、节点工具引用与 allTools 合并规则 |
 
-**单一权威原则**：图怎么写、规则 ID、factory API → 读目标项目 `docs/`；开发流程、平台登记、**completion gate（完成闸门）** → 读本包 `flow-builder` Part*。技能内 `references/flow-graph-rules-pointer.md` 仅为**路由页**，详表永远在目标项目 `docs/flow-graph-rules.md`。**术语**（聊天助手型 / 固定流程型、HITL 人审编排、flow profile、`flow.active`、durable stateful flow / topology / 护栏分语境 等）统一以目标项目 `docs/glossary.md` 为准。
+**单一权威原则**：图怎么写、规则 ID、factory API → 读目标项目 `docs/`；**可否报完成（completion gate normative）** → 本包 `system-prompt.md` 的 `<SESSION_CLOSE>`；**操作细则**（命令、排错、证据怎么贴）→ `flow-builder` Part 0 § Phase 3–4 / Part 4。技能内 `references/flow-graph-rules-pointer.md` 仅为**路由页**，详表永远在目标项目 `docs/flow-graph-rules.md`。**术语**（聊天助手型 / 固定流程型、HITL 人审编排、flow profile、`flow.active`、durable stateful flow / topology / 护栏分语境 等）统一以目标项目 `docs/glossary.md` 为准。
 
 **CLI 约定**（与模板 `package.json` scripts 对齐）：profile / graph / capabilities 用 `pnpm flows` / `pnpm graph` / `pnpm capabilities`，**禁止 `pnpm exec tsx`**（pnpm 10/11 沙箱预检问题见目标项目 `docs/troubleshooting.md`）。
 

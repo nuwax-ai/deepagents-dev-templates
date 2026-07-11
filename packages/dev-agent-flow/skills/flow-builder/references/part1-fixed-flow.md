@@ -2,7 +2,6 @@
 
 > 所属：`flow-builder` L2-A。入口路由见上级 [SKILL.md](../SKILL.md)。
 > **本框架无脚手架、无 `src/libs/topologies/` 预设图、无内置场景 flow**（注册表仅 `default` ReAct）。固定流程型一律**直接改 `src/app/graph.ts`** 手写落地；本 Part 负责「选型 + 落地骨架」，编排细节见 [part2-orchestration.md](part2-orchestration.md)。
-> 旧文件名 `part1-scaffold.md` 仅为兼容重定向 stub，权威正文即本文件。
 
 把**固定流程型**需求落地成可跑 flow：先按范式**选型**（定 state/nodes/edges），再在 `src/app/graph.ts` **手写连线**，节点优先 `src/libs/nodes/` factory。流程内若某步需审批/人工复核/定稿，加 **HITL 人审节点**（interrupt+resume），它是固定流程型下的一种编排，不是独立形态。
 

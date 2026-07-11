@@ -44,9 +44,11 @@ OLD=$(./scripts/session.sh refresh -q)   # 可选：记录当前 devConversation
 
 ## completion gate 用法
 
+须满足系统提示词 `<SESSION_CLOSE>`（`--with-logs` 双证；平台能力加 `--expect-tool`）：
+
 ```bash
 pnpm typecheck && pnpm test && pnpm graph
-./scripts/debug.sh --message "<主路径 prompt>"
+./scripts/debug.sh --message "<主路径 prompt>" --with-logs
 ```
 
 有平台能力时必须追加工具断言：
@@ -54,7 +56,8 @@ pnpm typecheck && pnpm test && pnpm graph
 ```bash
 ./scripts/debug.sh \
   --message "搜索并总结今天的 AI 行业新闻，标注来源" \
-  --expect-tool search
+  --expect-tool search \
+  --with-logs
 ```
 
 HITL / approval flow：

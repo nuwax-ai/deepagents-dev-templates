@@ -1,24 +1,24 @@
 # Part 4a：验证与调试（强制）
 
 > 所属：`flow-builder` L2-D。入口路由见 [SKILL.md](../SKILL.md)。
-> completion gate（完成闸门）与读日志排错的**详细执行依据**在本层；总清单见 [part0-workflow.md](part0-workflow.md) § completion gate 收尾清单。
+> completion gate：**normative（可否报完成）** → 开发 Agent 系统提示词 `<SESSION_CLOSE>`；**本层 = 操作细则**（命令、排错）。总清单见 [part0-workflow.md](part0-workflow.md) § completion gate 收尾清单。
 
-## completion gate（完成闸门）
+## completion gate（完成闸门 · 操作细则）
 
-本地开发迭代优先用 flow-debugger `debug.sh --message "<短 prompt>"`，快速确认主路径能在平台真实链路跑通；收工真实运行验证也必须走 flow-debugger。本地 `pnpm smoke` / rcoder-cli 已移除。
+本地开发迭代优先用 flow-debugger `debug.sh --message "<短 prompt>" --with-logs`，快速确认主路径能在平台真实链路跑通；收工真实运行验证也必须走 flow-debugger。本地 `pnpm smoke` / rcoder-cli 已移除。
 
-报告「完成 / done」前必须在本轮真实执行并贴出原始输出：
+报告「完成 / done」前必须在本轮真实执行并贴出原始输出（须满足 `<SESSION_CLOSE>`）：
 
 ```bash
 pnpm typecheck && pnpm test && pnpm graph
-flow-debugger/scripts/debug.sh --message "..." [--expect-tool <工具名子串>]
+flow-debugger/scripts/debug.sh --message "..." --with-logs [--expect-tool <工具名子串>]
 ```
 
 失败 → 读完整错误 → 修复 → 重跑；至多 5 轮仍不绿则如实交回用户。
 
 **真实运行门**：flow-debugger 用平台真实会话端到端复现完整运行路径，是生产路径的质量门；静态三连不能替代。执行应出现在用户 agent-dev 预览会话。
 
-Scaffold 生成器自带快检（`typecheck && graph`）；开发中可追加 flow-debugger 短 prompt，**全量 completion gate 仍须三连 + flow-debugger 真实调试**。
+手写图后静态快检：`pnpm typecheck && pnpm graph`；开发中可追加 flow-debugger 短 prompt，**全量 completion gate 仍须三连 + `debug.sh --with-logs`**（平台能力加 `--expect-tool`）。
 
 **收尾清单**（系统提示词非空、R-G009、**平台能力搜索证据**等）→ [part0-workflow.md](part0-workflow.md) § completion gate 收尾清单。
 

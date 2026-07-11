@@ -15,7 +15,6 @@ flow-builder/
 └── references/
     ├── part0-workflow.md          ← 端到端流程 / completion gate 清单 / LangGraph 文档 / 内置工具
     ├── part1-fixed-flow.md        ← 固定流程型：图选型 + 手写 src/app/graph.ts 落地（含 HITL 人审）
-    ├── part1-scaffold.md          ← stub → part1-fixed-flow.md（旧链接兼容；无脚手架）
     ├── part2-orchestration.md
     ├── part3-tools-config.md
     ├── part4a-verify-debug.md
@@ -93,7 +92,7 @@ flow-builder/
 
 ## L1 铁律
 
-- **文档分工**：图规则 / factory API / 配置路径 / **术语** → 当前工作目录 `docs/`（**术语权威**：`docs/glossary.md`）；图选型流程 / 平台登记 / **completion gate（完成闸门）** → 本技能 Part*。
+- **文档分工**：图规则 / factory API / 配置路径 / **术语** → 当前工作目录 `docs/`（**术语权威**：`docs/glossary.md`）；**可否报完成** → 系统提示词 `<SESSION_CLOSE>`（normative）；图选型 / 平台登记 / 收工**操作细则** → 本技能 Part*。
 - 图是契约；factory 优先；**Bespoke nodes** 不硬塞 factory；框架注册表仅 `default`（ReAct），**无 scaffold / 无 `src/libs/topologies/` / 无内置场景 flow**——固定流程型（含流程内 HITL 人审）直接改 `src/app/graph.ts`，扩展范式对照 `docs/examples.md` / `docs/flow-patterns.md`；保护区不改。
 - **用户可见大段 LLM 输出**（compose / aggregate / draft / 修订稿）→ **`createLlmStreamNode`**（`write` 读 `r.text`）；**禁止** `createLlmNode`（仅 invoke）；**R-G009**。
 - **平台能力（外部工具/Plugin/技能）** → **写图前**必须先 `dev-engineer-toolkit` 搜平台并 `add-tool`，再用 `get-config --key tools --full` 确认已注册工具的真实工具名（**禁止**手抄 schema）；真实调试/运行时由平台宿主注入，`deepagents-flow-ts` 加载进 `runtime.allTools`（默认 ReAct `think.bindTools(runtime.allTools)` 绑定）；固定管道节点用 `pickTools(runtime.allTools, names)` 得到 `StructuredTool[]` 后传 `createToolExecNode`，主动调用节点按工具名定位并 `invoke`；**禁止**为已登记能力手写 fetch/`tool()` 包装；**`add-tool` 后加载 `flow-debugger`**；收工须 `debug.sh --with-logs` + `--expect-tool` + 日志 `[结论]`；**禁止**用 `pnpm flow` 冒充端到端；**联网搜索较常见**，见 Part 3 § 联网搜索；禁止未搜平台就写外部能力、禁止以「用户待配置」代替登记（见 Part 3 § 平台能力登记、Part 0 completion gate）。

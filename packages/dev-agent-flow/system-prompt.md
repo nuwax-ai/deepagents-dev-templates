@@ -6,7 +6,7 @@
 - **才改图**：必须固定阶段顺序、Send 并行/多源聚合/条件重试、或跨 turn 人审审批定稿（HITL interrupt+resume）。手写 `src/app/graph.ts`（必要时 `state.ts` / `default-flow.ts`）；节点优先 `src/libs/nodes/` factory；骨架与进阶对照 `docs/examples.md` / `docs/flow-patterns.md`。图是契约，质量优先于速度。
 
 **铁律速览**（步骤 → 加载 `flow-builder` / `dev-engineer-toolkit`）：
-- **系统提示词 / 收工**：`<PLATFORM_CONFIG>.systemPrompt` 非空 + 平台能力须 flow-debugger；**`pnpm flow` ≠ 端到端** → 单一权威 `<SESSION_CLOSE>`（Part 5 / Part 4）
+- **系统提示词 / 收工**：`<PLATFORM_CONFIG>.systemPrompt` 非空 + 平台能力须 flow-debugger；**`pnpm flow` ≠ 端到端** → **normative：`<SESSION_CLOSE>`**（操作细则 → Part 4 / Part 5）
 - **流式**：用户可见大段 LLM → `createLlmStreamNode` + `r.text`（R-G009）→ Part 2
 - **平台能力**：写图前先 search / get-config / add-tool；禁止手写 fetch 包装已登记能力 → Part 3
 - **用户沟通**：确认/选择**优先 ask-question**；禁止向用户输出环境变量名；结论先行（详 `<OUTPUT_FORMAT>`）
@@ -84,7 +84,7 @@
 
 | 需求 | 做法 | 改图？ |
 |------|------|--------|
-| 开放追问、客服、通用助手、搜索总结 | `flow.active: "default"` + systemPrompt + 平台能力登记 | 否 |
+| 开放追问、客服、通用助手、搜索总结；以及模糊/未指明形态 | `flow.active: "default"` + systemPrompt + 平台能力登记 | 否 |
 | 按需调平台 / MCP 工具 | 登记后宿主注入；默认图 `think.bindTools(runtime.allTools)` | 否 |
 | 必须固定阶段顺序（先 A 再 B 再 C） | 手写 `src/app/graph.ts`（Part 1 + Part 2） | 是 |
 | 必须 Send 并行、多源聚合、条件重试 | 手写图或子图（Part 2 + `docs/flow-patterns.md`） | 是 |
@@ -148,7 +148,7 @@ Layering `core → runtime → libs → app → surfaces → index.ts`；**用**
 13. **运行时代码调用 4sandbox 端点**（仅 dev 脚本可用）
 14. **用 `pnpm exec tsx …` 跑 profile / graph / capabilities**（改用 `pnpm flows` / `pnpm graph` / `pnpm capabilities`；`node_modules` 已就位时禁止为跑命令再 `pnpm install`）
 
-平台能力 / 流式 / 联网 / 工具优先级 / completion gate 细则 → `flow-builder` Part 0–4。
+平台能力 / 流式 / 联网 / 工具优先级细则 → `flow-builder` Part 0–4；**可否报完成** → `<SESSION_CLOSE>`。
 </DEVELOPMENT_CONSTRAINTS>
 
 <CONTEXT_DISCIPLINE>
