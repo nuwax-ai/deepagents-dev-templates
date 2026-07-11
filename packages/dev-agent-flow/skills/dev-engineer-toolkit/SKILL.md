@@ -2,7 +2,7 @@
 name: dev-engineer-toolkit
 description: "当开发项目需要搜索可用工具（API）、可用技能（SKILL）、或进行项目配置（系统提示词、开场白等智能体配置）时使用。这是开发工程师的基础技能包，所有涉及额外API接口查询、技能发现、项目配置读写的场景都必须使用本技能。Keywords: API搜索, 技能搜索, 项目配置, 系统提示词, 开场白, agent配置, 工具搜索, tool search, skill discovery"
 tags: [api-search, skill-search, project-config, dev-toolkit, agent-config, tool-discovery]
-version: "1.7.3"
+version: "1.7.4"
 ---
 
 # 开发工程师工具包
@@ -341,7 +341,7 @@ Python 环境由 `check-python.sh` 自动探测，缺失时可用 `--install`（
 # 只看已注册工具列表（摘要）
 ./scripts/get-config.sh --key tools
 
-# 取已注册工具的完整配置（含 schema），固化进 flow spec.tools
+# 取已注册工具的完整配置（含真实工具名与 schema），供图内节点按名引用 + 收工 --expect-tool 断言
 ./scripts/get-config.sh --key tools --full
 
 # 只看已注册技能列表（含下载链接）
@@ -357,7 +357,7 @@ Python 环境由 `check-python.sh` 自动探测，缺失时可用 `--install`（
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
 | `--key` | string | - | 只查看指定配置：`systemPrompt`、`openingChatMsg`、`tools`、`skills`、`mcpConfigs`；不填返回全部 |
-| `--full` | flag | - | 配合 `--key tools` 输出完整工具配置（含 schema），用于固化进 flow `spec.tools` |
+| `--full` | flag | - | 配合 `--key tools` 输出完整工具配置（含真实工具名与 schema），供图内节点从 `runtime.allTools` 按名引用、收工 `--expect-tool` 断言 |
 
 **返回示例（完整配置）：**
 
@@ -466,16 +466,16 @@ Python 环境由 `check-python.sh` 自动探测，缺失时可用 `--install`（
 1. 注册工具（必须先注册才能调用）
    ./scripts/add-tool.sh --target-type "Plugin" --target-id 614
 
-2. 取已注册工具的真实配置，固化进 flow spec.tools（非手抄 search 结果）
+2. 取已注册工具的真实工具名与 schema（非手抄 search 结果）
    ./scripts/get-config.sh --key tools --full
-   - 用返回的 targetType / targetId / schema 等固化进 spec.tools
+   - 记录返回的真实工具名 / targetType / targetId 到 project.md
 
-3. 根据固化配置开发图节点
+3. 真实调试/运行时由平台宿主注入，图节点从 runtime.allTools 按真实工具名引用（默认 ReAct bindTools）
    - 保持 schema 中的 ${...} 占位符，不硬编码
 ```
 
-> ⚠️ **注册是调用前提**：搜索到的 Plugin、Workflow、Knowledge、Skill 必须先通过 `add-tool.sh` 注册才能调用。
-> ⚠️ **配置来自 get-config**：`spec.tools` 的工具配置须用 `get-config --key tools --full` 拉取已注册的真实配置固化，**禁止**照 `search-apis.sh` 结果手抄 schema。
+> ⚠️ **注册是调用前提**：搜索到的 Plugin、Workflow、Knowledge、Skill 必须先通过 `add-tool.sh` 注册；真实调试/运行时由平台宿主注入给目标 Agent。
+> ⚠️ **工具名来自 get-config**：图内节点引用 / flow-debugger `--expect-tool` 的工具名须用 `get-config --key tools --full` 拉取已注册的真实名称，**禁止**照 `search-apis.sh` 结果手抄 schema。
 
 ### 工作流 B：开发前资源发现
 

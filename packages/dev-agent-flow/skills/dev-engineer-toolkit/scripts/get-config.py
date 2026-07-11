@@ -25,7 +25,7 @@ def print_key(data: dict, key: str, full: bool = False) -> None:
     if key in ("tools", "skills", "mcpConfigs") and isinstance(val, list):
         if key == "tools":
             if full:
-                # 完整输出（含 schema），供开发期固化进 flow spec.tools（非手抄）
+                # 完整输出（含 schema），用于确认真实工具名与调试断言（非手抄 search 结果）。
                 print(json.dumps(val, ensure_ascii=False, indent=2))
                 return
             print(f"=== 已注册工具 ({len(val)} 个) ===")
@@ -93,7 +93,7 @@ def main() -> None:
     p.add_argument(
         "--full",
         action="store_true",
-        help="配合 --key tools 输出完整工具配置（含 schema），用于固化进 flow spec.tools",
+        help="配合 --key tools 输出完整工具配置（含真实工具名与 schema），用于图内按名引用与 --expect-tool 断言",
     )
     args = p.parse_args()
 

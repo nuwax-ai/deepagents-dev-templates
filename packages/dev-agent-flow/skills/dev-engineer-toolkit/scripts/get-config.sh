@@ -4,7 +4,7 @@
 # 用法:
 #   ./scripts/get-config.sh
 #   ./scripts/get-config.sh --key systemPrompt
-#   ./scripts/get-config.sh --key tools --full   # 取完整工具配置（含 schema），固化进 flow spec.tools
+#   ./scripts/get-config.sh --key tools --full   # 取完整工具配置（含真实工具名与 schema）
 #
 # Python 检测: ./scripts/check-python.sh
 #
