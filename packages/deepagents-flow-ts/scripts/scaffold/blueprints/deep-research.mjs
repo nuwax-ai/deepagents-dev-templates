@@ -6,7 +6,7 @@
  * 图逻辑单一权威在 src/libs/topologies/deep-research/；本 blueprint 只生成薄封装绑 spec。
  *
  * spec.systemPrompt 不注入：deep-research 是多阶段领域 prompt（clarify/plan/research/draft/converse），
- * 通用 persona 不适配多阶段研究范式。
+ * 通用 systemPrompt 不适配多阶段研究范式。
  * ⚠️ research 真实检索须平台登记 docMcp / searchMcp + 模型凭证。
  */
 

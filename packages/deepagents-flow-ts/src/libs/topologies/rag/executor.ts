@@ -5,7 +5,7 @@
  * scaffold 生成的 flow 用 createRagExecutor（mcpServers 驱动，不需 rag 配置文件）。
  *
  * spec.systemPrompt 不注入：rag 的 rewrite/generate 节点是领域 RAG prompt（检索+规则），
- * 通用 persona 不适配检索范式（计划：多 LLM 节点拓扑保留领域 prompt）。
+ * 通用 systemPrompt 不适配检索范式（计划：多 LLM 节点拓扑保留领域 prompt）。
  */
 import type { FlowRuntime } from "../../../runtime/flow-runtime.js";
 import type { FlowExecutor } from "../../../core/flow-types.js";
