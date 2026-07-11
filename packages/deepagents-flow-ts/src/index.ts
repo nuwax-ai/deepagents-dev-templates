@@ -154,22 +154,16 @@ export async function createFlowRuntime(
 
 /**
  * materializeFlow —— 把 FlowDef 物化成 surface 能用的 StatefulFlow。
- *
- * `stateful-recipe` 在此（root，能 import surfaces）调 createStatefulFlow 包装 recipe
- * （规避 app/libs → surfaces 分层违规）；`stateful-custom` 直接调各自 createExecutor。
  * createStatefulFlow 全工程仅此一处调用。
  */
 function materializeFlow(def: FlowDef, runtime: FlowRuntime): StatefulFlow {
-  if (def.kind === "stateful-recipe") {
-    return createStatefulFlow({
-      ...def.recipe(runtime),
-      checkpointer: runtime.checkpointer,
-      appConfig: runtime.config,
-      conversational: def.profile.interaction === "chat",
-      mcpClient: runtime.ctx.mcpClient ?? undefined,
-    });
-  }
-  return def.createExecutor(runtime);
+  return createStatefulFlow({
+    ...def.recipe(runtime),
+    checkpointer: runtime.checkpointer,
+    appConfig: runtime.config,
+    conversational: def.conversational ?? def.profile.interaction === "chat",
+    mcpClient: runtime.ctx.mcpClient ?? undefined,
+  });
 }
 
 interface ParsedArgs {

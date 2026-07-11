@@ -3,7 +3,7 @@ import { createPlatformToolDescriptors } from "../src/runtime/platform-tools/des
 import { schemaToZodInput } from "../src/runtime/platform-tools/schema-to-zod.js";
 
 describe("platform schema-driven tooling", () => {
-  it("将 spec.tools 展开为 descriptor（toolName = targetType_targetId，从 schema 解析）", () => {
+  it("将 platformToolRefs 展开为 descriptor（toolName = targetType_targetId，从 schema 解析）", () => {
     const descriptors = createPlatformToolDescriptors([
       {
         targetType: "Plugin",

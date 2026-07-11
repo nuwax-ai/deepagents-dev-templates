@@ -59,6 +59,7 @@ export function createFlowGraph(config: CreateFlowGraphConfig = {}) {
       "tools",
       createToolExecNode<FlowState>({
         tools: allTools,
+        config: config.config,
         callbacks,
         write: (msgs) => ({
           messages: msgs,

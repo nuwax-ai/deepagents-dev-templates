@@ -192,8 +192,10 @@ export function createStatefulFlow<S = Record<string, unknown>>(
     async run(input, threadId, callbacks): Promise<FlowRunResult> {
       const config = baseConfig(threadId, callbacks ?? {});
 
-      // 每次 run 入口修复历史 checkpoint 中的孤立 tool_calls（写回磁盘）。
-      await applyCheckpointMessageRepair(graph, config);
+      // 每次 run 入口修复历史 checkpoint：孤立 tool_calls + 多模态 content 压文本（写回磁盘）。
+      await applyCheckpointMessageRepair(graph, config, {
+        appConfig: options.appConfig,
+      });
 
       if (options.appConfig && input.resume === undefined) {
         await applyCompaction(graph, config, options.appConfig);

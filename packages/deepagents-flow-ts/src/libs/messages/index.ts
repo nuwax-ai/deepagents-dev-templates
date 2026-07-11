@@ -7,6 +7,15 @@ export {
   sanitizeToolCalls,
 } from "./sanitize-tool-calls.js";
 export {
+  coerceContentToText,
+  coerceMessagesToTextContent,
+  isIllegalContentTypeError,
+  messageContentNeedsTextCoerce,
+  shouldCoerceToTextOnly,
+  type CoerceMode,
+  type CoerceMessagesOptions,
+} from "./coerce-text-content.js";
+export {
   applyCheckpointMessageRepair,
   checkpointRepairUpdate,
   completeOrphanedToolCalls,

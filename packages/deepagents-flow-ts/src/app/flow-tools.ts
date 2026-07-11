@@ -35,7 +35,7 @@ export function createFlowTools(
     skills?: DiscoveredSkill[];
     /** 已发现的声明式 subagent → 暴露 task 委派工具。 */
     subAgents?: DiscoveredSubAgent[];
-    /** 基于 spec.tools(schema) 动态创建的平台 StructuredTool。 */
+    /** 基于 `platformToolRefs`（schema）动态创建的平台 StructuredTool。 */
     platformTools?: StructuredTool[];
   }
 ): StructuredTool[] {

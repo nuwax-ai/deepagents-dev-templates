@@ -14,7 +14,7 @@ function toObject(value: unknown): Record<string, unknown> | undefined {
 }
 
 /**
- * 平台工具的运行时工具名。优先 ref.toolName（get-config 返回的工具名，若有）；
+ * 平台工具的运行时工具名。优先 ref.toolName（平台返回的工具名，若有）；
  * 否则按 `${targetType}_${targetId}` 自动推导（如 `Plugin_309`、`Workflow_1309`，保留 targetType 原大小写）。
  */
 export function platformToolName(ref: {
@@ -26,9 +26,10 @@ export function platformToolName(ref: {
 }
 
 /**
- * 把 spec.tools 固化的平台工具引用（开发期 `get-config --key tools --full` 拉取的真实配置）
- * 展开为可执行 descriptor。一个 ref（targetType+targetId）→ 一个 descriptor；
- * 工具名自动拼；`method` / `url` / `auth` / 参数 schema 从 `schema` 解析（支持
+ * 把 `platformToolRefs` 固化的平台工具引用（平台已登记工具的真实配置，
+ * **不是**旧 scaffold `spec.tools` / `*.flow.json`）展开为可执行 descriptor。
+ * 一个 ref（targetType+targetId）→ 一个 descriptor；工具名自动拼；
+ * `method` / `url` / `auth` / 参数 schema 从 `schema` 解析（支持
  * `{ method, url, authorization, requestBody.params }` 这种平台接口定义结构）。
  */
 export function createPlatformToolDescriptors(refs: PlatformToolRef[]): PlatformToolDescriptor[] {

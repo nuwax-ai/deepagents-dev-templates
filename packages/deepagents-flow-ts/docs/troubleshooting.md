@@ -17,15 +17,12 @@
 | 步 | 动作 |
 |----|------|
 | 1 | `.logs/` 搜 `LLM 未返回 JSON` 或节点 `label` |
-| 2 | 打开 `src/app/flows/<name>/graph.ts` 对应 `addNode` |
+| 2 | 打开 `src/app/graph.ts` 或自建图文件对应 `addNode` |
 | 3 | `write` 是否用 `r.parsed`？**否 → 删 `parse`** |
 | 4 | 必须结构化？加强 prompt JSON schema；加 `fallback` 或 `createLlmRouterNode` + `routeFallback` |
 | 5 | 入口节点？prompt 加非预期输入兜底（引导正确格式，不强求 JSON） |
-| 6 | 手改过 `graph.ts`？**同步** `scripts/scaffold/specs/<name>.flow.json` |
 
 **契约详表**：[flow-graph-rules.md](flow-graph-rules.md) R-G001 / R-G002。
-
-**参考范例**：`scripts/scaffold/specs/_example.interview-agent.flow.json`（`prepare` 无 parse；`evaluate` 有 parse）。
 
 ---
 
@@ -72,13 +69,9 @@
 
 ---
 
-## spec 与 graph.ts 不一致
+## graph.ts 与文档不一致
 
-**规则**：[R-G003](flow-graph-rules.md#r-g003-spec-与-graphts-双向同步)。
-
-**症状**：手修 `graph.ts` 后 `generate.mjs` 覆盖修复；或 spec 仍含已删的 `parse`。
-
-**规则**：`graph.ts` 与 `scripts/scaffold/specs/<name>.flow.json` **双向同步**；以当前可跑版本为准。
+手改 `src/app/graph.ts` 后请同步更新相关 `docs/` 说明（人工同步，无 scaffold/spec 双向生成）。
 
 ---
 
@@ -101,6 +94,26 @@
 **平台约定**：避免在真实 `sessionId` 就绪前用 `pending` 作 `thread_id` 持久化 checkpoint。
 
 **关联修复**：ACP `_meta.systemPrompt.append` 应追加而非覆盖 `prompts/flow.base.md`（v1.9.2 `resolveSystemPrompt`）。
+
+---
+
+## `400 messages.content.type 参数非法` / 截图后会话不可恢复
+
+**症状**：调用 `chrome-devtools__take_screenshot`（或其它返回图片的 MCP）后，ACP 报 `抱歉，处理您的问题时出现错误`；日志中 LLM 返回 `400 messages.content.type 参数非法，取值范围 ['text']`；之后同会话任意新消息立刻失败。
+
+**根因**：工具结果把 `image_url` + base64 PNG 写进 ToolMessage / checkpoint；智谱等 OpenAI 兼容端点只接受 `content.type = text`，历史一旦污染，每轮 `think` 都会 400。
+
+**runtime 修复**（三层，对齐孤立 tool_calls 修复模式）：
+
+| 层 | 时机 | 行为 |
+|----|------|------|
+| 1 | `createToolExecNode` 写路径 | 入库前剥 image / image_url 等（默认只打视觉/二进制块，保留 thinking） |
+| 2 | 每次 `flow.run` 入口 `repairCheckpoint` | `coerceMessagesToTextContent` 清洗历史并写回 |
+| 3 | `think` 调 LLM 前；content.type 400 时 `all-non-string` 强制压扁再试 1 次 | 覆盖 vision 误开、漏网非 text 块 |
+
+**开关**：默认 text-only（只剥图像类）。若模型确支持 vision，设 `FLOW_SUPPORTS_VISION=1` 或 `model.settings.supportsVision: true` 可跳过首轮剥离；端点仍 400 时 think 会强制剥图重试一次。
+
+**历史坏 checkpoint**：修复后下一轮 `run` 会自动清洗；仍异常可新建会话或删 thread 文件。
 
 ---
 

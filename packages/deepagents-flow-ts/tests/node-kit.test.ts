@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { HumanMessage, AIMessage, type BaseMessage } from "@langchain/core/messages";
+import { HumanMessage, AIMessage, ToolMessage, type BaseMessage } from "@langchain/core/messages";
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import { Annotation } from "@langchain/langgraph";
@@ -400,5 +400,39 @@ describe("createToolExecNode", () => {
     const node = createToolExecNode<{ messages: BaseMessage[] }>({ tools: [] as any });
     const out = (await node({ messages: [new AIMessage({ content: "no calls" })] })) as any;
     expect(out.messages).toEqual([]);
+  });
+
+  it("supportsVision=true 时工具写路径保留 image_url content block", async () => {
+    const screenshot = tool(
+      async () =>
+        [
+          { type: "text", text: "screenshot" },
+          {
+            type: "image_url",
+            image_url: { url: `data:image/png;base64,${"A".repeat(120)}` },
+          },
+        ] as any,
+      {
+        name: "screenshot",
+        schema: z.object({}),
+        description: "return a screenshot",
+      }
+    );
+    const node = createToolExecNode<{ messages: BaseMessage[] }>({
+      tools: [screenshot] as any,
+      config: { model: { settings: { supportsVision: true } } } as any,
+    });
+    const ai = new AIMessage({
+      content: "",
+      tool_calls: [{ id: "tc_vision", name: "screenshot", args: {} }] as any,
+    });
+
+    const out = (await node({ messages: [ai] })) as any;
+    const tm = out.messages[0] as ToolMessage;
+
+    expect(Array.isArray(tm.content)).toBe(true);
+    expect(tm.content).toEqual(
+      expect.arrayContaining([expect.objectContaining({ type: "image_url" })])
+    );
   });
 });

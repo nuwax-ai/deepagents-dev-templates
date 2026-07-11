@@ -9,6 +9,11 @@
 
 import { AIMessage, SystemMessage, type BaseMessage } from "@langchain/core/messages";
 import type { StructuredTool } from "@langchain/core/tools";
+import {
+  coerceMessagesToTextContent,
+  isIllegalContentTypeError,
+  shouldCoerceToTextOnly,
+} from "../../libs/messages/coerce-text-content.js";
 import { sanitizeToolCalls } from "../../libs/messages/sanitize-tool-calls.js";
 import { resolveModel, logger, type AppConfig } from "../../runtime/index.js";
 import { hasModelCredentials } from "../../libs/compaction.js";
@@ -104,7 +109,11 @@ export function createThinkNode(deps: ThinkNodeDeps) {
       throw new Error(`think: 模型解析失败（已配置凭证）: ${detail}`);
     }
     const { shortTimeoutMs } = resolveLlmResilience(config);
-    const cleanMessages = sanitizeToolCalls(state.messages);
+    // 孤立 tool_calls 清洗 +（默认）多模态 content 压纯文本，避免智谱等端点 400
+    let cleanMessages = sanitizeToolCalls(state.messages);
+    if (shouldCoerceToTextOnly(config)) {
+      cleanMessages = coerceMessagesToTextContent(cleanMessages);
+    }
     const promptForModel = withSystemPrompt(
       cleanMessages,
       systemPrompt ?? "",
@@ -115,18 +124,41 @@ export function createThinkNode(deps: ThinkNodeDeps) {
       messageCount: promptForModel.length,
       firstMessageType: promptForModel[0]?._getType?.() ?? "unknown",
     });
+    const invokeOpts = {
+      timeoutMs: shortTimeoutMs,
+      label: "think 调模型",
+      retryLabel: "think LLM",
+      config,
+      signal: runtimeConfig?.signal,
+    };
     // 有凭证时调用失败直接抛错，避免回显输入伪装成功（ACP stopReason=end_turn 误导用户）
-    const ai = await invokeWithResilience(
-      boundModel,
-      promptForModel,
-      {
-        timeoutMs: shortTimeoutMs,
-        label: "think 调模型",
-        retryLabel: "think LLM",
-        config,
-        signal: runtimeConfig?.signal,
+    let ai: AIMessage;
+    try {
+      ai = (await invokeWithResilience(boundModel, promptForModel, invokeOpts)) as AIMessage;
+    } catch (err) {
+      // 自愈：content.type 非法时强制 aggressive 压扁后单次重试。
+      // - vision 开启时首轮未 coerce，此处强制剥图
+      // - 首轮已 images-coerce 仍失败时，压扁 thinking 等漏网非 text 块
+      if (!isIllegalContentTypeError(err)) {
+        throw err;
       }
-    );
+      log.warn("think LLM content.type 非法，强制 aggressive text coerce 后重试一次", {
+        error: String(err),
+        firstPassCoerced: shouldCoerceToTextOnly(config),
+      });
+      const forced = coerceMessagesToTextContent(sanitizeToolCalls(state.messages), {
+        mode: "all-non-string",
+      });
+      const retryPrompt = withSystemPrompt(
+        forced,
+        systemPrompt ?? "",
+        config?.model.provider
+      );
+      ai = (await invokeWithResilience(boundModel, retryPrompt, {
+        ...invokeOpts,
+        attempts: 1,
+      })) as AIMessage;
+    }
     return {
       messages: [ai],
       steps: [`think: ${(ai.tool_calls ?? []).length} tool_calls`],

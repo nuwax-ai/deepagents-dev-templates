@@ -7,6 +7,7 @@
 import { RemoveMessage, ToolMessage, type BaseMessage } from "@langchain/core/messages";
 import type { RunnableConfig } from "@langchain/core/runnables";
 import { logger } from "../../runtime/logger.js";
+import { coerceMessagesToTextContent, shouldCoerceToTextOnly } from "./coerce-text-content.js";
 import {
   findOrphanedToolCallIds,
   messageId,
@@ -19,6 +20,13 @@ export interface CheckpointRepairOptions {
   /** ACP cancel 时 in-flight 的 tool_call_id；为这些 id 补 synthetic ToolMessage。 */
   cancelledToolCallIds?: Iterable<string>;
   cancelReason?: string;
+  /**
+   * 是否将多模态 content（image_url 等）压成纯文本后写回。
+   * 默认 true；传 false 或开启 supportsVision 时跳过（见 shouldCoerceToTextOnly）。
+   */
+  coerceTextContent?: boolean;
+  /** 可选：用于判定 supportsVision（model.settings / env）。 */
+  appConfig?: { model?: { settings?: Record<string, unknown> } };
 }
 
 /** 为指定孤立 tool_call 追加取消 ToolMessage，再 sanitize 剩余孤立项。 */
@@ -37,7 +45,7 @@ export function completeOrphanedToolCalls(
   return sanitizeToolCalls([...messages, ...additions]);
 }
 
-/** 内存侧修复：cancel 补全 + 全量 sanitize。 */
+/** 内存侧修复：cancel 补全 + 全量 sanitize + 多模态 content 压文本。 */
 export function repairCheckpointMessages(
   prior: BaseMessage[],
   opts: CheckpointRepairOptions = {}
@@ -48,6 +56,12 @@ export function repairCheckpointMessages(
       ? completeOrphanedToolCalls(prior, cancelled, opts.cancelReason)
       : prior;
   next = sanitizeToolCalls(next);
+  // 默认剥图：修复已被 image_url 毒死的历史会话（智谱等 text-only 端点）
+  const doCoerce =
+    opts.coerceTextContent !== false && shouldCoerceToTextOnly(opts.appConfig);
+  if (doCoerce) {
+    next = coerceMessagesToTextContent(next);
+  }
   return next;
 }
 

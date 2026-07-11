@@ -12,6 +12,12 @@ import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import { AIMessage, ToolMessage, type BaseMessage } from "@langchain/core/messages";
 import type { StructuredTool } from "@langchain/core/tools";
 import type { FlowCallbacks, ToolCallEvent } from "../../core/flow-types.js";
+import type { AppConfig } from "../../runtime/index.js";
+import {
+  coerceContentToText,
+  messageContentNeedsTextCoerce,
+  shouldCoerceToTextOnly,
+} from "../messages/coerce-text-content.js";
 import { normalizeToolResult } from "./tool-result-normalize.js";
 
 /**
@@ -55,6 +61,8 @@ export async function runTool(
 export interface ToolExecNodeOptions<S extends { messages: BaseMessage[] }> {
   /** 可执行工具集（与 think 绑定同一组）。 */
   tools: StructuredTool[];
+  /** AppConfig，用于判定模型是否支持 vision content blocks。 */
+  config?: AppConfig;
   /** surface 回调（透出工具调用事件）。 */
   callbacks?: FlowCallbacks;
   /** 把 ToolMessage[] 映射成 state 更新（默认 { messages }）。 */
@@ -68,7 +76,7 @@ export interface ToolExecNodeOptions<S extends { messages: BaseMessage[] }> {
 export function createToolExecNode<S extends { messages: BaseMessage[] }>(
   opts: ToolExecNodeOptions<S>
 ) {
-  const { tools, callbacks, write } = opts;
+  const { tools, config: appConfig, callbacks, write } = opts;
   const toolNode = new ToolNode(tools);
 
   return async (state: S, config?: LangGraphRunnableConfig): Promise<Partial<S>> => {
@@ -175,6 +183,21 @@ export function createToolExecNode<S extends { messages: BaseMessage[] }>(
           byId.delete(tm.tool_call_id);
         }
       }
+    }
+
+    // 写路径：text-only 模型默认把 image_url / base64 截图等压成纯文本，避免毒化 checkpoint。
+    // vision 模型显式开启 supportsVision 时保留原始 content blocks。
+    if (shouldCoerceToTextOnly(appConfig)) {
+      toolMsgs = toolMsgs.map((tm) => {
+        if (!messageContentNeedsTextCoerce(tm.content)) return tm;
+        return new ToolMessage({
+          content: coerceContentToText(tm.content),
+          tool_call_id: tm.tool_call_id,
+          name: tm.name,
+          id: tm.id,
+          status: tm.status,
+        });
+      });
     }
 
     for (const tm of toolMsgs) {

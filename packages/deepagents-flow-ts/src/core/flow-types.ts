@@ -1,3 +1,6 @@
+import type { BaseCheckpointSaver } from "@langchain/langgraph";
+import type { RunnableConfig } from "@langchain/core/runnables";
+
 /**
  * Flow 契约（core 层）—— graph 与 surface 之间的共享词汇，**纯类型、零依赖**。
  *
@@ -185,8 +188,7 @@ export interface StatefulFlow {
 /**
  * 图拓扑反射的结构化产物（getFlowTopology / 各拓扑 getXxxTopology 返回）。
  *
- * 放 core（纯契约）：app/topology 与 libs/topologies 都要产出/消费它，libs 不能 import app，
- * 故契约下沉 core。app/topology.ts re-export 以维持公开 npm 子路径 `/topology`。
+ * 放 core（纯契约）：app/topology 产出/消费它；app/topology.ts re-export 以维持公开 npm 子路径 `/topology`。
  */
 export interface FlowTopologyNode {
   id: string;
@@ -215,7 +217,7 @@ export type FlowInteractionKind = "chat" | "pipeline" | "approval";
 /** flow 的实现来源：默认底座、预设拓扑，或 custom 节点级编排。 */
 export type FlowImplementationKind = "default" | "preset" | "custom";
 
-/** flow 注册表的机器可读画像，供 CLI / scaffold 统一选型。 */
+/** flow 注册表的机器可读画像，供 CLI 选型。 */
 export interface FlowProfile {
   interaction: FlowInteractionKind;
   implementation: FlowImplementationKind;
@@ -223,4 +225,57 @@ export interface FlowProfile {
   summary: string;
   defaultForAmbiguous?: boolean;
   requiresGraphReason?: boolean;
+}
+
+/**
+ * LangGraph 编译图的最小结构（与 src/surfaces/stateful-flow.ts 的 RunnableGraph 逐字对齐）。
+ * 放 core 供 app recipe 与 surfaces createStatefulFlow 共享，避免 app → surfaces 分层违规。
+ */
+export interface TopologyRunnableGraph {
+  stream(input: unknown, config?: RunnableConfig): Promise<AsyncIterable<unknown>>;
+  getState(config: RunnableConfig): Promise<{
+    values: unknown;
+    next?: readonly string[];
+    /** 当前 checkpoint 定位 config —— 有 checkpoint_id ⇒ 该 thread 已开过题。 */
+    config?: { configurable?: { checkpoint_id?: string } };
+  }>;
+  /** 写回状态（自动压缩用）。 */
+  updateState(config: RunnableConfig, values: Record<string, unknown>): Promise<unknown>;
+}
+
+/**
+ * stateful 图的构造配方：createStatefulFlow 的「图相关」入参子集。
+ * checkpointer + appConfig 由组合根 materialize 时注入（来自 FlowRuntime）。
+ */
+export interface StatefulTopologyRecipe<S = Record<string, unknown>> {
+  /** 用注入的 checkpointer 编译图并返回。 */
+  buildGraph: (checkpointer: BaseCheckpointSaver) => TopologyRunnableGraph;
+  /** 新任务：把用户 query 映射成图初始 state。 */
+  toInput: (query: string) => Record<string, unknown>;
+  /** 终态：从图最终 values 取回答（+可选脚注）。 */
+  toResult: (values: S) => { answer: string; footer?: string };
+  /** 注入给所有节点的额外 configurable（如 Send 并行实例读取）。 */
+  configurable?: Record<string, unknown>;
+  /** 递归上限（防 reflection 回边死循环）。 */
+  recursionLimit?: number;
+  /**
+   * 平台工具引用（schema source of truth）。
+   * 来源：平台已登记工具的真实配置 → 固化为 `FlowDef.platformToolRefs` /
+   * recipe 透传；**不是**旧 scaffold `spec.tools` / `*.flow.json`。
+   */
+  platformToolRefs?: Array<{
+    targetType: "Plugin" | "Workflow" | "Knowledge";
+    targetId: number;
+    name?: string;
+    description?: string;
+    schema?: unknown;
+    inputSchema?: unknown;
+    outputSchema?: unknown;
+    mode?: string;
+    method?: string;
+    url?: string;
+    auth?: unknown;
+    names?: string[];
+    toolNames?: string[];
+  }>;
 }

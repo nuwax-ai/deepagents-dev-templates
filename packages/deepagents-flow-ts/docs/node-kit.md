@@ -1,6 +1,6 @@
 # node-kit —— 节点 factory catalog
 
-> **选型先看 [node-catalog.md](node-catalog.md)**(有哪些节点类型 + 何时选 + 节点级 DSL 的 `type` 词表);本文件是各 factory 的 **API / 用法详情**。
+> **选型先看 [node-catalog.md](node-catalog.md)**(有哪些节点类型 + 何时选);本文件是各 factory 的 **API / 用法详情**。
 >
 > **建 flow 必读**。`src/libs/nodes/` 把 LangGraph 常见节点模式做成**参数化节点 factory**——
 > 你拼图时优先 `addNode("x", createYyyNode({...}))`,不再每个节点手写 `async (state) => ...` 体。
@@ -22,18 +22,18 @@ import {
 |---|---|---|
 | 一次调 LLM,写回文本（**中间步骤 / 结构化前置**） | `createLlmNode` | plan/rewrite/grade |
 | 一次调 LLM,写回**结构化** JSON | `createLlmNode({ parse })` | plan/rewrite |
-| LLM 裁决 → **Command goto** 路由(reflection/evaluator) | `createLlmRouterNode` | deep-research outline_review/quality_review |
 | **流式**调 LLM,逐 token 给用户 | `createLlmStreamNode` | compose/aggregate/draft/finalize 修订 |
+| LLM 裁决 → **Command goto** 路由(reflection/evaluator) | `createLlmRouterNode` | 评审重做环（见 [examples.md](examples.md)） |
 | 执行模型 `tool_calls`(ReAct 工具步) | `createToolExecNode` | 默认图 tools |
-| **主动 MCP 检索**(stdio,rateLimited+三态) | `createMcpRetrievalNode` | travel research / rag retrieve |
-| 人审门(前置):`interrupt` 暂停 → 通过/打回 | `createHumanApprovalNode` | review/approve/confirm/clarify |
+| **主动 MCP 检索**(节点自选 server+tool) | `createMcpRetrievalNode` | RAG retrieve（见 [examples.md](examples.md)） |
+| 人审门(前置):`interrupt` 暂停 → 通过/打回 | `createHumanApprovalNode` | review/approve/confirm |
 | 人审门(同步弹窗):同 turn `onApprovalRequest` | `createPermissionApprovalNode` | 确认发布? / 秒级 yes-no |
-| HITL 后置定稿:按 feedback 短路/LLM 修订 | `createApprovalFinalizeNode` | human-in-loop/travel/pm finalize |
+| HITL 后置定稿:按 feedback 短路/LLM 修订 | `createApprovalFinalizeNode` | HITL finalize |
 | input → 首条 HumanMessage | `createPrepareNode` | 默认图 prepare |
-| 并行扇出(Send map-reduce) | `createFanout` | travel/deep-research research |
-| 把一张小图当节点用 | `createSubgraphNode` | dev-agent researcher |
+| 并行扇出(Send map-reduce) | `createFanout` | 多源并行（见 [flow-patterns.md](flow-patterns.md)） |
+| 把一张小图当节点用 | `createSubgraphNode` | 子任务封装 |
 
-> **定制节点（bespoke）不要硬塞**：isApproval 短路定稿、LLM 裁决路由、主动 MCP 检索**已有 factory**（见下各节）；剩余真正 bespoke（如 deep-research converse 的 interrupt 路由、RAG retrieve 的意图驱动多工具并行、adaptive-rag 的逐项 LLM 评分 grade_documents / grade_generation、文件交付）才保留手写，见各 example「保留 bespoke」注释。
+> **定制节点（bespoke）不要硬塞**：定稿短路、LLM 路由、MCP 检索**已有 factory**。剩余真正 bespoke（多源检索取优、文件交付等）才手写，并注释「为何不用 factory」。范式骨架见 [examples.md](examples.md)，**无**内置场景 topology。
 
 ---
 
@@ -58,8 +58,8 @@ graph.addNode("compose", compose);
 - `r.content` 已是 `extractText` 后的纯文本;`parse` 提供时 `r.parsed = parse(content)`。
 - **结构化**:加 `parse`(常用 `parseJson`),`write` 里读 `r.parsed`。PM 的 plan/evaluate、rag 的 rewrite 都用这个。
 - **`write` 可收第三参 `config?`**(LangGraphRunnableConfig)——供 write 内发 `emitPlan(config,…)`/`emitStage(config,…)` 副作用;不用就忽略(默认两参 `(r, s)`)。
-- 例:[project-manager](../src/libs/topologies/project-manager/) plan/estimate/evaluate、[rag](../src/libs/topologies/rag/) rewrite、[adaptive-rag](../src/libs/topologies/adaptive-rag/) route_question / transform_query（`{ parse }` 结构化裁决 / 查询重写）。
-- **用户可见初稿/汇总**见 [`createLlmStreamNode`](#createllmstreamnode--流式-llm)（human-in-loop compose、travel aggregate 等已迁移）。
+- 例：自建评估循环图 plan/estimate/evaluate；RAG rewrite；路由节点 `createLlmNode({ parse })`。
+- **用户可见初稿/汇总**见 [`createLlmStreamNode`](#createllmstreamnode--流式-llm)。
 
 ### parse 使用契约（必读）
 
@@ -74,7 +74,7 @@ graph.addNode("compose", compose);
 | **3. 必须结构化时** | prompt 明确 JSON schema + few-shot；非入口节点或配 `fallback` / `routeFallback` |
 | **4. 失败兜底分工** | `createLlmRouterNode`：parse 失败走 `routeFallback`；`createLlmNode`：**无**内置 parse 兜底，需显式 `fallback` 或不加 `parse` |
 
-**正反例**（摘自 `interview-agent` 修复案例，完整 spec 见 `scripts/scaffold/specs/_example.interview-agent.flow.json`）：
+**正反例**：入口 `prepare` 无 parse；需结构化裁决的 `evaluate` 节点 write 读 `r.parsed` 并配 parse（见 R-G001）。
 
 ```ts
 // ❌ 反例：write 不用 parsed，却 parse → 用户非 JSON 输入即抛「LLM 未返回 JSON」
@@ -107,7 +107,7 @@ const draft = createLlmStreamNode<MyState>({
 ```
 
 - 只用于**用户可见的大段输出**:有 `onToken` sink 且模型支持 stream 时逐 chunk `emitTextToken`,否则退回一次性 invoke(`r.streamed=false`)。
-- 例:[deep-research](../src/libs/topologies/deep-research/) draft、[travel-planner](../src/libs/topologies/travel-planner/graph.ts) aggregate、[human-in-loop](../src/libs/topologies/human-in-loop/graph.ts) compose（带「失败复用上版草稿」fallback）。
+- 例：compose / aggregate / draft 等用户可见大段输出节点（可配「失败复用上版草稿」fallback）。
 
 ## createLlmRouterNode —— LLM 裁决 → Command goto
 
@@ -128,7 +128,7 @@ const grade = createLlmRouterNode<MyState>({
 
 - createLlmNode 的「路由变体」:成功走 `route`、失败(无模型/error/parse)走 `routeFallback`,都返回 `{goto, update}` → 包成 `Command`(`.goto` 是数组,如 `["redo"]`)。
 - 与「外部纯函数条件边」互补:那条是 `addConditionalEdges` + `routeAfterXxx` 纯函数;本 factory 是**节点内** Command goto(reflection/evaluator 模式)。`route` 内常调 `routeAfterXxx({...s, ...update})` 算 goto。
-- 例:[deep-research outline_review/quality_review](../src/libs/topologies/deep-research/nodes/review.ts)。
+- 例：reflection 评审节点（`createLlmRouterNode` + routeFallback）。
 
 ## createToolExecNode —— 执行 tool_calls
 
@@ -156,8 +156,8 @@ const research = createMcpRetrievalNode<MyState>({
 ```
 
 - 与 createToolExecNode 互补:后者执行模型 tool_calls(ToolNode 模式);本 factory 是**主动检索**——节点自己决定调哪个 MCP server 的哪个 tool(RAG/调研)。内部 `rateLimited` 节流 + `runTool` 三态透出。
-- 多源并行取优(如 deep-research docs + web 启发式合并)**不收口**——保留 bespoke subgraph。
-- 例:[travel-planner research](../src/libs/topologies/travel-planner/graph.ts)。
+- 多源并行取优**不收口**——保留 bespoke subgraph（见 [flow-patterns.md](flow-patterns.md) § Send）。
+- 例：并行调研子节点（`createMcpRetrievalNode` + `onToolCall`）。
 
 ## createHumanApprovalNode —— HITL 人审
 
@@ -180,9 +180,9 @@ const gate = createHumanApprovalNode<MyState>({
 
 - `interrupt` 暂停、`isApproval(feedback)` 判定(默认中英文通过词;`regex` 可覆盖)。空回复视为通过。
 - `write`(简单写回)或 `route`(Command 路由)二选一。
-- **结构化表单（平台问答卡片）**：审阅定稿等多字段场景在 interrupt **之前**加 `createAskQuestionPresentationNode`（ask-question MCP），见 [human-in-loop](../src/libs/topologies/human-in-loop/)、[flow-patterns.md](./flow-patterns.md) § interrupt 人审。
+- **结构化表单（平台问答卡片）**：审阅定稿等多字段场景在 interrupt **之前**用节点 **direct-invoke** 平台 ask-question MCP（展示表单），再用 `createHumanApprovalNode` 收回复——**两节点必拆**。本 kit **不**导出专用 presentation factory；骨架见 [examples.md](examples.md) § HITL / [flow-patterns.md](flow-patterns.md) § interrupt。
 - 术语口径：**平台问答卡片** = **主平台的问答卡片**（定义见 [glossary.md](./glossary.md)）；文档/注释勿用产品口语问答卡片、dockpanel 等指代该 UI。
-- 例:[human-in-loop](../src/libs/topologies/human-in-loop/) review、[travel-planner](../src/libs/topologies/travel-planner/) confirm、[project-manager](../src/libs/topologies/project-manager/) approve、[deep-research](../src/libs/topologies/deep-research/) clarify/outlineGate。
+- 例：HITL review / confirm / approve 节点。
 
 ## createPermissionApprovalNode —— 同步弹窗审批
 
@@ -217,7 +217,7 @@ const finalize = createApprovalFinalizeNode<MyState>({
 ```
 
 - 与 createHumanApprovalNode 互补:后者**前置** interrupt 收 feedback;本 factory **后置**——feedback 已在 state,按是否通过短路(不调 LLM)或调 LLM 修订。完整 HITL 流常是 `approval(前置) → … → finalize(后置)`。
-- 例:[human-in-loop/travel/pm finalize](../src/libs/topologies/human-in-loop/graph.ts)。
+- 例：HITL 定稿节点（`createApprovalFinalizeNode`）。
 
 ## createPrepareNode —— input → 首条消息
 
@@ -241,7 +241,7 @@ graph.addConditionalEdges("gather", fanout, ["research"]);
 // state 的聚合 channel 必须用 reducer(并行写才安全):results: Annotation<T[]>({ reducer: (a,b)=>[...a,...b] })
 ```
 
-- 例:[travel-planner](../src/libs/topologies/travel-planner/) fanoutToResearch、[deep-research](../src/libs/topologies/deep-research/) fanoutToResearch。
+- 例：`createFanout` + Send 并行调研扇出。
 
 ## createSubgraphNode —— 子图作节点
 
@@ -255,7 +255,7 @@ parentGraph.addNode("research", researcher);   // 编译后的子图直接当节
 ```
 
 - 子图独立 state,经共享 channel(如 `messages`)与父图映射。
-- 例:[dev-agent](../src/app/flows/dev-agent) 的 researcher subgraph。
+- 例：researcher 子图封装（`createSubgraphNode`）。
 
 ---
 
@@ -278,7 +278,7 @@ parentGraph.addNode("research", researcher);   // 编译后的子图直接当节
 - **规则条件边**(`toolsCondition`、`routeAfterEvaluate` 等):就是普通 `(state) => nodeName` 纯函数,`addConditionalEdges` 连,可单测。
 - **LLM 裁决路由**(反射/评估器),两种方式:
   - **节点内 Command goto**(推荐):`createLlmRouterNode`(上)——LLM 评审 → parse → 返回 Command goto。
-  - **外部纯条件边**:`createLlmNode({ parse })` 写 decision + 配纯函数 `routeAfterXxx` + `addConditionalEdges`(见 project-manager `routeAfterEvaluate`)。routeAfterXxx 是 exported 纯函数,可被两种方式复用。
+  - **外部纯条件边**:`createLlmNode({ parse })` 写 decision + 配纯函数 `routeAfterXxx` + `addConditionalEdges`（**R-G004**）。routeAfterXxx 宜为 exported 纯函数便于单测。
 
 ## 自定义 StructuredTool
 
@@ -290,16 +290,8 @@ parentGraph.addNode("research", researcher);   // 编译后的子图直接当节
 
 ---
 
-## 节点级 scaffold（custom topology）
+## 自建 custom 图
 
-不想套 preset topology、要按 nodes+edges+state 自由编排时，用 `custom` topology（spec 即契约）：
-spec 声明 `state`(channels + reducer 类型)/ `nodes`(name→type+params)/ `edges`(static/conditional/fanout)/ `input`/`result`,
-`scripts/scaffold/blueprints/custom.mjs` **生成时渲染**真实 `src/app/flows/<name>/graph.ts`(内联本目录 factory,受 tsc 检查;无运行时解释器)。节点 `type` 词表 + 选型见 [node-catalog.md](node-catalog.md)。
+在 `src/app/graph.ts`（或新文件）直接用本目录 factory 编排 nodes+edges+state。节点 `type` 词表见 [node-catalog.md](node-catalog.md)。
 
-**custom 范例**（`scripts/scaffold/specs/_example.*.flow.json`；spec 教学件，仅 `translate-review` / `router-gate` 同时注册为内置 flow，其余按需自行生成）：
-- 流式：`translate-review` / `multi-aspect-search` / `router-gate`（`draft`）/ `interview-agent`（`ask` + `writeReport`）
-- 教学用非流式（勿照抄到生产 flow）：`grade-redo`（`write` 仍 `llm`）、`interview-agent`（`prepare` / `evaluate` 结构化仍 `llm`）
-
-生成后手改 `graph.ts` 须**同步** spec，否则 regenerate 会覆盖修复。
-
-进阶模式(Send/interrupt/Command/subgraph/checkpointer 的原生细节)见 [flow-patterns.md](flow-patterns.md)。
+进阶模式(Send/interrupt/Command/subgraph/checkpointer 的原生细节)见 [flow-patterns.md](flow-patterns.md)。扩展思路见 [examples.md](examples.md)（仅文档）。

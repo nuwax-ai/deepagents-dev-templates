@@ -74,10 +74,10 @@ export function createPlatformStructuredTool({
         );
       }
       // url / method / authorization 从固化 schema 读，${...} 占位符由运行时 env 替换。
-      // schema.url 必须由 get-config 固化带来；缺 url 时拒绝执行（不猜测端点，避免 Knowledge 等未验证路由 404）。
+      // schema.url 必须随平台登记配置固化带来；缺 url 时拒绝执行（不猜测端点，避免 Knowledge 等未验证路由 404）。
       if (!descriptor.url) {
         throw new Error(
-          `[${descriptor.toolName}] missing descriptor.url (spec.tools 未固化 url)`
+          `[${descriptor.toolName}] missing descriptor.url (platformToolRefs 未固化 url；请写入平台已登记工具的完整 schema)`
         );
       }
       const url = descriptor.url.replace(/\$\{PLATFORM_BASE_URL\}/g, baseUrl);

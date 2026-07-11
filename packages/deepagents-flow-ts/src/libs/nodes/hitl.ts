@@ -11,8 +11,7 @@
  *
  * **ask-question MCP 不是 `createHumanApprovalNode` 的替代品**，而是其**前置展示层**：
  * MCP 负责渲染结构化 UI（`rawInput.ui` → ACP tool_call）；`interrupt` 仍负责 durable checkpoint / resume。
- * 二者必须拆成**相邻两节点**（如 `present_review` → `review`），见
- * `libs/topologies/human-in-loop/graph.ts`。
+ * 二者必须拆成**相邻两节点**（如 `present_review` → `review`），在自建 HITL 图里接线。
  *
  * ## ask-question MCP：何时用、如何用
  *
@@ -33,7 +32,7 @@
  * - 工具名：`ask-question__nuwax_ask_question`（或无前缀 `nuwax_ask_question`）；用
  *   `findAskQuestionTool(runtime.allTools)` 从已 hydrate 的 MCP 工具集定位
  *
- * **接线模板**（human-in-loop 拓扑）：
+ * **接线模板**（自建 HITL 图）：
  * ```
  * START → compose → present_review(MCP 展示) → review(interrupt) → finalize → END
  * ```
@@ -42,7 +41,7 @@
  * - `review`：`createHumanApprovalNode` + `normalizeReviewFeedback` 归一化 JSON/表单文本 → `ok` 或修改意见
  * - resume 只重跑 `review`，**不会**重复发 MCP 卡片（`present_review` 已落 checkpoint）
  *
- * 范例与 API 见 `libs/topologies/human-in-loop/`、`docs/node-kit.md` § createHumanApprovalNode。
+ * API 见 `docs/node-kit.md` § createHumanApprovalNode。
  */
 
 import { Command, interrupt, type LangGraphRunnableConfig } from "@langchain/langgraph";

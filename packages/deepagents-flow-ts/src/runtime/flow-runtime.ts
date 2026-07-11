@@ -26,7 +26,11 @@ export interface FlowRuntime {
   ctx: RuntimeContext;
   /** 全部工具（内置通用 + flow 自补 + native MCP）—— 供 think 节点 bindTools。 */
   allTools: StructuredTool[];
-  /** flow spec.tools 中声明的平台工具引用（schema 源）。 */
+  /**
+   * 平台工具引用（schema 源）：来自 `FlowDef.platformToolRefs` /
+   * `createFlowRuntime({ platformToolRefs })`。须固化平台已登记工具的真实配置；
+   * **不是**旧 flow.json `spec.tools`。运行期也可由宿主注入等价工具。
+   */
   platformToolRefs: PlatformToolRef[];
   /** 由 platformToolRefs 展开后的可执行 descriptor（一 toolName 一条）。 */
   platformToolDescriptors: PlatformToolDescriptor[];

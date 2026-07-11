@@ -45,6 +45,8 @@ export const ModelConfigSchema = z.object({
       invokeLongTimeoutMs: z.number().min(1000).optional(),
       /** 并行/Send 扇出时 LLM 最大并发。可被 LLM_MAX_CONCURRENT 覆盖。 */
       maxConcurrentInvokes: z.number().min(1).optional(),
+      /** 模型是否支持 vision content blocks；开启后保留 image_url 等多模态消息。 */
+      supportsVision: z.boolean().optional(),
     })
     .default({}),
 });

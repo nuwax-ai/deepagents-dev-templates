@@ -20,21 +20,20 @@
 
 ## Flow 交互形态
 
-面向用户用「用」列中文；`chat` / `pipeline` / `approval` 为机器值，不直接问用户。
+面向用户仅两类形态（「用」列中文）：**聊天助手型** / **固定流程型**。`chat` / `pipeline` 为对应机器值；`approval` 是固定流程型内**人审编排**的机器值（不作独立形态问用户）。
 
 | 弃用 | 用 | 定义 |
 |---|---|---|
-| 无须写图的聊天模式名 | **聊天助手型** / **default flow** | `flow.active: "default"` + systemPrompt + 平台能力；开放追问勿 custom graph |
-| 管线、pipeline（对用户） | **固定流程型** | 机器值 `pipeline`；翻译/审稿/打分/报告 |
-| HITL/interrupt（对用户） | **人工确认型** | 机器值 `approval`；interrupt/resume 或 human-in-loop preset |
+| 无须写图的聊天模式名 | **聊天助手型** / **default flow** | `flow.active: "default"` + systemPrompt + 平台能力；**唯一默认路径**；开放追问勿手写图 |
+| 管线、pipeline（对用户） | **固定流程型** | 机器值 `pipeline`；**仅用户明确要求**固定阶段一次交付时才考虑；直接改 `src/app/graph.ts`；流程内某步需人审/审批用 HITL interrupt+resume 编排（机器值 `approval`） |
+| ~~人工确认型~~（已并入固定流程型） | **HITL / 人审编排** | 非独立用户形态；`createHumanApprovalNode` + interrupt/resume，作为固定流程型图里的一种节点编排 |
 | flow 类型、图类型 | **flow profile** | `flows --json`；含 `interaction` / `implementation` / `userLabel` |
-| 为了写图而写图 | **graphReason** | `custom` spec 必填；说明 default/preset 为何不够 |
+| 为了写图而写图 | **graphReason** | 用户明确要求手写图时须说明 default 为何不够 |
 
 | 用户中文 | 机器值 | 默认落点 |
 |---|---|---|
-| 聊天助手型 | `chat` | `default`；必要时 chat preset |
-| 固定流程型 | `pipeline` | preset；否则 `custom` + graphReason |
-| 人工确认型 | `approval` | HITL preset；否则 `custom` + graphReason |
+| 聊天助手型 | `chat` | **`default`（唯一默认）**；追问/客服/问答/搜索总结等一律先走此路径，不写图 |
+| 固定流程型 | `pipeline`（人审步骤 `approval`） | **仅用户明确要求**（固定步骤、一次交付、翻译/审稿/打分/报告等）→ 直接改 `src/app/graph.ts` 手写图；流程内需审批/人工复核/定稿则加 HITL interrupt+resume 节点 |
 
 | 弃用 | 用 | 定义 |
 |---|---|---|
@@ -47,7 +46,7 @@
 | 运行时胶水代码 | **接入逻辑**（plumbing） | surface 侧 ACP/CLI 复用连接代码 |
 | - | **接入层**（seam） | surface 与图解耦接缝 |
 | - | **surface seam** | surface 侧 seam |
-| - | **可运行 flow 挂载点**（app/flows） | app 层注册入口；图逻辑在 `libs/topologies` |
+| - | **可运行 flow 挂载点**（app/flows） | app 层注册入口；**仅 default**；图逻辑在 `graph.ts` |
 
 ## 平台侧
 
@@ -61,7 +60,7 @@
 
 | 弃用 | 用 | 定义 |
 |---|---|---|
-| topology（对用户分类） | **拓扑** | 内部图实现/scaffold；用户分类见 §Flow 交互形态 |
+| topology（对用户分类） | **拓扑** | 内部图实现；用户分类见 §Flow 交互形态；本包无内置拓扑库 |
 | guard（统称，无语境） | **护栏** | recursion → recursion guard；超时 → timeout guard（`withTimeout`）；校验 → input-validation guard |
 | - | **流水线** | pipeline；多阶段编排 |
 
@@ -69,21 +68,14 @@
 
 | 弃用 | 用 | 定义 |
 |---|---|---|
-| persona、人设、统一人格 | **spec.systemPrompt** / **场景系统提示词** | scaffold 槽位；角色/风格/输出约束 |
-| - | **runtime.systemPrompt** | `resolveSystemPrompt`：ACP 追加 → config inline → `systemPromptPath` → fallback |
-| - | **领域 prompt** | 拓扑内各 LLM 节点 SystemMessage；与 spec 无关 |
-| - | **角色开场** | spec 注入单节点时仅换角色开场；JSON 契约等领域默认保留 |
-| 「systemPrompt 注入图」（无来源/节点） | 写明 **spec/runtime** + **目标节点** | 例：`spec → compose` |
+| persona、人设、统一人格 | **场景系统提示词** | `agent.systemPrompt` / ACP 下发；角色/风格/输出约束 |
+| - | **runtime.systemPrompt** | `resolveSystemPrompt`：本地 `prompts/flow.base.md` + ACP 追加 + `PLATFORM_CONVENTIONS` |
+| - | **领域 prompt** | 图内各 LLM 节点 SystemMessage；与旧 scaffold spec 无关 |
+| 「systemPrompt 注入图」（无来源/节点） | 写明 **runtime/config** + **目标节点** | 例：`runtime.systemPrompt → think` |
 
-| 拓扑 | spec → | runtime | 备注 |
+| 图 | 注入点 | runtime | 备注 |
 |---|---|---|---|
-| default / react-tools | prepare/think（优先） | spec 空时兜底 | 单 ReAct |
-| dev-agent | 不注入 | 唯一通道 | 同 default 图 |
-| human-in-loop | compose | 不混入 | spec 空 → `DEFAULT_COMPOSE_PROMPT` |
-| project-manager | plan 角色开场 | 不用 | 其余节点领域默认 |
-| travel-planner | aggregate 角色开场 | 不用 | 其余节点领域默认 |
-| rag / adaptive-rag | 不注入 | 不用 | 各节点领域 RAG prompt |
-| deep-research | 不注入 | 不用 | clarify/plan/research/draft/converse 等领域 prompt |
+| default | prepare / think（优先） | config / ACP 兜底 | 单 ReAct conversational |
 
 ## 格式
 

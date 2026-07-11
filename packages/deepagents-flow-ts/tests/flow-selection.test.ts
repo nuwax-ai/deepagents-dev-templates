@@ -17,8 +17,8 @@ describe("flow selection", () => {
   });
 
   it("keeps legacy activeFlow compatible", () => {
-    expect(resolveFlowSelection({ activeFlow: "router-gate" })).toMatchObject({
-      active: "router-gate",
+    expect(resolveFlowSelection({ activeFlow: "legacy-name" })).toMatchObject({
+      active: "legacy-name",
       source: "activeFlow",
     });
   });
@@ -26,11 +26,11 @@ describe("flow selection", () => {
   it("prefers flow.active over legacy activeFlow", () => {
     expect(
       resolveFlowSelection({
-        activeFlow: "router-gate",
-        flow: { active: "search-aggregator" },
+        activeFlow: "legacy-name",
+        flow: { active: "default" },
       })
     ).toMatchObject({
-      active: "search-aggregator",
+      active: "default",
       source: "flow.active",
     });
   });
@@ -43,7 +43,8 @@ describe("flow selection", () => {
 describe("flow profiles", () => {
   it("lists registered flows with machine-readable profiles", () => {
     const profiles = listFlowProfiles();
-    expect(profiles.find((f) => f.name === "default")?.profile).toMatchObject({
+    expect(profiles).toHaveLength(1);
+    expect(profiles[0]?.profile).toMatchObject({
       interaction: "chat",
       implementation: "default",
       defaultForAmbiguous: true,
@@ -58,13 +59,5 @@ describe("flow profiles", () => {
   it("marks only default as the ambiguous chat default", () => {
     const ambiguousDefaults = listFlowProfiles().filter((f) => f.profile.defaultForAmbiguous);
     expect(ambiguousDefaults.map((f) => f.name)).toEqual(["default"]);
-  });
-
-  it("marks custom teaching flows as requiring graph reason", () => {
-    expect(listFlowProfiles().find((f) => f.name === "router-gate")?.profile).toMatchObject({
-      interaction: "pipeline",
-      implementation: "custom",
-      requiresGraphReason: true,
-    });
   });
 });

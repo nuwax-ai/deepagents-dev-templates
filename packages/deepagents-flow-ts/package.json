@@ -1,7 +1,7 @@
 {
   "name": "nuwax-flow-ts",
-  "version": "1.16.1",
-  "description": "Flow / workflow-orchestration agent template — the agent runs an explicit LangGraph StateGraph (not a dynamic tool loop) over ACP. Self-contained runtime; MCP via @langchain/mcp-adapters. Ships registered flows under app/flows (default ReAct, platform-capability sample, streaming pipeline, LLM router, dev-agent) plus libs/topologies building blocks.",
+  "version": "2.0.0",
+  "description": "Flow / workflow-orchestration agent template — explicit LangGraph ReAct default graph over ACP. Self-contained runtime; MCP via @langchain/mcp-adapters. App layer is a pure default ReAct workspace (flow.active: default only); extend via graph.ts + docs.",
   "type": "module",
   "packageManager": "pnpm@10.18.2",
   "main": "dist/index.js",
