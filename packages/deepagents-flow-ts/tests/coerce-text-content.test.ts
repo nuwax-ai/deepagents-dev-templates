@@ -14,6 +14,7 @@ import {
   coerceMessagesToTextContent,
   isIllegalContentTypeError,
   messageContentNeedsTextCoerce,
+  resolveCoerceMode,
   shouldCoerceToTextOnly,
 } from "../src/libs/messages/coerce-text-content.js";
 import { repairCheckpointMessages } from "../src/libs/messages/repair-checkpoint.js";
@@ -204,11 +205,14 @@ describe("messageContentNeedsTextCoerce / shouldCoerceToTextOnly / isIllegalCont
       )
     ).toBe(true);
     expect(isIllegalContentTypeError(new Error("rate limit"))).toBe(false);
-    expect(
-      isIllegalContentTypeError(new Error("Invalid content.type somehow unrelated"))
-    ).toBe(true);
     // 仅有 content.type 字样、无非法语义 → 不认
     expect(isIllegalContentTypeError(new Error("see content.type docs"))).toBe(false);
+  });
+
+  it("resolveCoerceMode：anthropic 只剥图；openai 兼容压扁全部非字符串", () => {
+    expect(resolveCoerceMode({ model: { provider: "anthropic" } })).toBe("images");
+    expect(resolveCoerceMode({ model: { provider: "openai" } })).toBe("all-non-string");
+    expect(resolveCoerceMode()).toBe("all-non-string");
   });
 });
 
@@ -240,7 +244,7 @@ describe("repairCheckpointMessages + coerce", () => {
 });
 
 describe("createToolExecNode 写路径 coerce", () => {
-  it("默认 text-only：工具返回 image_url → checkpoint 写入纯文本", async () => {
+  it("默认 text-only（openai）：工具返回 image_url → checkpoint 写入纯文本", async () => {
     const prev = process.env.FLOW_SUPPORTS_VISION;
     delete process.env.FLOW_SUPPORTS_VISION;
     try {
@@ -261,7 +265,7 @@ describe("createToolExecNode 写路径 coerce", () => {
       );
       const node = createToolExecNode<{ messages: BaseMessage[] }>({
         tools: [screenshot] as any,
-        config: { model: { settings: {} } } as any,
+        config: { model: { provider: "openai", settings: {} } } as any,
       });
       const ai = new AIMessage({
         content: "",
@@ -273,6 +277,35 @@ describe("createToolExecNode 写路径 coerce", () => {
       expect(tm.content as string).toContain("Took a screenshot");
       expect(tm.content as string).toMatch(/image_url omitted/);
       expect(tm.content as string).not.toContain("DDDD");
+    } finally {
+      if (prev === undefined) delete process.env.FLOW_SUPPORTS_VISION;
+      else process.env.FLOW_SUPPORTS_VISION = prev;
+    }
+  });
+
+  it("openai：纯 text block 数组也压成字符串（智谱兼容）", async () => {
+    const prev = process.env.FLOW_SUPPORTS_VISION;
+    delete process.env.FLOW_SUPPORTS_VISION;
+    try {
+      const echo = tool(
+        async () => [{ type: "text", text: "hello blocks" }] as any,
+        {
+          name: "echo_blocks",
+          schema: z.object({}),
+          description: "return text blocks",
+        }
+      );
+      const node = createToolExecNode<{ messages: BaseMessage[] }>({
+        tools: [echo] as any,
+        config: { model: { provider: "openai", settings: {} } } as any,
+      });
+      const ai = new AIMessage({
+        content: "",
+        tool_calls: [{ id: "tc_echo", name: "echo_blocks", args: {} }] as any,
+      });
+      const out = (await node({ messages: [ai] })) as any;
+      expect(typeof (out.messages[0] as ToolMessage).content).toBe("string");
+      expect((out.messages[0] as ToolMessage).content).toBe("hello blocks");
     } finally {
       if (prev === undefined) delete process.env.FLOW_SUPPORTS_VISION;
       else process.env.FLOW_SUPPORTS_VISION = prev;
@@ -330,7 +363,7 @@ describe("createThinkNode content coerce + 自愈重试", () => {
     else process.env.OPENAI_API_KEY = originalApiKey;
   });
 
-  it("调 LLM 前剥掉 image_url；content.type 400 时 aggressive 重试一次", async () => {
+  it("调 LLM 前剥掉 image_url；content.type 400 时 aggressive 重试并写回历史", async () => {
     const seen: BaseMessage[][] = [];
     let calls = 0;
     mockInvoke.mockImplementation(async (msgs: BaseMessage[]) => {
@@ -356,8 +389,9 @@ describe("createThinkNode content coerce + 自愈重试", () => {
     });
 
     const poisoned = [
-      new HumanMessage("打开百度"),
+      new HumanMessage({ id: "h1", content: "打开百度" }),
       new ToolMessage({
+        id: "tm1",
         content: [
           { type: "text", text: "shot" },
           {
@@ -376,9 +410,19 @@ describe("createThinkNode content coerce + 自愈重试", () => {
     } as any);
 
     expect(calls).toBe(2);
-    expect(out.messages?.[0]).toMatchObject({ content: "ok after retry" });
+    expect(out.steps).toContain("think#coerce-writeback");
+    // RemoveMessage ×2 + coerced human/tool + AI
+    expect((out.messages ?? []).length).toBeGreaterThan(1);
+    const last = out.messages![out.messages!.length - 1] as AIMessage;
+    expect(last.content).toBe("ok after retry");
 
-    // 两轮送入模型的 tool content 都必须是纯字符串（无 image_url / base64）
+    // 写回的 ToolMessage 应为纯字符串
+    const writtenTm = (out.messages ?? []).find(
+      (m) => m._getType?.() === "tool"
+    ) as ToolMessage | undefined;
+    expect(writtenTm).toBeDefined();
+    expect(typeof writtenTm!.content).toBe("string");
+
     for (const msgs of seen) {
       const tm = msgs.find((m) => m._getType?.() === "tool") as ToolMessage | undefined;
       expect(tm).toBeDefined();
@@ -432,7 +476,9 @@ describe("createThinkNode content coerce + 自愈重试", () => {
     } as any);
 
     expect(calls).toBe(2);
-    expect(out.messages?.[0]).toMatchObject({ content: "vision fallback ok" });
+    const last = out.messages![out.messages!.length - 1] as AIMessage;
+    expect(last.content).toBe("vision fallback ok");
+    expect(out.steps).toContain("think#coerce-writeback");
 
     // 首轮未 coerce：仍带 array content（含 image_url）
     const firstTm = seen[0]!.find((m) => m._getType?.() === "tool") as ToolMessage;

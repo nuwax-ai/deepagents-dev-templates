@@ -229,6 +229,8 @@ export function createStatefulFlow<S = Record<string, unknown>>(
     applyCheckpointMessageRepair(graph, baseConfig(threadId), {
       cancelledToolCallIds: opts?.cancelledToolCallIds,
       cancelReason: opts?.cancelReason,
+      // 与 run 入口一致：按 supportsVision / provider 决定是否剥图与压扁强度
+      appConfig: options.appConfig,
     });
 
   // 对话型不暴露 hasStarted → surface 每轮走 query（带历史累积，多轮对话）；

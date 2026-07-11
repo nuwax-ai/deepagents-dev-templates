@@ -16,6 +16,8 @@ import type { AppConfig } from "../../runtime/index.js";
 import {
   coerceContentToText,
   messageContentNeedsTextCoerce,
+  rebuildMessageWithTextContent,
+  resolveCoerceMode,
   shouldCoerceToTextOnly,
 } from "../messages/coerce-text-content.js";
 import { normalizeToolResult } from "./tool-result-normalize.js";
@@ -185,18 +187,17 @@ export function createToolExecNode<S extends { messages: BaseMessage[] }>(
       }
     }
 
-    // 写路径：text-only 模型默认把 image_url / base64 截图等压成纯文本，避免毒化 checkpoint。
-    // vision 模型显式开启 supportsVision 时保留原始 content blocks。
+    // 写路径：text-only 模型默认压成纯文本，避免毒化 checkpoint。
+    // anthropic → 仅剥图像；openai 兼容（含智谱）→ 压扁任意非字符串 content。
+    // vision 显式开启时保留原始 content blocks。
     if (shouldCoerceToTextOnly(appConfig)) {
+      const mode = resolveCoerceMode(appConfig);
       toolMsgs = toolMsgs.map((tm) => {
-        if (!messageContentNeedsTextCoerce(tm.content)) return tm;
-        return new ToolMessage({
-          content: coerceContentToText(tm.content),
-          tool_call_id: tm.tool_call_id,
-          name: tm.name,
-          id: tm.id,
-          status: tm.status,
-        });
+        if (!messageContentNeedsTextCoerce(tm.content, mode)) return tm;
+        return rebuildMessageWithTextContent(
+          tm,
+          coerceContentToText(tm.content, mode)
+        ) as ToolMessage;
       });
     }
 

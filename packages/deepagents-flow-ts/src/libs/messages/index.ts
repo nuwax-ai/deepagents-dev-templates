@@ -11,6 +11,8 @@ export {
   coerceMessagesToTextContent,
   isIllegalContentTypeError,
   messageContentNeedsTextCoerce,
+  rebuildMessageWithTextContent,
+  resolveCoerceMode,
   shouldCoerceToTextOnly,
   type CoerceMode,
   type CoerceMessagesOptions,

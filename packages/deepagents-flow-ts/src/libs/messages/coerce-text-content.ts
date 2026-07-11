@@ -37,7 +37,7 @@ const NON_TEXT_BLOCK_TYPES = new Set([
  * 显式开启 vision 时跳过剥离：`FLOW_SUPPORTS_VISION=1` 或 `model.settings.supportsVision`。
  */
 export function shouldCoerceToTextOnly(config?: {
-  model?: { settings?: Record<string, unknown> };
+  model?: { provider?: string; settings?: Record<string, unknown> };
 }): boolean {
   const env = process.env.FLOW_SUPPORTS_VISION?.trim().toLowerCase();
   if (env === "1" || env === "true" || env === "yes") return false;
@@ -46,6 +46,19 @@ export function shouldCoerceToTextOnly(config?: {
 }
 
 export type CoerceMode = "images" | "all-non-string";
+
+/**
+ * 按 provider 选择默认 coerce 强度（须先通过 shouldCoerceToTextOnly）。
+ * - anthropic：只剥图像，保留 text[] + cache_control / thinking
+ * - 其余（openai 兼容，含智谱 GLM）：压扁任意非字符串 content（含纯 text block 数组）
+ *   —— 智谱等端点常拒收数组 content，即便块类型全是 text
+ */
+export function resolveCoerceMode(config?: {
+  model?: { provider?: string; settings?: Record<string, unknown> };
+}): CoerceMode {
+  if (config?.model?.provider === "anthropic") return "images";
+  return "all-non-string";
+}
 
 /**
  * content 是否需要压成纯文本。
@@ -145,17 +158,15 @@ export function coerceMessagesToTextContent(
 
 /**
  * 识别「模型拒收非 text content.type」类错误（智谱：参数非法，取值范围 ['text']）。
- * 要求同时命中 content.type 语义 + 非法/不支持语义，避免误伤无关 400。
+ * 收紧：须命中 content.type / 取值范围 ['text']，避免无关文案误触发自愈。
  */
 export function isIllegalContentTypeError(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
+  if (/参数非法.*\['text'\]/i.test(msg)) return true;
   const mentionsContentType =
-    /content\.type/i.test(msg) || /content\s*type/i.test(msg);
-  if (!mentionsContentType) {
-    // 智谱有时只写取值范围 ['text']，无 content.type 字样
-    return /参数非法.*\['text'\]/i.test(msg);
-  }
-  return /非法|invalid|unsupported|not\s+(?:supported|allowed)|取值范围/i.test(msg);
+    /content\.type/i.test(msg) || /messages\.content\.type/i.test(msg);
+  if (!mentionsContentType) return false;
+  return /非法|unsupported|not\s+(?:supported|allowed)|取值范围|invalid/i.test(msg);
 }
 
 function coerceBlockToText(block: unknown, mode: CoerceMode = "images"): string {
@@ -307,9 +318,9 @@ function formatBytes(n: number): string {
 
 /**
  * 按消息类型重建，保留 id / tool_calls / tool_call_id /
- * response_metadata / usage_metadata 等关键字段（repair 写回后用量统计不丢）。
+ * response_metadata / usage_metadata 等关键字段（写路径与 repair 共用）。
  */
-function rebuildMessageWithTextContent(msg: BaseMessage, content: string): BaseMessage {
+export function rebuildMessageWithTextContent(msg: BaseMessage, content: string): BaseMessage {
   const raw = msg as unknown as Record<string, unknown>;
   const id = messageId(msg);
   const name = typeof raw.name === "string" ? raw.name : undefined;

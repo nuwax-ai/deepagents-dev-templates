@@ -7,7 +7,7 @@
 import { RemoveMessage, ToolMessage, type BaseMessage } from "@langchain/core/messages";
 import type { RunnableConfig } from "@langchain/core/runnables";
 import { logger } from "../../runtime/logger.js";
-import { coerceMessagesToTextContent, shouldCoerceToTextOnly } from "./coerce-text-content.js";
+import { coerceMessagesToTextContent, resolveCoerceMode, shouldCoerceToTextOnly } from "./coerce-text-content.js";
 import {
   findOrphanedToolCallIds,
   messageId,
@@ -25,8 +25,8 @@ export interface CheckpointRepairOptions {
    * 默认 true；传 false 或开启 supportsVision 时跳过（见 shouldCoerceToTextOnly）。
    */
   coerceTextContent?: boolean;
-  /** 可选：用于判定 supportsVision（model.settings / env）。 */
-  appConfig?: { model?: { settings?: Record<string, unknown> } };
+  /** 可选：用于判定 supportsVision / provider coerce 强度。 */
+  appConfig?: { model?: { provider?: string; settings?: Record<string, unknown> } };
 }
 
 /** 为指定孤立 tool_call 追加取消 ToolMessage，再 sanitize 剩余孤立项。 */
@@ -60,7 +60,9 @@ export function repairCheckpointMessages(
   const doCoerce =
     opts.coerceTextContent !== false && shouldCoerceToTextOnly(opts.appConfig);
   if (doCoerce) {
-    next = coerceMessagesToTextContent(next);
+    next = coerceMessagesToTextContent(next, {
+      mode: resolveCoerceMode(opts.appConfig),
+    });
   }
   return next;
 }

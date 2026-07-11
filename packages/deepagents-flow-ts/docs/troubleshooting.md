@@ -107,11 +107,11 @@
 
 | 层 | 时机 | 行为 |
 |----|------|------|
-| 1 | `createToolExecNode` 写路径 | 入库前剥 image / image_url 等（默认只打视觉/二进制块，保留 thinking） |
-| 2 | 每次 `flow.run` 入口 `repairCheckpoint` | `coerceMessagesToTextContent` 清洗历史并写回 |
-| 3 | `think` 调 LLM 前；content.type 400 时 `all-non-string` 强制压扁再试 1 次 | 覆盖 vision 误开、漏网非 text 块 |
+| 1 | `createToolExecNode` 写路径 | 入库前按 `resolveCoerceMode` 压扁（anthropic 只剥图像；openai 兼容含智谱压任意非字符串） |
+| 2 | 每次 `flow.run` 入口 `repairCheckpoint` | `coerceMessagesToTextContent` 清洗历史并写回（传 `appConfig`） |
+| 3 | `think` 调 LLM 前；content.type 400 时 `all-non-string` 重试，**成功则写回 state** | 同轮后续 think / 下轮不再踩毒 |
 
-**开关**：默认 text-only（只剥图像类）。若模型确支持 vision，设 `FLOW_SUPPORTS_VISION=1` 或 `model.settings.supportsVision: true` 可跳过首轮剥离；端点仍 400 时 think 会强制剥图重试一次。
+**开关**：默认 text-only。`FLOW_SUPPORTS_VISION=1` 或 `model.settings.supportsVision: true` 跳过首轮剥离；端点仍 400 时 think 强制剥图重试并写回。`provider: anthropic` 保留 text[]/thinking；其余 provider 默认压扁数组 content。
 
 **历史坏 checkpoint**：修复后下一轮 `run` 会自动清洗；仍异常可新建会话或删 thread 文件。
 

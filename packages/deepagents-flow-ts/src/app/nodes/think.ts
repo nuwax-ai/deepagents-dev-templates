@@ -12,8 +12,10 @@ import type { StructuredTool } from "@langchain/core/tools";
 import {
   coerceMessagesToTextContent,
   isIllegalContentTypeError,
+  resolveCoerceMode,
   shouldCoerceToTextOnly,
 } from "../../libs/messages/coerce-text-content.js";
+import { checkpointRepairUpdate } from "../../libs/messages/repair-checkpoint.js";
 import { sanitizeToolCalls } from "../../libs/messages/sanitize-tool-calls.js";
 import { resolveModel, logger, type AppConfig } from "../../runtime/index.js";
 import { hasModelCredentials } from "../../libs/compaction.js";
@@ -109,13 +111,22 @@ export function createThinkNode(deps: ThinkNodeDeps) {
       throw new Error(`think: 模型解析失败（已配置凭证）: ${detail}`);
     }
     const { shortTimeoutMs } = resolveLlmResilience(config);
-    // 孤立 tool_calls 清洗 +（默认）多模态 content 压纯文本，避免智谱等端点 400
-    let cleanMessages = sanitizeToolCalls(state.messages);
+    // 孤立 tool_calls 清洗 +（默认）多模态 / 非字符串 content 压纯文本
+    const sanitized = sanitizeToolCalls(state.messages);
+    let forModel = sanitized;
+    /** 送入模型的历史是否相对 state.messages 有实质清洗（需写回 checkpoint） */
+    let historyDirty = false;
     if (shouldCoerceToTextOnly(config)) {
-      cleanMessages = coerceMessagesToTextContent(cleanMessages);
+      const coerced = coerceMessagesToTextContent(sanitized, {
+        mode: resolveCoerceMode(config),
+      });
+      if (coerced !== sanitized) {
+        forModel = coerced;
+        historyDirty = true;
+      }
     }
     const promptForModel = withSystemPrompt(
-      cleanMessages,
+      forModel,
       systemPrompt ?? "",
       config?.model.provider
     );
@@ -136,9 +147,7 @@ export function createThinkNode(deps: ThinkNodeDeps) {
     try {
       ai = (await invokeWithResilience(boundModel, promptForModel, invokeOpts)) as AIMessage;
     } catch (err) {
-      // 自愈：content.type 非法时强制 aggressive 压扁后单次重试。
-      // - vision 开启时首轮未 coerce，此处强制剥图
-      // - 首轮已 images-coerce 仍失败时，压扁 thinking 等漏网非 text 块
+      // 自愈：content.type 非法时强制 aggressive 压扁后单次重试，并写回历史。
       if (!isIllegalContentTypeError(err)) {
         throw err;
       }
@@ -146,11 +155,12 @@ export function createThinkNode(deps: ThinkNodeDeps) {
         error: String(err),
         firstPassCoerced: shouldCoerceToTextOnly(config),
       });
-      const forced = coerceMessagesToTextContent(sanitizeToolCalls(state.messages), {
+      forModel = coerceMessagesToTextContent(sanitized, {
         mode: "all-non-string",
       });
+      historyDirty = forModel !== sanitized || historyDirty;
       const retryPrompt = withSystemPrompt(
-        forced,
+        forModel,
         systemPrompt ?? "",
         config?.model.provider
       );
@@ -159,9 +169,31 @@ export function createThinkNode(deps: ThinkNodeDeps) {
         attempts: 1,
       })) as AIMessage;
     }
+
+    // 清洗后的历史写回 checkpoint，避免同轮后续 think / 下轮 run 再踩毒 content
+    const outMessages: BaseMessage[] = [];
+    if (historyDirty) {
+      const writeback = checkpointRepairUpdate(state.messages, forModel);
+      if (writeback.length > 0) {
+        outMessages.push(...writeback);
+        log.info("think 已将 coerce 后的历史写回 state", {
+          priorCount: state.messages.length,
+          coercedCount: forModel.length,
+        });
+      } else {
+        log.warn("think coerce 后无法写回（消息缺 id），仅依赖当次 LLM 入参", {
+          priorCount: state.messages.length,
+        });
+      }
+    }
+    outMessages.push(ai);
+
     return {
-      messages: [ai],
-      steps: [`think: ${(ai.tool_calls ?? []).length} tool_calls`],
+      messages: outMessages,
+      steps: [
+        `think: ${(ai.tool_calls ?? []).length} tool_calls`,
+        ...(historyDirty ? ["think#coerce-writeback"] : []),
+      ],
     };
   };
 }
