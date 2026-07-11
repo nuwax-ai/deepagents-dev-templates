@@ -1,6 +1,12 @@
 # Glossary
 
-> 术语权威源。写文档/注释只查「用」列。实现细节 → `node-kit.md`；systemPrompt 解析 → `src/runtime/context/prompt.ts`。
+> 术语权威源。写文档/注释只查「用」列。实现细节 → `node-kit.md`；systemPrompt 解析 → `src/runtime/context/prompt.ts`。改图判定 → `docs/examples.md` § 先判定。
+
+## 编排范式（强制 / 禁止）
+
+| 弃用 | 用 | 定义 |
+|---|---|---|
+| 自由工具循环、自由 tool loop、其它非图范式 | **LangGraph TS / `StateGraph` 图编排** | 本模板唯一编排范式：`StateGraph` + node/edge；**禁止**自由 tool loop（无显式图、模型自驱调工具循环） |
 
 ## 编排 / 流程
 
@@ -14,26 +20,31 @@
 | 一个会话一个主题 | **one session, one topic** | `hasStarted` 推断续跑 vs 新开 |
 | 多模式 stream | **multi-mode stream** | `streamMode: ["messages","tools","custom","updates"]` + `mapStreamChunk` |
 | 上下文压缩 | **context compaction** | `compactHistory` + `RemoveMessage` |
-| 多轮 HITL | **multi-turn HITL** | 多轮人审循环 |
-| 完成闸门 | **completion gate**（完成闸门） | 强制验证门；首次中英并列 |
+| 跨 turn 人审、多轮人审 | **multi-turn HITL** | 跨用户回合的人审循环（interrupt → 用户回复 → resume）；须 checkpointer |
+| interrupt+resume、人审断点 | **interrupt / resume** | LangGraph `interrupt()` 暂停；surface 用 `Command({ resume })` 续跑；见 `flow-patterns.md` |
+| Send 并行、fan-out、多源聚合 | **Send / fan-out** | `Send` 并行派发多份子 state，reducer 聚合；见 `flow-patterns.md` |
+| 条件重试、自纠正回边 | **条件重试** | `addConditionalEdges`（或 router）按评分/门控回到 rewrite 等节点；返回值须 ∈ targets（R-G004） |
+| 完成闸门 | **completion gate**（完成闸门） | 强制验证门；normative 在开发 Agent `<SESSION_CLOSE>`；操作细则在 flow-builder Part* |
 | 工具回路 | **ReAct** | `think`(bindTools) ↔ `tools`(ToolNode) → `respond` |
 
 ## Flow 交互形态
 
 面向用户仅两类形态（「用」列中文）：**聊天助手型** / **固定流程型**。`chat` / `pipeline` 为对应机器值；`approval` 是固定流程型内**人审编排**的机器值（不作独立形态问用户）。
 
+**改图判定**（与 `docs/examples.md` / 开发 Agent system-prompt 同构）：说不清「default 为什么不够」就不要改图；命中能力门槛（固定阶段顺序、Send 并行/多源聚合/条件重试、multi-turn HITL）再手写 `src/app/graph.ts`。
+
 | 弃用 | 用 | 定义 |
 |---|---|---|
 | 无须写图的聊天模式名 | **聊天助手型** / **default flow** | `flow.active: "default"` + systemPrompt + 平台能力；**唯一默认路径**；开放追问勿手写图 |
-| 管线、pipeline（对用户） | **固定流程型** | 机器值 `pipeline`；**仅用户明确要求**固定阶段一次交付时才考虑；直接改 `src/app/graph.ts`；流程内某步需人审/审批用 HITL interrupt+resume 编排（机器值 `approval`） |
-| ~~人工确认型~~（已并入固定流程型） | **HITL / 人审编排** | 非独立用户形态；`createHumanApprovalNode` + interrupt/resume，作为固定流程型图里的一种节点编排 |
+| 管线、pipeline（对用户） | **固定流程型** | 机器值 `pipeline`；须能说明 default 不够（固定阶段 / Send / 条件重试等）才手写 `src/app/graph.ts`；流程内人审用 HITL interrupt/resume（机器值 `approval`） |
+| ~~人工确认型~~（已并入固定流程型） | **HITL / 人审编排** | 非独立用户形态；`createHumanApprovalNode` + interrupt/resume；含审批 / 人工复核 / 定稿 |
 | flow 类型、图类型 | **flow profile** | `flows --json`；含 `interaction` / `implementation` / `userLabel` |
-| 为了写图而写图 | **graphReason** | 用户明确要求手写图时须说明 default 为何不够 |
+| 为了写图而写图 | **graphReason** | 手写图时须说明 default 为何不够（能力门槛，非「用户念出固定流程四字」） |
 
 | 用户中文 | 机器值 | 默认落点 |
 |---|---|---|
-| 聊天助手型 | `chat` | **`default`（唯一默认）**；追问/客服/问答/搜索总结等一律先走此路径，不写图 |
-| 固定流程型 | `pipeline`（人审步骤 `approval`） | **仅用户明确要求**（固定步骤、一次交付、翻译/审稿/打分/报告等）→ 直接改 `src/app/graph.ts` 手写图；流程内需审批/人工复核/定稿则加 HITL interrupt+resume 节点 |
+| 聊天助手型 | `chat` | **`default`（唯一默认）**；追问/客服/问答/搜索总结/模糊未指明形态 → 不写图 |
+| 固定流程型 | `pipeline`（人审步骤 `approval`） | 命中能力门槛 → 手写 `src/app/graph.ts`；需审批/复核/定稿则加 multi-turn HITL（interrupt/resume） |
 
 | 弃用 | 用 | 定义 |
 |---|---|---|

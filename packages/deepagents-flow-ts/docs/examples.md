@@ -12,7 +12,7 @@
 | 让模型按需调用平台工具 / MCP 工具 | 平台登记后由宿主注入会话，默认图 `think.bindTools(runtime.allTools)` | 否 |
 | 必须固定阶段顺序（先 A 再 B 再 C） | 手写固定管道 | 是 |
 | 必须 Send 并行、多源聚合、条件重试 | 手写图或子图 | 是 |
-| 必须跨 turn 人审 / 审批 / 定稿 | 手写 HITL 图，走 interrupt/resume | 是 |
+| 必须 multi-turn HITL（人审 / 审批 / 定稿） | 手写 HITL 图，走 interrupt/resume | 是 |
 
 > 说不清“default 为什么不够”时，不要改图。默认图已经具备多轮记忆、checkpoint、自动压缩、流式响应和工具调用回路。
 
