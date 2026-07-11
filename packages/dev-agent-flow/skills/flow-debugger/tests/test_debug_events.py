@@ -87,12 +87,31 @@ class ConversationIdResolveTests(unittest.TestCase):
 
 
 class SessionCommandTests(unittest.TestCase):
-    def test_cmd_new_exits_with_instructions(self) -> None:
+    def test_cmd_new_creates_conversation(self) -> None:
         import session  # noqa: E402
 
-        with self.assertRaises(SystemExit) as ctx:
-            session.cmd_new(None)
-        self.assertEqual(ctx.exception.code, 1)
+        with mock.patch.object(session, "dev_agent_id", return_value=123):
+            with mock.patch.object(
+                session,
+                "api_request",
+                return_value=(200, {"code": "0000", "success": True, "data": {"id": 1555999}}),
+            ):
+                with mock.patch("sys.stdout", new_callable=io.StringIO) as out:
+                    session.cmd_new(argparse.Namespace(quiet=True))
+        self.assertEqual(out.getvalue().strip(), "1555999")
+
+    def test_cmd_new_errors_when_id_missing(self) -> None:
+        import session  # noqa: E402
+
+        with mock.patch.object(session, "dev_agent_id", return_value=123):
+            with mock.patch.object(
+                session,
+                "api_request",
+                return_value=(200, {"code": "0000", "success": True, "data": {}}),
+            ):
+                with self.assertRaises(SystemExit) as ctx:
+                    session.cmd_new(argparse.Namespace(quiet=True))
+        self.assertEqual(ctx.exception.code, 4)
 
     def test_cmd_refresh_quiet(self) -> None:
         import session  # noqa: E402

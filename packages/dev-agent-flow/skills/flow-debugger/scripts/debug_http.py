@@ -18,7 +18,7 @@ API_PREFIX = "/api/v1/4sandbox/agent"
 AGENT_CONFIG_PATH = "/{devAgentId}"
 # 会话接口（经沙箱重写 agent/conversation/** → 内部 /api/agent/conversation/*）
 CHAT_PATH = "/conversation/chat"                                       # POST(SSE) 发消息（conversationId 用 devConversationId）
-CONVERSATION_CREATE_PATH = "/conversation/create"                      # 平台 UI「刷子」创建；flow-debugger **不调用**，用 GET devConversationId
+CONVERSATION_CREATE_PATH = "/conversation/create"                      # 新建调试会话：session.sh new 调用；body {agentId, devMode:true}；响应 data.id；后端回写 agent.devConversationId
 CONVERSATION_DETAIL_PATH = "/conversation/{conversationId}"            # POST 会话内容/初始历史
 CONVERSATION_STOP_PATH = "/conversation/chat/stop/{conversationId}"    # POST 取消（路径参=conversationId，无 body）
 PERMISSION_RESPONSE_PATH = "/conversation/chat/permission-request/response"  # POST 权限审批响应

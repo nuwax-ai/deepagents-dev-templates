@@ -83,7 +83,7 @@ flow-builder/
 
 ## L1 铁律
 
-- **文档分工**：图规则 / factory API / 配置路径 / **术语** → 当前工作目录 `docs/`（**术语权威**：`docs/glossary.md`）；脚手架流程 / 平台登记 / **completion gate（完成闸门）** → 本技能 Part*（见 [README.md](../../../README.md) § 文档分工）。
+- **文档分工**：图规则 / factory API / 配置路径 / **术语** → 当前工作目录 `docs/`（**术语权威**：`docs/glossary.md`）；脚手架流程 / 平台登记 / **completion gate（完成闸门）** → 本技能 Part*。
 - 图是契约；factory 优先；**Bespoke nodes** 不硬塞 factory；topology 单一权威看 `src/libs/topologies/`，可运行挂载看 `src/app/flows/`（示范：`scripts/scaffold/specs/`）；保护区不改。
 - **用户可见大段 LLM 输出**（compose / aggregate / draft / 修订稿）→ **`createLlmStreamNode`**（`write` 读 `r.text`）；**禁止** `createLlmNode`（仅 invoke）。custom spec 用 `type: "llm-stream"`；**R-G009**。
 - **平台能力（外部工具/Plugin/技能）** → **写图前**必须先 `dev-engineer-toolkit` 搜平台并 `add-tool`，再用 `get-config --key tools --full` 拉取已注册工具配置固化进 `spec.tools`（**禁止**手抄 schema）；固定管道节点 `params` 写工具名（`platform-tool`→`toolName`，集合→`tools`）；**禁止**为已登记能力手写 fetch/`tool()` 包装；**`add-tool` 后加载 `flow-debugger`**；收工须 `debug.sh --with-logs` + `--expect-tool` + 日志 `[结论]`；**禁止**用 `pnpm flow` 冒充端到端；**联网搜索较常见**，见 Part 3 § 联网搜索；禁止未搜平台就写外部能力、禁止以「用户待配置」代替登记（见 Part 3 § 平台能力登记、Part 0 completion gate）。

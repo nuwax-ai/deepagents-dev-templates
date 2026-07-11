@@ -15,7 +15,7 @@
 
 ## 常用命令
 
-在 `packages/dev-agent-flow/skills/flow-debugger` 下执行：
+加载 `flow-debugger` skill 后，在其 `scripts/` 目录执行：
 
 ```bash
 ./scripts/debug.sh --message "你是谁？"

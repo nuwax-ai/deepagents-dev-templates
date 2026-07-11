@@ -7,7 +7,8 @@
   cancel   取消/停止执行（页面「停止」）
            POST /conversation/chat/stop/{conversationId}（路径参=conversationId，无 body）
 
-  new      已禁用 —— 预览面板「刷子」须用户手动点击，脚本无法代建会话。
+  new      POST /conversation/create 新建调试会话（{agentId, devMode:true}），打印 data.id
+           与 UI「刷子」等价；后端 devMode 创建会回写 agent.devConversationId，故 new 后无需额外 refresh
 
 端点契约集中在 debug_http.py。退出码：0 成功 | 1 参数错 | 2 平台未就绪 | 3 HTTP 失败/超时 | 4 业务错误
 """
@@ -21,6 +22,7 @@ import time
 
 from debug_http import (
     AGENT_CONFIG_PATH,
+    CONVERSATION_CREATE_PATH,
     CONVERSATION_STOP_PATH,
     api_request,
     configure_stdio_utf8,
@@ -32,18 +34,22 @@ from debug_http import (
 )
 
 
-def cmd_new(_args) -> None:
-    print(
-        "[ERROR] 脚本无法代用户新建会话。请在 agent-dev 预览面板手动点击「刷子」清空上下文。",
-        file=sys.stderr,
+def cmd_new(args) -> None:
+    aid = dev_agent_id()
+    status, payload = api_request(
+        "POST",
+        CONVERSATION_CREATE_PATH,
+        body={"agentId": aid, "devMode": True},
     )
-    print(
-        "[提示] 用户点刷子后执行：\n"
-        "  ./scripts/session.sh refresh              # 立即拉取 devConversationId\n"
-        "  ./scripts/session.sh wait --previous <旧ID>  # 轮询直到会话 ID 变化",
-        file=sys.stderr,
-    )
-    sys.exit(1)
+    ensure_http_ok(status, payload)
+    cid = str((payload.get("data") or {}).get("id") or "").strip()
+    if not cid:
+        print("[ERROR] create 成功但响应缺 data.id。", file=sys.stderr)
+        sys.exit(4)
+    if args.quiet:
+        print(cid)
+    else:
+        print(f"[OK] 新建调试会话 devConversationId={cid}")
 
 
 def cmd_refresh(args) -> None:
@@ -94,7 +100,7 @@ def cmd_wait(args) -> None:
     sys.exit(3)
 
 
-def cmd_current(args) -> None:
+def cmd_current(_args) -> None:
     aid = dev_agent_id()
     path = AGENT_CONFIG_PATH.replace("{devAgentId}", str(aid))
     status, payload = api_request("GET", path)
@@ -121,13 +127,15 @@ def cmd_cancel(args) -> None:
 
 def main() -> None:
     configure_stdio_utf8()
-    p = argparse.ArgumentParser(description="dev 调试会话管理（refresh/wait/current/cancel）")
+    p = argparse.ArgumentParser(description="dev 调试会话管理（new/refresh/wait/current/cancel）")
     sub = p.add_subparsers(dest="cmd", required=True)
 
-    sub.add_parser(
+    pn = sub.add_parser(
         "new",
-        help="已禁用：须用户在预览面板点「刷子」",
-    ).set_defaults(func=cmd_new)
+        help="新建调试会话（POST /conversation/create，与 UI 刷子等价）",
+    )
+    pn.add_argument("--quiet", "-q", action="store_true", help="仅输出新会话 ID")
+    pn.set_defaults(func=cmd_new)
 
     pr = sub.add_parser("refresh", help="拉取当前 devConversationId（GET agent 配置）")
     pr.add_argument("--quiet", "-q", action="store_true", help="仅输出 ID（便于脚本捕获）")
