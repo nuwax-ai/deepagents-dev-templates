@@ -74,7 +74,7 @@ version: "1.5.0"
 |------|------|
 | `--message` / `--message-file` | 调试 prompt（文本 / UTF-8 文件，二选一） |
 | `--conversation` | 会话 ID（覆盖自动解析；默认 GET agent → `devConversationId`） |
-| `--expect-tool` | 期望被调用的工具名子串（断言 `componentExecuteResults` 命中且 success） |
+| `--expect-tool` | 期望被调用的**runtime/SSE 工具名子串**（断言 `componentExecuteResults` 命中且 success；禁止中文登记名，见 flow-builder Part 3 § 三层工具名） |
 | `--auto-approve` | 自动批准权限审批（选首个 allow option） |
 | `--ask-marker` | 回答 ask-question：把 `<!--nuwax-mcp-ask-request-id:<requestId>-->` 追加到 message 末尾 |
 | `--variables` | 变量参数（JSON 字符串） |
@@ -120,6 +120,8 @@ version: "1.5.0"
 ```
 
 stderr 须出现 **`[结论] 日志正常`**（exit 0）才可报通过；`[结论] 发现问题`（exit 4）即失败，即使 SSE 已通过。
+
+**`[性能]` 加载耗时**：日志含 runtime 装配各阶段计时时，会额外输出 `[性能] 加载总耗时≈<n>ms | <阶段>=<n>ms | ...`（按耗时降序）。用于定位启动瓶颈（常见大头：`mcp.getTools` / `runtime.context`）。该追踪由 flow-ts 侧全局 env 开关 `PERF_TRACE` 控制，**默认开启**（随时可排查性能问题）；无此段说明日志不含 perf 行（如已显式关闭），不影响成败判定。
 
 ## HITL 处理流程
 

@@ -43,13 +43,15 @@
 
 固定管道要让某个节点用平台工具时，在**节点 `params`** 里写工具名，不再使用 `tools[].bindTo` 能力位：
 
+> **示例免责**：下列 `targetId` / `name` / `toolName` / 工具名均为**结构占位**，非真实工具；真实值**必须**经 `search-apis.sh` → `add-tool.sh` → `get-config.sh --key tools --full` 获取，**禁止照抄本文数值 / 名称**。
+
 ```jsonc
 {
   "tools": [
     {
       "targetType": "Plugin",
-      "targetId": 614,
-      "name": "token价格查询",
+      "targetId": 0,          // 占位：填 get-config 返回的真实 targetId
+      "name": "<平台登记名>",  // 占位示例，非真实登记名
       "description": "查询代币的实时价格",
       "schema": "{...get-config --full 拉取的接口 schema 原文...}"
     }
@@ -57,22 +59,37 @@
 }
 ```
 
-- 运行时工具名：优先用 `toolName`（get-config 返回的工具名，若有），否则按 `${targetType}_${targetId}` 自动拼（如 `Plugin_309`）；节点 `params.toolName` 用这个名字。
+- 运行时工具名：优先用 `toolName`（get-config 返回的工具名，若有），否则按 `${targetType}_${targetId}` 自动拼（如 `Plugin_<id>`）；节点 `params.toolName` 用这个名字。
 - `platform-tool` 节点用 `params.toolName`（单工具，必填）；`tool-exec` 节点用 `params.tools: ["工具名"]`（工具集合，缺省=全部）。
 - `spec.tools` 的工具配置（`targetType` / `targetId` / `name` / `description` / `schema` / `toolNames`）须用 `get-config.sh --key tools --full` 从平台**拉取已注册工具的真实配置固化**，**禁止**照 `search-apis.sh` 结果手抄 schema。运行时直接消费 `spec.tools` 里固化的配置构建工具，不再查平台配置接口。
 - schema 中的 `${...}` 占位符必须保持原样；禁止硬编码 URL、密钥或鉴权值。
 
+### 三层工具名（生产易错 · `--expect-tool` 必读）
+
+> 下表「形态示例」列仅示意**命名形态**（占位），非真实工具名；真实名以 `get-config --key tools --full` 返回为准。
+
+| 层级 | 在哪出现 | 形态示例（占位） | 用途 |
+|------|----------|------|------|
+| **平台登记名** | `add-tool` / 提示词指引 | `<中文登记名>` | 提示词里告诉模型用哪个能力 |
+| **SSE trace 名** | `componentExecuteResults[].name` | `platform__<tool>` | `debug.sh --expect-tool <tool>`（子串匹配） |
+| **Runtime bindTools 名** | `bindTools` 后 / 图节点 `params.toolName` | `platform__<tool>_<n>` | LLM 实际调用的工具名 |
+
+**铁律**：
+- `--expect-tool` 用 **runtime/SSE 英文子串**（如实际返回的 `<tool>` 片段或 `Plugin_<id>`），**禁止**用中文登记名
+- `get-config --key tools --full` 后记录返回的 `toolName`，收工断言以 runtime 子串为准
+- 提示词里可写中文登记名引导模型；flow-debugger 断言用 runtime 子串
+
 ### 固定管道主动工具节点
 
-需要“独立联网搜索节点 / 业务 API 节点”时，优先使用 custom DSL 的 `platform-tool`，不要把它写成 `tool-exec`：
+需要“独立联网搜索节点 / 业务 API 节点”时，优先使用 custom DSL 的 `platform-tool`，不要把它写成 `tool-exec`（下例 `targetId` / `toolName` 同为占位，真实值以 get-config 为准）：
 
 ```jsonc
 {
   "tools": [
     {
       "targetType": "Plugin",
-      "targetId": 309,
-      "name": "联网搜索",
+      "targetId": 0,             // 占位：填 get-config 返回的真实 targetId
+      "name": "<平台登记名>",     // 占位示例，非真实登记名
       "description": "在互联网上搜索相关信息",
       "schema": "{...get-config --full 拉取的接口 schema 原文...}"
     }
@@ -82,7 +99,7 @@
       "web_search": {
         "type": "platform-tool",
         "params": {
-          "toolName": "Plugin_309",
+          "toolName": "Plugin_<id>", // 与上面 targetId 对应的运行时工具名
           "args": "(s) => ({ query: s.query, freshness: 'noLimit' })",
           "write": "(r) => ({ searchResult: r.raw })"
         }

@@ -36,7 +36,7 @@ OLD=$(./scripts/session.sh refresh -q)   # 可选：记录当前 devConversation
 | 参数 | 说明 |
 |------|------|
 | `--message` / `--message-file` | 调试 prompt；中文或长 prompt 优先文件 |
-| `--expect-tool` | 断言 `componentExecuteResults` 中出现工具名子串且 success |
+| `--expect-tool` | 断言 `componentExecuteResults` 中出现**runtime/SSE 工具名子串**且 success（见 Part 3 § 三层工具名；禁止中文登记名） |
 | `--auto-approve` | 自动批准权限审批 |
 | `--ask-marker <requestId>` | 回答 ask-question，用同一 conversation 续接 |
 | `--conversation <id>` | 指定会话；默认读平台注入的 `CONVERSATION_ID` |

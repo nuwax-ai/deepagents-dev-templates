@@ -44,6 +44,10 @@ MODEL_RE = re.compile(
     r"\bapiKey\b|api_key|Missing credentials",
     re.IGNORECASE,
 )
+# 性能：runtime 装配阶段计时（perf-trace 输出 `perf ... phase=<name> ms=<n>`）。
+PERF_PHASE_RE = re.compile(r"\bperf\b.*?\bphase=(\S+)\s+ms=(\d+)", re.IGNORECASE)
+# 汇总行：`perf-summary ... totalMs=<n>`（可选，单阶段行已足够聚合）。
+PERF_SUMMARY_RE = re.compile(r"\bperf-summary\b.*?\btotalMs=(\d+)", re.IGNORECASE)
 TRACE_FIELDS = (
     "flowStatus",
     "outputChars",
@@ -126,6 +130,8 @@ def parse_log(path: str) -> dict | None:
     permissions: list[str] = []
     model_issues: list[str] = []
     flow_trace: dict | None = None
+    perf_phases: dict[str, int] = {}
+    perf_total: int | None = None
 
     for raw in lines:
         line = raw.rstrip("\n")
@@ -137,7 +143,14 @@ def parse_log(path: str) -> dict | None:
             d = tool_calls.setdefault(name, {"start": 0, "done": 0, "failed": 0})
             if status in d:
                 d[status] += 1
+        elif (pm := PERF_PHASE_RE.search(line)):
+            # 性能阶段行：同名取最大耗时（同一阶段多次装配时取最慢一次，偏保守）。
+            phase, ms = pm.group(1), int(pm.group(2))
+            perf_phases[phase] = max(perf_phases.get(phase, 0), ms)
         else:
+            sm = PERF_SUMMARY_RE.search(line)
+            if sm:
+                perf_total = int(sm.group(1))
             if ERROR_RE.search(line):
                 errors.append(stripped)
             if PERM_RE.search(line):
@@ -164,6 +177,8 @@ def parse_log(path: str) -> dict | None:
         "tool_calls": tool_calls,
         "permissions": permissions,
         "model_issues": model_issues,
+        "perf_phases": perf_phases,
+        "perf_total": perf_total,
         "first_ts": _ts(0),
         "last_ts": _ts(-1),
         "line_count": len(lines),
@@ -237,6 +252,8 @@ def main() -> None:
     merged_tools: dict[str, dict] = {}
     merged_perms: list[str] = []
     merged_model: list[str] = []
+    merged_perf: dict[str, int] = {}
+    perf_total: int | None = None
     flow_trace: dict | None = None
     analyzed = []
 
@@ -252,6 +269,10 @@ def main() -> None:
                 d[k] += cnt[k]
         merged_perms.extend(s["permissions"])
         merged_model.extend(s["model_issues"])
+        for phase, ms in s.get("perf_phases", {}).items():
+            merged_perf[phase] = max(merged_perf.get(phase, 0), ms)
+        if s.get("perf_total") is not None:
+            perf_total = s["perf_total"]
         if s["flow_trace"]:
             flow_trace = s["flow_trace"]  # 取最后一个有效 trace
 
@@ -275,6 +296,13 @@ def main() -> None:
             for n, c in merged_tools.items()
         )
         print(f"[工具调用] {tool_summary}", file=sys.stderr)
+
+    if merged_perf:
+        # 按耗时降序，一眼定位启动瓶颈；总耗时优先用 perf-summary，缺失则回退各阶段之和。
+        ordered = sorted(merged_perf.items(), key=lambda kv: kv[1], reverse=True)
+        total = perf_total if perf_total is not None else sum(merged_perf.values())
+        breakdown = " | ".join(f"{name}={ms}ms" for name, ms in ordered)
+        print(f"[性能] 加载总耗时≈{total}ms | {breakdown}", file=sys.stderr)
 
     if merged_perms:
         print(f"[permission/HITL] {len(merged_perms)} 个事件", file=sys.stderr)

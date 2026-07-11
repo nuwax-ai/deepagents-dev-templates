@@ -39,7 +39,7 @@
 | 2 | 确认主 Agent（见 § 主 Agent 命名与身份） |
 | 3 | 按下方「设计流程」+ 七要素 + ≥1 few-shot（有固定格式时） |
 | 4 | 名称 → 更新 `config.agent.name` / `agent.description` |
-| 5 | 写入 `prompts/flow.base.md`（开场白单独文件，UTF-8） |
+| 5 | 写入 `prompts/<场景>.md`（业务 Agent 底稿，**经第 7 步同步为平台 `systemPrompt` 生效**；**勿覆盖** `prompts/flow.base.md` 通用基座） |
 | 6 | 需要时填入 part1 的 `systemPrompt`；摘要写入 `project.md` |
 | 7 | **有定稿即同步** — 同轮或下轮执行「平台同步」，勿拖到收工 |
 
@@ -66,7 +66,7 @@
 |----|------|-------------|
 | 1 | 确认 `flow.active: "default"`（聊天助手型；无需 scaffold） | `config/flow-agent.config.json` |
 | 2 | 写入智能体名称与简述 | `agent.name`、`agent.description` |
-| 3 | Part 5 七要素设计 systemPrompt（标题 `# [Agent 名] — …`） | `prompts/flow.base.md` |
+| 3 | Part 5 七要素设计 systemPrompt（标题 `# [Agent 名] — …`） | `prompts/<场景>.md`（或沿用 `flow.base.md` 仅当 Agent 即通用 Flow 编排助手） |
 | 4 | 若用户要欢迎语 → 写开场白源文件 | 如 `prompts/opening.md` |
 | 5 | 平台同步（见上节） | `update-config.sh` → `systemPrompt` / `openingChatMsg` |
 
@@ -114,7 +114,7 @@
 
 经 `dev-engineer-toolkit` 将定稿写入平台在线配置，禁止只改本地不同步：
 
-1. **落盘** — 定稿写入本地 UTF-8 源文件（如 `prompts/flow.base.md`；开场白单独文件）
+1. **落盘** — 定稿写入本地 UTF-8 源文件（业务 Agent 用 `prompts/<场景>.md`；`flow.base.md` 保留通用基座；开场白单独文件）
 2. **上传** — `update-config.sh --system-prompt-file` / `--opening-msg-file`（含中文必须用文件，禁止命令行内联）
 3. **单字段更新** — 只改系统提示词或开场白之一时，勿传空值覆盖另一字段
 4. **scaffold 衔接** — 需要时填入 part1 的 `systemPrompt`（若该 topology 注入 prompt）

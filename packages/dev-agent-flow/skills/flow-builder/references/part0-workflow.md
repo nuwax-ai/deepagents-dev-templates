@@ -23,13 +23,13 @@
 
 | 判断 | 需求信号 | 落点 |
 |------|----------|------|
-| **聊天助手型** | 「支持追问」「继续问」「随便问」「助手」「客服」「问答」「搜索总结」——用户会连续发问或开放提问 | `flow.active: "default"` + 平台能力登记 + systemPrompt，**不写图**；确需专属样板才建薄 recipe（对照 `search-aggregator`） |
+| **聊天助手型** | 「支持追问」「继续问」「随便问」「助手」「客服」「问答」「搜索总结」——用户会连续发问或开放提问 | `flow.active: "default"` + 平台能力登记 + Part 5 systemPrompt，**不写图**；确需专属样板才切换已有 conversational recipe（如 `search-aggregator`） |
 | **固定流程型** | 「先 A 再 B」「固定步骤」「翻译这段」「审这篇」「生成报告」「给 X 打分」——流程固定、一次交付 | preset 优先；不满足才 `custom`，且 spec 必须写 `interaction` + `graphReason` |
 | **人工确认型** | 「审批」「确认后发布」「人工复核」「修改意见」「定稿」 | HITL 系（`human-in-loop` / `project-manager`）或 approval custom |
 
 **聊天助手型默认路径（MVP 最快）**：`flow.active: "default"` + `dev-engineer-toolkit` 登记平台能力 + Part 5 systemPrompt 定制 ≈ 交付，**不写任何图代码**。新建图必须能说明「default 为什么不够」（如：固定阶段顺序、需 Send 并行、需 HITL interrupt），说不出就走聊天助手型。
 
-> **反例（真实失败案例）**：「搜索聚合 Agent，支持**追问和钻取**」被误判成 fanout×4 固定流程——每轮盲搜 4 路、无法真正追问钻取。「追问」即聊天助手型信号，正确落点：default ReAct + 平台搜索能力登记 + systemPrompt。
+> **反例（真实失败案例）**：「支持**追问和钻取**」被误判成 fanout 固定流程——每轮盲搜、无法真正追问。「追问」即聊天助手型信号，正确落点：default ReAct + 平台能力登记 + Part 5 systemPrompt（业务提示词写 `prompts/<场景>.md` 同步平台，**勿覆盖** `prompts/flow.base.md` 通用基座）。
 
 **无法判断时的固定话术**：`我先按“可追问的聊天助手”来做，这样交付最快、也最适合开放式需求；如果你后续需要固定审批或多阶段处理，再升级成流程版。`
 

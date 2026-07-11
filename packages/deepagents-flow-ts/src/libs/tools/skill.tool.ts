@@ -31,7 +31,7 @@ ${scriptsNote}
 
 /**
  * 在 skillRoot/references/ 下解析 part 参数对应的 markdown 文件。
- * part 可为完整文件名（含或不含 .md）或前缀（如 part3 → part3-tools-config.md）。
+ * part 可为完整文件名（含或不含 .md）或前缀（如 part2 → part2-xxx.md）。
  */
 export function resolveSkillReferencePath(skillRoot: string, part: string): string | null {
   const trimmed = part.trim();
@@ -96,13 +96,13 @@ export function createSkillTool(skills: DiscoveredSkill[]) {
     },
     {
       name: "load_skill",
-      description: `读取 skill 说明：默认 SKILL.md 正文；可选 part 加载 references/ 子文件（如 part0-workflow、part3）。可用 skills: ${names}。`,
+      description: `读取 skill 说明：默认 SKILL.md 正文；可选 part 加载 references/ 子文件（按文件名或前缀，如 part1、part2）。可用 skills: ${names}。`,
       schema: z.object({
         name: z.string().describe("skill 名（见系统提示词 Available Skills 列表）"),
         part: z
           .string()
           .optional()
-          .describe("可选：references/ 下文件名或前缀（如 part3-tools-config、part0）"),
+          .describe("可选：references/ 下文件名或前缀（如 part2-xxx、part1）"),
       }),
     }
   );

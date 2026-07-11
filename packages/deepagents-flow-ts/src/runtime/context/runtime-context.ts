@@ -19,6 +19,7 @@ import { type AppConfig, type ACPSessionConfig } from "../config/config-loader.j
 import { resolvePath } from "../config/config-paths.js";
 import { resolvePackageRoot } from "../package-root.js";
 import { logger } from "../logger.js";
+import { timePhase } from "../perf-trace.js";
 import { inferMcpTransport } from "../mcp/infer-mcp-transport.js";
 import { verifyMcpServersWithToolList } from "../mcp/verify-mcp-tool-list.js";
 import {
@@ -497,7 +498,10 @@ export async function hydrateRuntimeContext(
       prefixToolNameWithServerName: true,
     } as never);
     context.mcpClient = client;
-    context.mcpTools = sanitizeLoadedMcpTools(await client.getTools(), log);
+    context.mcpTools = sanitizeLoadedMcpTools(
+      await timePhase("mcp.getTools", () => client.getTools(), { mode: "bulk", servers: connNames.length }),
+      log
+    );
   } catch (err) {
     // bulk 整体抛（如 Zod 校验失败）→ 逐 server 隔离重试，避免单个非法 server 连累全部。
     log.warn("MCP bulk load failed; retrying per-server", {
@@ -541,9 +545,10 @@ export async function hydrateRuntimeContext(
   }
 
   if (context.mcpClient) {
-    context.mcpServerToolLists = await verifyMcpServersWithToolList(
-      context.mcpClient,
-      connNames
+    context.mcpServerToolLists = await timePhase(
+      "mcp.verify",
+      () => verifyMcpServersWithToolList(context.mcpClient!, connNames),
+      { servers: connNames.length }
     );
   }
 

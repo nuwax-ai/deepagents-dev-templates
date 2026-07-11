@@ -61,6 +61,16 @@ export {
   logPromptComplete,
   type AcpPromptCycle,
 } from "./session-trace.js";
+export {
+  isPerfTraceEnabled,
+  markStart,
+  markEnd,
+  recordPhase,
+  timePhase,
+  beginPerfSession,
+  endPerfSession,
+  type PerfMark,
+} from "./perf-trace.js";
 export { getPackageVersion } from "./version.js";
 export type { PlatformToolRef, PlatformToolDescriptor } from "./platform-tools/types.js";
 export { createPlatformToolDescriptors } from "./platform-tools/descriptor.js";

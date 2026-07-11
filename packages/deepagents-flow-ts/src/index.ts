@@ -30,6 +30,11 @@ import {
   renderSkillsSection,
   renderSubagentsSection,
   renderMcpServersSection,
+  beginPerfSession,
+  endPerfSession,
+  timePhase,
+  markStart,
+  markEnd,
   type AppConfig,
   type ACPSessionConfig,
 } from "./runtime/index.js";
@@ -68,12 +73,20 @@ export async function createFlowRuntime(
   options: { sessionConfig?: ACPSessionConfig; workspaceRoot?: string; platformToolRefs?: PlatformToolRef[] } = {}
 ): Promise<FlowRuntime> {
   const workspaceRoot = options.workspaceRoot ?? process.cwd();
-  const ctx = await createRuntimeContextAsync(appConfig, options.sessionConfig, workspaceRoot);
+  // 全流程加载耗时追踪（全局 env 开关 PERF_TRACE，默认开）：各阶段单独计时 + 收尾汇总，定位启动瓶颈。
+  const perf = beginPerfSession("runtime.load");
+
+  // runtime.context 含 MCP 加载（getTools 通常是启动大头）。
+  const ctx = await timePhase("runtime.context", () =>
+    createRuntimeContextAsync(appConfig, options.sessionConfig, workspaceRoot)
+  );
   const sandbox = getFlowSandboxPolicy(appConfig);
 
+  const discoverMark = markStart("discover.skills+subagents");
   const skillsPaths = resolveSkillsPaths(appConfig);
   const skills = discoverSkills(appConfig, workspaceRoot);
   const subAgents = discoverSubAgents(appConfig, workspaceRoot);
+  markEnd(discoverMark, { skills: skills.length, subAgents: subAgents.length });
   const progressiveSkills = appConfig.skills.progressiveLoading;
 
   const platformToolRefs = options.platformToolRefs ?? [];
@@ -83,6 +96,7 @@ export async function createFlowRuntime(
   );
 
   // skills → load_skill 工具;subAgents → task 委派工具(沙箱按 workspaceRoot / 各自 workdir)。
+  const toolsMark = markStart("tools.build");
   const allTools = createFlowTools(ctx, {
     workspaceRoot,
     policy: sandbox,
@@ -90,8 +104,10 @@ export async function createFlowRuntime(
     subAgents,
     platformTools,
   });
+  markEnd(toolsMark, { toolCount: allTools.length });
 
   // 系统提示词追加「Available Skills」「Subagents」「MCP Servers」清单。
+  const promptMark = markStart("systemPrompt.resolve");
   const baseSystemPrompt = resolveSystemPrompt(appConfig, options.sessionConfig, workspaceRoot);
   const sections = [
     renderMcpServersSection(ctx.mcpServerToolLists),
@@ -101,6 +117,7 @@ export async function createFlowRuntime(
   const systemPrompt = sections.length
     ? `${baseSystemPrompt}\n\n${sections.join("\n\n")}`
     : baseSystemPrompt;
+  markEnd(promptMark, { chars: systemPrompt.length });
 
   logRuntimeSystemPromptDiagnostics({
     sessionConfig: options.sessionConfig,
@@ -113,7 +130,11 @@ export async function createFlowRuntime(
   });
 
   // 文件后端 checkpointer(跨重启恢复 + interrupt/resume 持久化)。
+  const checkpointerMark = markStart("checkpointer.build");
   const checkpointer = createFileCheckpointer(appConfig, workspaceRoot);
+  markEnd(checkpointerMark);
+
+  endPerfSession(perf, { workspaceRoot });
 
   return {
     config: appConfig,
