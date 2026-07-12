@@ -53,11 +53,11 @@ const { longTimeoutMs } = resolveLlmResilience(cfg.config);
 开放对话 + 工具调用优先走默认图，不写 graph：
 
 1. 在平台侧登记 Plugin / Workflow / Knowledge / MCP。
-2. 已登记工具进入运行时：宿主注入 `runtime.allTools`，或开发期把真实 schema 固化为 `FlowDef.platformToolRefs` 再经 `createFlowRuntime` 装配。
+2. 已登记工具进入运行时：**宿主注入**，或开发期把真实 schema **固化为** `FlowDef.platformToolRefs` 再经 `createFlowRuntime` 装配为 `StructuredTool`。图内按需用于独立节点（`createPlatformToolActionNode`）、局部工具集合（`pickTools` → `createToolExecNode`），或并入 `runtime.allTools` 供默认 ReAct `bindTools`。
 3. 把领域说明写进 systemPrompt，例如“需要实时信息时优先调用已登记搜索工具，汇总来源后回答”。
 4. 本地快检：`pnpm flow "…"`；端到端在平台预览会话经 ACP 验证。
 
-运行时关系：平台宿主把已登记能力注入会话，`deepagents-flow-ts` 加载到 `runtime.allTools`，默认图在 `think` 中 `bindTools(runtime.allTools)`。
+运行时关系：平台宿主可把已登记能力注入会话；固化路径经 `createPlatformStructuredTool` 生成工具。默认 ReAct 便捷路径是并入 `runtime.allTools` 后在 `think` 中 `bindTools`；固定管道不必全部进 `allTools`，按节点或集合接线即可。
 
 ## 固定线性管道
 

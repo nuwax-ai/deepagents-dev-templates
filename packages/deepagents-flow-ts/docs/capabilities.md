@@ -34,13 +34,13 @@ pnpm sessions       # 已持久化的会话
 - **skills** — `discoverSkills` 发现 `agentsDirectories` 下各 `<root>/skills/`（默认含 `builtin/skills/`、`.agents/skills/`）及 `config.skills.directories` 的 SKILL.md；经 `renderSkillsSection` 注入清单，模型用 `load_skill(name)` 渐进式读正文。
 - **subagents** — `discoverSubAgents` 发现 `agentsDirectories` 下各 `<root>/agents/`；默认 ReAct 图经 `task({ subagent_type, description })` 委派。自定义图可用 subgraph（见 [flow-patterns.md](flow-patterns.md)）。
 - **builtInTools** — `createFlowTools(ctx)`（[src/app/flow-tools.ts](../src/app/flow-tools.ts)）组装 http/json + bash/fs/grep·glob + `load_skill`/`task` + native MCP + demo，`bindTools` 绑给模型、`ToolNode` 执行。`http_request` 默认拦截私有/loopback/链路本地/云元数据端点（防 SSRF）+ 响应字节上限（防 OOM）；需访问内网改用 `createHttpRequestTool({ allowPrivateNetwork: true })`。
-- **platformToolRefs** — `FlowDef.platformToolRefs`（或 `createFlowRuntime({ platformToolRefs })`）传入的平台 Plugin / Workflow / Knowledge 引用；经 `createPlatformToolDescriptors` 展开后注入 `FlowRuntime.allTools`。schema **不是** `*.flow.json` / 旧 scaffold `spec.tools`；须用平台已登记工具的真实配置固化（`targetType` / `targetId` / `schema` 等）。运行期也可由宿主直接注入等价工具进 `allTools`。
+- **platformToolRefs** — `FlowDef.platformToolRefs`（或 `createFlowRuntime({ platformToolRefs })`）传入的平台 Plugin / Workflow / Knowledge 引用；经 `createPlatformToolDescriptors` + `createPlatformStructuredTool` 生成 `StructuredTool`。schema **不是** `*.flow.json` / 旧 scaffold `spec.tools`；须用平台已登记工具的真实配置固化（`targetType` / `targetId` / `schema` 等）。运行期也可由宿主直接注入等价工具。二者可并用；**不必**全部并入 `allTools`——图内也可把固化/注入得到的 `StructuredTool` 用于独立节点（`createPlatformToolActionNode`）或局部工具集合（`pickTools` → `createToolExecNode`）；并入 `allTools` 是默认 ReAct 的便捷路径。
 - **compaction** — [src/libs/compaction.ts](../src/libs/compaction.ts)，消费 `config.compaction`。
 - **sessionStore** — `FileCheckpointSaver`（继承 `MemorySaver`），默认持久化到 `~/.flowagents/<workspace 散列>/`（`resolveSessionDir` 按 workspace 隔离）；设 `config.memory.dir` 为相对路径可 opt-out 回项目内。CLI：`sessions` 列出、`sessions delete <id>` 删除。
 
 ## 扩展（不改 `src/libs/` 保护区）
 
-- **加平台能力 / MCP**：搜索、文档、业务 API 等须在**平台侧**登记。把已登记工具的真实 schema 写入 **`FlowDef.platformToolRefs`**（字段：`targetType` / `targetId` / `schema` 等；工具名运行时按 `targetType_targetId` 或 `toolName` 拼），再经 `createFlowRuntime({ platformToolRefs })` 构建 `StructuredTool` 并注入 `FlowRuntime.allTools`；或依赖宿主会话直接注入。图侧用 `createPlatformToolActionNode` / `createToolExecNode`（或 default ReAct 的 `bindTools(allTools)`）按工具名引用即可——**零包装代码**。勿再写旧 scaffold 的 `spec.tools` / `*.flow.json`。本地 MCP 调试可参考 [config/mcp.examples.json](../config/mcp.examples.json)（chrome-devtools / filesystem / bash 等），复制到 `servers` 或经会话下发。
+- **加平台能力 / MCP**：搜索、文档、业务 API 等须在**平台侧**登记。把已登记工具的真实 schema 写入 **`FlowDef.platformToolRefs`**（字段：`targetType` / `targetId` / `schema` 等；工具名运行时按 `targetType_targetId` 或 `toolName` 拼），再经 `createFlowRuntime({ platformToolRefs })` 构建 `StructuredTool`；或依赖宿主会话直接注入。图侧按需接线：**独立节点** `createPlatformToolActionNode`、**局部集合** `createToolExecNode` / `pickTools`、**可选** default ReAct `bindTools(allTools)`——**零包装代码**。勿再写旧 scaffold 的 `spec.tools` / `*.flow.json`。本地 MCP 调试可参考 [config/mcp.examples.json](../config/mcp.examples.json)（chrome-devtools / filesystem / bash 等），复制到 `servers` 或经会话下发。
 - **加 Skill**：
   - **项目内置（推荐）**：`builtin/skills/<name>/SKILL.md`（`agentsDirectories` 含 `./builtin`）。
   - **工作区扩展**：`.agents/skills/<name>/SKILL.md`，或在 `config.skills.directories` 增加目录。
@@ -56,7 +56,7 @@ pnpm sessions       # 已持久化的会话
 
 在本仓库内扩展业务能力时，按下列顺序判断（扩展方式见上文 [扩展（不改 src/libs/ 保护区）](#扩展不改-srclibs-保护区)）：
 
-1. **平台能力（schema 声明即接入）** — `FlowDef.platformToolRefs`（或宿主注入的等价工具，**非** flow.json）声明的 Plugin / Workflow / Knowledge，runtime 按 schema 转成可执行工具并注入 `FlowRuntime.allTools`；conversational ReAct 自动 bind，固定管道按工具名引用，**零包装代码**
+1. **平台能力（schema 声明即接入）** — `FlowDef.platformToolRefs`（或宿主注入的等价工具，**非** flow.json）声明的 Plugin / Workflow / Knowledge，runtime 按 schema 转成 `StructuredTool`；可按需用于独立节点、局部工具集合，或并入 `FlowRuntime.allTools` 供 conversational ReAct bind——**零包装代码**
 2. **内置 `libs/tools`** — bash / 读写 / grep·glob / http / json / load_skill / task / demo
 3. **自写 `src/app/`** — 最后手段（仅平台确无命中的真外部 API），在 [flow-tools.ts](../src/app/flow-tools.ts) 注册
 

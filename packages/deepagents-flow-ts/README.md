@@ -201,12 +201,12 @@ pnpm test
 
 ## 联网 / 外部检索
 
-> **需要联网搜索时**：当前项目**不提供**开箱即用的网页搜索。须在**平台侧**登记搜索能力（Plugin / Workflow / Knowledge 等）。已登记工具经宿主注入 `FlowRuntime.allTools`，或把真实 schema 固化为 **`FlowDef.platformToolRefs`** 再经 `createFlowRuntime` 装配。conversational ReAct 的 `think ↔ tools` 可零代码使用；固定管道用 `createPlatformToolActionNode({ toolName, tools })` / `createToolExecNode({ tools })` / `createMcpRetrievalNode` 按工具名或 StructuredTool 引用。禁止为已登记能力手写 fetch / `tool()` 包装；禁止用 `bash`+curl / `http_request` 替代；禁止在项目配置内硬编码搜索服务。
+> **需要联网搜索时**：当前项目**不提供**开箱即用的网页搜索。须在**平台侧**登记搜索能力（Plugin / Workflow / Knowledge 等）。已登记工具可经宿主注入，或把真实 schema 固化为 **`FlowDef.platformToolRefs`** 再经 `createFlowRuntime` 装配为 `StructuredTool`。conversational ReAct 便捷路径是并入 `allTools` 后 `think ↔ tools` 零代码使用；固定管道用 `createPlatformToolActionNode({ toolName, tools })` / `createToolExecNode({ tools })` / `createMcpRetrievalNode` 传入独立节点或局部工具集合（`tools` 来自固化产物或注入子集，**不必**全部进 `allTools`）。禁止为已登记能力手写 fetch / `tool()` 包装；禁止用 `bash`+curl / `http_request` 替代；禁止在项目配置内硬编码搜索服务。
 
 | 能力 | 说明 |
 |------|------|
 | 工作区检索 | `grep` / `glob` 工具（`createSearchTools`）；**非**联网；ReAct 默认图经 `flow-tools.ts` 注册 |
-| **平台能力对话** | 改 default 图 systemPrompt + 平台登记搜索/知识工具；运行期进入 `allTools` 后 ReAct 自动 bind |
+| **平台能力对话** | 改 default 图 systemPrompt + 平台登记搜索/知识工具；可并入 `allTools` 供 ReAct bind，或按节点/集合接线 |
 | 固定管道工具节点 | `createPlatformToolActionNode` / `createToolExecNode` / `createMcpRetrievalNode` |
 | **运行时注入** | `src/runtime/` / `src/app/flow-tools.ts`；平台会话能力与项目配置汇总为 runtime 工具集 |
 
