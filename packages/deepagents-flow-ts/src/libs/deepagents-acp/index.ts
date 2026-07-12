@@ -2,8 +2,7 @@
  * DeepAgents Server - ACP Integration
  *
  * This package provides an Agent Client Protocol (ACP) server that wraps
- * DeepAgents, enabling seamless integration with IDEs like Zed, JetBrains,
- * and other ACP-compatible clients.
+ * DeepAgents, enabling seamless integration with ACP platform hosts.
  *
  * @packageDocumentation
  * @module deepagents-acp

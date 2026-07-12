@@ -2,7 +2,7 @@
  * emitToolCall —— Flow ToolCallEvent → ACP session/update（tool_call / tool_call_update）。
  *
  * 展示逻辑：libs/deepagents-acp/acp-tool-presentation.ts（与 Legacy 共用）
- * ACP 调试与 HITL：docs/zed-debug.md、docs/troubleshooting.md
+ * ACP 调试与 HITL：见 docs/troubleshooting.md
  * 参考实现：https://github.com/nuwax-ai/claude-code-acp-ts
  *
  * ACP 宿主 acpUpdateMapper 只读 rawInput / rawOutput。ask-question 依赖 rawInput.ui（平台问答卡片）。

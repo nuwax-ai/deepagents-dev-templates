@@ -1,0 +1,12 @@
+{
+  "id": "mcp-context7-usage",
+  "dimension": "mcp-context7",
+  "title": "context7 用法契约 + 编排页绑定两工具",
+  "description": "L0/manifest 声明 resolve-library-id → query-docs；drift 要求编排页仍绑定这两工具。不改 MCP 本体。",
+  "checks": ["manifest", "mcp-usage", "platform-drift"],
+  "expect": {
+    "server": "context7",
+    "tools": ["resolve-library-id", "query-docs"],
+    "toolOrder": ["resolve-library-id", "query-docs"]
+  }
+}

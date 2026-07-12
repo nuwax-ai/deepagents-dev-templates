@@ -1,7 +1,7 @@
 /**
  * DeepAgents ACP Server CLI
  *
- * Run a DeepAgents ACP server for integration with IDEs like Zed.
+ * Run a DeepAgents ACP server for platform host integration.
  *
  * Usage:
  *   npx deepagents-acp [options]
@@ -168,8 +168,8 @@ function showHelp(): void {
   console.log(`
 DeepAgents ACP Server
 
-Run a DeepAgents-powered AI coding assistant that integrates with IDEs
-like Zed, JetBrains, and other ACP-compatible clients.
+Run a DeepAgents-powered agent server for ACP-compatible platform hosts
+(e.g. NuwaClaw).
 
 USAGE:
   npx deepagents-acp [options]
@@ -208,22 +208,6 @@ EXAMPLES:
 
   # Combined debug and file logging
   npx deepagents-acp --debug --log-file ./debug.log
-
-ZED INTEGRATION:
-  Add to your Zed settings.json:
-
-  {
-    "agent": {
-      "profiles": {
-        "deepagents": {
-          "name": "DeepAgents",
-          "command": "npx",
-          "args": ["deepagents-acp", "--log-file", "/tmp/deepagents.log"],
-          "env": {}
-        }
-      }
-    }
-  }
 
 For more information, visit:
   https://github.com/langchain-ai/deepagentsjs

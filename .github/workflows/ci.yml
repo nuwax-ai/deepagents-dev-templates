@@ -79,6 +79,6 @@ jobs:
       # flow-ts 复用 app-ts 的 runtime（workspace 依赖），需先构建它
       - run: pnpm --filter deepagents-app-ts build
       - run: pnpm --filter deepagents-flow-ts build
-      - run: pnpm --filter deepagents-flow-ts typecheck:examples
+      - run: pnpm --filter deepagents-flow-ts typecheck
       # 全套单测在无凭证下跑（节点走启发式 fallback，不调用真实模型）
       - run: pnpm --filter deepagents-flow-ts test

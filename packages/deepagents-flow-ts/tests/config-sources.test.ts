@@ -34,6 +34,16 @@ describe("normalizeModelProvider", () => {
   });
 });
 
+describe("AppConfigSchema model settings", () => {
+  it("保留 supportsVision 配置，供消息 content coerce 判定使用", () => {
+    const parsed = AppConfigSchema.parse({
+      model: { settings: { temperature: 0, supportsVision: true } },
+    });
+
+    expect(parsed.model.settings.supportsVision).toBe(true);
+  });
+});
+
 describe("inferModelProviderIfUnset", () => {
   const protocolEnvKeys = ["API_PROTOCOL", "LLM_PROVIDER"] as const;
   const credEnvKeys = [

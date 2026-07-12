@@ -1,0 +1,532 @@
+---
+name: dev-engineer-toolkit
+description: "当开发项目需要搜索可用工具（API）、可用技能（SKILL）、或进行项目配置（系统提示词、开场白等智能体配置）时使用。这是开发工程师的基础技能包，所有涉及额外API接口查询、技能发现、项目配置读写的场景都必须使用本技能。Keywords: API搜索, 技能搜索, 项目配置, 系统提示词, 开场白, agent配置, 工具搜索, tool search, skill discovery"
+tags: [api-search, skill-search, project-config, dev-toolkit, agent-config, tool-discovery]
+version: "1.7.5"
+---
+
+# 开发工程师工具包
+
+## 概述
+
+本技能为开发工程师 Agent 提供下列基础能力：
+
+| 能力 | 说明 | 脚本 |
+|------|------|------|
+| **搜索工具/API** | 搜索平台可用资源（插件 API、工作流 API、知识库等），按关键词检索 | `scripts/search-apis.sh` |
+| **搜索技能** | 搜索平台中已注册的技能（SKILL），按关键词检索 | `scripts/search-skills.sh` |
+| **注册工具** | 将搜索到的工具/技能（Plugin、Workflow、Knowledge、Skill）注册到当前项目，注册后方可调用 | `scripts/add-tool.sh` |
+| **删除工具** | 从项目中移除已注册的工具/技能组件 | `scripts/remove-tool.sh` |
+| **下载技能** | **受限**：脚本仍在；**禁止**用其代替平台 `add-tool` 接入（见下 §5 / Part 7） | `scripts/download-skill.sh` |
+| **项目配置读写** | 读取/更新项目配置（系统提示词、开场白、模型参数等） | `scripts/get-config.sh` / `scripts/update-config.sh` |
+| **Python 环境检测** | 检测 Python / uv 是否可用，缺失时可用 uv 安装 | `scripts/check-python.sh` |
+
+> 搜索 API 与搜索技能共用同一个后端接口，通过 `type` 参数（`tool` / `skill`）区分搜索目标，脚本已封装好差异。
+
+## When to Use
+
+**必须使用本技能的场景：**
+
+1. **需要新的 API 接口时** — 开发中需要调用某个功能接口，先通过 `search-apis.sh` 搜索平台是否已有可用 API，避免重复造轮子。
+2. **需要联网搜索时** — 需求含互联网检索、实时资讯、网页搜索时，先通过 `search-apis.sh` 搜索平台搜索类 Plugin 并 `add-tool.sh` 登记，再开发。内置 `search`/`grep` 仅用于仓库内检索，不是联网搜索。
+3. **需要查找已有技能时** — 开发中需要某个领域能力（如代码审查、测试生成），先通过 `search-skills.sh` 检索是否已有对应技能可复用。
+4. **需要读取项目配置时** — 需要获取当前项目的系统提示词、开场白、模型设置等配置信息时，使用 `get-config.sh`。
+5. **需要更新项目配置时** — 用户要求修改系统提示词、开场白、或任何项目级配置时，**必须**使用 `update-config.sh` 通过接口更新，不要仅本地修改文件。
+
+所有脚本由平台沙箱运行时自动配置，直接执行即可，无需传入认证或项目标识参数。
+
+### UTF-8 / Windows 编码（配置读写必读）
+
+`get-config.sh` / `update-config.sh` 内部调用 **`get-config.py` / `update-config.py`**；`search-apis.sh` / `search-skills.sh` 内部调用 **`search-tools.py`**（标准库，无第三方依赖）。请求头带 `Content-Type: application/json; charset=utf-8`，JSON 使用 `ensure_ascii=False`，避免中文乱码。
+
+> 本地 **Windows** 上 Agent 命令走 **Git Bash**；`python3` 常为系统商店占位（不可用），实际可用的一般是 `python` 或 `py -3`。统一执行 `./scripts/*.sh`，**禁止** `python3` 失败后改手写 `curl`。
+
+```bash
+# 推荐：从 UTF-8 文件上传（含中文时长文本）
+./scripts/update-config.sh --system-prompt-file prompts/flow.base.md
+
+# 中文搜索关键词若 shell 仍乱码，用 --kw-file
+echo -n "搜索" > .tmp/kw.txt
+./scripts/search-apis.sh --kw-file .tmp/kw.txt --format table
+```
+
+**含中文的长系统提示词**：务必用 `--system-prompt-file` 指向 **UTF-8** 文件，不要用 `--system-prompt` 在命令行内联多行中文。
+
+**含中文的搜索关键词**：优先 `--kw "关键词"`（`search-tools.py` 会自动修复 Git Bash 编码）；仍异常时用 `--kw-file` 读 UTF-8 文件。
+
+**禁止**：
+
+- 手写 `curl -d "..."` 拼含中文的 JSON body
+- `python3` 失败时改用手写 curl（应先 `./scripts/check-python.sh --install`）
+
+写操作后用 `get-config.sh --key systemPrompt` 核对平台端中文是否正确；若已乱码，用修复后的脚本**重新上传**覆盖。
+
+### Python 环境检测（配置脚本依赖 Python 3）
+
+`get-config.sh` / `update-config.sh` 依赖 Python 3 运行 `*.py`。**搜索与配置脚本更新前建议先检测**：
+
+```bash
+./scripts/check-python.sh
+# 仅当输出无可用 Python 且 PATH 中有 uv 时：
+./scripts/check-python.sh --install
+```
+
+| 检测项 | 说明 |
+|--------|------|
+| `python3` | Windows 个人电脑上**常不可用**（商店占位）；脚本会自动跳过并尝试 `python` |
+| `python` / `py -3` | Windows 上最常见可用入口 |
+| `uv` | **不保证**在 PATH 中；有则 `check-python.sh --install` 可安装 Python |
+
+Python 环境由 `check-python.sh` 自动探测，缺失时可用 `--install`（需 PATH 中有 uv）。`update-config.sh` 启动时会自动探测；仅当 `python`/`py -3` 都不可用且 PATH 有 `uv` 时，才尝试 `uv python install`。
+
+---
+
+### 1. 搜索工具/API — `scripts/search-apis.sh`
+
+在平台中搜索可用的工具和 API 资源（插件 API、工作流 API、知识库等）。
+
+```bash
+# 按关键词搜索
+./scripts/search-apis.sh --kw "文件上传"
+
+# 分页控制
+./scripts/search-apis.sh --kw "auth" --page 1 --page-size 10
+
+# 浏览全部（不分页）
+./scripts/search-apis.sh --page-size 100
+
+# 表格友好输出
+./scripts/search-apis.sh --kw "notification" --format table
+```
+
+**参数说明：**
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `--kw` | string | - | 搜索关键词，支持模糊匹配 |
+| `--kw-file` | path | - | 从 UTF-8 文件读取关键词（中文 shell 编码异常时用） |
+| `--page` | int | 1 | 页码 |
+| `--page-size` | int | 20 | 每页数量（1-100） |
+| `--format` | json\|table | json | 输出格式 |
+
+**返回格式（JSON）：**
+
+```json
+{
+  "code": "0000",
+  "success": true,
+  "data": [
+    {
+      "targetType": "Plugin",
+      "targetId": 123,
+      "name": "文件上传",
+      "description": "上传文件到对象存储",
+      "schema": "{...接口定义...}"
+    },
+    {
+      "targetType": "Workflow",
+      "targetId": 456,
+      "name": "审批流程",
+      "description": "通用审批工作流"
+    }
+  ],
+  "message": null
+}
+```
+
+> `targetType` 枚举：`Plugin`（插件 API）、`Workflow`（工作流 API）、`Knowledge`（知识库）、`Skill`（技能）
+
+> ⚠️ **schema 占位约束**：搜索结果中 `schema` 字段可能包含 `${...}` 占位符。在使用这些 API 时**必须保持占位符原样**，禁止替换为字面量或硬编码 URL/密钥。
+
+**退出码：**
+
+| 码 | 含义 |
+|----|------|
+| 0 | 成功 |
+| 1 | 参数错误 |
+| 2 | 平台运行时未就绪（脚本依赖的沙箱配置缺失） |
+| 3 | HTTP 请求失败 |
+| 4 | 业务错误（`code` ≠ `0000`） |
+
+---
+
+### 2. 搜索技能 — `scripts/search-skills.sh`
+
+在平台中搜索已注册的可用技能。与搜索 API 共用同一个后端接口，脚本内部使用 `type: "skill"`。
+
+```bash
+# 按关键词搜索
+./scripts/search-skills.sh --kw "代码审查"
+
+# 分页控制
+./scripts/search-skills.sh --kw "debug" --page 1 --page-size 5
+
+# 浏览全部
+./scripts/search-skills.sh --page-size 100
+
+# 表格友好输出
+./scripts/search-skills.sh --kw "review" --format table
+```
+
+**参数说明：**
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `--kw` | string | - | 搜索关键词 |
+| `--kw-file` | path | - | 从 UTF-8 文件读取关键词（中文 shell 编码异常时用） |
+| `--page` | int | 1 | 页码 |
+| `--page-size` | int | 20 | 每页数量（1-100） |
+| `--format` | json\|table | json | 输出格式 |
+
+**返回格式（JSON）：**
+
+```json
+{
+  "code": "0000",
+  "success": true,
+  "data": [
+    {
+      "targetType": "Skill",
+      "targetId": 789,
+      "name": "code-review",
+      "description": "审查代码变更，发现 bug 和改进点",
+      "schema": "{...}"
+    }
+  ],
+  "message": null
+}
+```
+
+**退出码：**
+
+| 码 | 含义 |
+|----|------|
+| 0 | 成功 |
+| 1 | 参数错误 |
+| 2 | 平台运行时未就绪（脚本依赖的沙箱配置缺失） |
+| 3 | HTTP 请求失败 |
+| 4 | 业务错误（`code` ≠ `0000`） |
+
+---
+
+### 3. 注册工具 — `scripts/add-tool.sh`
+
+向当前智能体项目注册/添加一个工具或技能。**搜索到的资源必须先注册才能调用**。
+
+```bash
+# 注册一个插件 API
+./scripts/add-tool.sh --target-type "Plugin" --target-id 614
+
+# 注册一个工作流
+./scripts/add-tool.sh --target-type "Workflow" --target-id 123
+
+# 注册一个知识库
+./scripts/add-tool.sh --target-type "Knowledge" --target-id 528
+
+# 注册一个技能
+./scripts/add-tool.sh --target-type "Skill" --target-id 494
+```
+
+**参数说明：**
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `--target-type` | string | - | 目标类型（**必填**）：`Plugin`、`Workflow`、`Knowledge`、`Skill` |
+| `--target-id` | int | - | 目标对象 ID（**必填**），来自搜索结果的 `targetId` 字段 |
+
+**返回示例：**
+
+```
+[OK] 工具注册成功
+  Agent ID : 42
+  类型     : Plugin
+  目标 ID  : 614
+```
+
+**退出码：**
+
+| 码 | 含义 |
+|----|------|
+| 0 | 注册成功 |
+| 1 | 参数错误 |
+| 2 | 平台运行时未就绪（脚本依赖的沙箱配置缺失） |
+| 3 | HTTP 请求失败 |
+| 4 | 业务错误（`code` ≠ `0000`） |
+
+---
+
+### 4. 删除工具 — `scripts/remove-tool.sh`
+
+从当前项目中移除已注册的工具或技能。
+
+```bash
+# 删除一个插件
+./scripts/remove-tool.sh --target-type "Plugin" --target-id 614
+
+# 删除一个知识库
+./scripts/remove-tool.sh --target-type "Knowledge" --target-id 528
+
+# 移除一个技能
+./scripts/remove-tool.sh --target-type "Skill" --target-id 494
+```
+
+**参数说明：**
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `--target-type` | string | - | 目标类型（**必填**）：`Plugin`、`Workflow`、`Knowledge`、`Skill` |
+| `--target-id` | int | - | 目标对象 ID（**必填**） |
+
+**退出码：**
+
+| 码 | 含义 |
+|----|------|
+| 0 | 删除成功 |
+| 1 | 参数错误 |
+| 2 | 平台运行时未就绪（脚本依赖的沙箱配置缺失） |
+| 3 | HTTP 请求失败 |
+| 4 | 业务错误 |
+
+---
+
+### 5. 下载技能 — `scripts/download-skill.sh`
+
+> **禁区（与系统提示词 / Part 7 对齐）**：平台已有技能 → 只用 `search-skills.sh` + `add-tool.sh` 登记接入，运行期由平台下发。**禁止**再 `download-skill.sh` 解压到项目或 `builtin/skills/` 来「本地安装」平台技能。本脚本仅保留给排障 / 离线查阅等例外，且**不得**当作收工路径。
+
+将 zip 下载并解压到指定目录（例外场景）。搜索结果中 `schema` 可能含下载链接，脚本可自动提取。
+
+```bash
+# 例外：仅排障时下载到指定目录（默认不要走这条）
+./scripts/download-skill.sh --target-id 494 --output-dir .tmp/skill-inspect/
+```
+
+**参数说明：**
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `--target-id` | int | - | 目标技能 ID（**必填**），来自 `search-skills.sh` 结果中的 `targetId` |
+| `--output-dir` | path | `.` | 解压输出目录 |
+
+**执行流程：**
+
+1. 优先从 `get-config` 技能列表中查找 `downloadUrl`（干净字段）
+2. 若未注册则回退到搜索接口，从 `schema` 文本中提取下载链接
+3. 下载 `.zip` 文件
+4. 解压到 `--output-dir` 指定目录
+5. 清理临时文件，列出解压结果
+
+**退出码：**
+
+| 码 | 含义 |
+|----|------|
+| 0 | 下载解压成功 |
+| 1 | 参数错误 |
+| 2 | 平台运行时未就绪（脚本依赖的沙箱配置缺失） |
+| 3 | 查询或下载失败 |
+
+---
+
+### 6. 获取配置 — `scripts/get-config.sh`
+
+读取当前智能体项目的完整配置，包括系统提示词、开场白、已注册的工具和技能列表、MCP 配置等。
+
+```bash
+# 查看项目完整配置
+./scripts/get-config.sh
+
+# 只看系统提示词
+./scripts/get-config.sh --key systemPrompt
+
+# 只看已注册工具列表（摘要）
+./scripts/get-config.sh --key tools
+
+# 取已注册工具的完整配置（含真实工具名与 schema），供图内节点按名引用 + 收工 --expect-tool 断言
+./scripts/get-config.sh --key tools --full
+
+# 只看已注册技能列表（含下载链接）
+./scripts/get-config.sh --key skills
+
+# 查看开场白 / MCP 配置
+./scripts/get-config.sh --key openingChatMsg
+./scripts/get-config.sh --key mcpConfigs
+```
+
+**参数说明：**
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `--key` | string | - | 只查看指定配置：`systemPrompt`、`openingChatMsg`、`tools`、`skills`、`mcpConfigs`；不填返回全部 |
+| `--full` | flag | - | 配合 `--key tools` 输出完整工具配置（含真实工具名与 schema），供 `platformToolRefs` 固化、独立节点/工具集合接线、收工 `flow-debugger` `--expect-tool` 断言 |
+
+**返回示例（完整配置）：**
+
+```
+========================================
+  智能体 #3054 配置信息
+========================================
+
+--- 系统提示词 ---
+你是一个专业的开发助手...
+
+--- 开场白 ---
+你好！我是你的开发助手。
+
+--- 已注册工具 (4 个) ---
+  [Plugin] #614 @retrieve token价格查询_1
+  [Knowledge] #528 Test
+
+--- 已注册技能 (1 个) ---
+  #494 flow-verify-and-test
+    下载: https://s3p.nuwax.com:9443/xxx.zip
+
+--- MCP 配置 (0 个) ---
+```
+
+> 返回数据中 `skills` 列表使用 `SkillResultItemDTO`，含干净的 `downloadUrl` 字段。`download-skill.sh` 优先从此处获取下载链接。
+
+**退出码：**
+
+| 码 | 含义 |
+|----|------|
+| 0 | 成功 |
+| 1 | 参数错误 |
+| 2 | 平台运行时未就绪（脚本依赖的沙箱配置缺失） |
+| 3 | HTTP 请求失败 |
+| 4 | 业务错误 |
+
+---
+
+### 7. 更新配置 — `scripts/update-config.sh`
+
+更新智能体的系统提示词和开场白。**当用户要求修改系统提示词或开场白时，必须使用 `update-config.sh` 通过接口更新，不要仅本地修改文件。**
+
+```bash
+# 推荐：从 UTF-8 文件上传（含中文时长文本）
+./scripts/update-config.sh --system-prompt-file "./prompts/flow.base.md"
+
+# 短文本
+./scripts/update-config.sh --opening-msg "欢迎使用智能开发助手！"
+
+# 同时更新两个
+./scripts/update-config.sh \
+  --system-prompt-file "./prompts/flow.base.md" \
+  --opening-msg-file "./welcome.txt"
+
+# Python 不可用时（需 PATH 中有 uv）
+./scripts/check-python.sh --install
+```
+
+**参数说明：**
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `--system-prompt` | string | - | 新的系统提示词 |
+| `--system-prompt-file` | path | - | 从文件读取系统提示词 |
+| `--opening-msg` | string | - | 新的开场白 |
+| `--opening-msg-file` | path | - | 从文件读取开场白 |
+
+> 至少指定 `--system-prompt` / `--system-prompt-file` / `--opening-msg` / `--opening-msg-file` 之一。留空的字段不会被修改。
+
+**退出码：**
+
+| 码 | 含义 |
+|----|------|
+| 0 | 更新成功 |
+| 1 | 参数错误 |
+| 2 | 平台运行时未就绪（脚本依赖的沙箱配置缺失） |
+| 3 | HTTP 请求失败 |
+| 4 | 业务错误 |
+
+---
+
+## 配置项参考
+
+以下是智能体项目的配置结构（由 `get-config.sh` 返回）：
+
+| 配置键 | 说明 | 值类型 |
+|--------|------|--------|
+| `systemPrompt` | 系统提示词 | string（支持多行） |
+| `openingChatMsg` | 开场白/欢迎语 | string |
+| `tools` | 已注册的工具列表 | `ToolSearchResultItemDTO[]` |
+| `skills` | 已注册的技能列表（含 `downloadUrl`） | `SkillResultItemDTO[]` |
+| `mcpConfigs` | MCP 配置列表 | `McpResultDTO[]` |
+
+> 更多配置项参考 `references/config-items.md`。
+
+---
+
+## 常见工作流
+
+### 工作流 A：工具采纳（搜索 → 注册 → 取配置固化 → 开发）
+
+当决定使用某个搜索到的工具 API 时，必须按以下三步操作：
+
+```
+1. 注册工具（必须先注册才能调用）
+   ./scripts/add-tool.sh --target-type "Plugin" --target-id 614
+
+2. 取已注册工具的真实工具名与 schema（非手抄 search 结果）
+   ./scripts/get-config.sh --key tools --full
+   - 可将完整 schema 固化到 FlowDef.platformToolRefs（或等价本地固化点）
+   - 记录 targetType / targetId / 真实工具名 / 接线方式到 project.md
+
+3. 按图需要接线（三选一或组合；不必全部进 runtime.allTools）
+   - 独立节点：createPlatformToolActionNode / 对 StructuredTool 直接 invoke
+   - 局部工具集合：pickTools → createToolExecNode / 子图 bindTools
+   - 可选并入 allTools：宿主注入或 platformToolRefs → 默认 ReAct bindTools
+   - 保持 schema 中的 ${...} 占位符，不硬编码 URL / 密钥
+```
+
+> ⚠️ **注册是调用前提**：搜索到的 Plugin、Workflow、Knowledge、Skill 必须先通过 `add-tool.sh` 注册。
+> ⚠️ **工具名来自 get-config**：图内接线 / flow-debugger `--expect-tool` 须用 `get-config --key tools --full` 拉取已注册的真实名称，**禁止**照 `search-apis.sh` 结果手抄 schema。
+> ⚠️ **固化 ≠ 自写**：允许把 get-config 返回的 schema 固化为 LangGraph StructuredTool；禁止为已登记能力另写 fetch / `tool()` 包装。
+
+### 工作流 B：开发前资源发现
+
+```
+1. 理解需求 → 列出需要的功能点
+2. 对每个功能点执行 search-apis.sh → 确认是否有现成 API
+3. 含联网搜索时 → search-apis.sh --kw "搜索"（及 "联网" / "web"）→ 命中 Plugin 则 add-tool.sh 登记
+4. 对每个领域问题执行 search-skills.sh → 确认是否有现成技能
+5. 对确认使用的工具执行 add-tool.sh → 注册到项目
+6. 汇总：已注册资源直接开发，缺失资源标记待开发
+```
+
+### 工作流 C：项目配置修改
+
+```
+1. 用户要求修改配置（如"把系统提示词改成XXX"）
+2. 先执行 get-config.sh 查看当前配置（可选但推荐）
+3. 将提示词写入 UTF-8 文件（如 prompts/flow.base.md），执行:
+   update-config.sh --system-prompt-file prompts/flow.base.md
+4. 再次执行 get-config.sh --key systemPrompt 确认中文未乱码
+```
+
+### 工作流 D：批量配置初始化
+
+```
+1. 整理所有需要配置的键值对
+2. 逐项执行 update-config.sh（长文本用 `--system-prompt-file` / `--opening-msg-file`）
+3. 最后执行 get-config.sh（不带 --key）确认全量配置正确
+```
+
+---
+
+## Anti-patterns
+
+- ❌ **跳过注册直接调用**：搜索到工具后不执行 `add-tool.sh` 注册，直接尝试调用，导致调用失败。
+- ❌ **内置 search/grep 当联网**：内置 `search`/`grep` 仅检索仓库内文件，不能替代平台搜索 Plugin。
+- ❌ **绕过搜索直接造轮子**：开发新功能前不搜索是否有现成 API/技能，导致重复实现。
+- ❌ **直接修改配置文件**：手动编辑项目配置文件而非使用配置接口更新，导致配置不同步或格式错误。
+- ❌ **假设 API 存在**：不执行搜索就假设某个接口存在，直接编写调用代码。
+- ❌ **替换 schema 占位符**：把搜索到的 API schema 中 `${...}` 占位符替换为字面量或硬编码 URL/密钥，导致代码不可移植。
+- ❌ **把 API 地址/Token 硬编码**：在代码或文档中硬编码接口地址或认证信息。
+- ❌ **手写 HTTP 调用平台接口**：应使用 `scripts/*.sh`，不要绕过脚本直接 curl。
+- ❌ **python3 失败就改手写 curl**：应先 `check-python.sh --install`，仍用 `update-config.sh`
+- ❌ **命令行内联多行中文**：应使用 `--system-prompt-file` 读 UTF-8 文件
+- ❌ **忽略返回值**：执行配置更新后不检查返回的 `code`/`success` 字段，可能导致静默失败
+- ✅ **先搜后用**：任何功能开发前，先用对应脚本检索平台已有资源。
+- ✅ **联网先搜 Plugin**：联网需求先 `search-apis.sh` 搜搜索类 Plugin，命中则 `add-tool.sh` 登记。
+- ✅ **配置走接口**：所有项目配置的读写统一通过 `get-config.sh` / `update-config.sh`（UTF-8 安全的 Python 实现）。
+- ✅ **中文用文件上传**：长系统提示词用 `--system-prompt-file` 指向 UTF-8 文件
+- ✅ **占位符原样保留**：使用搜索到的 API 时，schema 中的 `${...}` 占位符保持原样，由运行时平台解析。

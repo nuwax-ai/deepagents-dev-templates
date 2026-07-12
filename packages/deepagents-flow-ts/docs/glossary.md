@@ -1,60 +1,93 @@
-# 术语对照表（Glossary）
+# Glossary
 
-> **用途**：固化本仓文档/注释里的关键术语，**指代准确**、跨文档一致，防止口语词随手写引入歧义。
->
-> **原则**：指代准确即可——**优先英文术语**，或**已确认的中文译名**；只有**不准确/歧义的口语词**才必须替换。中英混排时，中文与英文之间留一个空格。
+> 术语权威源。写文档/注释只查「用」列。实现细节 → `node-kit.md`；systemPrompt 解析 → `src/runtime/context/prompt.ts`。改图判定 → `docs/examples.md` § 先判定。
 
-## 1. 编排 / 流程概念 —— 用英文术语
+## 编排范式（强制 / 禁止）
 
-这些概念在 LangGraph / 本模板里有确切英文名，文档统一用英文，避免口语化中文产生歧义。
-
-| 不准确口语（弃用） | 准确术语 | 说明 |
+| 弃用 | 用 | 定义 |
 |---|---|---|
-| 长任务、长任务硬化 | **durable stateful flow** | 多阶段 + 多轮 HITL + 跨重启续跑的有状态流程（`createStatefulFlow` 基座）。**“长任务”歧义**：既可能指持久化（durable），也可能指耗时（long-running），故弃用。 |
-| （强调耗时/token 的）长任务 | **long-running**（pipeline / work） | 仅强调“运行耗时长”时用；不含“跨重启持久化”语义。 |
-| 跨重启续跑 | **cross-restart resume** | 进程/IDE 重启后由 checkpointer 落盘续跑。 |
-| 阶段进度 | **stage progress** | `emitStage` → `onStage`，多阶段流水线每步可见。 |
-| 单步护栏、递归护栏 | **recursion guard** | 特指 `recursionLimit` 防 reflection 回边死循环。**仅 recursion 语境**用此词（见 §4）。 |
-| 一个会话一个主题 | **one session, one topic** | `hasStarted` 从 checkpointer 推断续跑 vs 新开。 |
-| 多模式 stream | **multi-mode stream** | `streamMode: ["messages","tools","custom","updates"]` + `mapStreamChunk`。 |
-| 上下文压缩 | **context compaction** | `compactHistory` + `RemoveMessage` 替换历史。 |
-| 多轮 HITL | **multi-turn HITL** | 多轮人审循环。 |
-| 完成闸门 | **completion gate**（完成闸门） | 强制验证门；首次出现中英并列。 |
+| 自由工具循环、自由 tool loop、其它非图范式 | **LangGraph TS / `StateGraph` 图编排** | 本模板唯一编排范式：`StateGraph` + node/edge；**禁止**自由 tool loop（无显式图、模型自驱调工具循环） |
 
-## 2. 架构 / 接入层 —— 中文译名 + 英文括注
+## 编排 / 流程
 
-模板特定的接缝概念，用确认中文译名，**首次出现**带英文括注。
-
-| 英文 | 确认中文（首次带括注） | 说明 |
+| 弃用 | 用 | 定义 |
 |---|---|---|
-| seam | **接入层（seam）** | surface 与具体图解耦的接缝。 |
-| surface seam | **surface seam（接入层）** | 同上，强调在 surface 侧。 |
-| plumbing | **接入逻辑**（plumbing） | surface 侧 ACP/CLI 复用的连接代码；统一用“接入逻辑”，勿用“运行时胶水代码 / plumbing”混写。 |
-| re-export shim | **re-export 转发层** | dedup 后指向 `libs/topologies` 的转发文件。 |
+| 长任务、长任务硬化（持久化义） | **durable stateful flow** | `createStatefulFlow` 基座；多阶段 + multi-turn HITL + cross-restart resume |
+| 长任务（耗时/token 义） | **long-running** | 仅运行耗时长；无跨重启持久化语义 |
+| 跨重启续跑 | **cross-restart resume** | checkpointer 落盘；进程/IDE 重启后续跑 |
+| 阶段进度 | **stage progress** | `emitStage` → `onStage` |
+| 单步护栏、递归护栏（非 recursion 语境） | **recursion guard** | 仅指 `recursionLimit` 防 reflection 回边死循环 |
+| 一个会话一个主题 | **one session, one topic** | `hasStarted` 推断续跑 vs 新开 |
+| 多模式 stream | **multi-mode stream** | `streamMode: ["messages","tools","custom","updates"]` + `mapStreamChunk` |
+| 上下文压缩 | **context compaction** | `compactHistory` + `RemoveMessage` |
+| 跨 turn 人审、多轮人审 | **multi-turn HITL** | 跨用户回合的人审循环（interrupt → 用户回复 → resume）；须 checkpointer |
+| interrupt+resume、人审断点 | **interrupt / resume** | LangGraph `interrupt()` 暂停；surface 用 `Command({ resume })` 续跑；见 `flow-patterns.md` |
+| Send 并行、fan-out、多源聚合 | **Send / fan-out** | `Send` 并行派发多份子 state，reducer 聚合；见 `flow-patterns.md` |
+| 条件重试、自纠正回边 | **条件重试** | `addConditionalEdges`（或 router）按评分/门控回到 rewrite 等节点；返回值须 ∈ targets（R-G004） |
+| 完成闸门 | **completion gate**（完成闸门） | 强制验证门；normative 在开发 Agent `<SESSION_CLOSE>`；操作细则在 flow-builder Part* |
+| 工具回路 | **ReAct** | `think`(bindTools) ↔ `tools`(ToolNode) → `respond` |
 
-## 3. 打包 / 平台
+## Flow 交互形态
 
-| 不准确（弃用） | 确认用法 | 说明 |
+面向用户仅两类形态（「用」列中文）：**聊天助手型** / **固定流程型**。`chat` / `pipeline` 为对应机器值；`approval` 是固定流程型内**人审编排**的机器值（不作独立形态问用户）。
+
+**改图判定**（与 `docs/examples.md` / 开发 Agent system-prompt 同构）：说不清「default 为什么不够」就不要改图；命中能力门槛（固定阶段顺序、Send 并行/多源聚合/条件重试、multi-turn HITL）再手写 `src/app/graph.ts`。
+
+| 弃用 | 用 | 定义 |
 |---|---|---|
-| 平台面、产品口语中的厂商平台侧称呼 | **平台侧** | **技术服务用语**：指 **主平台** 一侧的元数据/接口（部署、在线配置、`mcpServers` 下发、能力登记等）。文档/注释统一称「平台侧」，即主平台一侧，勿用厂商产品名指代该侧。 |
-| 产品口语问答卡片、dockpanel、结构化审阅卡片 | **平台问答卡片** | **技术服务用语**：指 **主平台** 在 ACP 宿主侧基于 ask-question MCP（`nuwax_ask_question`）与 `rawInput.ui` 渲染的**问答卡片**（结构化提问 UI）。用于图内 HITL 的固定字段表单展示；它是展示层，不替代 `interrupt` 的跨轮 checkpoint/resume。文档/注释统一称「平台问答卡片」，即主平台的问答卡片，勿用厂商产品名指代该 UI。 |
-| 制品 | **压缩包** | 本仓打包产出（npm `.tgz` + nuwax `.tar.gz`/`.zip`）形式上**均为压缩文件**，故 `.md` 统一用“压缩包”。<br>**Nuance**：泛指构建产出物的抽象语义其实是 *artifact（制品）*；若某处强调“产出物”而非“压缩文件形态”，可保留“制品（artifact）”。 |
-| 模版 | **模板** | 错别字订正。 |
+| 无须写图的聊天模式名 | **聊天助手型** / **default flow** | `flow.active: "default"` + systemPrompt + 平台能力；**唯一默认路径**；开放追问勿手写图 |
+| 管线、pipeline（对用户） | **固定流程型** | 机器值 `pipeline`；须能说明 default 不够（固定阶段 / Send / 条件重试等）才手写 `src/app/graph.ts`；流程内人审用 HITL interrupt/resume（机器值 `approval`） |
+| ~~人工确认型~~（已并入固定流程型） | **HITL / 人审编排** | 非独立用户形态；`createHumanApprovalNode` + interrupt/resume；含审批 / 人工复核 / 定稿 |
+| flow 类型、图类型 | **flow profile** | `flows --json`；含 `interaction` / `implementation` / `userLabel` |
+| 为了写图而写图 | **graphReason** | 手写图时须说明 default 为何不够（能力门槛，非「用户念出固定流程四字」） |
 
-## 4. 准确的确认中文 —— 予以保留（勿机械英文化）
-
-下列中文**本就是对应英文的标准、准确译名**，不属于“不准确口语”。文档可中可英，**代码注释保留中文以利可读**，无需强行改成英文。
-
-| 确认中文 | 等价英文 | 说明 |
+| 用户中文 | 机器值 | 默认落点 |
 |---|---|---|
-| **拓扑** | topology | topology 的标准中文译名。`.md` 面向英文平台生态统一用 `topology`；`.ts` 代码注释保留“拓扑”。两者等价、皆准确。 |
-| **流水线** | pipeline | 多阶段编排。 |
-| **护栏** | guard | guard 的通用中文。**按语境细分**：<br>· recursion 语境 → **recursion guard**（见 §1）<br>· 超时语境 → **timeout guard**（`withTimeout`）<br>· 外部输入校验 → **input-validation guard**<br>**不可**把 timeout/validation 语境的“护栏”误植为 recursion guard。 |
+| 聊天助手型 | `chat` | **`default`（唯一默认）**；追问/客服/问答/搜索总结/模糊未指明形态 → 不写图 |
+| 固定流程型 | `pipeline`（人审步骤 `approval`） | 命中能力门槛 → 手写 `src/app/graph.ts`；需审批/复核/定稿则加 multi-turn HITL（interrupt/resume） |
 
-## 5. 标点（中文行内）
+| 弃用 | 用 | 定义 |
+|---|---|---|
+| - | **`flow.active`** | config 正式 flow 字段；缺省 `default` |
 
-中文句子里的标点统一用**全角**：`：`（冒号）、`（）`（括号）、`、`（顿号）。代码 / 路径 / 英文短语内部保持半角。
+## 架构 / 接入层
 
----
+| 弃用 | 用 | 定义 |
+|---|---|---|
+| 运行时胶水代码 | **接入逻辑**（plumbing） | surface 侧 ACP/CLI 复用连接代码 |
+| - | **接入层**（seam） | surface 与图解耦接缝 |
+| - | **surface seam** | surface 侧 seam |
+| - | **可运行 flow 挂载点**（app/flows） | app 层注册入口；**仅 default**；图逻辑在 `graph.ts` |
 
-> **单一权威**：本表是模板内术语权威源；扩展 flow 或写系统提示词时以本表与 `docs/node-kit.md` 为准。
+## 平台侧
+
+| 弃用 | 用 | 定义 |
+|---|---|---|
+| 平台面、厂商产品名指主平台 | **平台侧** | 主平台元数据/接口：部署、在线配置、`mcpServers`、能力登记 |
+| dockpanel、结构化审阅卡片 | **平台问答卡片** | 主平台 ACP 侧 `nuwax_ask_question` + `rawInput.ui` 问答 UI；展示层，不替代 interrupt/resume |
+| 模版 | **模板** | 错别字订正 |
+
+## 保留中文（勿机械英文化）
+
+| 弃用 | 用 | 定义 |
+|---|---|---|
+| topology（对用户分类） | **拓扑** | 内部图实现；用户分类见 §Flow 交互形态；本包无内置拓扑库 |
+| guard（统称，无语境） | **护栏** | recursion → recursion guard；超时 → timeout guard（`withTimeout`）；校验 → input-validation guard |
+| - | **流水线** | pipeline；多阶段编排 |
+
+## systemPrompt
+
+| 弃用 | 用 | 定义 |
+|---|---|---|
+| persona、人设、统一人格 | **场景系统提示词** | `agent.systemPrompt` / ACP 下发；角色/风格/输出约束 |
+| - | **runtime.systemPrompt** | `resolveSystemPrompt`：本地 `prompts/flow.base.md` + ACP 追加 + `PLATFORM_CONVENTIONS` |
+| - | **领域 prompt** | 图内各 LLM 节点 SystemMessage；与旧 scaffold spec 无关 |
+| 「systemPrompt 注入图」（无来源/节点） | 写明 **runtime/config** + **目标节点** | 例：`runtime.systemPrompt → think` |
+
+| 图 | 注入点 | runtime | 备注 |
+|---|---|---|---|
+| default | prepare / think（优先） | config / ACP 兜底 | 单 ReAct conversational |
+
+## 格式
+
+中文行内标点全角：`：` `（）` `、`；代码/路径/英文短语半角。

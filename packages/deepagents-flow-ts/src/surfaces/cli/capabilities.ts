@@ -8,7 +8,11 @@
 import { readFileSync, existsSync } from "node:fs";
 import { dirname, resolve, join } from "node:path";
 import { loadFlowConfig } from "../../runtime/flow-config.js";
-import { discoverSkills, discoverSubAgents } from "../../runtime/index.js";
+import {
+  discoverSkills,
+  discoverSubAgents,
+  resolveSystemPrompt,
+} from "../../runtime/index.js";
 import { resolveFlowHome } from "../../runtime/services/file-checkpoint-saver.js";
 
 const BUILTIN_TOOLS = [
@@ -20,7 +24,7 @@ const BUILTIN_TOOLS = [
   { name: "glob", layer: "agent-builtin", desc: "按 glob 列文件" },
   { name: "http_request", layer: "agent-builtin", desc: "HTTP 调用" },
   { name: "json_utils", layer: "agent-builtin", desc: "JSON 解析/校验/合并" },
-  { name: "load_skill", layer: "agent-builtin", desc: "按需读取已发现 skill 的完整 SKILL.md" },
+  { name: "load_skill", layer: "agent-builtin", desc: "按需读取 skill 的 SKILL.md 或 references/ 子文件（part 参数）" },
   { name: "task", layer: "agent-builtin", desc: "委派任务给已发现的声明式子智能体（builtin/agents 或 .agents/agents）" },
   { name: "echo", layer: "agent-builtin", desc: "demo：回显（无凭证 fallback）" },
   { name: "calculate", layer: "agent-builtin", desc: "demo：算术求值" },
@@ -60,6 +64,16 @@ export async function runCapabilities(): Promise<void> {
     ...(a.workdir ? { workdir: a.workdir } : {}),
   }));
 
+  const workspaceRoot = process.cwd();
+  const systemPrompt = resolveSystemPrompt(appConfig, undefined, workspaceRoot);
+  const contextBudget = {
+    systemPromptChars: systemPrompt.length,
+    skillsCatalogChars: skills.reduce((n, s) => n + s.name.length + s.description.length + 4, 0),
+    skillsCount: skills.length,
+    progressiveLoading: appConfig.skills.progressiveLoading,
+    note: "工具 schema 经 bindTools 注入，通常大于 systemPrompt；skills 正文经 load_skill 按需加载",
+  };
+
   const result = {
     agent: appConfig.agent.name,
     description: appConfig.agent.description,
@@ -78,6 +92,7 @@ export async function runCapabilities(): Promise<void> {
       triggerThreshold: appConfig.compaction.triggerThreshold,
     },
     memoryDir: resolveFlowHome(appConfig, process.cwd()),
+    contextBudget,
     capabilitySources,
   };
 

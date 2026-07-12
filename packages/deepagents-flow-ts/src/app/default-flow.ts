@@ -14,7 +14,7 @@
  */
 
 import type { FlowRuntime } from "../runtime/flow-runtime.js";
-import type { StatefulTopologyRecipe } from "../libs/topologies/types.js";
+import type { StatefulTopologyRecipe } from "../core/flow-types.js";
 import { createFlowGraph } from "./graph.js";
 import type { FlowState } from "./state.js";
 

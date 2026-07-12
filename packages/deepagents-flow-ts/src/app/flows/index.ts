@@ -1,85 +1,120 @@
 /**
- * Flow 注册表 —— 多 flow 选图入口（app 层）。
+ * Flow 注册表 —— 选图入口（app 层）。
  *
- * 默认图（default）纳入注册表但**不移动**其文件（graph.ts / default-flow.ts / topology.ts 原位）。
- * scaffold 生成的场景 flow 落在 `src/app/flows/<name>/`，并在下方 `flows` 表注册一行
- * —— generator 在 SCAFFOLD-REGISTRY 标记区自动插入 import + 表项，勿手动打乱标记。
+ * 产品工作区仅保留默认 ReAct（default）；图逻辑在 `graph.ts` / `default-flow.ts`。
+ * 多轮 chat、检索增强等场景请直接改默认图或对照 `docs/` 自建，勿依赖内置 demo 选图。
  *
- * 内置示例刻意精简为 4 个（宁缺毋滥，各代表一类形态）：
- *  - default          conversational ReAct 泛化底座（多数对话型需求 = 零图路径：default + 平台能力 + systemPrompt）
- *  - search-aggregator conversational + 平台能力样板（复用默认图，演示「登记即接入」，见其 index.ts）
- *  - translate-review  one-shot 流式管道教学（custom 拓扑）
- *  - router-gate       LLM 路由教学（custom 拓扑）
- * 更多形态见 `src/libs/topologies/`（8 积木）；场景 spec 范例在 `scripts/scaffold/specs/`。
- *
- * 选图：config 顶层自定义键 `activeFlow`（经 loadFlowConfig 的 `raw` 读取，缺省 "default"，
- * 机制同 examples 读 `raw.rag`）。组合根 index.ts 按 `resolveFlow(activeFlow)` 取 executor / topology。
- * 不改 runtime 的 AppConfig schema（保护区），零侵入。
+ * 选图：配置 `flow.active`（缺省 "default"）。
+ * 组合根 index.ts 按 `resolveFlowSelection(raw)` + `resolveFlow(...)` 取 executor / topology。
  */
 
 import type { FlowRuntime } from "../../runtime/flow-runtime.js";
-import type { StatefulFlow } from "../../core/flow-types.js";
+import type {
+  FlowInteractionKind,
+  FlowProfile,
+  StatefulTopologyRecipe,
+} from "../../core/flow-types.js";
 import { recipe as defaultRecipe } from "../default-flow.js";
 import { getFlowTopology, type FlowTopology } from "../topology.js";
-import * as routerGateFlow from "./router-gate/index.js";
-import * as searchAggregatorFlow from "./search-aggregator/index.js";
-import * as translateReviewFlow from "./translate-review/index.js";
 import { logger } from "../../runtime/index.js";
-import type { StatefulTopologyRecipe } from "../../libs/topologies/types.js";
+import type { PlatformToolRef } from "../../runtime/platform-tools/types.js";
 
 /**
- * 一个可挂载到 surface 的 flow 定义（discriminated union on `kind`）。
- *
- * 两类：
- *  - `stateful-recipe`：拓扑只给「图构造配方」recipe；recipe 零 surface 依赖、可存 app 层；
- *    createStatefulFlow 的实际调用由组合根 index.ts（root，能 import surfaces）的 materializeFlow 完成
- *    ——规避 app/libs → surfaces 分层违规。
- *  - `stateful-custom`：自定义 StatefulFlow（如 dev-agent，依赖 app/graph），createExecutor 留 app 层。
- *
- * getTopology 静态导出图拓扑（不运行图、不需凭证），供 `graph` 命令 / inspector 消费。
+ * 可挂载到 surface 的 flow 定义。
+ * createStatefulFlow 的实际调用由组合根 index.ts 的 materializeFlow 完成。
  */
-export type FlowDef =
-  | {
-      name: string;
-      kind: "stateful-recipe";
-      recipe: (runtime: FlowRuntime) => StatefulTopologyRecipe;
-      /**
-       * 对话型（多轮对话，非 HITL）。物化时透传 createStatefulFlow → 不暴露 hasStarted，
-       * surface 每轮走 query + 稳定 threadId 累积历史（见 surfaces/stateful-flow.ts）。
-       */
-      conversational?: boolean;
-      getTopology: () => Promise<FlowTopology>;
-    }
-  | {
-      name: string;
-      kind: "stateful-custom";
-      createExecutor: (runtime: FlowRuntime) => StatefulFlow;
-      getTopology: () => Promise<FlowTopology>;
-    };
+export type FlowDef = {
+  name: string;
+  kind: "stateful-recipe";
+  profile: FlowProfile;
+  recipe: (runtime: FlowRuntime) => StatefulTopologyRecipe;
+  /**
+   * 对话型（多轮对话）。物化时：显式 `conversational` 优先；未设则
+   * `profile.interaction === "chat"` → `createStatefulFlow({ conversational: true })`
+   * （不暴露 hasStarted，surface 每轮 query + 稳定 threadId 累积历史）。
+   */
+  conversational?: boolean;
+  /**
+   * 平台工具引用。平台已登记工具的真实 schema 固化于此；
+   * 经 `createFlowRuntime` → `allTools`。**不是**旧 `spec.tools` / flow.json。
+   */
+  platformToolRefs?: PlatformToolRef[];
+  getTopology: () => Promise<FlowTopology>;
+};
 
+export interface FlowSelection {
+  active: string;
+  source: "flow.active" | "activeFlow" | "default";
+  defaultInteraction: FlowInteractionKind;
+  unknownActivePolicy: "warn-default" | "default";
+}
+
+function normalizeInteraction(value: unknown): FlowInteractionKind {
+  return value === "pipeline" || value === "approval" ? value : "chat";
+}
+
+function normalizeUnknownPolicy(value: unknown): "warn-default" | "default" {
+  return value === "default" ? "default" : "warn-default";
+}
+
+/** 从 flow 配置解析 active flow，同时兼容旧顶层 activeFlow。 */
+export function resolveFlowSelection(raw: Record<string, unknown> = {}): FlowSelection {
+  const flow = raw.flow && typeof raw.flow === "object" ? raw.flow as Record<string, unknown> : {};
+  const activeFromFlow = typeof flow.active === "string" && flow.active.trim() ? flow.active.trim() : undefined;
+  const activeFromLegacy = typeof raw.activeFlow === "string" && raw.activeFlow.trim()
+    ? raw.activeFlow.trim()
+    : undefined;
+  if (activeFromFlow && activeFromLegacy) {
+    logger.warn(`flow.active="${activeFromFlow}" 优先于旧 activeFlow="${activeFromLegacy}"；请迁移到 flow.active。`);
+  }
+  return {
+    active: activeFromFlow ?? activeFromLegacy ?? "default",
+    source: activeFromFlow ? "flow.active" : activeFromLegacy ? "activeFlow" : "default",
+    defaultInteraction: normalizeInteraction(flow.defaultInteraction),
+    unknownActivePolicy: normalizeUnknownPolicy(flow.unknownActivePolicy),
+  };
+}
+
+/** 内置 flow 注册表：仅 default。 */
 export const flows: Record<string, FlowDef> = {
   default: {
     name: "default",
     kind: "stateful-recipe",
+    profile: {
+      interaction: "chat",
+      implementation: "default",
+      userLabel: "聊天助手型",
+      summary: "可连续追问、按需调工具，适合客服、问答、搜索总结和通用助手。",
+      defaultForAmbiguous: true,
+    },
     conversational: true,
     recipe: defaultRecipe,
     getTopology: () => getFlowTopology(),
   },
-  // --- SCAFFOLD-REGISTRY-START (generator 自动维护，勿手改此区) ---
-  "router-gate": { name: "router-gate", kind: "stateful-recipe", recipe: routerGateFlow.recipe, getTopology: routerGateFlow.getTopology },
-  "search-aggregator": { name: "search-aggregator", kind: "stateful-recipe", conversational: true, recipe: searchAggregatorFlow.recipe, getTopology: searchAggregatorFlow.getTopology },
-  "translate-review": { name: "translate-review", kind: "stateful-recipe", recipe: translateReviewFlow.recipe, getTopology: translateReviewFlow.getTopology },
-  // --- SCAFFOLD-REGISTRY-END ---
 };
 
 /** 按名取 flow，未命中或未指定回落到 default。 */
-export function resolveFlow(name?: string): FlowDef {
-  // 未知 activeFlow（拼错 / 大小写错）不静默回落 default —— 告警，否则用户以为切到了某拓扑，
-  // 实际跑的是默认 ReAct，难以排查。仍回落 default（不中断），但留下可追踪的 warn。
-  if (name && !flows[name]) {
+export function resolveFlow(name?: string, opts: { unknownActivePolicy?: "warn-default" | "default" } = {}): FlowDef {
+  if (name && !flows[name] && opts.unknownActivePolicy !== "default") {
     logger.warn(
-      `activeFlow "${name}" 未在 flow 注册表，回落 default。已注册: ${Object.keys(flows).join(", ")}`
+      `active flow "${name}" 未在 flow 注册表，回落 default。已注册: ${Object.keys(flows).join(", ")}`
     );
   }
   return (name ? flows[name] : undefined) ?? flows.default!;
+}
+
+export function listFlowProfiles() {
+  return Object.values(flows).map((def) => ({
+    name: def.name,
+    kind: def.kind,
+    profile: def.profile,
+    isDefault: def.name === "default",
+    conversational: def.conversational ?? def.profile.interaction === "chat",
+  }));
+}
+
+export function recommendFlows(kind: FlowInteractionKind) {
+  return listFlowProfiles()
+    .filter((flow) => flow.profile.interaction === kind)
+    .sort((a, b) => Number(Boolean(b.profile.defaultForAmbiguous)) - Number(Boolean(a.profile.defaultForAmbiguous)));
 }

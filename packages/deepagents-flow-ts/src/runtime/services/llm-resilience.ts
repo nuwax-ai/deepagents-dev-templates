@@ -15,6 +15,7 @@
 import type { BaseMessage } from "@langchain/core/messages";
 import { logger, type AppConfig } from "../index.js";
 import { acpPromptLogFields } from "../session-trace.js";
+import { markStart, markEnd } from "../perf-trace.js";
 
 const log = logger.child("llm-resilience");
 
@@ -298,6 +299,8 @@ export function invokeWithResilience<M extends InvokeModel>(
   const timeoutMs = options.timeoutMs ?? resilience.shortTimeoutMs;
   const label = options.label ?? "LLM 调模型";
   const startedAt = Date.now();
+  // perf 计时（与 startedAt 同口径，含并发闸门排队）：每次模型调用一行 perf + 计入当前 prompt 汇总。
+  const perfMark = markStart("llm.invoke");
   log.debug("LLM invoke start", acpPromptLogFields({
     label,
     messageCount: messages.length,
@@ -330,9 +333,11 @@ export function invokeWithResilience<M extends InvokeModel>(
         if (Object.keys(usage).length > 0) {
           log.info("LLM usage", acpPromptLogFields({ label, durationMs, ...usage }));
         }
+        markEnd(perfMark, { label, ...usage });
         return result;
       })
       .catch((err) => {
+        markEnd(perfMark, { label, failed: true });
         log.warn("LLM invoke failed", acpPromptLogFields({
           label,
           durationMs: Date.now() - startedAt,

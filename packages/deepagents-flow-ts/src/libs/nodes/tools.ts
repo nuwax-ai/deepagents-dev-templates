@@ -3,7 +3,7 @@
  * （in_progress → completed/failed）。默认图 tools 节点的泛化版（包 prebuilt ToolNode）。
  *
  * 也提供 runTool：执行单个工具 fn 并三态透出（供自定义工具节点 / MCP 检索节点用，
- * 如 examples 的 research/search 节点）。
+ * 如 topologies 的 research/search 节点）。
  */
 
 import { randomUUID } from "node:crypto";
@@ -12,6 +12,14 @@ import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import { AIMessage, ToolMessage, type BaseMessage } from "@langchain/core/messages";
 import type { StructuredTool } from "@langchain/core/tools";
 import type { FlowCallbacks, ToolCallEvent } from "../../core/flow-types.js";
+import type { AppConfig } from "../../runtime/index.js";
+import {
+  coerceContentToText,
+  messageContentNeedsTextCoerce,
+  rebuildMessageWithTextContent,
+  resolveCoerceMode,
+  shouldCoerceToTextOnly,
+} from "../messages/coerce-text-content.js";
 import { normalizeToolResult } from "./tool-result-normalize.js";
 
 /**
@@ -55,6 +63,8 @@ export async function runTool(
 export interface ToolExecNodeOptions<S extends { messages: BaseMessage[] }> {
   /** 可执行工具集（与 think 绑定同一组）。 */
   tools: StructuredTool[];
+  /** AppConfig，用于判定模型是否支持 vision content blocks。 */
+  config?: AppConfig;
   /** surface 回调（透出工具调用事件）。 */
   callbacks?: FlowCallbacks;
   /** 把 ToolMessage[] 映射成 state 更新（默认 { messages }）。 */
@@ -68,7 +78,7 @@ export interface ToolExecNodeOptions<S extends { messages: BaseMessage[] }> {
 export function createToolExecNode<S extends { messages: BaseMessage[] }>(
   opts: ToolExecNodeOptions<S>
 ) {
-  const { tools, callbacks, write } = opts;
+  const { tools, config: appConfig, callbacks, write } = opts;
   const toolNode = new ToolNode(tools);
 
   return async (state: S, config?: LangGraphRunnableConfig): Promise<Partial<S>> => {
@@ -175,6 +185,20 @@ export function createToolExecNode<S extends { messages: BaseMessage[] }>(
           byId.delete(tm.tool_call_id);
         }
       }
+    }
+
+    // 写路径：text-only 模型默认压成纯文本，避免毒化 checkpoint。
+    // anthropic → 仅剥图像；openai 兼容（含智谱）→ 压扁任意非字符串 content。
+    // vision 显式开启时保留原始 content blocks。
+    if (shouldCoerceToTextOnly(appConfig)) {
+      const mode = resolveCoerceMode(appConfig);
+      toolMsgs = toolMsgs.map((tm) => {
+        if (!messageContentNeedsTextCoerce(tm.content, mode)) return tm;
+        return rebuildMessageWithTextContent(
+          tm,
+          coerceContentToText(tm.content, mode)
+        ) as ToolMessage;
+      });
     }
 
     for (const tm of toolMsgs) {

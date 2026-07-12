@@ -8,8 +8,10 @@
 |---|------|
 | `packages/deepagents-app-ts` | TypeScript 模板 |
 | `packages/deepagents-app-py` | Python 模板 |
+| `packages/deepagents-flow-ts` | Flow / LangGraph TS 工作流编排模板（包名 `nuwax-flow-ts`） |
 | `packages/inspector` | 编排可视化工具 |
 | `packages/dev-agent` | 开发 Agent 配置/Skills |
+| `packages/dev-agent-flow` | Flow 版开发 Agent 配置/Skills |
 
 ## 开发环境
 
@@ -52,6 +54,34 @@ pnpm lint
 
 # 构建
 pnpm build
+```
+
+### Flow TypeScript 模板
+
+```bash
+cd packages/deepagents-flow-ts
+
+# 本地快检
+pnpm flow "你好"
+
+# 运行测试
+pnpm test
+
+# 类型检查
+pnpm typecheck
+
+# 构建
+pnpm build
+```
+
+根目录也提供了只针对 Flow 模板的入口：
+
+```bash
+pnpm flow:typecheck
+pnpm flow:test
+pnpm flow:build
+pnpm flow:graph
+pnpm dev-agent-flow:static
 ```
 
 ### Python 模板
@@ -127,8 +157,10 @@ pnpm inspect
 
 - `app-ts`: TypeScript 模板
 - `app-py`: Python 模板
+- `flow-ts`: Flow / LangGraph TS 工作流编排模板
 - `inspector`: Inspector 包
 - `dev-agent`: 开发 Agent 配置
+- `dev-agent-flow`: Flow 版开发 Agent 配置
 - `ci`: CI/CD 相关
 
 ### 示例

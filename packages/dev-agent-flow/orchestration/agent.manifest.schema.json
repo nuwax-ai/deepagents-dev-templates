@@ -1,0 +1,143 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://deepagents.dev/schemas/dev-agent-flow/agent.manifest.schema.json",
+  "title": "Dev Agent Flow Manifest",
+  "type": "object",
+  "required": ["version", "agent", "prompts", "skills", "mcp"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "agent": {
+      "type": "object",
+      "required": ["name", "platformType"],
+      "properties": {
+        "name": { "type": "string" },
+        "platformType": { "type": "string" },
+        "description": { "type": "string" }
+      }
+    },
+    "prompts": {
+      "type": "object",
+      "required": ["system", "user"],
+      "properties": {
+        "system": { "$ref": "#/$defs/promptRef" },
+        "user": { "$ref": "#/$defs/promptRef" }
+      }
+    },
+    "skills": {
+      "type": "array",
+      "minItems": 3,
+      "items": { "$ref": "#/$defs/skillRef" }
+    },
+    "mcp": {
+      "type": "object",
+      "required": ["devAgent", "hostDefaults", "templateBuiltin"],
+      "properties": {
+        "devAgent": {
+          "type": "object",
+          "required": ["servers"],
+          "properties": {
+            "servers": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/mcpServerRef" }
+            }
+          }
+        },
+        "hostDefaults": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/hostMcpRef" }
+        },
+        "templateBuiltin": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/templateBuiltinRef" }
+        }
+      }
+    },
+    "platformExtras": {
+      "type": "object",
+      "properties": {
+        "ignoreTypesInDrift": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "note": { "type": "string" }
+      }
+    }
+  },
+  "$defs": {
+    "promptRef": {
+      "type": "object",
+      "required": ["path", "platformField", "requiredSections"],
+      "properties": {
+        "path": { "type": "string" },
+        "platformField": { "type": "string" },
+        "requiredSections": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        }
+      }
+    },
+    "skillRef": {
+      "type": "object",
+      "required": ["name", "path", "platformComponentType"],
+      "properties": {
+        "name": { "type": "string" },
+        "path": { "type": "string" },
+        "platformComponentType": { "const": "Skill" }
+      }
+    },
+    "mcpServerRef": {
+      "type": "object",
+      "required": ["name", "tune", "tools", "toolOrder"],
+      "properties": {
+        "name": { "type": "string" },
+        "platformComponentType": { "const": "Mcp" },
+        "tune": { "const": "usage-only" },
+        "tools": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        },
+        "toolOrder": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "whenToUse": { "type": "array", "items": { "type": "string" } },
+        "forbid": { "type": "array", "items": { "type": "string" } },
+        "l0Markers": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "hostMcpRef": {
+      "type": "object",
+      "required": ["tune", "toolName", "referenceRepo", "referencePolicy"],
+      "properties": {
+        "tune": { "const": "usage-only" },
+        "hosts": { "type": "array", "items": { "type": "string" } },
+        "toolName": { "type": "string" },
+        "referenceRepo": { "type": "string", "format": "uri" },
+        "referencePolicy": { "type": "string" },
+        "whenToUse": { "type": "array", "items": { "type": "string" } },
+        "forbid": { "type": "array", "items": { "type": "string" } },
+        "l0Markers": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "templateBuiltinRef": {
+      "type": "object",
+      "required": ["path", "serverConfig"],
+      "properties": {
+        "path": { "type": "string" },
+        "serverConfig": {
+          "type": "object",
+          "required": ["command", "args"],
+          "properties": {
+            "command": { "type": "string" },
+            "args": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "note": { "type": "string" }
+      }
+    }
+  }
+}

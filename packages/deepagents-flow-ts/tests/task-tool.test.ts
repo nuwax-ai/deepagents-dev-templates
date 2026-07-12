@@ -538,4 +538,48 @@ describe("createTaskTool", () => {
       new Set(["task-call-a", "task-call-b"])
     );
   });
+
+  it("messages 模式累积 chunk → onToken 折叠无叠词", async () => {
+    const childGraph = {
+      stream: async function* () {
+        yield ["messages", [{ content: "你" }, { langgraph_node: "think" }]];
+        yield ["messages", [{ content: "你好" }, { langgraph_node: "think" }]];
+        yield ["messages", [{ content: "你好世界" }, { langgraph_node: "think" }]];
+      },
+      getState: async () => ({
+        values: {
+          messages: [new AIMessage({ content: "你好世界" })],
+          output: "你好世界",
+        },
+      }),
+    };
+    vi.mocked(createFlowGraph).mockReturnValueOnce(
+      childGraph as ReturnType<typeof createFlowGraph>
+    );
+
+    const task = createTaskTool({
+      config: baseConfig,
+      parentWorkspaceRoot: process.cwd(),
+      buildTools: () => [],
+      subAgents: [
+        {
+          name: "researcher",
+          description: "研究",
+          systemPrompt: "研究。",
+        },
+      ],
+    });
+    const tokens: string[] = [];
+    await task.invoke(
+      { subagent_type: "researcher", description: "test" },
+      {
+        configurable: {
+          langgraph_tool_call_id: "call_fold",
+          onToken: (text: string) => tokens.push(text),
+        },
+      }
+    );
+
+    expect(tokens).toEqual(["你", "好", "世界"]);
+  });
 });

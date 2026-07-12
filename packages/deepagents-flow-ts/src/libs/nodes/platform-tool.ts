@@ -74,7 +74,9 @@ export function createPlatformToolActionNode<S>(opts: PlatformToolActionNodeOpti
     }
 
     try {
-      const raw = await tool.invoke(builtArgs);
+      // { callbacks: [] } 抑制 LangChain Runnable._callWithConfig 内部的 handleToolStart/End，
+      // 否则会与本节点显式的 onToolCall 重复（出现第二个 unknown ToolCall 事件）。
+      const raw = await tool.invoke(builtArgs, { callbacks: [] });
       if (onToolCall) {
         await onToolCall({
           toolCallId,

@@ -1,5 +1,8 @@
 # LangGraph 原生对象收敛开发方案
 
+> 📋 **状态**：计划中（未完全落地）  
+> ⚠️ **路径口径已过时（v1.14.0+）**：本文多处引用 `examples/`、`typecheck:examples`；现行以 [recent-changelog.md](./recent-changelog.md) §3 废弃清单为准。示范路径改为 `scripts/scaffold/specs/` + `tests/topologies/`。
+
 本文档记录 `deepagents-flow-ts` 将自造执行/事件机制逐步收敛到 LangGraph 原生对象的开发计划。
 
 核心目标：保持 **workflow-first** 架构，图本身就是请求路径。不要在图之上再造 `FlowEvent`、`Flow` 等黑盒抽象；surface 应直接 stream 编译后的 LangGraph 图，并消费原生 `[mode, chunk]`。
@@ -60,7 +63,7 @@
 目标文件：
 
 - `src/app/state.ts`
-- `examples/dev-agent/researcher.ts`
+- `（历史路径；现见 src/app/flows/dev-agent + libs/nodes createSubgraphNode）`
 
 只替换真正的 `messages` channel：
 
@@ -82,7 +85,7 @@ export const FlowStateAnnotation = Annotation.Root({
 
 不要机械替换这些字段：
 
-- `examples/rag/graph.ts` 的 `history: Annotation<BaseMessage[]>`：它是 RAG 输入历史，不是 LangGraph 主 `messages` channel。
+- `libs/topologies/rag/graph.ts（历史 examples 路径已移除）` 的 `history: Annotation<BaseMessage[]>`：它是 RAG 输入历史，不是 LangGraph 主 `messages` channel。
 - travel / pm / review / deep-research 里的业务状态：这些图没有通用 `messages` reducer，不能强行展开 `MessagesAnnotation.spec`。
 - tests 里的 toy state：测试通常在覆盖局部语义，除非确实手写了 `messagesStateReducer`。
 
@@ -137,8 +140,8 @@ const recent = await trimMessages(messages, {
 
 目标范围：
 
-- `examples/deep-research/graph.ts` 的 LLM 节点。
-- 后续再看 `examples/travel-planner/graph.ts`、RAG 检索节点等。
+- `libs/topologies/deep-research/graph.ts（历史 examples 路径已移除）` 的 LLM 节点。
+- 后续再看 `libs/topologies/travel-planner/graph.ts（历史 examples 路径已移除）`、RAG 检索节点等。
 
 先做一个最小 spike：
 
@@ -325,7 +328,7 @@ pnpm graph
 
 ```bash
 pnpm typecheck:examples
-pnpm test -- examples/deep-research
+pnpm test -- tests/topologies/deep-research
 ```
 
 阶段 B：

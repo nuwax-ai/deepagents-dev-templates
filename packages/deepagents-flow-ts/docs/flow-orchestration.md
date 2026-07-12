@@ -18,10 +18,10 @@
 - **标准 ReAct**（默认图）：`prepare → think ↔ tools → respond`。think 用 `bindTools` 出 `tool_calls`，tools 节点执行产出 `ToolMessage`，`toolsCondition` 路由。
 - **条件边循环**：`addConditionalEdges(router)` + 上限计数器（防死循环）。
 - **HITL（人审）**：`interrupt(...)` 暂停 + `Command({ resume })` 恢复，需 checkpointer + `StatefulFlow`。
-- **并行 map-reduce**：`Send` 扇出多路 + reducer 聚合（见 `libs/topologies/travel-planner`）。
+- **并行 map-reduce**：`Send` 扇出多路 + reducer 聚合（见 [flow-patterns.md](flow-patterns.md) § Send）。
 - **子智能体（subagent）**：把一个编译后的子图作为父图节点（subgraph），子图有独立 state。
-- **自适应 RAG**（`libs/topologies/adaptive-rag`，对齐官方 Adaptive RAG）：`route_question` 路由（向量检索 / 网页搜索 / 直接回答）+ `grade_documents` 文档评分 + `grade_generation` 幻觉/答案双评分 + 检索/生成双自纠正循环（带上限计数器）。适合需要路由与生成质量把关的进阶问答。
-- **conversational 多轮对话**：对话型 flow（`default` / `search-aggregator`）用 `createStatefulFlow({ conversational: true })`——不暴露 `hasStarted`，surface 每轮走 `query` + 稳定 threadId + checkpointer 累积历史 → 多轮记忆（区别于 HITL 的 `resume` 续跑同一任务）。
+- **检索增强**：在默认图外自建线性图：`rewrite → retrieve → grade → prepare → generate`（factory 见 node-kit）。
+- **conversational 多轮对话**：`default` 用 `createStatefulFlow({ conversational: true })`——不暴露 `hasStarted`，surface 每轮走 `query` + 稳定 threadId + checkpointer 累积历史。
 
 ## 节点命名坑
 
@@ -33,4 +33,6 @@ LangGraph 限制：**节点名不能与 state channel 同名**。判定字段叫
 
 ## 参考
 
-`src/app/graph.ts`（默认图）、`libs/topologies/rag`（线性+条件重试）、`libs/topologies/travel-planner`（并行+HITL）、`libs/topologies/project-manager`（评估循环+HITL）、`src/app/topologies/dev-agent.ts`（全能力）、`libs/topologies/adaptive-rag`（路由 + 检索/生成双自纠正，conversational）。
+- `src/app/graph.ts` — 默认 ReAct（唯一产品入口）
+- [examples.md](examples.md) — 多轮 chat / 平台能力 / RAG 等扩展思路（仅文档）
+- `src/libs/nodes/` — factory 目录

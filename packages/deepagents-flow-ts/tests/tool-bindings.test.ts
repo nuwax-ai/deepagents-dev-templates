@@ -10,7 +10,7 @@ describe("pickTools", () => {
   it("names 为空时返回全部工具（向后兼容：节点未声明工具名 = 用全部）", () => {
     const tools = [fakeTool("echo"), fakeTool("search")];
     expect(pickTools(tools, [])).toEqual(tools);
-    // 节点 params.tools 缺省时 blueprint 传 []，等价于用全部
+    // 节点未声明工具名（names 为 undefined）时等价于用全部
     expect(pickTools(tools, undefined as unknown as string[])).toEqual(tools);
   });
 

@@ -1,0 +1,44 @@
+{
+  "_comment": "脱敏样例：对齐 nuwax 编排页 Agent 详情 data 投影。仅保留 prompts + Skill + context7 Mcp。不含真实 tenant/space/id。ask-question 故意不出现在 agentComponentConfigList（宿主默认，不要求编排页 type=Mcp）。",
+  "id": 0,
+  "uid": "sample-dev-agent-flow",
+  "type": "TaskAgent",
+  "subType": "General",
+  "name": "智能体开发",
+  "description": null,
+  "systemPrompt": "{{INLINE_FROM:system-prompt.md}}",
+  "userPrompt": "{{INLINE_FROM:user-prompt.md}}",
+  "agentComponentConfigList": [
+    {
+      "type": "Skill",
+      "name": "flow-builder",
+      "groupName": null
+    },
+    {
+      "type": "Skill",
+      "name": "dev-engineer-toolkit",
+      "groupName": null
+    },
+    {
+      "type": "Skill",
+      "name": "flow-debugger",
+      "groupName": null
+    },
+    {
+      "type": "Mcp",
+      "name": "context7",
+      "groupName": "context7",
+      "tools": [
+        { "name": "resolve-library-id" },
+        { "name": "query-docs" }
+      ]
+    }
+  ],
+  "_ignoredInDrift": [
+    {
+      "type": "Model",
+      "name": "deepseek-v4-flash",
+      "note": "Model/Page/Event/Hook/Variable 不在四维调优范围"
+    }
+  ]
+}

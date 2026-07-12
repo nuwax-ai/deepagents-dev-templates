@@ -1,7 +1,7 @@
 # 排错索引
 
 > **范围**：本工作目录内 flow 的运行时排错。
-> 先查 `.logs/`（`LOG_DIR=<REPO>/.logs`，`LOG_LEVEL=debug`；配置见 [zed-debug.md](zed-debug.md)）。
+> 先查 `.logs/`（`LOG_DIR=<REPO>/.logs`，`LOG_LEVEL=debug`）。
 > **图编排硬规则**（按 ID 追加）：[flow-graph-rules.md](flow-graph-rules.md)。
 
 ## `LLM 未返回 JSON`
@@ -17,15 +17,12 @@
 | 步 | 动作 |
 |----|------|
 | 1 | `.logs/` 搜 `LLM 未返回 JSON` 或节点 `label` |
-| 2 | 打开 `src/app/flows/<name>/graph.ts` 对应 `addNode` |
+| 2 | 打开 `src/app/graph.ts` 或自建图文件对应 `addNode` |
 | 3 | `write` 是否用 `r.parsed`？**否 → 删 `parse`** |
 | 4 | 必须结构化？加强 prompt JSON schema；加 `fallback` 或 `createLlmRouterNode` + `routeFallback` |
 | 5 | 入口节点？prompt 加非预期输入兜底（引导正确格式，不强求 JSON） |
-| 6 | 手改过 `graph.ts`？**同步** `scripts/scaffold/specs/<name>.flow.json` |
 
 **契约详表**：[flow-graph-rules.md](flow-graph-rules.md) R-G001 / R-G002。
-
-**参考范例**：`scripts/scaffold/specs/_example.interview-agent.flow.json`（`prepare` 无 parse；`evaluate` 有 parse）。
 
 ---
 
@@ -48,13 +45,11 @@
 | 步 | 动作 |
 |----|------|
 | 1 | 确认 env 含 `LOG_DIR`、`LOG_LEVEL`（HITL 建议 `debug`） |
-| 2 | 复现：Zed / `pnpm smoke` / CLI |
+| 2 | 复现：本地 `pnpm flow` 快检，或经 ACP surface 在平台预览会话复现 |
 | 3 | 打开 `.logs/` 最新 `.log` 或按 `sessionId` 定位 |
 | 4 | 过滤：`runtime:flow-graph`、`interrupt`、`onPrompt`、`permission 门控` 等 |
 | 5 | 修复后重跑，确认新日志无同类 error |
 | 6 | 记录根因摘要（勿把整段 log 提交 git） |
-
-常见前缀与 Zed 配置：[zed-debug.md](zed-debug.md)。
 
 ---
 
@@ -74,13 +69,9 @@
 
 ---
 
-## spec 与 graph.ts 不一致
+## graph.ts 与文档不一致
 
-**规则**：[R-G003](flow-graph-rules.md#r-g003-spec-与-graphts-双向同步)。
-
-**症状**：手修 `graph.ts` 后 `generate.mjs` 覆盖修复；或 spec 仍含已删的 `parse`。
-
-**规则**：`graph.ts` 与 `scripts/scaffold/specs/<name>.flow.json` **双向同步**；以当前可跑版本为准。
+手改 `src/app/graph.ts` 后请同步更新相关 `docs/` 说明（人工同步，无 scaffold/spec 双向生成）。
 
 ---
 
@@ -106,6 +97,26 @@
 
 ---
 
+## `400 messages.content.type 参数非法` / 截图后会话不可恢复
+
+**症状**：调用 `chrome-devtools__take_screenshot`（或其它返回图片的 MCP）后，ACP 报 `抱歉，处理您的问题时出现错误`；日志中 LLM 返回 `400 messages.content.type 参数非法，取值范围 ['text']`；之后同会话任意新消息立刻失败。
+
+**根因**：工具结果把 `image_url` + base64 PNG 写进 ToolMessage / checkpoint；智谱等 OpenAI 兼容端点只接受 `content.type = text`，历史一旦污染，每轮 `think` 都会 400。
+
+**runtime 修复**（三层，对齐孤立 tool_calls 修复模式）：
+
+| 层 | 时机 | 行为 |
+|----|------|------|
+| 1 | `createToolExecNode` 写路径 | 入库前按 `resolveCoerceMode` 压扁（anthropic 只剥图像；openai 兼容含智谱压任意非字符串） |
+| 2 | 每次 `flow.run` 入口 `repairCheckpoint` | `coerceMessagesToTextContent` 清洗历史并写回（传 `appConfig`） |
+| 3 | `think` 调 LLM 前；content.type 400 时 `all-non-string` 重试，**成功则写回 state** | 同轮后续 think / 下轮不再踩毒 |
+
+**开关**：默认 text-only。`FLOW_SUPPORTS_VISION=1` 或 `model.settings.supportsVision: true` 跳过首轮剥离；端点仍 400 时 think 强制剥图重试并写回。`provider: anthropic` 保留 text[]/thinking；其余 provider 默认压扁数组 content。
+
+**历史坏 checkpoint**：修复后下一轮 `run` 会自动清洗；仍异常可新建会话或删 thread 文件。
+
+---
+
 ## 工具调用长时间 EXECUTING
 
 **可能原因**：
@@ -113,7 +124,7 @@
 1. 图在 LLM 节点抛错未走完，session 未正常收尾
 2. 并行调试命令与 ACP 会话交叉
 
-**建议**：先修图错误（尤其 `LLM 未返回 JSON`），再重跑 `pnpm smoke`。
+**建议**：先修图错误（尤其 `LLM 未返回 JSON`），再用 `pnpm flow` 或 ACP 会话重跑验证。
 
 ---
 
@@ -133,10 +144,26 @@
 
 ---
 
+## `pnpm exec` / `pnpm run` 卡住（Windows 沙箱 · pnpm 10/11 混用）
+
+**症状**：`pnpm exec tsx …` 或部分 `pnpm run` 长时间 `EXECUTING`；报错 `minimumReleaseAge` / `VERIFY_DEPS_BEFORE_RUN`；`node_modules` 装完仍失败。
+
+**根因**：pnpm **10 与 11 默认策略不同**（11 默认 `minimumReleaseAge=1440`、`verifyDepsBeforeRun=install`），`pnpm exec` 会在执行前再做依赖预检/重装。
+
+**本项目约定**（见根目录 `.npmrc` + `packageManager`）：
+
+| 做法 | 说明 |
+|------|------|
+| 用 **`pnpm flow` / `pnpm graph` / `pnpm flows`** 等 scripts | **禁止** `pnpm exec tsx` |
+| `.npmrc` 已设 `minimum-release-age=0`、`verify-deps-before-run=false` | 10/11 行为对齐 |
+| `packageManager` 建议 corepack 启用 `pnpm@10.18.2` | 避免漂到 11 默认 |
+| 仍失败且 `node_modules/.bin/tsx` 存在 | fallback：`node node_modules/tsx/dist/cli.mjs src/index.ts …` |
+
+---
+
 ## 相关文档
 
 - [flow-graph-rules.md](flow-graph-rules.md) — **图编排规则（R-G001+，可持续追加）**
 - [node-kit.md](node-kit.md) — factory API + parse 契约摘要
 - [node-catalog.md](node-catalog.md) — 选型决策树
 - [flow-patterns.md](flow-patterns.md) — Send / interrupt / checkpoint
-- [zed-debug.md](zed-debug.md) — 日志 env 配置

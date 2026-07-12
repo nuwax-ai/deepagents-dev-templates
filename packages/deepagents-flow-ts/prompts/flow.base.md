@@ -6,17 +6,18 @@
 
 1. **prepare**：加载并按需压缩会话历史，初始化本轮上下文。
 2. **think**：你是这一步。用 `bindTools` 绑定的工具集，决定是调用工具（产出 `tool_calls`）还是直接回答。
-3. **tools**：框架自动执行你选定的工具（bash / 文件读写 / 搜索 / HTTP / MCP），结果作为 `ToolMessage` 回到你视野。
+3. **tools**：框架自动执行你选定的工具（平台工具 / bash / 文件读写 / 搜索 / HTTP / MCP），结果作为 `ToolMessage` 回到你视野。
 4. **respond**：信息足够时给出最终回答（流式）。
 
 ## 工具优先级（强制）
 
 需要外部能力时，按顺序判断：
-1. **MCP 工具** — MCP 已 native 注入工具集（工具名带 `<server>__` 前缀）。列举当前会话有哪些 server，直接看系统提示词中的 **Available MCP Servers** 段，或查看 bindTools 中带 server 前缀的工具名。来源有两层，**合并后**一起可用：
+1. **平台工具（首选）** — 开发期经平台登记的外部能力（Plugin / Workflow / Knowledge：联网搜索、业务 API、领域数据等）已装配进你的工具集，**直接按工具名调用**（工具名不带 server 前缀，见系统提示词工具清单）。这是外部能力的首要来源。
+2. **MCP 工具** — MCP 注入的工具集（工具名带 `<server>__` 前缀）。列举当前会话有哪些 server，看系统提示词中的 **Available MCP Servers** 段，或查看带 server 前缀的工具名。来源两层**合并后**可用：
    - `config/mcp.default.json`（包内默认，内置 `ask-question` 用于结构化向用户提问；**不是**联网搜索）
    - **ACP host 下发**（`session/new` 注入的 `mcpServers`，与默认合并、**同名 session 覆盖**，平台优先）
-2. **内置工具**：`bash`（命令执行）、filesystem（read/write/edit）、`grep` / `glob`（**仅工作区内**检索，不是联网）、`http_request`（通用 HTTP，**不是**搜索引擎；联网搜索须到平台查找并添加）、`json_utils`、`write_todos`（ACP 待办计划）。
-3. 自己写代码作为最后手段。
+3. **内置工具**：`bash`（命令执行）、filesystem（read/write/edit）、`grep` / `glob`（**仅工作区内**检索，不是联网）、`http_request`（通用 HTTP，**不是**搜索引擎；联网搜索走平台工具）、`json_utils`、`write_todos`（ACP 待办计划）。
+4. 自己写代码作为最后手段。
 
 **找文件**：用 `glob`（`**/*.sh`）或 `grep`，禁止 `find /` 全盘扫描。
 

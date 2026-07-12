@@ -3,7 +3,7 @@
  *
  * 关键 seam：deepagents-acp 的 `onPrompt` 钩子在 agent 运行前触发，
  * 返回 `{ stopReason }` 即短路 agent。主入口经 materializeFlow 传入 StatefulFlow；
- * examples 仍可能传入 legacy function executor。
+ * legacy 仍可能传入 legacy function executor。
  * 把回答经 `conn` 流式推给客户端，然后短路——deep agent 永不进入请求路径。
  *
  * per-session 配置（D）：`createExecutor` 工厂 + `configureSession` 钩子让 ACP `session/new`
@@ -375,7 +375,7 @@ export interface SessionExecutor {
 
 export interface FlowAcpOptions {
   /**
-   * 单 executor 模式：StatefulFlow（主路径）；legacy function executor 仅 examples 兼容。
+   * 单 executor 模式：StatefulFlow（主路径）；legacy function executor 仅 legacy function 兼容。
    * 与 createExecutor 二选一；createExecutor 优先。
    */
   executor?: FlowExecutor | StatefulFlow;
@@ -453,6 +453,43 @@ export function createFlowHooks(options: FlowAcpOptions): DeepAgentsServerHooks 
     return options.executor;
   }
 
+  /** dispose 旧 executor 并按 sessionConfigs 重建（configureSession / model 热切换共用）。 */
+  async function rebuildSessionExecutor(sessionId: string): Promise<void> {
+    if (!options.createExecutor) return;
+    const configured = sessionConfigs.get(sessionId);
+    if (!configured) {
+      log.warn("rebuildSessionExecutor: no session config cached", { sessionId });
+      return;
+    }
+    try {
+      const built = await options.createExecutor({
+        sessionConfig: configured.sessionConfig,
+        workspaceRoot: configured.workspaceRoot,
+      });
+      try {
+        await sessions.get(sessionId)?.dispose?.();
+      } catch (dispErr) {
+        log.warn("rebuildSessionExecutor: 旧 executor dispose 失败", {
+          sessionId,
+          error: String(dispErr),
+        });
+      }
+      sessions.set(sessionId, built);
+      sessionFailures.delete(sessionId);
+      log.info("per-session runtime hot-reloaded", {
+        sessionId,
+        cwd: configured.workspaceRoot,
+        model: configured.sessionConfig.model,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      sessionFailures.set(sessionId, message);
+      sessions.delete(sessionId);
+      log.error("rebuildSessionExecutor failed", { sessionId, error: message });
+      throw err;
+    }
+  }
+
   return {
     // session/new | session/load：按 ACP cwd/mcpServers/model 装配 per-session runtime。
     async configureSession(ctx) {
@@ -470,19 +507,7 @@ export function createFlowHooks(options: FlowAcpOptions): DeepAgentsServerHooks 
       });
       sessionConfigs.set(ctx.sessionId, { sessionConfig, workspaceRoot });
       try {
-        const built = await options.createExecutor({ sessionConfig, workspaceRoot });
-        // session/load 重配时先 dispose 旧资源，避免泄漏。
-        // best-effort：旧实例 dispose 抛错不应阻断新实例就位（与 onSessionClosed 一致）。
-        try {
-          await sessions.get(ctx.sessionId)?.dispose?.();
-        } catch (dispErr) {
-          log.warn("configureSession: 旧 executor dispose 失败", {
-            sessionId: ctx.sessionId,
-            error: String(dispErr),
-          });
-        }
-        sessions.set(ctx.sessionId, built);
-        sessionFailures.delete(ctx.sessionId);
+        await rebuildSessionExecutor(ctx.sessionId);
         log.info("configureSession → per-session runtime", {
           sessionId: ctx.sessionId,
           phase: ctx.phase,
@@ -660,6 +685,32 @@ export function createFlowHooks(options: FlowAcpOptions): DeepAgentsServerHooks 
         promptMs: startedAt != null ? Date.now() - startedAt : 0,
       });
       promptTurnStartedAt.delete(ctx.sessionId);
+    },
+
+    /** session/set_config_option(model)：更新 sessionConfig 并热重建 executor（think 节点闭包绑定新 model）。 */
+    async onSessionConfigOption(ctx) {
+      if (!options.createExecutor || ctx.configId !== "model") return;
+      const model = ctx.value.trim();
+      if (!model) return;
+
+      const configured = sessionConfigs.get(ctx.sessionId);
+      if (!configured) {
+        log.warn("onSessionConfigOption: no session config cached", {
+          sessionId: ctx.sessionId,
+        });
+        return;
+      }
+
+      if (configured.sessionConfig.model === model && sessions.has(ctx.sessionId)) {
+        return;
+      }
+
+      configured.sessionConfig = {
+        ...configured.sessionConfig,
+        model,
+      };
+      sessionConfigs.set(ctx.sessionId, configured);
+      await rebuildSessionExecutor(ctx.sessionId);
     },
 
     // session 关闭：释放 per-session 资源（MCP stdio 子进程等）+ 清兜底状态。

@@ -19,7 +19,7 @@ import type { StructuredTool } from "@langchain/core/tools";
 import type { AppConfig, DiscoveredSubAgent } from "../runtime/index.js";
 import { createFlowGraph } from "./graph.js";
 import type { FlowState } from "./state.js";
-import { extractText, STREAM_TEXT_NODES } from "../libs/nodes/index.js";
+import { extractText, STREAM_TEXT_NODES, foldStreamTextChunk } from "../libs/nodes/index.js";
 import type { FlowCallbacks } from "../core/flow-types.js";
 
 /** 兼容 LangChain 实例与 checkpoint 反序列化后的 plain object。 */
@@ -241,8 +241,10 @@ export function createTaskTool(deps: TaskToolDeps) {
           if (node && STREAM_TEXT_NODES.has(node)) {
             const text = extractText(msg?.content);
             if (text) {
-              streamBuffer += text;
-              await parentCallbacks.onToken?.(text, subagent_type, toolCallId);
+              const folded = foldStreamTextChunk(streamBuffer, text);
+              if (!folded.delta) continue;
+              streamBuffer = folded.full;
+              await parentCallbacks.onToken?.(folded.delta, subagent_type, toolCallId);
             }
           }
         }

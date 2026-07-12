@@ -383,7 +383,7 @@ const PLATFORM_MODEL_ENV_KEYS = [
 /** agent_config.env 模板占位符，未替换时不应进入 flow-ts 子进程 */
 const MODEL_PROVIDER_PLACEHOLDER_RE = /\{MODEL_PROVIDER_[A-Z_]+\}/;
 
-/** 凭证类 env 日志脱敏（保留前4后2，与 logger / smoke-acp 一致） */
+/** 凭证类 env 日志脱敏（保留前4后2，与 logger 一致） */
 function maskEnvSecretForLog(value: string): string {
   if (!value || value.length <= 8) return value ? "***" : "(unset)";
   return `${value.slice(0, 4)}…${value.slice(-2)} (${value.length} chars)`;

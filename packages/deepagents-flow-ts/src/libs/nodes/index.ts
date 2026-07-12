@@ -55,6 +55,7 @@ export {
   type ChatModelLike,
   type StreamLlmTextOptions,
 } from "./llm.js";
+export { foldStreamTextChunk, type StreamTextFoldResult } from "./stream-text-delta.js";
 export { createFanout, type FanoutOptions } from "./fanout.js";
 export { createSubgraphNode, type SubgraphNodeOptions } from "./subgraph.js";
 export { requireModel } from "./model-resolver.js";

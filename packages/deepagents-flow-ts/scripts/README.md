@@ -1,6 +1,6 @@
 # Scripts
 
-本项目的构建、打包与冒烟测试脚本。全部为 **纯 Node `.mjs`**，可在 Windows PowerShell、macOS 与 Linux 下运行。
+本项目的构建、打包与本地范例运行脚本。全部为 **纯 Node `.mjs`**，可在 Windows PowerShell、macOS 与 Linux 下运行。
 
 ## Version sync
 
@@ -23,58 +23,11 @@
 | `package-platforms.mjs` | `pnpm run package:platforms` | 按平台归档 + `platforms.json` |
 | `validate-package.mjs` | `pnpm run validate:package` | 校验压缩包完整性 |
 
-## Smoke tests
+## runtime 可观测/加速开关
 
-| Script | npm 命令 | 说明 |
-|--------|----------|------|
-| `smoke-acp.mjs` | `pnpm run smoke` | 默认 flow（`src/index.ts`，读 `activeFlow`） |
-| | `pnpm run smoke -- --example <name>` | 精选范例短名冒烟 |
-| `run-example.mjs` | `pnpm run example <name> [args]` | 本地跑精选范例；`pnpm example --list` |
-| `lib/example-registry.mjs` | — | `smoke --example` 与 `pnpm example` 共用别名表 |
-
-**精选范例别名**：
-
-| 别名 | 入口 |
-|------|------|
-| `rag` | `examples/rag/index.ts` |
-| `travel` | `examples/travel-planner/index.ts` |
-| `pm` | `examples/project-manager/index.ts` |
-| `review` | `examples/human-in-loop/index.ts` |
-| `research` | `examples/deep-research/index.ts` |
-
-### 模型 env（`lib/smoke-env.mjs`）
-
-与 runtime `config-loader` 对齐；过滤 `{MODEL_PROVIDER_*}` 占位符后 `-e` 传给 rcoder-cli（避免 400 Invalid model）。
-
-`smoke-acp.mjs` 用 `dotenv` **`override:true`** 加载项目 `.env` —— **`.env` 覆盖** NuWaClaw / shell 注入值；未设的键再回落到注入 env。
-
-| 层级 | 规则 |
-|------|------|
-| 凭证 | `OPENAI_API_KEY` / `ANTHROPIC_*` / `OPENCODE_OPENAI_API_KEY` |
-| Provider | `API_PROTOCOL` / `LLM_PROVIDER` > 凭证推断 > `config.model.provider` |
-| Model | `OPENAI_MODEL` > `ANTHROPIC_MODEL` > `DEFAULT_MODEL` > `config.model.name` |
-| Base URL | `OPENAI_BASE_URL` > `ANTHROPIC_BASE_URL` > `config.model.baseUrl` |
-| OPENCODE 兜底 | standard 缺失时用 `OPENCODE_OPENAI_API_KEY` / `OPENCODE_OPENAI_API_BASE` / `OPENCODE_MODEL`（NuWaClaw opencode 下发）；forward 仍发 standard 键 |
-
-本地开发推荐 `cp .env.example .env`；在 NuWaClaw 内若已有 `OPENCODE_*` 或 `API_PROTOCOL` + 单家族 key，可不建 `.env`。
-
-### Smoke 专用 env
-
-| Env | 说明 |
-|-----|------|
-| `SMOKE_PROMPT` | 主路径用户输入 |
-| `SMOKE_PROMPT_EDGE` | 可选第二条（边界输入，如「你是？」） |
-| `SMOKE_EXPECT_ACTIVE_FLOW` | 与 `activeFlow` 不一致则 exit 1 |
-| `SMOKE_WARN_ACTIVE_FLOW=0` | 关闭 `activeFlow=default` 警告 |
-| `SMOKE_TIMEOUT` | rcoder 超时秒数（默认 `150`） |
-| `SMOKE_VERBOSE=1` | 传 `-v` 给 rcoder-cli |
-| `SMOKE_DEBUG=1` / `--debug` | 打印解析后的 provider/model/forward env |
-| `SMOKE_DRY_RUN=1` / `--dry-run` | 只打印 rcoder 命令，不调 API |
-| `AGENT_ENTRY` / `--entry` | 指定入口 TS 文件 |
-
-`--entry` 或 `AGENT_ENTRY` 可指定任意入口；`--debug --dry-run` 可在无 API key 时检查命令与 env 解析。
-
-**通过/失败**：见 `lib/smoke-outcome.mjs` —— 以 session-trace 的 `flowStatus` + 产出/流式指标为准；`interrupted` + `streamed`（HITL 首轮）与 `done` + `streamed` 均算通过；rcoder 的 `Session cancelled` 在 trace 正常时忽略。设 `SMOKE_EXPECT_TOOL` 时另校验工具调用轨迹（`SMOKE_TOOL_TRACE=1` 脱敏摘要，见 `tests/session-tool-trace.test.ts`）。
+> runtime 提供两个 env 开关（运行时读取，与构建脚本无关）：
+> - `SMOKE_TOOL_TRACE=1`（session-trace 输出 `tool invoke start/done/failed` 工具调用摘要到日志）
+> - `AGENT_LIGHT=1`（跳过 MCP 加载，轻量验证）
 
 ## Windows 打包工具（可选）
 
@@ -96,6 +49,3 @@ pnpm run check:tools   # 检测工具是否就绪
 | `lib/bundle.mjs` | esbuild 打包 |
 | `lib/staging.mjs` | staging 复制与归档 |
 | `lib/tools.mjs` | CLI 工具检测 |
-| `lib/smoke-env.mjs` | smoke 模型 env 解析（与 runtime 对齐） |
-| `lib/smoke-outcome.mjs` | smoke 输出解析（session-trace 优先于 rcoder 噪音） |
-| `lib/example-registry.mjs` | 精选范例别名注册表 |

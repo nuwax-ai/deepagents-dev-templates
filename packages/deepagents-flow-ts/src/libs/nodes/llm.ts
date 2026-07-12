@@ -20,6 +20,7 @@ import {
   resolveLlmResilience,
 } from "../../runtime/services/llm-resilience.js";
 import { emitTextToken } from "./emit.js";
+import { foldStreamTextChunk } from "./stream-text-delta.js";
 
 /** 从 LLM 返回的 content 抽纯文本（string 或 content block 数组）。 */
 export function extractText(content: unknown): string {
@@ -111,8 +112,10 @@ export async function streamLLMText(
     for await (const chunk of stream) {
       const text = extractText(chunk.content);
       if (!text) continue;
-      full += text;
-      await emitTextToken(config, text);
+      const folded = foldStreamTextChunk(full, text);
+      if (!folded.delta) continue;
+      full = folded.full;
+      await emitTextToken(config, folded.delta);
     }
     return full;
   };

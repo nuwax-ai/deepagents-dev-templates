@@ -45,6 +45,8 @@ export const ModelConfigSchema = z.object({
       invokeLongTimeoutMs: z.number().min(1000).optional(),
       /** 并行/Send 扇出时 LLM 最大并发。可被 LLM_MAX_CONCURRENT 覆盖。 */
       maxConcurrentInvokes: z.number().min(1).optional(),
+      /** 模型是否支持 vision content blocks；开启后保留 image_url 等多模态消息。 */
+      supportsVision: z.boolean().optional(),
     })
     .default({}),
 });
@@ -157,6 +159,12 @@ export const PluginsConfigSchema = z.object({
   disabled: z.array(z.string()).default([]),
 });
 
+export const FlowSelectionConfigSchema = z.object({
+  active: z.string().default("default"),
+  defaultInteraction: z.enum(["chat", "pipeline", "approval"]).default("chat"),
+  unknownActivePolicy: z.enum(["warn-default", "default"]).default("warn-default"),
+});
+
 export const LoggingConfigSchema = z.object({
   level: z.enum(["debug", "info", "warn", "error"]).default("info"),
   structured: z.boolean().default(true),
@@ -228,6 +236,7 @@ export const AppConfigSchema = z.object({
   memory: MemoryConfigSchema.default({}),
   hooks: z.array(HookConfigSchema).default([]),
   plugins: PluginsConfigSchema.default({}),
+  flow: FlowSelectionConfigSchema.default({}),
   workspace: WorkspaceConfigSchema.default({}),
   logging: LoggingConfigSchema.default({}),
   compaction: CompactionConfigSchema.default({}),

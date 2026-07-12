@@ -5,7 +5,7 @@
  * DeepAgents ACP Server Implementation
  *
  * This module provides an ACP (Agent Client Protocol) server that wraps
- * DeepAgents, enabling integration with IDEs like Zed, JetBrains, and others.
+ * DeepAgents, enabling integration with ACP platform hosts (e.g. NuwaClaw).
  *
  * @see https://agentclientprotocol.com
  * @see https://github.com/agentclientprotocol/typescript-sdk
@@ -16,6 +16,7 @@ import {
   ndJsonStream,
   type Agent,
   type ContentBlock,
+  type SetSessionConfigOptionResponse,
 } from "@agentclientprotocol/sdk";
 import { randomUUID } from "node:crypto";
 
@@ -27,6 +28,7 @@ import {
 } from "deepagents";
 
 import { ACPFilesystemBackend } from "./acp-filesystem-backend.js";
+import { applySessionConfigOptionPatch, buildSessionConfigOptionsSnapshot, resolveEnvModelId } from "./session-config-option.js";
 
 import {
   type BaseMessage,
@@ -76,6 +78,7 @@ type PromptResponse = Record<string, unknown>;
 type CancelNotification = Record<string, unknown>;
 type SetSessionModeRequest = Record<string, unknown>;
 type SetSessionModeResponse = Record<string, unknown>;
+type SetSessionConfigOptionRequest = Record<string, unknown>;
 type AuthenticateRequest = Record<string, unknown>;
 type AuthenticateResponse = Record<string, unknown>;
 type SessionNotification = Record<string, unknown>;
@@ -123,7 +126,7 @@ const DEFAULT_COMMANDS = [
  * DeepAgents ACP Server
  *
  * Wraps DeepAgents with the Agent Client Protocol, enabling communication
- * with ACP clients like Zed, JetBrains IDEs, and other compatible tools.
+ * with ACP-compatible platform hosts.
  *
  * @example
  * ```typescript
@@ -373,6 +376,9 @@ export class DeepAgentsServer {
       cancel: (params) => this.handleCancel(params as CancelNotification),
       setSessionMode: (params) =>
         this.handleSetSessionMode(params as SetSessionModeRequest),
+      // nuwaclaw / ACP SDK：newSession 后同步 model（env 已注入时此处为兼容 ack）
+      setSessionConfigOption: (params) =>
+        this.handleSetSessionConfigOption(params as SetSessionConfigOptionRequest),
     };
   }
 
@@ -773,6 +779,62 @@ export class DeepAgentsServer {
     this.log("Set mode for session:", sessionId, "to:", mode);
 
     return;
+  }
+
+  /**
+   * Handle ACP session/set_config_option request（nuwaclaw prompt 前 model 对齐）。
+   * flow-ts 模型主要来自进程 env；此处记录 host 期望值并返回成功，避免 Method not found 阻断 chat。
+   */
+  private async handleSetSessionConfigOption(
+    params: SetSessionConfigOptionRequest,
+  ): Promise<SetSessionConfigOptionResponse> {
+    const sessionId = params.sessionId as string;
+    const session = this.sessions.get(sessionId);
+
+    if (!session) {
+      throw new Error(`Session not found: ${sessionId}`);
+    }
+
+    const configId = typeof params.configId === "string" ? params.configId : "";
+    const value =
+      typeof params.value === "string" ? params.value : String(params.value ?? "");
+
+    const kind = applySessionConfigOptionPatch(session, { configId, value }, {
+      envModelId: resolveEnvModelId(),
+    });
+    if (kind.kind === "model") {
+      this.log("Set model for session:", sessionId, "to:", value);
+      if (kind.runtimeModelMismatch) {
+        this.log(
+          "session/set_config_option model differs from process env; host may hot-reload runtime",
+          {
+            sessionId,
+            requested: kind.runtimeModelMismatch.requested,
+            envModel: kind.runtimeModelMismatch.envModel,
+          },
+        );
+      }
+    } else if (kind.kind === "mode") {
+      this.log("Set mode via config option for session:", sessionId, "to:", value);
+    } else {
+      this.log("Ignored unknown session config option:", {
+        sessionId,
+        configId,
+        value,
+      });
+    }
+
+    await this.hooks?.onSessionConfigOption?.({
+      sessionId,
+      configId,
+      value,
+    });
+
+    return {
+      configOptions: buildSessionConfigOptionsSnapshot(session, {
+        envModelFallback: resolveEnvModelId(),
+      }),
+    };
   }
 
   /**

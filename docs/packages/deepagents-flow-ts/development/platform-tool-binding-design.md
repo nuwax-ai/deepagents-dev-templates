@@ -1,5 +1,8 @@
 # 平台工具登记与节点直接引用设计
 
+> ⚠️ 已过时：本文基于“`spec.tools` 仅开发期记录、运行时不读”的旧方案。  
+> 现行方案见：[`platform-tool-schema-driven-runtime.md`](./platform-tool-schema-driven-runtime.md)
+
 ## 目标
 
 本文说明平台工具（Plugin / Workflow / Knowledge）从「开发期搜索登记」到「运行期节点调用」的完整链路，以及各层职责边界。
@@ -137,8 +140,8 @@
 
 | 文件 | 作用 |
 | --- | --- |
-| `packages/dev-agent-flow/skills/dev-engineer-toolkit/` | 平台搜索、注册、配置摘要 |
-| `packages/dev-agent-flow/skills/flow-builder/references/part3-tools-config.md` | 平台能力登记与节点工具引用流程 |
+| `packages/dev-agent-flow/orchestration/skills/dev-engineer-toolkit/` | 平台搜索、注册、配置摘要 |
+| `packages/dev-agent-flow/orchestration/skills/flow-builder/references/part3-tools-config.md` | 平台能力登记与节点工具引用流程 |
 | `packages/deepagents-flow-ts/scripts/scaffold/schema.mjs` | `spec.tools[]` 登记表 schema（开发期记录） |
 | `packages/deepagents-flow-ts/src/app/tool-bindings.ts` | `pickTools(allTools, names[])`：按工具名取子集 |
 | `packages/deepagents-flow-ts/src/libs/nodes/platform-tool.ts` | 固定管道主动工具调用节点（按 `toolName` 定位） |

@@ -35,4 +35,4 @@
 - **sessionStore** —— `FileCheckpointSaver`（继承 `MemorySaver`）持久化到 `config.memory.dir`（默认 `~/.flowagents/sessions/<workspace 散列>/`，可显式 opt-out 回 `./.flow-sessions`）；线程隔离、重启存活、恢复 interrupt/resume。
 - **builtInTools** —— `createFlowTools(ctx)` 组合 bash/fs/grep·glob/http/json + `load_skill`/`task`/`write_todos` + demo 工具 + `ctx.mcpTools`（含 MCP 与平台适配工具）；经 `bindTools` 绑定到模型，由 `ToolNode` 执行。固定管道节点可用 `pickTools(allTools, names)` 或 `createPlatformToolActionNode` 按工具名选取子集。
 
-运行时查询：`pnpm exec tsx src/index.ts capabilities`（工作区开发，无需凭证）；平台安装包产品名为 **nuwax-flow-ts**。
+运行时查询：`pnpm capabilities`（工作区开发，无需凭证）；平台安装包产品名为 **nuwax-flow-ts**。

@@ -52,8 +52,8 @@ function todayDate(): string {
   return new Date().toISOString().slice(0, 10).replace(/-/g, "_");
 }
 
-/** 敏感字段名（凭证 / 端点 / 模型名）；非 debug 级脱敏其值。 */
-const SENSITIVE_KEY = /(?:api[_-]?key|secret|token|auth[_-]?token|password|baseUrl|base[_-]?url|endpoint|url|model(?:Name|name)?)/i;
+/** 敏感字段名（凭证 / 端点 / 模型名）；非 debug 级脱敏其值。token 仅匹配带前缀（auth/access/refresh/id）或 jwt，避免误伤 tokenChunks/inputTokens 等计数字段。 */
+const SENSITIVE_KEY = /(?:api[_-]?key|secret|(?:auth|access|refresh|id)[_-]?token|jwt|password|baseUrl|base[_-]?url|endpoint|url|model(?:Name|name)?)/i;
 
 /** 本地时间戳 YYYY-MM-DD HH:MM:SS.mmm（参照 nuwaclaw perf.log 行首格式）。 */
 function localTimestamp(): string {

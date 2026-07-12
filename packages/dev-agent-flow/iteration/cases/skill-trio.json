@@ -1,0 +1,10 @@
+{
+  "id": "skill-trio",
+  "dimension": "skill",
+  "title": "三技能存在且可与编排页 Skill 名集合对齐",
+  "description": "flow-builder / dev-engineer-toolkit / flow-debugger 均有 SKILL.md；drift 比名集合。",
+  "checks": ["manifest", "skills", "platform-drift"],
+  "expect": {
+    "skillNames": ["flow-builder", "dev-engineer-toolkit", "flow-debugger"]
+  }
+}

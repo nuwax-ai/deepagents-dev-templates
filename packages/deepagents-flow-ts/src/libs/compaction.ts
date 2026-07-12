@@ -9,8 +9,8 @@
  *  - 超阈值 + 有凭证 → 保留最近 keepRecentTokens + LLM 摘要旧部分成 SystemMessage
  *  - 超阈值 + 无凭证 → 仅 trimMessages 裁剪（不摘要，避免调模型）
  *
- * 典型接入：StatefulFlow.run 入口 load history → compactHistory → 作为初始 messages 传图
- * （见 src/app/topologies/dev-agent.ts）。默认图单 turn，历史不增长，压缩不触发。
+ * 典型接入：StatefulFlow.run 入口 load history → compactHistory → 作为初始 messages 传图。
+ * 默认图 conversational 多轮时历史增长，可在 createStatefulFlow 路径自动触发压缩。
  */
 
 import {
@@ -56,7 +56,7 @@ function messagesToText(messages: BaseMessage[]): string {
  *
  * MessagesAnnotation 的 reducer 默认是「追加」；要真正用摘要替换旧历史，需先 RemoveMessage 删掉
  * 旧消息（按 id），再写回压缩结果（摘要 + 保留的近期消息）。把这步抽成纯函数便于单测，
- * 调用方（如 dev-agent run-loop）拿到后 `graph.updateState(config, { messages })` 即可。
+ * 调用方拿到后 `graph.updateState(config, { messages })` 即可。
  *
  * compacted 未变短（没触发压缩 / 无 id 可删）时返回 []，调用方据此跳过 updateState。
  */
@@ -83,7 +83,7 @@ export interface CompactableGraph {
  * 对一张带 checkpointer 的图，就地压缩其 `state.messages`（超阈值时摘要+RemoveMessage 替换）。
  *
  * 把「读 checkpoint 历史 → compactHistory → compactionUpdate → updateState」收成一处，
- * 供 createStatefulFlow（自动）与自定义有状态 flow（dev-agent）共用，避免各处重写。
+ * 供 createStatefulFlow（自动）与自定义有状态 flow 共用，避免各处重写。
  * 状态无 `messages`（如 topic/plan 型 flow）或未超阈值时为 no-op，返回 false。
  */
 export async function applyCompaction(

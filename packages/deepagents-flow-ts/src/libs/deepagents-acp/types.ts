@@ -190,6 +190,16 @@ export interface DeepAgentsServerHooks {
   }): void | Promise<void>;
 
   /**
+   * `session/set_config_option` 之后调用。Flow surface 可在此热切换 per-session runtime
+   *（如 `configId=model` 时重建 executor）。
+   */
+  onSessionConfigOption?(ctx: {
+    sessionId: string;
+    configId: string;
+    value: string;
+  }): void | Promise<void>;
+
+  /**
    * `session/load` 后向客户端回放聊天记录。宿主（如 Flow surface）从 FileCheckpointSaver
    * 等持久层读 messages；返回 `undefined` 或空数组时 server 回退内部 MemorySaver +
    * `session.messages`（跨进程场景通常仍为空，待宿主实现完整回放）。
@@ -293,6 +303,12 @@ export interface SessionState {
    * Current mode (if applicable)
    */
   mode?: string;
+
+  /**
+   * Host-synced model id via ACP `session/set_config_option` (`configId=model`)。
+   * Flow surface 会据此热重建 per-session executor（loadConfig layer-6 覆盖 model.name）。
+   */
+  modelId?: string;
 
   /**
    * Cached permission decisions for tools (always-allow / always-reject)

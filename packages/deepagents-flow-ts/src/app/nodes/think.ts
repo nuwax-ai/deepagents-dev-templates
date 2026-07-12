@@ -9,6 +9,13 @@
 
 import { AIMessage, SystemMessage, type BaseMessage } from "@langchain/core/messages";
 import type { StructuredTool } from "@langchain/core/tools";
+import {
+  coerceMessagesToTextContent,
+  isIllegalContentTypeError,
+  resolveCoerceMode,
+  shouldCoerceToTextOnly,
+} from "../../libs/messages/coerce-text-content.js";
+import { checkpointRepairUpdate } from "../../libs/messages/repair-checkpoint.js";
 import { sanitizeToolCalls } from "../../libs/messages/sanitize-tool-calls.js";
 import { resolveModel, logger, type AppConfig } from "../../runtime/index.js";
 import { hasModelCredentials } from "../../libs/compaction.js";
@@ -104,9 +111,22 @@ export function createThinkNode(deps: ThinkNodeDeps) {
       throw new Error(`think: 模型解析失败（已配置凭证）: ${detail}`);
     }
     const { shortTimeoutMs } = resolveLlmResilience(config);
-    const cleanMessages = sanitizeToolCalls(state.messages);
+    // 孤立 tool_calls 清洗 +（默认）多模态 / 非字符串 content 压纯文本
+    const sanitized = sanitizeToolCalls(state.messages);
+    let forModel = sanitized;
+    /** 送入模型的历史是否相对 state.messages 有实质清洗（需写回 checkpoint） */
+    let historyDirty = false;
+    if (shouldCoerceToTextOnly(config)) {
+      const coerced = coerceMessagesToTextContent(sanitized, {
+        mode: resolveCoerceMode(config),
+      });
+      if (coerced !== sanitized) {
+        forModel = coerced;
+        historyDirty = true;
+      }
+    }
     const promptForModel = withSystemPrompt(
-      cleanMessages,
+      forModel,
       systemPrompt ?? "",
       config?.model.provider
     );
@@ -115,21 +135,65 @@ export function createThinkNode(deps: ThinkNodeDeps) {
       messageCount: promptForModel.length,
       firstMessageType: promptForModel[0]?._getType?.() ?? "unknown",
     });
+    const invokeOpts = {
+      timeoutMs: shortTimeoutMs,
+      label: "think 调模型",
+      retryLabel: "think LLM",
+      config,
+      signal: runtimeConfig?.signal,
+    };
     // 有凭证时调用失败直接抛错，避免回显输入伪装成功（ACP stopReason=end_turn 误导用户）
-    const ai = await invokeWithResilience(
-      boundModel,
-      promptForModel,
-      {
-        timeoutMs: shortTimeoutMs,
-        label: "think 调模型",
-        retryLabel: "think LLM",
-        config,
-        signal: runtimeConfig?.signal,
+    let ai: AIMessage;
+    try {
+      ai = (await invokeWithResilience(boundModel, promptForModel, invokeOpts)) as AIMessage;
+    } catch (err) {
+      // 自愈：content.type 非法时强制 aggressive 压扁后单次重试，并写回历史。
+      if (!isIllegalContentTypeError(err)) {
+        throw err;
       }
-    );
+      log.warn("think LLM content.type 非法，强制 aggressive text coerce 后重试一次", {
+        error: String(err),
+        firstPassCoerced: shouldCoerceToTextOnly(config),
+      });
+      forModel = coerceMessagesToTextContent(sanitized, {
+        mode: "all-non-string",
+      });
+      historyDirty = forModel !== sanitized || historyDirty;
+      const retryPrompt = withSystemPrompt(
+        forModel,
+        systemPrompt ?? "",
+        config?.model.provider
+      );
+      ai = (await invokeWithResilience(boundModel, retryPrompt, {
+        ...invokeOpts,
+        attempts: 1,
+      })) as AIMessage;
+    }
+
+    // 清洗后的历史写回 checkpoint，避免同轮后续 think / 下轮 run 再踩毒 content
+    const outMessages: BaseMessage[] = [];
+    if (historyDirty) {
+      const writeback = checkpointRepairUpdate(state.messages, forModel);
+      if (writeback.length > 0) {
+        outMessages.push(...writeback);
+        log.info("think 已将 coerce 后的历史写回 state", {
+          priorCount: state.messages.length,
+          coercedCount: forModel.length,
+        });
+      } else {
+        log.warn("think coerce 后无法写回（消息缺 id），仅依赖当次 LLM 入参", {
+          priorCount: state.messages.length,
+        });
+      }
+    }
+    outMessages.push(ai);
+
     return {
-      messages: [ai],
-      steps: [`think: ${(ai.tool_calls ?? []).length} tool_calls`],
+      messages: outMessages,
+      steps: [
+        `think: ${(ai.tool_calls ?? []).length} tool_calls`,
+        ...(historyDirty ? ["think#coerce-writeback"] : []),
+      ],
     };
   };
 }

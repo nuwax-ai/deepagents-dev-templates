@@ -16,6 +16,7 @@ import {
   formatMessagesForLog,
   getEffectiveLogLevel,
 } from "./logger.js";
+import { beginPerfSession, endPerfSession, markStart, markEnd, recordPhase } from "./perf-trace.js";
 
 const log = logger.child("session-trace");
 
@@ -29,6 +30,23 @@ export interface AcpPromptCycle {
 }
 
 const acpPromptStore = new AsyncLocalStorage<AcpPromptCycle>();
+
+/**
+ * 单次 flow 执行的 perf 作用域（traceFlowRun 设，traceFlowCallbacks.onToken 读首 token 算 TTFT）。
+ * 经 AsyncLocalStorage 传递，使任意拓扑/自实现 flow 的 onToken 都能拿到 run 起点而无需改 flow 签名。
+ */
+interface PerfRunScope {
+  /** run 起点（performance.now() 时基，与 perf-trace 一致），算端到端 TTFT 用。 */
+  perfStartedAt: number;
+  /** 是否已记录首个 token（一轮只记一次 flow.firstToken）。 */
+  firstTokenDone: boolean;
+}
+const perfRunStore = new AsyncLocalStorage<PerfRunScope>();
+
+/** 当前 flow 执行的 perf 作用域（traceFlowRun 执行范围内有效；无则 undefined）。 */
+function getPerfRun(): PerfRunScope | undefined {
+  return perfRunStore.getStore();
+}
 
 /** 是否处于 ACP onPrompt 周期内（executor 层据此跳过重复 trace 包装）。 */
 export function isInAcpPromptCycle(): boolean {
@@ -74,7 +92,7 @@ function resolveSessionId(ctx?: SessionTraceContext): string | undefined {
 }
 
 /**
- * SMOKE_EXPECT_TOOL 只需要工具名、状态与结果长度，不应为此开启全局 debug
+ * 工具调用断言只需要工具名、状态与结果长度，不应为此开启全局 debug
  * （debug 会关闭凭证/端点脱敏）。专用开关下以 info 输出安全摘要；正常运行仍保持 debug。
  */
 function logToolInvokeSummary(
@@ -126,8 +144,20 @@ export function traceFlowCallbacks(
 ): FlowCallbacks {
   return {
     ...callbacks,
-    onToken: async (token, source, toolCallId) =>
-      callbacks.onToken?.(token, source, toolCallId),
+    onToken: async (token, source, toolCallId) => {
+      // 端到端 TTFT：首个流式 token 到达时刻 − run 起点（perfStartedAt）。一轮只记一次。
+      // 任意拓扑/自实现 flow 经 traceFlowCallbacks 包装即自动获得，无需 flow 自身插点。
+      const runScope = getPerfRun();
+      if (runScope && !runScope.firstTokenDone) {
+        runScope.firstTokenDone = true;
+        recordPhase(
+          "flow.firstToken",
+          Math.round(performance.now() - runScope.perfStartedAt),
+          source ? { source } : undefined,
+        );
+      }
+      return callbacks.onToken?.(token, source, toolCallId);
+    },
     onToolCall: async (e) => {
       traceToolCallEvent(e, ctx);
       await callbacks.onToolCall?.(e);
@@ -193,8 +223,13 @@ export async function traceFlowRun<T extends {
     input: inputText ? truncateForLog(inputText, 200) : undefined,
     inputChars: inputText.length,
   });
+  // 每轮 prompt 一份 perf 汇总（label 即 trace label，如 flow.run）：聚合 flow.run / llm.invoke / flow.firstToken。
+  // scope 经 AsyncLocalStorage 下发，onToken 据此算端到端 TTFT（任意拓扑/自实现 flow 通用）。
+  const perfSession = beginPerfSession(label);
+  const runMark = markStart(label);
+  const scope: PerfRunScope = { perfStartedAt: runMark.startedAt, firstTokenDone: false };
   try {
-    const result = await fn();
+    const result = await perfRunStore.run(scope, fn);
     const answer = result.output ?? result.answer ?? "";
     const doneMeta: Record<string, unknown> = {
       ...compactMeta(meta),
@@ -226,6 +261,11 @@ export async function traceFlowRun<T extends {
       error: String(err),
     });
     throw err;
+  } finally {
+    markEnd(runMark);
+    endPerfSession(perfSession, {
+      sessionId: resolveSessionId({ sessionId: meta.sessionId, threadId: meta.threadId }),
+    });
   }
 }
 
