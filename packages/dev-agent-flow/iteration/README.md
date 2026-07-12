@@ -9,6 +9,7 @@
 |------|------|
 | 版本清单（回朔） | [`VERSIONS.md`](VERSIONS.md) |
 | 对齐基线 | [`ALIGNMENT.md`](ALIGNMENT.md) |
+| 评价口径 | [`EVALUATION.md`](EVALUATION.md) |
 | 迭代台账（过程） | [`ITERATION.md`](ITERATION.md) |
 | 跑分记录 | [`scoreboard.md`](scoreboard.md) |
 | 静态检查 | `checks/`、`cases/`、`run-static.sh` |
