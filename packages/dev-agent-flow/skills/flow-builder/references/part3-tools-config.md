@@ -37,19 +37,36 @@
 6. 记入 `project.md`（targetId、真实工具名、验证方式）
 7. 平台**确无**命中 → 记录搜索输出 → **然后**方可走优先级 3 自写 app 工具
 
-### 工具登记与节点引用
+### 工具登记与图内接线
 
-平台 `add-tool` 负责**登记/启用**工具；真实调试/运行时由平台宿主把已登记能力注入会话（ACP/MCP/session 配置），`deepagents-flow-ts` 再加载成 `runtime.allTools`（`StructuredTool[]`）。图内节点**从 `runtime.allTools` 按名引用**，无需在代码里手抄 schema：
+平台 `add-tool` 负责**登记/启用**；登记后工具进入运行时的方式有**两路来源**，图内用法有**三种接线**，不必全部塞进 `runtime.allTools`。
 
-- **默认 ReAct**：宿主注入后，`think.bindTools(runtime.allTools)` 会拿到平台工具，模型按需调用——聊天助手型只需登记 + systemPrompt 点名，**不写图**。
-- **固定管道 / 自建图**：要让某节点用平台工具时，先用 `pickTools(runtime.allTools, ["真实工具名"])` 得到 `StructuredTool[]` 再传给 `createToolExecNode`；主动调用节点则从 `runtime.allTools` 按工具名定位后 direct-invoke。
-- **调试确认**：若 `get-config` 能看到工具但运行未调用，先用 `flow-debugger --with-logs` 查本次会话是否实际注入该工具（SSE/runtime 工具名、MCP server、日志中的 `Loaded MCP tools`）。
+#### 来源（二选一或并用）
+
+| 来源 | 做法 | 产物 |
+|------|------|------|
+| **宿主注入** | 平台会话 / ACP / MCP 下发已登记能力 | `StructuredTool` 进入 `runtime.allTools`（或等价注入集合） |
+| **配置固化** | `get-config.sh --key tools --full` 拉真实 schema → 写入 `FlowDef.platformToolRefs`（或等价本地固化点）→ `createPlatformStructuredTool` | `StructuredTool`（由 runtime 按 schema 生成，**零包装代码**） |
+
+- `get-config` 返回的 `toolName` / `targetType` / `targetId` / 完整 `schema` 可固化到 `platformToolRefs`；`project.md` 只记决策摘要（targetId、真实工具名、接线方式、验证方式）。
+- **禁止**照 `search-apis.sh` 结果手抄半截 schema；**禁止**为已登记能力另写 fetch / `tool()` 包装（固化 schema ≠ 自写实现）。
+- 禁止硬编码 URL、密钥或鉴权值；schema 里的 `${...}` 占位符由运行环境解析。
+
+#### 用法（按图需要选一种或组合）
+
+| 用法 | 适用场景 | 接线方式 |
+|------|----------|----------|
+| **独立节点** | 固定管道点名调某一个 Plugin（如「每轮必搜」） | `createPlatformToolActionNode({ tools, toolName, args, write })` 或节点内对 `StructuredTool` 直接 `invoke` |
+| **局部工具集合** | 某段 ReAct / 子图只需部分平台工具 | `pickTools(tools, ["真实工具名"])` → `createToolExecNode({ tools: selected })`；或子图 `bindTools(selected)` |
+| **并入 allTools（可选）** | 默认 ReAct、聊天助手型、模型按需选工具 | 宿主注入或 `platformToolRefs` 装配进 `runtime.allTools` → `think.bindTools(runtime.allTools)` |
+
+- **默认 ReAct / 聊天助手型**：登记 + systemPrompt 点名即可，**不写图**；宿主注入或固化后并入 `allTools` 是便捷路径之一。
+- **固定管道 / 自建图**：优先按节点或局部集合接线；不必为了「能用平台工具」强行把所有工具挂进 `allTools`。
+- **调试确认**：若 `get-config` 能看到工具但运行未调用，先用 `flow-debugger` 查本次会话是否实际注入 / 固化工具（SSE/runtime 工具名、MCP server、日志中的 `Loaded MCP tools`）。
 
 > **示例免责**：下列 `targetId` / 工具名均为**结构占位**，非真实工具；真实值**必须**经 `search-apis.sh` → `add-tool.sh` → `get-config.sh --key tools --full` 获取，**禁止照抄本文数值 / 名称**。
 
-- 运行时工具名：优先用 `get-config` 返回的 `toolName`，否则按 `${targetType}_${targetId}` 自动拼（如 `Plugin_<id>`）；节点里用这个名字定位工具。
-- `get-config.sh --key tools --full` 返回的工具名 / schema 仅用于**确认真实名称并写进 `project.md`**（供收工 `--expect-tool` 断言），不再落盘成 flow spec。
-- 禁止硬编码 URL、密钥或鉴权值；schema 里的 `${...}` 占位符由运行环境解析。
+- 运行时工具名：优先用 `get-config` 返回的 `toolName`，否则按 `${targetType}_${targetId}` 自动拼（如 `Plugin_<id>`）；节点 / 集合里用这个名字定位工具。
 
 ### 三层工具名（生产易错 · `--expect-tool` 必读）
 
@@ -65,49 +82,55 @@
 - `--expect-tool` 用 **runtime/SSE 英文子串**（如实际返回的 `<tool>` 片段或 `Plugin_<id>`），**禁止**用中文登记名
 - `get-config --key tools --full` 后记录返回的 `toolName`，收工断言以 runtime 子串为准
 - 提示词里可写中文登记名引导模型；flow-debugger 断言用 runtime 子串
+- 若业务输出看似已调用工具但 `--expect-tool` 未命中，不算通过；用 flow-debugger `--show-trace` 或重新 `get-config --key tools --full` 确认 runtime/SSE 名称，修正断言后重跑同一主路径
 
-### 固定管道主动工具节点
+### 固定管道与工具集合示例
 
-需要"独立联网搜索节点 / 业务 API 节点"（固定管道里主动调用，而非等 ReAct 的 `tool_calls`）时，在自定义节点里从 `runtime.allTools` 按工具名定位后 direct-invoke（下例 `toolName` 为占位，真实值以 `get-config` 为准）：
+**独立节点**（`createPlatformToolActionNode`）：从固化或注入得到的 `StructuredTool[]` 中点名调用。
 
 ```typescript
-// src/app/graph.ts / src/app/nodes/：固定管道里主动调用平台工具
+// src/app/graph.ts：固定管道里主动调用平台工具（toolName 占位，真实值以 get-config 为准）
+import { createPlatformToolActionNode } from "../libs/nodes/index.js";
 import type { StructuredTool } from "@langchain/core/tools";
 
-function webSearchNode(allTools: StructuredTool[]) {
-  const tool = allTools.find((t) => t.name === "Plugin_<id>"); // 占位：用 get-config 返回的真实工具名
-  if (!tool) throw new Error("平台搜索工具未登记（先 add-tool）");
-  return async (s: MyStateType): Promise<Partial<MyStateType>> => {
-    const raw = await tool.invoke({ query: s.query, freshness: "noLimit" });
-    return { searchResult: raw };
-  };
+// platformTools：来自 platformToolRefs 固化或 runtime.allTools / 宿主注入子集
+function buildSearchNode(platformTools: StructuredTool[]) {
+  return createPlatformToolActionNode<MyStateType>({
+    tools: platformTools,
+    toolName: "Plugin_<id>",
+    args: (s) => ({ query: s.query, freshness: "noLimit" }),
+    write: ({ raw }, _s) => ({ searchResult: raw }),
+  });
 }
 ```
 
-需要让模型在某个 ReAct 子回路里按需发起 `tool_calls` 时，`createToolExecNode` 的 `tools` 参数必须是 `StructuredTool[]`，不要传字符串数组：
+**局部工具集合**（`createToolExecNode` + `pickTools`）：ReAct 子回路只暴露部分平台工具。
 
 ```typescript
 import { pickTools } from "./tool-bindings.js";
 import { createToolExecNode } from "../libs/nodes/index.js";
+import type { StructuredTool } from "@langchain/core/tools";
 
-const selectedTools = pickTools(allTools, ["Plugin_<id>"]);
-if (selectedTools.length === 0) {
-  throw new Error("平台工具未注入本次会话：Plugin_<id>");
+// availableTools：固化产物、allTools 子集或宿主注入集合均可
+function buildToolsNode(availableTools: StructuredTool[]) {
+  const selectedTools = pickTools(availableTools, ["Plugin_<id>"]);
+  if (selectedTools.length === 0) {
+    throw new Error("平台工具未就绪：Plugin_<id>");
+  }
+  return createToolExecNode<MyStateType>({ tools: selectedTools });
 }
-const toolsNode = createToolExecNode<MyStateType>({ tools: selectedTools });
 ```
 
-- **主动调用**：固定管道节点自行从 state 构造参数、按工具名定位并 `invoke`，适合"每轮必搜"这类固定步骤。
-- **`createToolExecNode`**：只执行上一条 `AIMessage.tool_calls`，适合 ReAct/tool-calling 回路；用 `pickTools(...)` 限定可调用工具集合（名字为空才表示全部，名字写错会得到空数组，必须显式报错）。
-- **默认 ReAct**：宿主注入后，`think.bindTools(runtime.allTools)` 会拿到平台工具，无需手写调用。
-- URL / 鉴权值不写入业务代码；真实密钥由运行环境注入。
+- **独立节点**：节点自行从 state 构造参数并 `invoke`，适合固定步骤（每轮必搜等）。
+- **`createToolExecNode`**：只执行上一条 `AIMessage.tool_calls`；用 `pickTools(...)` 限定局部集合（名字写错得空数组，须显式报错）。
+- **默认 ReAct**：宿主注入或固化后并入 `allTools` → `bindTools`，模型按需调用；无需手写 HTTP。
 
 ### 完成闸门
 
 | 场景 | 可否报「完成」 |
 |------|----------------|
 | 已执行平台搜索 + `get-config`，确无对应能力，已记录关键词与输出 | ✅ 可自写 app 工具或图内降级 |
-| 平台有命中，已 `add-tool`，固定管道需要时节点已按真实工具名从 `runtime.allTools` 引用 | ✅ |
+| 平台有命中，已 `add-tool`，且已固化或可被节点/集合引用（独立节点 / 局部集合 / 可选 allTools） | ✅ |
 | 未执行平台搜索就写外部能力 / 占位未接线 | ❌ 不得报完成 |
 | 平台有命中但未 `add-tool` | ❌ 不得报完成 |
 | 以「用户待配置」代替开发期登记 | ❌ 不得报完成 |
@@ -125,7 +148,7 @@ const toolsNode = createToolExecNode<MyStateType>({ tools: selectedTools });
 
 1. 完成 § 平台能力登记 步骤 1–4
 2. 追加关键词：`搜索` / `联网` / `web` / 业务领域词
-3. 命中 → `add-tool.sh`；固定管道需要时节点按真实工具名从 `runtime.allTools` 引用
+3. 命中 → `add-tool.sh`；固定管道需要时按真实工具名接线（独立节点 / 局部集合 / 可选 allTools）
 4. 记入 `project.md`
 
 ### 禁止
@@ -192,7 +215,7 @@ export const weatherTool = tool(
 
 ## Anti-patterns
 
-- ❌ 为已登记平台能力手写 fetch / `tool()` 包装
+- ❌ 为已登记平台能力手写 fetch / `tool()` 包装（固化 `platformToolRefs` schema 允许，自写 HTTP 禁止）
 - ❌ 不查平台能力就自写工具
 - ❌ 联网搜索未走 `search-apis.sh` 就 bash+curl 或自写搜索 API
 - ❌ 运行时代码调用 `4sandbox` 系平台内部端点（仅 dev-engineer-toolkit 脚本可用）

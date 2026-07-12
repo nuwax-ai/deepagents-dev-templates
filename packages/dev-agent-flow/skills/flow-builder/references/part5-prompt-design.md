@@ -23,6 +23,8 @@
 
 **禁止**：口头确认不落盘；收工平台 `systemPrompt` 仍空/占位；只改图不提炼用户已发描述。
 
+**污染防线**：设计 / 同步目标 Agent `systemPrompt` 时，禁止复制运行时自动追加区块，包括 `Available Skills`、`Subagents`、`Available MCP Servers`；也禁止写入 `dev-engineer-toolkit` / `flow-builder` / `flow-debugger` 等开发 Agent 技能名。目标提示词只写业务契约；能力清单由运行时按目标 Agent 实际配置自动追加。
+
 ### 何时触发（识别即做）
 
 - 用户首条或任意消息描述要什么 Agent / 对谁说话 / 什么风格

@@ -28,7 +28,7 @@
 | 需求 | 形态 / 做法 | 改图？ |
 |------|-------------|--------|
 | 开放追问、客服、通用助手、搜索总结；模糊未指明形态 | **聊天助手型（default）**：`flow.active: "default"` + 平台能力登记 + Part 5 systemPrompt；**不写图、不设节点**（已含 ReAct + 多轮记忆） | 否 |
-| 按需调平台 / MCP 工具 | 登记后宿主注入；默认图 `think.bindTools(runtime.allTools)` | 否 |
+| 按需调平台 / MCP 工具 | 登记后宿主注入或 get-config 固化；默认图可 `think.bindTools(runtime.allTools)` | 否 |
 | **必须**固定阶段顺序（先 A 再 B 再 C） | **固定流程型**：手写 `src/app/graph.ts`（Part 1 + Part 2） | 是 |
 | **必须** Send 并行、多源聚合、条件重试 | 手写图或子图（Part 2 + `docs/flow-patterns.md`） | 是 |
 | **必须** multi-turn HITL（人审 / 审批 / 定稿） | interrupt/resume（Part 1/2） | 是 |
@@ -55,7 +55,7 @@
 |----|------|
 | 1 | 加载 `dev-engineer-toolkit` + Part 3 § 平台能力登记 |
 | 2 | `search-apis.sh` / `search-skills.sh`（按关键词拆词） |
-| 3 | 命中 → `add-tool.sh` → `get-config --key tools --full` 确认真实工具名（图内节点从 `runtime.allTools` 引用） |
+| 3 | 命中 → `add-tool.sh` → `get-config --key tools --full` 确认真实工具名与 schema；按需固化或宿主注入后接线（独立节点 / 局部集合 / 可选 allTools） |
 | 4 | 无命中 → 记录关键词与输出，方可自写 app 工具 |
 | 5 | **`add-tool` 完成后 → 加载 `flow-debugger`**（收工前必跑 `debug.sh --with-logs`） |
 
@@ -94,7 +94,7 @@
 ### 聊天助手型（default flow）· 复用默认图
 
 1. `flow.active: "default"`，**不写图、不设置节点**（已内置 ReAct + 多轮对话上下文记忆）
-2. **需平台能力** → 须已完成上文「平台能力门禁」；`think.bindTools(runtime.allTools)` 自动绑定
+2. **需平台能力** → 须已完成上文「平台能力门禁」；宿主注入或固化后按需接线（默认 ReAct 可 `bindTools(allTools)`）
 3. Part 5 提炼 `systemPrompt`（理解用户消息）→ 平台同步 → Phase 3
 
 ### 固定流程型 · 手写 `src/app/graph.ts`（含流程内 HITL 人审）

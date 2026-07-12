@@ -44,7 +44,7 @@ version: "1.5.2"
 | 视角 | 脚本 | 佐证什么 |
 |------|------|----------|
 | 平台 SSE | `debug.sh` | 用户可见输出、工具 trace、`--expect-tool` 断言 |
-| runtime 内部 | `analyze-logs.sh` | `.logs/` 错误、flowStatus、失败工具、模型/permission 问题 |
+| runtime 内部 | `analyze-logs.sh` | 当前项目根 `.logs/` 下的错误、flowStatus、失败工具、模型/permission 问题 |
 
 **收工推荐**（一步完成双证）：
 
@@ -53,6 +53,14 @@ version: "1.5.2"
 ```
 
 或分步：`debug.sh` 后紧接 `analyze-logs.sh --since 10`（有 `devConversationId` 时加 `--session <id>`）。**两者均 exit 0** 且 stderr 出现 `日志佐证通过` / `[结论] 日志正常` 方可报完成。SSE 绿但日志红 → **仍判失败**。
+
+**断言 / 日志工具失败不能人工绕过**：
+
+- `--expect-tool` 未命中，即使 agent 文本看起来用了工具，也不能报完成；先用 `--show-trace` 或 `get-config --key tools --full` 找到 runtime/SSE 英文工具名子串，修正 `--expect-tool` 后重跑同一主路径。
+- `analyze-logs` 找不到日志或文件名不匹配时，先扩大 `--since` / 指定 `--session`，或用 `analyze-logs.sh --file <实际日志文件>` 重跑；`cat` / 手工浏览日志只能辅助定位，不能替代 `[结论]` / `[flow 状态]` / `[工具调用]` 摘要。
+- 若脚本本身不支持当前日志格式，修脚本或明确报告调试工具阻塞；不得把“业务输出正确”写成 flow-debugger 通过。
+
+**日志目录约定**：开发阶段会话调试日志写入当前工作目录 / 目标项目根的 `.logs/`。`analyze-logs` 默认会找 `<cwd>/.logs` 并向上定位项目根；若从 skill 目录或其他目录执行导致误判，显式传 `--dir <项目根>/.logs` 或 `--file <实际日志文件>`。
 
 ## When to Use
 
@@ -93,7 +101,7 @@ version: "1.5.2"
 | `--wait-idle-timeout` / `--wait-idle-interval` | `--wait-idle` 的等待超时/轮询间隔（默认 120s / 2s） |
 | `--after-stop-wait` | 发送前稳定等待 N 秒，适合刚 cancel/stop 后复用同会话 |
 | `--allow-busy` | 允许向 `EXECUTING` 会话继续发送（仅用于并发/冲突复现） |
-| `--expect-tool` | 期望被调用的**runtime/SSE 工具名子串**（断言 `componentExecuteResults` 命中且 success；禁止中文登记名，见 flow-builder Part 3 § 三层工具名） |
+| `--expect-tool` | 期望被调用的**runtime/SSE 工具名子串**（断言 `componentExecuteResults` 命中且 success；禁止中文登记名，见 flow-builder Part 3 § 三层工具名；未命中时用 `--show-trace` / `get-config --key tools --full` 修正后重跑） |
 | `--auto-approve` | 自动批准权限审批（选首个 allow option） |
 | `--ask-marker` | 回答 ask-question：把 `<!--nuwax-mcp-ask-request-id:<requestId>-->` 追加到 message 末尾 |
 | `--variables` | 变量参数（JSON 字符串） |
@@ -136,11 +144,14 @@ version: "1.5.2"
 ```bash
 ./scripts/analyze-logs.sh --since 10               # 调试后分析最近日志（推荐）
 ./scripts/analyze-logs.sh --session <devConversationId>
+./scripts/analyze-logs.sh --dir <project-root>/.logs
 ./scripts/analyze-logs.sh                # 分析最新 .logs/ 日志
 ./scripts/analyze-logs.sh --file <path>  # 指定文件
 ```
 
 stderr 须出现 **`[结论] 日志正常`**（exit 0）才可报通过；`[结论] 发现问题`（exit 4）即失败，即使 SSE 已通过。
+
+若默认查找不到日志但你已定位到实际日志文件，必须使用 `--file <path>` 让 `analyze-logs` 产出结论；直接 `cat` 日志不算收工证据。
 
 **`[性能]` 加载耗时**：日志含 runtime 装配各阶段计时时，会额外输出 `[性能] 加载总耗时≈<n>ms | <阶段>=<n>ms | ...`（按耗时降序）。用于定位启动瓶颈（常见大头：`mcp.getTools` / `runtime.context`）。该追踪由 flow-ts 侧全局 env 开关 `PERF_TRACE` 控制，**默认开启**（随时可排查性能问题）；无此段说明日志不含 perf 行（如已显式关闭），不影响成败判定。
 

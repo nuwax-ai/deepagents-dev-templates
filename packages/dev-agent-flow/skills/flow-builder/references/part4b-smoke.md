@@ -83,10 +83,12 @@ HITL / approval flow：
 - `debug.sh` exit 4：SSE 真实执行不通过，**或 SSE 绿但日志佐证失败**（`--with-logs` 时 analyze 发现错误 / 找不到日志）。
 - `debug.sh` exit 5：遇权限审批或 ask-question，必须响应后续接，不可直接报完成。
 - `debug.sh` exit 3：后端 4sandbox 调试端点未就绪 / SSE 失败 / 超时。向用户说明端到端调试受后端 ready 阻塞，但静态三连仍需完成。
-- 工具登记了但 `--expect-tool` 未命中。
+- 工具登记了但 `--expect-tool` 未命中；即使文本答案像是工具结果，也必须用 `--show-trace` / `get-config --key tools --full` 修正 runtime/SSE 工具名子串后重跑。
 - LLM 兜底回答有文本，但没有真实调用应调用的平台能力。
 
 ## 日志佐证（收工必经）
+
+开发阶段会话调试日志写在当前工作目录 / 目标项目根 `.logs/` 下。`analyze-logs` 默认会尝试定位该目录；若从 skill 目录执行或 session 文件名不匹配，显式传 `--dir <project-root>/.logs` 或 `--file <actual-log-path>` 后重跑。
 
 ```bash
 # 推荐：一步双证
@@ -95,6 +97,9 @@ HITL / approval flow：
 # 或分步
 ./scripts/debug.sh --message "…" --expect-tool search
 ./scripts/analyze-logs.sh --since 10 --session <devConversationId>
+./scripts/analyze-logs.sh --dir <project-root>/.logs
+# 默认匹配不到日志文件时，用实际路径重新跑 analyzer；cat 只能辅助定位，不能替代 analyzer 结论
+./scripts/analyze-logs.sh --file <actual-log-path>
 ```
 
 报完成须贴 stderr 中的 **`[结论]`**、**`[flow 状态]`**、**`[工具调用]`** 摘要；缺一不可。
