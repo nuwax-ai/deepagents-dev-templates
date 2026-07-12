@@ -109,10 +109,13 @@ export async function createFlowRuntime(
   // 系统提示词追加「Available Skills」「Subagents」「MCP Servers」清单。
   const promptMark = markStart("systemPrompt.resolve");
   const baseSystemPrompt = resolveSystemPrompt(appConfig, options.sessionConfig, workspaceRoot);
+  const mcpServersSection = renderMcpServersSection(ctx.mcpServerToolLists);
+  const skillsSection = renderSkillsSection(skills, progressiveSkills);
+  const subagentsSection = renderSubagentsSection(subAgents);
   const sections = [
-    renderMcpServersSection(ctx.mcpServerToolLists),
-    renderSkillsSection(skills, progressiveSkills),
-    renderSubagentsSection(subAgents),
+    mcpServersSection,
+    skillsSection,
+    subagentsSection,
   ].filter(Boolean);
   const systemPrompt = sections.length
     ? `${baseSystemPrompt}\n\n${sections.join("\n\n")}`
@@ -125,8 +128,8 @@ export async function createFlowRuntime(
     systemPromptPath: appConfig.agent.systemPromptPath,
     workspaceRoot,
     finalSystemPromptChars: systemPrompt.length,
-    skillsSectionChars: sections[0]?.length,
-    subagentsSectionChars: sections[1]?.length,
+    skillsSectionChars: skillsSection?.length,
+    subagentsSectionChars: subagentsSection?.length,
   });
 
   // 文件后端 checkpointer(跨重启恢复 + interrupt/resume 持久化)。

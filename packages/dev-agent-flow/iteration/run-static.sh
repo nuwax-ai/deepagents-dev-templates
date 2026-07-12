@@ -18,6 +18,7 @@ run() {
 run check-manifest
 run check-prompts
 run check-skills
+run check-no-junk
 run check-mcp-usage
 run check-case-schema
 run check-platform-drift
