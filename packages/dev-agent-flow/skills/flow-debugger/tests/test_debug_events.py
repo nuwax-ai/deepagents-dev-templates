@@ -86,31 +86,73 @@ class ConversationIdResolveTests(unittest.TestCase):
                 self.assertEqual(debug_http.resolve_conversation_id(), "env-id")
 
 
+class DebugConversationSafetyTests(unittest.TestCase):
+    def test_default_refuses_executing_conversation(self) -> None:
+        args = argparse.Namespace(
+            allow_busy=False,
+            wait_idle=False,
+            after_stop_wait=0,
+            wait_idle_timeout=5.0,
+            wait_idle_interval=0.1,
+        )
+        with mock.patch.object(debug, "fetch_conversation_task_status", return_value="EXECUTING"):
+            with self.assertRaises(SystemExit) as ctx:
+                debug._guard_conversation_before_send(args, "1555771")
+        self.assertEqual(ctx.exception.code, 4)
+
+    def test_allow_busy_skips_status_check(self) -> None:
+        args = argparse.Namespace(
+            allow_busy=True,
+            wait_idle=False,
+            after_stop_wait=0,
+            wait_idle_timeout=5.0,
+            wait_idle_interval=0.1,
+        )
+        with mock.patch.object(debug, "fetch_conversation_task_status") as status:
+            debug._guard_conversation_before_send(args, "1555771")
+        status.assert_not_called()
+
+    def test_wait_idle_polls_until_terminal(self) -> None:
+        args = argparse.Namespace(
+            allow_busy=False,
+            wait_idle=True,
+            after_stop_wait=0,
+            wait_idle_timeout=5.0,
+            wait_idle_interval=0.1,
+        )
+        with mock.patch.object(
+            debug,
+            "fetch_conversation_task_status",
+            side_effect=["EXECUTING", "COMPLETE"],
+        ):
+            with mock.patch("time.sleep"):
+                debug._guard_conversation_before_send(args, "1555771")
+
+    def test_create_dev_conversation_returns_id(self) -> None:
+        with mock.patch.object(debug_http, "dev_agent_id", return_value=123):
+            with mock.patch.object(
+                debug_http,
+                "api_request",
+                return_value=(200, {"code": "0000", "success": True, "data": {"id": 1555999}}),
+            ):
+                self.assertEqual(debug_http.create_dev_conversation(), "1555999")
+
+
 class SessionCommandTests(unittest.TestCase):
     def test_cmd_new_creates_conversation(self) -> None:
         import session  # noqa: E402
 
-        with mock.patch.object(session, "dev_agent_id", return_value=123):
-            with mock.patch.object(
-                session,
-                "api_request",
-                return_value=(200, {"code": "0000", "success": True, "data": {"id": 1555999}}),
-            ):
-                with mock.patch("sys.stdout", new_callable=io.StringIO) as out:
-                    session.cmd_new(argparse.Namespace(quiet=True))
+        with mock.patch.object(session, "create_dev_conversation", return_value="1555999"):
+            with mock.patch("sys.stdout", new_callable=io.StringIO) as out:
+                session.cmd_new(argparse.Namespace(quiet=True))
         self.assertEqual(out.getvalue().strip(), "1555999")
 
     def test_cmd_new_errors_when_id_missing(self) -> None:
         import session  # noqa: E402
 
-        with mock.patch.object(session, "dev_agent_id", return_value=123):
-            with mock.patch.object(
-                session,
-                "api_request",
-                return_value=(200, {"code": "0000", "success": True, "data": {}}),
-            ):
-                with self.assertRaises(SystemExit) as ctx:
-                    session.cmd_new(argparse.Namespace(quiet=True))
+        with mock.patch.object(session, "create_dev_conversation", side_effect=SystemExit(4)):
+            with self.assertRaises(SystemExit) as ctx:
+                session.cmd_new(argparse.Namespace(quiet=True))
         self.assertEqual(ctx.exception.code, 4)
 
     def test_cmd_refresh_quiet(self) -> None:
@@ -135,6 +177,20 @@ class SessionCommandTests(unittest.TestCase):
                         argparse.Namespace(previous="1555771", timeout=5.0, interval=0.1, quiet=False)
                     )
         self.assertIn("1555888", out.getvalue())
+
+    def test_cmd_cancel_prints_next_step_hint(self) -> None:
+        import session  # noqa: E402
+
+        with mock.patch.object(session, "resolve_conversation_id", return_value="1555771"):
+            with mock.patch.object(
+                session,
+                "api_request",
+                return_value=(200, {"code": "0000", "success": True}),
+            ):
+                with mock.patch("sys.stderr", new_callable=io.StringIO) as err:
+                    session.cmd_cancel(argparse.Namespace(conversation=""))
+        self.assertIn("debug.sh --wait-idle", err.getvalue())
+        self.assertIn("debug.sh --new-session", err.getvalue())
 
 
 if __name__ == "__main__":

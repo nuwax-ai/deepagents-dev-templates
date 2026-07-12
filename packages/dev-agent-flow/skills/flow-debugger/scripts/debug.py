@@ -24,10 +24,13 @@ from debug_http import (
     PERMISSION_RESPONSE_PATH,
     api_request,
     configure_stdio_utf8,
-    resolve_conversation_id,
+    create_dev_conversation,
     ensure_http_ok,
+    fetch_conversation_task_status,
+    is_executing_task_status,
     is_terminal_event,
     read_text_option,
+    resolve_conversation_id,
     sse_request,
 )
 
@@ -377,6 +380,85 @@ def run_log_corroboration(conversation_id: str, since_minutes: float) -> int:
     return subprocess.run(cmd, cwd=os.getcwd()).returncode
 
 
+def _wait_for_idle_conversation(
+    conv: str,
+    timeout: float,
+    interval: float,
+) -> str | None:
+    """轮询会话状态直到不再 EXECUTING；返回最后状态。"""
+    deadline = time.monotonic() + max(interval, timeout)
+    while True:
+        status = fetch_conversation_task_status(conv)
+        if not is_executing_task_status(status):
+            return status
+        if time.monotonic() >= deadline:
+            print(
+                f"[ERROR] 等待会话空闲超时：conversationId={conv} 仍为 EXECUTING。",
+                file=sys.stderr,
+            )
+            sys.exit(3)
+        print(
+            f"[等待] conversationId={conv} 仍在 EXECUTING，{interval:.1f}s 后重试…",
+            file=sys.stderr,
+        )
+        time.sleep(interval)
+
+
+def _guard_conversation_before_send(args, conv: str) -> None:
+    """默认阻止向仍在执行中的 dev 会话继续写 prompt。"""
+    if not conv or args.allow_busy:
+        return
+    if args.after_stop_wait > 0:
+        print(
+            f"[等待] stop 后稳定等待 {args.after_stop_wait:.1f}s 再检查会话状态…",
+            file=sys.stderr,
+        )
+        time.sleep(args.after_stop_wait)
+    if args.wait_idle:
+        status = _wait_for_idle_conversation(
+            conv,
+            timeout=args.wait_idle_timeout,
+            interval=max(0.5, args.wait_idle_interval),
+        )
+        if status:
+            print(
+                f"[DEBUG] conversationId={conv} 当前状态={status}，继续发送。",
+                file=sys.stderr,
+            )
+        else:
+            print(
+                f"[DEBUG] conversationId={conv} 未返回 taskStatus，继续发送；"
+                "如需干净验证推荐 --new-session。",
+                file=sys.stderr,
+            )
+        return
+
+    status = fetch_conversation_task_status(conv)
+    if is_executing_task_status(status):
+        print(
+            f"[ERROR] 当前 devConversationId={conv} 仍在 EXECUTING，默认拒绝连续发送。",
+            file=sys.stderr,
+        )
+        print(
+            "[提示] 可等待结束后重试，或使用 session.sh cancel 后 debug.sh --wait-idle，"
+            "或用 session.sh new / debug.sh --new-session 开新会话；"
+            "确需测试并发/冲突场景时显式加 --allow-busy。",
+            file=sys.stderr,
+        )
+        sys.exit(4)
+    if status:
+        print(
+            f"[DEBUG] conversationId={conv} 当前状态={status}，继续发送。",
+            file=sys.stderr,
+        )
+    else:
+        print(
+            f"[DEBUG] conversationId={conv} 未返回 taskStatus，继续发送；"
+            "如需干净验证推荐 --new-session。",
+            file=sys.stderr,
+        )
+
+
 # === 主流程 =================================================================
 
 
@@ -396,6 +478,39 @@ def main() -> None:
         "--conversation",
         default="",
         help="会话 ID（覆盖 CONVERSATION_ID env；默认挂到用户 agent-dev 预览会话）",
+    )
+    p.add_argument(
+        "--new-session",
+        action="store_true",
+        help="发送前先新建 dev 调试会话（推荐用于干净收工验证）",
+    )
+    p.add_argument(
+        "--wait-idle",
+        action="store_true",
+        help="当前会话仍在 EXECUTING 时等待终态再发送，而不是默认拒绝",
+    )
+    p.add_argument(
+        "--wait-idle-timeout",
+        type=float,
+        default=120.0,
+        help="--wait-idle 最长等待秒数（默认 120）",
+    )
+    p.add_argument(
+        "--wait-idle-interval",
+        type=float,
+        default=2.0,
+        help="--wait-idle 轮询间隔秒（默认 2）",
+    )
+    p.add_argument(
+        "--after-stop-wait",
+        type=float,
+        default=0.0,
+        help="发送前先稳定等待 N 秒，适合 cancel/stop 后复用同会话",
+    )
+    p.add_argument(
+        "--allow-busy",
+        action="store_true",
+        help="允许向 EXECUTING 会话继续发送（仅用于并发/冲突复现）",
     )
     p.add_argument(
         "--expect-tool",
@@ -446,6 +561,13 @@ def main() -> None:
     )
     args = p.parse_args()
 
+    if args.new_session and args.conversation.strip():
+        print(
+            "[ERROR] --new-session 不能与 --conversation 同时使用。",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     message = read_text_option(
         args.message or None, args.message_file or None, "message"
     )
@@ -457,8 +579,14 @@ def main() -> None:
     if args.ask_marker:
         message = message + f"\n<!--nuwax-mcp-ask-request-id:{args.ask_marker}-->"
 
-    # 会话：--conversation > GET devConversationId > CONVERSATION_ID env
-    conv = resolve_conversation_id(args.conversation) or ""
+    # 会话：--new-session > --conversation > GET devConversationId > CONVERSATION_ID env
+    if args.new_session:
+        conv = create_dev_conversation()
+        print(f"[DEBUG] 已新建调试会话 devConversationId={conv}", file=sys.stderr)
+    else:
+        conv = resolve_conversation_id(args.conversation) or ""
+    _guard_conversation_before_send(args, conv)
+
     # ConversationChatParams：conversationId + message + debug（agent-dev 调试语义）
     body: dict = {"message": message, "debug": True}
     if conv:

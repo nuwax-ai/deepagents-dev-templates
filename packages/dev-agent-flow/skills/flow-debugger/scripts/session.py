@@ -22,10 +22,10 @@ import time
 
 from debug_http import (
     AGENT_CONFIG_PATH,
-    CONVERSATION_CREATE_PATH,
     CONVERSATION_STOP_PATH,
     api_request,
     configure_stdio_utf8,
+    create_dev_conversation,
     dev_agent_id,
     ensure_http_ok,
     fetch_dev_conversation_id,
@@ -35,17 +35,7 @@ from debug_http import (
 
 
 def cmd_new(args) -> None:
-    aid = dev_agent_id()
-    status, payload = api_request(
-        "POST",
-        CONVERSATION_CREATE_PATH,
-        body={"agentId": aid, "devMode": True},
-    )
-    ensure_http_ok(status, payload)
-    cid = str((payload.get("data") or {}).get("id") or "").strip()
-    if not cid:
-        print("[ERROR] create 成功但响应缺 data.id。", file=sys.stderr)
-        sys.exit(4)
+    cid = create_dev_conversation()
     if args.quiet:
         print(cid)
     else:
@@ -123,6 +113,11 @@ def cmd_cancel(args) -> None:
     status, payload = api_request("POST", path)
     ensure_http_ok(status, payload)
     print(f"[OK] 已取消会话 {cid}")
+    print(
+        "[提示] 若继续同会话，请先用 debug.sh --wait-idle 等待终态；"
+        "若要干净验证，推荐 session.sh new 或 debug.sh --new-session。",
+        file=sys.stderr,
+    )
 
 
 def main() -> None:

@@ -16,6 +16,7 @@
 #   ./scripts/session.sh wait --previous 1555771
 #   ./scripts/session.sh current
 #   ./scripts/session.sh cancel
+#   # cancel 后继续同会话请先 ./scripts/debug.sh --wait-idle；干净验证优先 new/new-session
 #
 # 环境变量: PLATFORM_BASE_URL, SANDBOX_ACCESS_KEY, DEV_AGENT_ID
 # 退出码: 0 成功 | 1 参数错 | 2 平台未就绪 | 3 HTTP 失败/等待超时 | 4 业务错误

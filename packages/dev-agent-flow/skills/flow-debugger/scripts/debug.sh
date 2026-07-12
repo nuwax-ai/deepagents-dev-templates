@@ -6,6 +6,8 @@
 #
 # 用法:
 #   ./scripts/debug.sh --message "你是谁？"
+#   ./scripts/debug.sh --new-session --message "干净验证"
+#   ./scripts/debug.sh --wait-idle --message "同会话续接"
 #   ./scripts/debug.sh --message-file prompts/test.md
 #   ./scripts/debug.sh --message "搜索今天的新闻" --expect-tool search --with-logs
 #   ./scripts/debug.sh --message "第二轮" --conversation <conversationId>
@@ -15,7 +17,7 @@
 #
 # 环境变量: PLATFORM_BASE_URL, SANDBOX_ACCESS_KEY, DEV_AGENT_ID, CONVERSATION_ID(可选, 沙箱注入)
 #
-# 退出码: 0 通过 | 1 参数错误 | 2 平台未就绪 | 3 HTTP/SSE 失败 | 4 调试不通过
+# 退出码: 0 通过 | 1 参数错误 | 2 平台未就绪 | 3 HTTP/SSE 失败 | 4 调试不通过/会话忙
 
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
