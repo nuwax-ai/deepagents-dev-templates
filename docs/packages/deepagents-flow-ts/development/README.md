@@ -145,5 +145,5 @@ development/
 
 | 文档 | 位置 |
 | --- | --- |
-| 开发 Agent（Flow 版）提示词 | `packages/dev-agent-flow/system-prompt.md` |
+| 开发 Agent（Flow 版）提示词 | `packages/dev-agent-flow/orchestration/system-prompt.md` |
 | app-ts ACP 测试方案 | `docs/packages/deepagents-app-ts/development/acp-test-plan.md` |

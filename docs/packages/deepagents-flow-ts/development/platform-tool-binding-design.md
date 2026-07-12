@@ -140,8 +140,8 @@
 
 | 文件 | 作用 |
 | --- | --- |
-| `packages/dev-agent-flow/skills/dev-engineer-toolkit/` | 平台搜索、注册、配置摘要 |
-| `packages/dev-agent-flow/skills/flow-builder/references/part3-tools-config.md` | 平台能力登记与节点工具引用流程 |
+| `packages/dev-agent-flow/orchestration/skills/dev-engineer-toolkit/` | 平台搜索、注册、配置摘要 |
+| `packages/dev-agent-flow/orchestration/skills/flow-builder/references/part3-tools-config.md` | 平台能力登记与节点工具引用流程 |
 | `packages/deepagents-flow-ts/scripts/scaffold/schema.mjs` | `spec.tools[]` 登记表 schema（开发期记录） |
 | `packages/deepagents-flow-ts/src/app/tool-bindings.ts` | `pickTools(allTools, names[])`：按工具名取子集 |
 | `packages/deepagents-flow-ts/src/libs/nodes/platform-tool.ts` | 固定管道主动工具调用节点（按 `toolName` 定位） |

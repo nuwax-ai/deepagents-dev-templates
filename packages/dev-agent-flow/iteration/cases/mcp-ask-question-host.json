@@ -1,0 +1,12 @@
+{
+  "id": "mcp-ask-question-host",
+  "dimension": "mcp-ask-question",
+  "title": "ask-question 宿主用法契约（编排页可不挂 Mcp）",
+  "description": "L0/manifest.hostDefaults 声明结构化提问用法；编排页无 ask-question type=Mcp 不得判失败。模板 mcp.default.json 仅核对存在。",
+  "checks": ["manifest", "mcp-usage"],
+  "expect": {
+    "toolName": "nuwax_ask_question",
+    "requirePlatformMcp": false,
+    "templateBuiltinPath": "../deepagents-flow-ts/config/mcp.default.json"
+  }
+}

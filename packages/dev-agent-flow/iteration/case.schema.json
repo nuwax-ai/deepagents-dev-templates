@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://deepagents.dev/schemas/dev-agent-flow/iteration.case.schema.json",
+  "title": "Dev Agent Flow Harness Case",
+  "type": "object",
+  "required": ["id", "dimension", "title", "checks"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "dimension": {
+      "type": "string",
+      "enum": ["prompt", "skill", "mcp-context7", "mcp-ask-question"]
+    },
+    "title": { "type": "string", "minLength": 1 },
+    "description": { "type": "string" },
+    "checks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "enum": [
+          "prompts",
+          "skills",
+          "mcp-usage",
+          "platform-drift",
+          "manifest"
+        ]
+      }
+    },
+    "expect": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

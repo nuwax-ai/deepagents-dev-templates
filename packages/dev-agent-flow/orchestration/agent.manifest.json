@@ -1,0 +1,110 @@
+{
+  "$schema": "./agent.manifest.schema.json",
+  "version": "1.0.0",
+  "agent": {
+    "name": "智能体开发",
+    "platformType": "TaskAgent",
+    "description": "【交付期望清单】智能体开发 Agent 编排后台应对齐的 prompts/skills/MCP 用法。仓内交付真源在 orchestration/（system-prompt.md / user-prompt.md / skills/*，人工同步后台）。迭代过程写在 iteration/ITERATION.md，不随本文件下发"
+  },
+  "prompts": {
+    "system": {
+      "path": "system-prompt.md",
+      "platformField": "systemPrompt",
+      "requiredSections": [
+        "SYSTEM_INSTRUCTIONS",
+        "BOOTSTRAP_FIRST",
+        "SESSION_CLOSE",
+        "OUTPUT_FORMAT"
+      ]
+    },
+    "user": {
+      "path": "user-prompt.md",
+      "platformField": "userPrompt",
+      "requiredSections": [
+        "BOOTSTRAP_FIRST",
+        "SESSION_CLOSE",
+        "OUTPUT_FORMAT"
+      ]
+    }
+  },
+  "skills": [
+    {
+      "name": "flow-builder",
+      "path": "skills/flow-builder/SKILL.md",
+      "platformComponentType": "Skill"
+    },
+    {
+      "name": "dev-engineer-toolkit",
+      "path": "skills/dev-engineer-toolkit/SKILL.md",
+      "platformComponentType": "Skill"
+    },
+    {
+      "name": "flow-debugger",
+      "path": "skills/flow-debugger/SKILL.md",
+      "platformComponentType": "Skill"
+    }
+  ],
+  "mcp": {
+    "devAgent": {
+      "servers": [
+        {
+          "name": "context7",
+          "platformComponentType": "Mcp",
+          "tune": "usage-only",
+          "tools": ["resolve-library-id", "query-docs"],
+          "toolOrder": ["resolve-library-id", "query-docs"],
+          "whenToUse": [
+            "查 LangGraph / 依赖库最新文档",
+            "内置技能未覆盖的第三方库 API 签名确认"
+          ],
+          "forbid": [
+            "写入目标 Agent systemPrompt",
+            "替代 flow-builder / dev-engineer-toolkit 已覆盖的框架细则"
+          ],
+          "l0Markers": [
+            "resolve-library-id",
+            "query-docs",
+            "Context7"
+          ]
+        }
+      ]
+    },
+    "hostDefaults": {
+      "ask-question": {
+        "tune": "usage-only",
+        "hosts": ["NuwaClaw", "rcoder-cloud"],
+        "toolName": "nuwax_ask_question",
+        "referenceRepo": "https://github.com/nuwax-ai/nuwax-ask-question-mcp",
+        "referencePolicy": "read-only-for-config-and-tools",
+        "whenToUse": [
+          "确认/多选/审批",
+          "HITL 结构化提问"
+        ],
+        "forbid": [
+          "要求用户配置 ask-question MCP",
+          "写成编排页挂载项",
+          "修改 nuwax-ask-question-mcp 源码"
+        ],
+        "l0Markers": [
+          "ask-question",
+          "nuwax_ask_question",
+          "结构化提问"
+        ]
+      }
+    },
+    "templateBuiltin": {
+      "ask-question": {
+        "path": "../deepagents-flow-ts/config/mcp.default.json",
+        "serverConfig": {
+          "command": "npx",
+          "args": ["-y", "nuwax-ask-question-mcp@latest"]
+        },
+        "note": "与宿主并存；session-wins 常见；不作 iteration 挂载 drift 项"
+      }
+    }
+  },
+  "platformExtras": {
+    "ignoreTypesInDrift": ["Page", "Event", "Hook", "Variable", "Model"],
+    "note": "Page/Event/Hook/Variable/Model 不在本 iteration 四维调优范围"
+  }
+}

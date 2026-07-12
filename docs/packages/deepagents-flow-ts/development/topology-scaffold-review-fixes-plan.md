@@ -122,7 +122,7 @@
 - `src/app/flows/grade-redo/graph.ts`、`src/app/flows/router-gate/graph.ts`（#8,12）
 - `src/libs/topologies/rag/nodes/generate.ts`、`rewrite.ts`、`src/libs/topologies/rag/graph.ts`（#10,15）
 - `src/libs/topologies/reflect.ts`、`src/app/topology.ts`（仅注释，#12）
-- `packages/dev-agent-flow/skills/flow-builder/SKILL.md`、`docs/node-catalog.md`（#14）
+- `packages/dev-agent-flow/orchestration/skills/flow-builder/SKILL.md`、`docs/node-catalog.md`（#14）
 
 ## 验证
 

@@ -3,7 +3,7 @@
 > **状态**：✅ 现行（`deepagents-flow-ts` **v1.9.1** 功能落地；**v1.9.2–v1.9.4** checkpoint / systemPrompt 见 [checkpoint-integrity-and-prompt-resolution.md](./checkpoint-integrity-and-prompt-resolution.md)）  
 > **受众**：Monorepo 维护者；改 `task` 工具、subagent 流式、`write_todos`、ACP `plan` / `messageId` 时必读。  
 > **关联源码**：[`task.tool.ts`](../../../../packages/deepagents-flow-ts/src/app/task.tool.ts)、[`todo.tool.ts`](../../../../packages/deepagents-flow-ts/src/libs/tools/todo.tool.ts)、[`plan-coordinator.ts`](../../../../packages/deepagents-flow-ts/src/surfaces/acp/plan-coordinator.ts)、[`server.ts`](../../../../packages/deepagents-flow-ts/src/surfaces/acp/server.ts)（`buildAcpCallbacks`）、[`tools.ts`](../../../../packages/deepagents-flow-ts/src/libs/nodes/tools.ts)（`langgraph_tool_call_id` 透传）  
-> **使用者排障**：[troubleshooting.md § task/subagent](../../../../packages/deepagents-flow-ts/docs/troubleshooting.md)、[dev-agent-flow Part 6](../../../../packages/dev-agent-flow/skills/flow-builder/references/part6-subagent.md)
+> **使用者排障**：[troubleshooting.md § task/subagent](../../../../packages/deepagents-flow-ts/docs/troubleshooting.md)、[dev-agent-flow Part 6](../../../../packages/dev-agent-flow/orchestration/skills/flow-builder/references/part6-subagent.md)
 
 本文记录 **2026-07** 一轮 subagent / ACP 能力增强：内置 `write_todos`、并行 `task` 流式分桶、会话级 Plan 合并、子 agent 输出兜底与联网委派约定，以及后续 code-review 修复项。
 

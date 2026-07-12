@@ -3,5 +3,11 @@
   "version": "0.3.1",
   "private": true,
   "description": "开发 Agent（Flow 版）的系统提示词和 Skills 配置 — 基于 nuwax-flow-ts 工作流编排模板的 Agent 开发助手",
-  "license": "MIT"
+  "license": "MIT",
+  "scripts": {
+    "iteration:static": "bash iteration/run-static.sh",
+    "iteration:drift": "python3 iteration/checks/check-platform-drift.py",
+    "harness:static": "pnpm run iteration:static",
+    "harness:drift": "pnpm run iteration:drift"
+  }
 }

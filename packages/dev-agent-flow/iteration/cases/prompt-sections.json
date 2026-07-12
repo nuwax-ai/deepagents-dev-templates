@@ -1,0 +1,11 @@
+{
+  "id": "prompt-sections",
+  "dimension": "prompt",
+  "title": "系统/用户提示词分区与平台字段对齐",
+  "description": "仓内 system-prompt.md / user-prompt.md 含必选分区；平台 drift 比全文或 hash。",
+  "checks": ["manifest", "prompts", "platform-drift"],
+  "expect": {
+    "systemSections": ["SYSTEM_INSTRUCTIONS", "BOOTSTRAP_FIRST", "SESSION_CLOSE", "OUTPUT_FORMAT"],
+    "userMarkers": ["BOOTSTRAP_FIRST", "SESSION_CLOSE", "OUTPUT_FORMAT"]
+  }
+}
