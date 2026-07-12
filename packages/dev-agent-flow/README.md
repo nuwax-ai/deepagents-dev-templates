@@ -1,5 +1,7 @@
 # 开发 Agent 配置（Flow 版）
 
+> **怎么迭代修化配置？** → 先读 [**HOWTO.md**](HOWTO.md)（改 `orchestration/` 的完整步骤）。
+
 ## 概述
 
 本包包含 **开发 Agent（Flow 版）** 的系统提示词和 Skills 配置。开发 Agent 运行在云端开发环境，职责是帮开发者基于 `nuwax-flow-ts` 工作流编排模板创建场景 Agent。
@@ -37,6 +39,7 @@
 
 ```
 packages/dev-agent-flow/
+├── HOWTO.md                      # 【必读】怎么迭代修化 orchestration
 ├── orchestration/                # 【交付】人工同步编排后台
 │   ├── system-prompt.md
 │   ├── user-prompt.md
@@ -61,15 +64,18 @@ packages/dev-agent-flow/
 
 ## 迭代层（`iteration/` · 不下发）
 
-[`iteration/`](iteration/) 记录需求确认、优化目标、迭代方案，并跑静态检查 / drift。**不自动下发**后台。
+[`iteration/`](iteration/) 记录需求确认、优化目标、迭代方案，并跑静态检查 / drift。**不自动下发**后台。  
+工作目录模板 [`deepagents-flow-ts`](../deepagents-flow-ts)：**默认不动**；为与开发 Agent 规则对齐**可以改**，并记入版本清单。
 
 | 入口 | 说明 |
 |------|------|
+| [iteration/VERSIONS.md](iteration/VERSIONS.md) | 交付配置版本清单（回朔；含可选模板变更） |
 | [iteration/ITERATION.md](iteration/ITERATION.md) | 需求确认 / 优化目标 / 方案台账 |
 | `pnpm iteration:static` | manifest / prompts / skills / mcp-usage / cases / sample drift |
 | `pnpm iteration:drift -- --platform <agent-detail.json>` | 对照平台编排页导出做四维 drift |
 
-细则 → [iteration/README.md](iteration/README.md)。
+细则 → [iteration/README.md](iteration/README.md)。  
+**操作手册** → [HOWTO.md](HOWTO.md)。
 
 ## 平台绑定（推荐 2 个 skill）
 

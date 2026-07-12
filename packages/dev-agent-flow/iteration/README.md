@@ -3,9 +3,13 @@
 本目录 = **需求确认 / 优化目标 / 迭代方案台账** + **静态门禁**。  
 **不是**交付包，**不**进入智能体开发 Agent 编排后台。
 
+**怎么改交付配置？** 见包根 [**HOWTO.md**](../HOWTO.md)（逐步手册）。
+
 | 角色 | 路径 |
 |------|------|
-| 迭代台账 | [`ITERATION.md`](ITERATION.md) |
+| 版本清单（回朔） | [`VERSIONS.md`](VERSIONS.md) |
+| 对齐基线 | [`ALIGNMENT.md`](ALIGNMENT.md) |
+| 迭代台账（过程） | [`ITERATION.md`](ITERATION.md) |
 | 跑分记录 | [`scoreboard.md`](scoreboard.md) |
 | 静态检查 | `checks/`、`cases/`、`run-static.sh` |
 
@@ -20,9 +24,9 @@
 | [`../orchestration/skills/*`](../orchestration/skills/) | `type=Skill` |
 | [`../orchestration/agent.manifest.json`](../orchestration/agent.manifest.json) | 期望清单（对照后台；本身不上传为组件） |
 
-闭环：改 `orchestration/` → 在 [`ITERATION.md`](ITERATION.md) 记本轮目标与方案 → `pnpm iteration:static` → **人工同步编排页** → 导出详情 `iteration:drift`。
+闭环：写清「本轮目标句」+ 过方向三问（[`ITERATION.md`](ITERATION.md)）→ 改 `orchestration/` → 升号写入 [`VERSIONS.md`](VERSIONS.md) → `pnpm iteration:static` → **人工同步编排页** → drift + 真实会话抽测。
 
-开发 Agent 面向的工作目录模板是 [`deepagents-flow-ts`](../../deepagents-flow-ts)，**不是**本迭代层的调优对象。
+开发 Agent 面向的工作目录模板是 [`deepagents-flow-ts`](../../deepagents-flow-ts)。**默认**不在本迭代层改模板；**为规则 / 能力对齐需要时可改**，变更须记入 [`VERSIONS.md`](VERSIONS.md) / [`ITERATION.md`](ITERATION.md)。
 
 ## 调优四维（检查覆盖）
 
@@ -54,6 +58,7 @@
 
 ```
 iteration/                       # 迭代层（不下发后台）
+├── VERSIONS.md                  # 交付配置回朔清单
 ├── ITERATION.md
 ├── scoreboard.md
 ├── README.md
@@ -70,4 +75,5 @@ iteration/                       # 迭代层（不下发后台）
 - 不把本目录打进编排后台  
 - 不自动写入平台编排后台  
 - 不改 MCP 本体  
-- 不以目标业务 Agent / `deepagents-flow-ts` E2E 作主门禁  
+- 不以目标业务 Agent E2E 作本迭代层主门禁  
+- **默认**不改 [`deepagents-flow-ts`](../../deepagents-flow-ts)；对齐需要时可改，并写入 VERSIONS  

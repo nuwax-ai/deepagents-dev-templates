@@ -5,8 +5,22 @@
 
 ## 模板（新开一轮复制）
 
+过不了「方向三问」不要升 `iter-*`、不要改交付。目标须能写成：  
+**开发者做 X 时，开发 Agent 应 Y，用 Z 验证。**
+
 ```markdown
 ### YYYY-MM-DD · <短标题>
+
+#### 版本号
+- iter-X.Y.Z（同步追加 [`VERSIONS.md`](VERSIONS.md) 条目）
+
+#### 方向三问（全过再动手）
+- [ ] 打中的是开发者痛点（收工 / 改图 / 平台能力 / 沟通…），不是「再润色一段」？
+- [ ] 改完后人工同步编排后台，开发 Agent 能立刻用上？
+- [ ] 回朔路径写得清（VERSIONS 文件清单 / git）？
+
+#### 本轮目标句
+- 开发者做 __ 时，开发 Agent 应 __，用 __ 验证。
 
 #### 需求确认
 - 已确认：
@@ -20,15 +34,45 @@
 - [ ] orchestration/user-prompt.md
 - [ ] orchestration/skills/...
 - [ ] orchestration/agent.manifest.json（期望清单，非后台文件）
+- [ ] packages/deepagents-flow-ts/...（仅对齐需要时）
 
 #### 验证
-- [ ] `pnpm iteration:static`
+- [ ] `pnpm iteration:static`（契约自洽）
 - [ ] `pnpm iteration:drift -- --platform <导出.json>`（同步后台后）
 - [ ] 人工已把 orchestration/ 同步到编排后台
+- [ ] 真实会话抽测打中「本轮目标句」的 Y（static 绿 ≠ 方向对）
 
 #### 结论
 -
 ```
+
+---
+
+## 2026-07-12 · 规则对齐 iter-0.2.0
+
+#### 版本号
+- iter-0.2.0（已写 [`VERSIONS.md`](VERSIONS.md)）
+
+#### 需求确认
+- 已确认：可按需改 `deepagents-flow-ts`；本轮对齐 ask-question / download-skill / MCP_USAGE
+- 待确认：无
+
+#### 本轮优化目标
+- 拆清 ask-question 双口径；统一 download-skill 禁区；manifest 显式要求 MCP_USAGE；文档写明模板可改
+
+#### 方案（改哪些交付文件）
+- [x] orchestration/system-prompt.md
+- [x] orchestration/agent.manifest.json
+- [x] orchestration/skills/dev-engineer-toolkit/SKILL.md
+- [ ] packages/deepagents-flow-ts/...（本轮核对后无需改）
+
+#### 验证
+- [x] `pnpm iteration:static`
+- [ ] 平台导出 drift
+- [ ] 人工同步编排后台
+
+#### 结论
+- 对齐完成；模板本轮无改动
 
 ---
 

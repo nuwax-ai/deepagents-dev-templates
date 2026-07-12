@@ -17,7 +17,7 @@ version: "1.7.5"
 | **搜索技能** | 搜索平台中已注册的技能（SKILL），按关键词检索 | `scripts/search-skills.sh` |
 | **注册工具** | 将搜索到的工具/技能（Plugin、Workflow、Knowledge、Skill）注册到当前项目，注册后方可调用 | `scripts/add-tool.sh` |
 | **删除工具** | 从项目中移除已注册的工具/技能组件 | `scripts/remove-tool.sh` |
-| **下载技能** | 将搜索到的技能下载并解压到项目目录 | `scripts/download-skill.sh` |
+| **下载技能** | **受限**：脚本仍在；**禁止**用其代替平台 `add-tool` 接入（见下 §5 / Part 7） | `scripts/download-skill.sh` |
 | **项目配置读写** | 读取/更新项目配置（系统提示词、开场白、模型参数等） | `scripts/get-config.sh` / `scripts/update-config.sh` |
 | **Python 环境检测** | 检测 Python / uv 是否可用，缺失时可用 uv 安装 | `scripts/check-python.sh` |
 
@@ -291,14 +291,13 @@ Python 环境由 `check-python.sh` 自动探测，缺失时可用 `--install`（
 
 ### 5. 下载技能 — `scripts/download-skill.sh`
 
-将搜索到的技能下载并解压到项目目录。搜索结果中 `schema` 字段包含下载链接，脚本自动提取并下载。
+> **禁区（与系统提示词 / Part 7 对齐）**：平台已有技能 → 只用 `search-skills.sh` + `add-tool.sh` 登记接入，运行期由平台下发。**禁止**再 `download-skill.sh` 解压到项目或 `builtin/skills/` 来「本地安装」平台技能。本脚本仅保留给排障 / 离线查阅等例外，且**不得**当作收工路径。
+
+将 zip 下载并解压到指定目录（例外场景）。搜索结果中 `schema` 可能含下载链接，脚本可自动提取。
 
 ```bash
-# 下载指定技能到当前目录
-./scripts/download-skill.sh --target-id 494
-
-# 下载到指定目录
-./scripts/download-skill.sh --target-id 494 --output-dir ./skills/
+# 例外：仅排障时下载到指定目录（默认不要走这条）
+./scripts/download-skill.sh --target-id 494 --output-dir .tmp/skill-inspect/
 ```
 
 **参数说明：**

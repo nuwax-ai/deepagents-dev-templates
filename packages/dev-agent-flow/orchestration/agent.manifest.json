@@ -14,7 +14,8 @@
         "SYSTEM_INSTRUCTIONS",
         "BOOTSTRAP_FIRST",
         "SESSION_CLOSE",
-        "OUTPUT_FORMAT"
+        "OUTPUT_FORMAT",
+        "MCP_USAGE"
       ]
     },
     "user": {
