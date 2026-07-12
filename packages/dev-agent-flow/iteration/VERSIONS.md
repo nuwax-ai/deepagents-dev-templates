@@ -25,6 +25,21 @@
 
 ---
 
+## iter-0.2.2 — 2026-07-12
+
+- **摘要**：勿误报鉴权 — 平台工具最终有产出（`done>0`，个别 failed 被 ReAct 重试消化）时，`debug.sh` 断言未命中 / HITL 失败禁止写成 Authorization 待办。收敛到 flow-debugger 单一权威 + L0 一句铁律 + analyze-logs 自动提示
+- **交付变更**：
+  - `orchestration/system-prompt.md` — `<SESSION_CLOSE>` 第 8 条一句铁律（工具最终有产出就别误报鉴权，指针 → flow-debugger）
+  - `orchestration/skills/flow-debugger/references/outcome-rules.md` — § 勿误报鉴权（判据 + 场景表，单一权威）
+  - `orchestration/skills/flow-debugger/SKILL.md` — 一句日志佐证铁律 + 一句 anti-pattern（指向 outcome-rules）
+  - `orchestration/skills/flow-debugger/scripts/analyze-logs.py` — 工具 `done>0` 时 `[提示]` 勿误报鉴权（含 ReAct 重试语义）
+- **模板变更**：无（不改 `deepagents-flow-ts` 运行时）
+- **约束/规则对齐要点**：判据是「工具最终是否有产出」而非「过程是否出现 auth 报错」；ReAct 会重试消化瞬态 auth 波动；仅工具始终无产出 + 401/凭证硬错误才算鉴权；`--expect-tool` 禁止中文登记名
+- **回朔**：`git checkout <commit> -- packages/dev-agent-flow/orchestration packages/dev-agent-flow/iteration`
+- **后台**：否（待人工同步 system-prompt / flow-debugger）
+
+---
+
 ## iter-0.2.1 — 2026-07-12
 
 - **摘要**：防开发技能污染 — 明确开发 Agent 三件套不得进入目标业务 Agent 的 `systemPrompt` / `skills` / `tools`

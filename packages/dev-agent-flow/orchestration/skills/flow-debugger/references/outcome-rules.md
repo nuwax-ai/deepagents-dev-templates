@@ -44,6 +44,18 @@ reason = 错误内容。
 
 ### 4. 全部不命中 → PASS
 
+## 勿误报鉴权（SSE 失败 vs 日志佐证）
+
+`debug.sh` exit 4/5 时，**须对照 `analyze-logs` 的 `[工具调用]` 摘要**再写收工结论。判据是**工具最终是否有产出**（`done>0`），不是过程中是否出现过 auth 报错——ReAct 回路会重试消化个别请求的瞬态 auth 波动，个别 `failed` 但 `done>0` 仍属成功产出。
+
+| 场景 | SSE 侧 | 日志侧 | 收工动作 | 禁止 |
+|------|--------|--------|----------|------|
+| 断言名错误 | exit 4，`--expect-tool` 未命中 | 目标工具 `done>0`（个别 failed 已被重试消化） | 用 `get-config --key tools --full` / `--show-trace` 取 runtime 子串重跑 | 写 Authorization / API key 待办 |
+| HITL 待续接 | exit 5 | 可有 permission 事件 | `--auto-approve` 或 `--ask-marker` 续接 | 写验证失败或鉴权待办 |
+| 真鉴权问题 | exit 4，工具**始终无产出** | `[模型/凭证问题]` 含 401/403/凭证硬错误 **且** 工具 `done=0` | 查会话 / 子 agent Authorization 下发与复用 | 无日志硬错误实证时写鉴权排障 |
+
+> **SSE 红 + 日志绿（工具最终有产出）= 断言 / HITL 问题，非鉴权。**
+
 ## 错误聚合定位（FAIL 时输出到 stderr）
 
 `aggregate_error_context()` 把失败原因结构化分段：

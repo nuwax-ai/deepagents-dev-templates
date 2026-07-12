@@ -240,6 +240,37 @@ def _has_problem(summary: dict) -> bool:
     return False
 
 
+def _maybe_print_auth_false_positive_hint(tool_calls: dict, model_issues: list) -> None:
+    """工具最终有产出（done>0）时，提示勿把瞬态 auth 波动 / 断言失败误判为鉴权故障。
+
+    背景：ReAct 回路会重试并消化个别请求的瞬态 auth 报错，最终仍拿到数据（done>0，即使过程中有
+    个别 failed）。debug.sh 可能因 --expect-tool 用了中文登记名（如「联网搜索_1」）而 exit 4，或
+    因权限审批 / ask-question 而 exit 5(HITL)——这些都不是平台鉴权故障。仅当日志出现 401/凭证类
+    硬错误（进入 model_issues）且工具始终无产出时，才算真正的鉴权问题。
+    """
+    if model_issues:
+        # 有 401/凭证硬错误时不提示，避免在真鉴权场景误导
+        return
+    produced = [
+        (name, cnt) for name, cnt in tool_calls.items() if cnt.get("done", 0) > 0
+    ]
+    if not produced:
+        return
+    # 取 done 次数最多的工具作示例，便于开发 Agent 对照
+    name, cnt = max(produced, key=lambda x: x[1]["done"])
+    detail = f"{name} done={cnt['done']}"
+    if cnt.get("failed", 0) > 0:
+        # 个别 failed 但 done>0：ReAct 已重试消化，仍属成功产出
+        detail += f", failed={cnt['failed']}（已被 ReAct 重试消化）"
+    print(
+        f"[提示] 平台工具最终有产出（例: {detail}）。"
+        "过程中的个别 auth 波动会被 ReAct 回路重试消化；"
+        "debug.sh 因 --expect-tool 未命中（常见中文登记名）或 HITL(exit 5) 失败属断言 / 续接问题，"
+        "无 401/凭证硬错误时禁止在收工报告写 Authorization 待办。",
+        file=sys.stderr,
+    )
+
+
 def main() -> None:
     configure_stdio_utf8()
 
@@ -360,6 +391,9 @@ def main() -> None:
             print(f"  > {line}", file=sys.stderr)
     else:
         print("[错误] 无", file=sys.stderr)
+
+    # 工具已成功且无凭证问题时，提示勿误报鉴权（不影响 exit code）
+    _maybe_print_auth_false_positive_hint(merged_tools, merged_model)
 
     summary = {
         "errors": merged_errors,

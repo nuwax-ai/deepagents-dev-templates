@@ -48,6 +48,46 @@
 
 ---
 
+## 2026-07-12 · 勿误报鉴权 iter-0.2.2
+
+#### 版本号
+- iter-0.2.2（已写 [`VERSIONS.md`](VERSIONS.md)）
+
+#### 方向三问（全过再动手）
+- [x] 打中的是开发者痛点（收工误报 Authorization 待办）？
+- [x] 改完后人工同步编排后台，开发 Agent 能立刻用上？
+- [x] 回朔路径写得清（VERSIONS 文件清单 / git）？
+
+#### 本轮目标句
+- 开发者做平台能力验收时，`analyze-logs` 显示工具 `done>0`（个别 failed 被 ReAct 重试消化）就应判定平台能力已接通；`debug.sh` 断言未命中（中文登记名）或 HITL 失败须修正后重跑，**禁止**写 Authorization 待办。用 `analyze-logs [提示]` 自动提醒 + flow-debugger 单一权威判据验证。
+
+#### 需求确认
+- 已确认：出行规划场景「联网搜索 Authorization 限制」是误报；CLI 与 debug 会话工具均正常，个别瞬态 auth 被 ReAct 重试消化
+- 待确认：无
+
+#### 本轮优化目标
+- 收敛：把「勿误报鉴权」从初版铺开的 14 文件收敛到 3 处核心（L0 一句 + flow-debugger 单一权威 + analyze-logs 自动提示），避免「同一件事各说一套」
+- 修正判据：从「failed>0 才算鉴权」改为「工具始终无产出 + 401/凭证硬错误才算鉴权」
+
+#### 方案（改哪些交付文件）
+- [x] orchestration/system-prompt.md — `<SESSION_CLOSE>` 第 8 条一句铁律（指针 → flow-debugger）
+- [x] orchestration/skills/flow-debugger/references/outcome-rules.md — § 勿误报鉴权（单一权威判据 + 场景表）
+- [x] orchestration/skills/flow-debugger/SKILL.md — 一句日志佐证铁律 + 一句 anti-pattern
+- [x] orchestration/skills/flow-debugger/scripts/analyze-logs.py — 工具 `done>0` 时 `[提示]`
+- [x] 回退初版铺开的 flow-builder part0/3/4a/4b/6 与 iteration case/check
+- [ ] packages/deepagents-flow-ts/...（本轮不改运行时）
+
+#### 验证
+- [x] `pnpm iteration:static`（回退 completion-triage 后仍全绿）
+- [x] `analyze-logs` fixture：工具 `done>0`（含个别 failed）输出 `[提示]`
+- [ ] 人工已把 orchestration/ 同步到编排后台
+- [ ] 真实会话抽测：平台能力验收收工不再出现 Authorization 已知限制
+
+#### 结论
+- 收敛到 3 处核心，判据修正为「最终有产出即接通」；静态门禁全绿；后台待人工同步
+
+---
+
 ## 2026-07-12 · 防开发技能污染 iter-0.2.1
 
 #### 版本号
