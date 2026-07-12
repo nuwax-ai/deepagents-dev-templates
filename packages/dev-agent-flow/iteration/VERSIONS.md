@@ -25,6 +25,22 @@
 
 ---
 
+## iter-0.2.1 — 2026-07-12
+
+- **摘要**：防开发技能污染 — 明确开发 Agent 三件套不得进入目标业务 Agent 的 `systemPrompt` / `skills` / `tools`
+- **交付变更**：
+  - `orchestration/system-prompt.md` — `<PLATFORM_CONFIG>` / `<SESSION_CLOSE>` 增加防污染与回读检查
+  - `orchestration/skills/flow-builder/SKILL.md` — L1 铁律增加开发技能污染禁区
+  - `orchestration/skills/flow-builder/references/part3-tools-config.md` — 平台能力登记前置区分目标 Agent 与开发 Agent
+  - `orchestration/skills/flow-builder/references/part5-prompt-design.md` — 提示词同步与 checklist 增加运行时段落 / 开发技能污染检查
+- **模板变更**：无（不改 `deepagents-flow-ts` 运行时）
+- **约束/规则对齐要点**：目标 Agent 只写业务契约与业务能力；`Available Skills` / `Available MCP Servers` 由目标运行时自动追加，不得复制；`flow-builder` / `dev-engineer-toolkit` / `flow-debugger` 只属于开发 Agent
+- **验证**：`pnpm iteration:static` 通过
+- **回朔**：`git checkout <commit> -- packages/dev-agent-flow/orchestration packages/dev-agent-flow/iteration`
+- **后台**：否（待人工同步 system-prompt / flow-builder）
+
+---
+
 ## iter-0.2.0 — 2026-07-12
 
 - **摘要**：规则对齐 — ask-question 双口径拆清、download-skill 禁区统一、MCP_USAGE 进 manifest；明确模板可按需改

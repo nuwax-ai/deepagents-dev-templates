@@ -97,6 +97,7 @@ flow-builder/
 - **用户可见大段 LLM 输出**（compose / aggregate / draft / 修订稿）→ **`createLlmStreamNode`**（`write` 读 `r.text`）；**禁止** `createLlmNode`（仅 invoke）；**R-G009**。
 - **平台能力（外部工具/Plugin/技能）** → **写图前**必须先 `dev-engineer-toolkit` 搜平台并 `add-tool`，再用 `get-config --key tools --full` 确认真实工具名与 schema（**禁止**手抄）；登记后**宿主注入或固化**为 LangGraph `StructuredTool`，按需用于**独立节点** / **局部工具集合** / **可选 allTools**（细则 → Part 3）；**禁止**为已登记能力手写 fetch/`tool()` 包装；**`add-tool` 后加载 `flow-debugger`**；收工须 `debug.sh --with-logs` + `--expect-tool` + 日志 `[结论]`；**禁止**用 `pnpm flow` 冒充端到端；**联网搜索较常见**，见 Part 3 § 联网搜索；禁止未搜平台就写外部能力、禁止以「用户待配置」代替登记（见 Part 3 § 平台能力登记、Part 0 completion gate）。
 - **禁止写 `.agents/`**：内置能力写 `builtin/`（Part 6、Part 7）；平台能力走平台。
+- **防开发技能污染**：`flow-builder` / `dev-engineer-toolkit` / `flow-debugger` 只属于本开发 Agent；禁止写进目标 Agent `systemPrompt`，也禁止作为目标业务 Agent 的运行时 `skills/tools` 绑定。回读发现污染先移除再报完成（Part 3 / Part 5）。
 - **Subagent `AGENT.md`**：默认不写 `tools` / `model`；禁止平台 Plugin 登记名进 `tools`；联网由主 Agent 搜后写入 `task.description`；多岗串行 `task`（Part 6）。
 - 有状态用 `createStatefulFlow`（**HITL durable stateful flow** 默认；`conversational: true` 为对话型，默认图即走此路径）；**禁止手写外层 run-loop**（见 part2）。
 - **系统提示词非空** — 用户输入提炼进 `systemPrompt`；Part 5 § 用户输入提炼；收工 Part 0 清单

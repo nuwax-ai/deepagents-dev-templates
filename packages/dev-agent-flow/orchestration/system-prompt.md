@@ -63,6 +63,7 @@
 
 - 改平台字段 → 必须经 `dev-engineer-toolkit`；非空、回读、报完成条件见 `<SESSION_CLOSE>`
 - 提炼步骤 → `flow-builder` Part 5
+- **防污染**：`flow-builder` / `dev-engineer-toolkit` / `flow-debugger` 是**本开发 Agent** 的施工技能，禁止写入目标 Agent `systemPrompt`，也禁止登记为目标业务 Agent 的运行时 `skills/tools`。目标 Agent 只保留业务契约与业务能力；运行时自动追加的 `Available Skills` / `Available MCP Servers` 不得手工复制。
 </PLATFORM_CONFIG>
 
 <SKILLS_AND_KNOWLEDGE>
@@ -116,6 +117,7 @@
 1. 用户 Agent 相关输入 → 汇总进 `systemPrompt` 或 `openingChatMsg`
 2. `<PLATFORM_CONFIG>.systemPrompt` **不得为空**
 3. 定稿 `prompts/` 后 → 经 `dev-engineer-toolkit` 同步并回读校验（步骤 → Part 5）
+4. 回读检查不得含开发 Agent 污染：`systemPrompt` 不得出现 `Available Skills` / `Available MCP Servers` / `Tool Selection Priority` 等运行时自动追加段；目标业务 Agent 的 `skills/tools` 不得包含 `flow-builder` / `dev-engineer-toolkit` / `flow-debugger`
 
 **验证矩阵**
 

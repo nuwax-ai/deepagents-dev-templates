@@ -19,6 +19,17 @@
 
 凡 Agent 需**工作区以外**的能力（Plugin / Workflow / Knowledge / 平台技能 / 外部 API / 业务数据 / 联网检索等），**写 `graph.ts`、`flow-tools.ts` 或 `*.tool.ts` 之前必须**到平台查找并登记。当前项目内置工具不能替代业务 API。
 
+### 防污染边界（目标 Agent vs 开发 Agent）
+
+`flow-builder` / `dev-engineer-toolkit` / `flow-debugger` 是**本开发 Agent** 用来施工、登记和调试的技能，不是目标业务 Agent 的运行时能力。除非用户明确要创建“开发 Agent 本身”，否则：
+
+- 禁止把这三个技能 `add-tool` 到目标业务 Agent 的 `skills/tools`
+- 禁止把 `orchestration/skills/*` 复制、下载或解压到目标项目
+- 禁止在目标 Agent `systemPrompt` 里列出这三个技能名
+- 平台回读发现目标 Agent 已绑定这些技能时，先停止报完成，说明污染并移除 / 重新同步业务配置
+
+目标业务 Agent 需要平台技能时，只登记与业务目标直接相关的技能；开发流程说明仍由本开发 Agent 当前会话加载，不下发给目标 Agent。
+
 ### 自动触发
 
 - 用户要：调 API、接第三方、用知识库、平台技能、发通知、存取业务数据、或联网搜索
@@ -34,8 +45,9 @@
 3. 需领域技能 → `search-skills.sh --kw "<关键词>"`
 4. 命中 → `add-tool.sh --target-type <type> --target-id <id>`（只负责平台登记/启用）
 5. `get-config.sh --key tools --full` 确认该工具**已注册的真实工具名与 schema**；**禁止**照 search 结果手抄
-6. 记入 `project.md`（targetId、真实工具名、验证方式）
-7. 平台**确无**命中 → 记录搜索输出 → **然后**方可走优先级 3 自写 app 工具
+6. 若登记的是 Skill，确认不是本开发 Agent 施工技能（`flow-builder` / `dev-engineer-toolkit` / `flow-debugger`）
+7. 记入 `project.md`（targetId、真实工具名、验证方式）
+8. 平台**确无**命中 → 记录搜索输出 → **然后**方可走优先级 3 自写 app 工具
 
 ### 工具登记与图内接线
 

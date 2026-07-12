@@ -23,7 +23,9 @@
 
 **禁止**：口头确认不落盘；收工平台 `systemPrompt` 仍空/占位；只改图不提炼用户已发描述。
 
-**污染防线**：设计 / 同步目标 Agent `systemPrompt` 时，禁止复制运行时自动追加区块，包括 `Available Skills`、`Subagents`、`Available MCP Servers`；也禁止写入 `dev-engineer-toolkit` / `flow-builder` / `flow-debugger` 等开发 Agent 技能名。目标提示词只写业务契约；能力清单由运行时按目标 Agent 实际配置自动追加。
+**污染防线**：设计 / 同步目标 Agent `systemPrompt` 时，禁止复制运行时自动追加区块，包括 `Available Skills`、`Subagents`、`Available MCP Servers`、`Tool Selection Priority`；也禁止写入 `dev-engineer-toolkit` / `flow-builder` / `flow-debugger` 等开发 Agent 技能名。目标提示词只写业务契约；能力清单由运行时按目标 Agent 实际配置自动追加。
+
+**技能污染防线**：目标业务 Agent 的平台 `skills/tools` 也不得绑定本开发 Agent 三件套（`flow-builder` / `dev-engineer-toolkit` / `flow-debugger`）。这些技能只服务开发会话；如果回读平台配置时看到它们出现在目标 Agent 能力清单中，先移除污染再报完成。
 
 ### 何时触发（识别即做）
 
@@ -54,9 +56,10 @@
 | 1 | 加载 `dev-engineer-toolkit` |
 | 2 | `update-config.sh --system-prompt-file …`（及 `--opening-msg-file`；中文**必须用文件**） |
 | 3 | `get-config.sh --key systemPrompt` 回读：**非空**、与定稿一致、反映用户意图 |
-| 4 | Phase 4 简报字段名、本地源文件、校验结果 |
+| 4 | `get-config.sh --key tools --full` / skills 回读（如本轮动过能力）：确认只含业务能力，不含开发 Agent 三件套 |
+| 5 | Phase 4 简报字段名、本地源文件、校验结果 |
 
-**不得报「完成」**：仅本地未同步；回读不一致；**`systemPrompt` 为空或过短无效**。
+**不得报「完成」**：仅本地未同步；回读不一致；**`systemPrompt` 为空或过短无效**；回读发现 `Available Skills` / `Available MCP Servers` 等运行时段落或开发 Agent 三件套污染。
 
 ---
 
@@ -168,6 +171,7 @@
 - [ ] 能力 3–5 条具体；工具名已配置
 - [ ] ≥1 few-shot（有固定格式时）
 - [ ] 有兜底；无矛盾指令
+- [ ] 无运行时自动追加段；无 `flow-builder` / `dev-engineer-toolkit` / `flow-debugger` 污染
 - [ ] 已按 § 平台同步完成上传与回读（`systemPrompt` 非空）
 
 ## Anti-patterns
@@ -175,6 +179,8 @@
 - ❌ 把「创建/命名通用智能体」建成 `.agents/agents/<name>/AGENT.md`（子智能体只走平台，见 Part 6）
 - ❌ 只有空泛角色能力，无工具指引/few-shot/输出规范
 - ❌ 未配置工具名写进提示词
+- ❌ 把开发 Agent 的 `flow-builder` / `dev-engineer-toolkit` / `flow-debugger` 绑定到目标业务 Agent
+- ❌ 把 `Available Skills` / `Available MCP Servers` / `Tool Selection Priority` 复制进目标 Agent `systemPrompt`
 - ❌ 硬编码进代码；只改本地不同步平台
 - ❌ 所有 LLM 节点 prompt 都写「只输出 JSON」（应仅用于 `write` 读 `r.parsed` 的节点）
 - ✅ 七要素 + few-shot → `dev-engineer-toolkit` 保存 → § 平台同步 →（自建图时）`createFlowGraph({ systemPrompt })` 注入

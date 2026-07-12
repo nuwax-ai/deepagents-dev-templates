@@ -48,6 +48,35 @@
 
 ---
 
+## 2026-07-12 · 防开发技能污染 iter-0.2.1
+
+#### 版本号
+- iter-0.2.1（已写 [`VERSIONS.md`](VERSIONS.md)）
+
+#### 需求确认
+- 已确认：不改 `deepagents-flow-ts` 运行时；通过提示词 / skill / 文档约束防止目标 Agent 泄漏开发 Agent 的能力清单与提示词
+- 待确认：无
+
+#### 本轮优化目标
+- 防止交付目标业务 Agent 时，把 `flow-builder` / `dev-engineer-toolkit` / `flow-debugger` 或 `Available Skills` / `Available MCP Servers` 等运行时自动段落污染进目标 Agent
+
+#### 方案（改哪些交付文件）
+- [x] orchestration/system-prompt.md
+- [x] orchestration/skills/flow-builder/SKILL.md
+- [x] orchestration/skills/flow-builder/references/part3-tools-config.md
+- [x] orchestration/skills/flow-builder/references/part5-prompt-design.md
+- [ ] packages/deepagents-flow-ts/...（本轮不改运行时）
+
+#### 验证
+- [x] `pnpm iteration:static`
+- [ ] 平台导出 drift
+- [ ] 人工同步编排后台
+
+#### 结论
+- 仓内约束已对齐并通过静态门禁；后台待人工同步
+
+---
+
 ## 2026-07-12 · 规则对齐 iter-0.2.0
 
 #### 版本号
