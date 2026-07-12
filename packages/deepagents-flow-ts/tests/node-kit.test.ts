@@ -1,17 +1,21 @@
 /**
  * libs/nodes factory + 原语单测 —— AI Agent 改 factory 的安全网。
  *
- * 全部用 mock 模型 / 简单 tool,不依赖 LLM 凭证。
- * 覆盖:extractText / parseJson / isApproval / runTool 原语,
- *   createPrepareNode / createFanout / createLlmNode(含 parse、fallback)/
- *   createLlmStreamNode / createToolExecNode / createHumanApprovalNode。
+ * 全部用 mock 模型 / 简单 tool，不依赖 LLM 凭证。
+ * 覆盖：
+ *  - 原语：extractText / parseJson / isApproval / runTool
+ *  - factory：createPrepareNode / createFanout / createLlmNode（含 parse、fallback）/
+ *    createLlmStreamNode / createToolExecNode / createApprovalFinalizeNode /
+ *    createLlmRouterNode / createMcpRetrievalNode / createHumanApprovalNode（经编译图 interrupt/resume）/
+ *    createPlatformToolActionNode / createSubgraphNode
  */
 
 import { describe, it, expect } from "vitest";
+import { randomUUID } from "node:crypto";
 import { HumanMessage, AIMessage, ToolMessage, type BaseMessage } from "@langchain/core/messages";
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import { Annotation } from "@langchain/langgraph";
+import { Annotation, StateGraph, START, END, MemorySaver, Command, INTERRUPT } from "@langchain/langgraph";
 import type { LangGraphRunnableConfig } from "@langchain/langgraph";
 import {
   createLlmNode,
@@ -23,6 +27,8 @@ import {
   createLlmRouterNode,
   createMcpRetrievalNode,
   createFanout,
+  createPlatformToolActionNode,
+  createSubgraphNode,
   extractText,
   parseJson,
   isApproval,
@@ -292,7 +298,7 @@ describe("createLlmRouterNode", () => {
 // ---------- createMcpRetrievalNode ----------
 describe("createMcpRetrievalNode", () => {
   type S = { q: string; out?: string };
-  // 真实 MCP 调用路径由 travel-planner 集成测试覆盖（需 npx + 网络）；此处测 guard。
+  // 真实 MCP 调用需 npx + 网络，不纳入单测；此处只测无副作用的 guard 分支（retrieve 返回 null / server 未配置）。
 
   it("retrieve 返回 null → 写回空结果(ok:false)", async () => {
     const node = createMcpRetrievalNode<S>({
@@ -434,5 +440,175 @@ describe("createToolExecNode", () => {
     expect(tm.content).toEqual(
       expect.arrayContaining([expect.objectContaining({ type: "image_url" })])
     );
+  });
+});
+
+// ---------- createHumanApprovalNode（经编译图 interrupt/resume：节点体内 interrupt() 只能在图运行时执行） ----------
+describe("createHumanApprovalNode", () => {
+  const S = Annotation.Root({
+    input: Annotation<string>({ value: (_: string, n: string) => n, default: () => "" }),
+    feedback: Annotation<string>({ value: (_: string, n: string) => n, default: () => "" }),
+    decision: Annotation<string>({ value: (_: string, n: string) => n, default: () => "" }),
+  });
+  type S_ = typeof S.State;
+
+  it("interrupt 抛出问题 → resume 通过词 → write(approved=true)", async () => {
+    const node = createHumanApprovalNode<S_>({
+      question: (s) => `确认:${s.input}`,
+      write: (feedback, approved) => ({ feedback, decision: approved ? "approved" : "changes" }),
+    });
+    const graph = new StateGraph(S)
+      .addNode("review", node)
+      .addEdge(START, "review")
+      .addEdge("review", END)
+      .compile({ checkpointer: new MemorySaver() });
+    const cfg = { configurable: { thread_id: randomUUID() } };
+
+    const first = (await graph.invoke({ input: "draft" }, cfg)) as any;
+    // interrupt 未 resume 时，invoke 返回体带 __interrupt__，携带 question 载荷
+    expect(first[INTERRUPT]?.[0]?.value).toEqual({ question: "确认:draft" });
+
+    const resumed = (await graph.invoke(new Command({ resume: "ok" }), cfg)) as any;
+    expect(resumed.decision).toBe("approved");
+    expect(resumed.feedback).toBe("ok");
+  });
+
+  it("resume 修改意见（非通过词）→ write(approved=false)", async () => {
+    const node = createHumanApprovalNode<S_>({
+      question: () => "确认?",
+      write: (feedback, approved) => ({ feedback, decision: approved ? "approved" : "changes" }),
+    });
+    const graph = new StateGraph(S)
+      .addNode("review", node)
+      .addEdge(START, "review")
+      .addEdge("review", END)
+      .compile({ checkpointer: new MemorySaver() });
+    const cfg = { configurable: { thread_id: randomUUID() } };
+
+    await graph.invoke({ input: "x" }, cfg);
+    const resumed = (await graph.invoke(new Command({ resume: "再改短一点" }), cfg)) as any;
+    expect(resumed.decision).toBe("changes");
+    expect(resumed.feedback).toBe("再改短一点");
+  });
+
+  it("route 变体：打回走 Command goto（返回上一节点）", async () => {
+    const node = createHumanApprovalNode<S_>({
+      question: () => "确认大纲?",
+      route: (approved) =>
+        approved
+          ? new Command({ goto: "next", update: { decision: "go" } })
+          : new Command({ goto: "plan", update: { decision: "redo" } }),
+    });
+    const graph = new StateGraph(S)
+      .addNode("review", node, { ends: ["plan", "next"] })
+      .addNode("plan", (s: S_) => ({ decision: `${s.decision}-planned` }))
+      .addNode("next", (s: S_) => ({ decision: `${s.decision}-nexted` }))
+      .addEdge(START, "review")
+      .addEdge("plan", END)
+      .addEdge("next", END)
+      .compile({ checkpointer: new MemorySaver() });
+    const cfg = { configurable: { thread_id: randomUUID() } };
+
+    await graph.invoke({ input: "outline" }, cfg);
+    const resumed = (await graph.invoke(new Command({ resume: "不行" }), cfg)) as any;
+    expect(resumed.decision).toBe("redo-planned");
+  });
+});
+
+// ---------- createPlatformToolActionNode（主动调用注入的工具集合，非 tool_calls 驱动） ----------
+describe("createPlatformToolActionNode", () => {
+  it("按 toolName 选工具 + 三态 onToolCall + write(raw)", async () => {
+    const quote = tool(async ({ city }: { city: string }) => `price:${city}`, {
+      name: "quote_price",
+      schema: z.object({ city: z.string() }),
+      description: "quote a city",
+    });
+    const statuses: string[] = [];
+    const node = createPlatformToolActionNode<{ city: string; out?: string }>({
+      tools: [quote] as any,
+      toolName: "quote_price",
+      args: (s) => ({ city: s.city }),
+      write: (r) => ({ out: String(r.raw) }),
+      callbacks: { onToolCall: (e) => void statuses.push(e.status) } as any,
+    });
+    const out = await node({ city: "SF" });
+    expect(out.out).toBe("price:SF");
+    expect(statuses).toEqual(["in_progress", "completed"]);
+  });
+
+  it("toolName 缺省 → 用 tools[0]", async () => {
+    const echo = tool(async ({ x }: { x: string }) => `got:${x}`, {
+      name: "echo",
+      schema: z.object({ x: z.string() }),
+      description: "echo",
+    });
+    const node = createPlatformToolActionNode<{ x: string; out?: string }>({
+      tools: [echo] as any,
+      args: (s) => ({ x: s.x }),
+      write: (r) => ({ out: String(r.raw) }),
+    });
+    expect((await node({ x: "hi" })).out).toBe("got:hi");
+  });
+
+  it("toolName 未匹配 → 抛错", async () => {
+    const node = createPlatformToolActionNode<any>({
+      tools: [] as any,
+      toolName: "nope",
+      args: () => ({}),
+      write: () => ({}),
+    });
+    await expect(node({})).rejects.toThrow(/未找到可用工具/);
+  });
+
+  it("工具抛错 → 透出 failed 状态并向上抛", async () => {
+    const boom = tool(
+      async () => {
+        throw new Error("tool boom");
+      },
+      { name: "boom", schema: z.object({}), description: "always throws" }
+    );
+    const statuses: string[] = [];
+    const node = createPlatformToolActionNode<any>({
+      tools: [boom] as any,
+      toolName: "boom",
+      args: () => ({}),
+      write: () => ({}),
+      callbacks: { onToolCall: (e) => void statuses.push(e.status) } as any,
+    });
+    await expect(node({})).rejects.toThrow(/tool boom/);
+    expect(statuses).toEqual(["in_progress", "failed"]);
+  });
+});
+
+// ---------- createSubgraphNode（子图编译后作节点用） ----------
+describe("createSubgraphNode", () => {
+  const Sub = Annotation.Root({
+    n: Annotation<number>({ value: (_: number, x: number) => x, default: () => 0 }),
+  });
+  type Sub_ = typeof Sub.State;
+
+  const makeDoubler = () =>
+    createSubgraphNode<Sub_>({
+      state: Sub,
+      nodes: { double: (s) => ({ n: s.n * 2 }) },
+      edges: [
+        [START, "double"],
+        ["double", END],
+      ],
+    });
+
+  it("编译出的子图可独立 invoke", async () => {
+    const out = (await makeDoubler().invoke({ n: 3 })) as Sub_;
+    expect(out.n).toBe(6);
+  });
+
+  it("子图作父图节点，经共享 channel(n) 映射", async () => {
+    const parent = new StateGraph(Sub)
+      .addNode("sub", makeDoubler())
+      .addEdge(START, "sub")
+      .addEdge("sub", END)
+      .compile();
+    const out = (await parent.invoke({ n: 4 })) as Sub_;
+    expect(out.n).toBe(8);
   });
 });

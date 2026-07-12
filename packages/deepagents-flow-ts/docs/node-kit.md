@@ -285,7 +285,7 @@ parentGraph.addNode("research", researcher);   // 编译后的子图直接当节
 在 `src/libs/tools/` 用 `tool()` + Zod 定义入参，在 `src/app/flow-tools.ts` 的 `createFlowTools()` → `buildTools()` 中注册；`think` 节点自动 `bindTools`。
 
 - 字段名、类型、必填与工具契约（JSON Schema）对齐；返回值必须是 `string`。
-- 需要运行时依赖时用工厂函数（参照 `platform-api.tool.ts`、`agent-variable.tool.ts`）。
+- 需要运行时依赖时用工厂函数（参照 `bash.tool.ts` 的 `createBashTool`、`fs.tool.ts` 的 `createFsTools`、`http-request.tool.ts` 的 `createHttpRequestTool`）。
 - 参照 [docs/capabilities.md](capabilities.md) 的工具优先级：MCP → 内置 → 自写。
 
 ---

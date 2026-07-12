@@ -46,7 +46,7 @@ src/
   libs/          ★ 可复用构建件（保护、消费不改）
     nodes/         节点 factory + 原语（建 flow 用，见 node-kit.md）+ model-resolver（凭证策略）
     tools/         内置通用工具（bash/fs/grep·glob/demo/http/json/skill；MCP 工具由 runtime 经 @langchain/mcp-adapters 原生注入，非 toolkit 静态导出）
-    mcp/           stdio MCP 客户端（callResolvedMcpTool/rateLimited；零 src import，自包含）
+    mcp/           MCP 访问层（callResolvedMcpTool/rateLimited；仅依赖 runtime，自包含）
     deepagents-acp/  vendored ACP SDK（自包含）
   app/           默认 ReAct 图（★ 可改、开发工作区）：graph.ts + nodes/ + flow-tools/task + state/topology/default-flow + flows/（注册表仅 default）
   surfaces/      ACP/CLI 适配器（保护）：acp/ cli/ + stateful-flow/map-stream-chunk/...

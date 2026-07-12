@@ -79,7 +79,7 @@
 | `emitStage` / `emitPlan` / `emitTextToken` | surface 事件生产(writer + callback 双发) |
 | `runTool(name, args, fn, onToolCall?)` | 执行一个工具 + 三态透出 |
 | `isApproval(feedback, opts?)` | HITL「通过」判定 |
-| `callResolvedMcpTool` / `rateLimited` / `McpServerConfig` | stdio MCP 客户端(见 `src/libs/mcp/stdio-client.ts`) |
+| `callResolvedMcpTool` / `rateLimited` / `McpServerConfig` | MCP 访问层(见 `src/libs/mcp/mcp-access.ts`) |
 
 > 原语是节点的「建材」,不是节点本身——不要 `addNode("x", emitPlan)`。
 
