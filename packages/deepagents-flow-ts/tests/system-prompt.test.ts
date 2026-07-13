@@ -1,5 +1,9 @@
 /**
- * resolveSystemPromptMeta —— ACP session 提示词追加语义（不覆盖本地 flow.base.md）。
+ * resolveSystemPromptMeta —— ACP session 提示词语义。
+ *
+ * 关键契约：平台经 ACP 下发 systemPrompt 时，它是 agent 的权威身份，**不再前置**本地
+ * flow.base.md（那是模板通用基座，会污染业务身份并与 PLATFORM_CONVENTIONS 工具优先级冲突）；
+ * 仅在末尾补 PLATFORM_CONVENTIONS。flow.base.md 只用于「无平台 session」的本地/CLI 路径。
  */
 
 import { describe, it, expect } from "vitest";
@@ -14,23 +18,22 @@ import { resolvePackageRoot } from "../src/runtime/package-root.js";
 describe("resolveSystemPromptMeta — ACP session append", () => {
   const pkgRoot = resolvePackageRoot(import.meta.url);
 
-  it("有 session prompt + 本地 flow.base.md → 身份在前、session 追加、PLATFORM_CONVENTIONS 在后", () => {
+  it("有 session prompt（即便本地存在 flow.base.md）→ 平台人设为主，不前置 flow.base.md，末尾补 PLATFORM_CONVENTIONS", () => {
     const config = AppConfigSchema.parse({});
     const meta = resolveSystemPromptMeta(
       config,
-      { systemPrompt: "平台补充指令" },
+      { systemPrompt: "平台业务人设" },
       pkgRoot
     );
 
     expect(meta.source).toBe("acp-session");
-    expect(meta.prompt).toContain("LangGraph 工作流图");
-    expect(meta.prompt.indexOf("LangGraph 工作流图")).toBeLessThan(
-      meta.prompt.indexOf("平台补充指令")
-    );
-    expect(meta.prompt.indexOf("平台补充指令")).toBeLessThan(
+    // flow.base.md 的身份句不得混入（防身份污染 + 工具优先级冲突）
+    expect(meta.prompt).not.toContain("LangGraph 工作流图");
+    // 平台人设在前，PLATFORM_CONVENTIONS 在后
+    expect(meta.prompt).toBe(`平台业务人设\n\n${PLATFORM_CONVENTIONS}`);
+    expect(meta.prompt.indexOf("平台业务人设")).toBeLessThan(
       meta.prompt.indexOf("Tool Selection Priority")
     );
-    expect(meta.prompt).toContain(PLATFORM_CONVENTIONS);
   });
 
   it("有 session prompt + 提示词文件不存在 → 仅 session + PLATFORM_CONVENTIONS", () => {
@@ -58,12 +61,12 @@ describe("resolveSystemPromptMeta — ACP session append", () => {
     expect(meta.prompt).not.toContain(PLATFORM_CONVENTIONS);
   });
 
-  it("自定义 systemPromptPath 在 ACP session 下仍被加载为 base", () => {
+  it("ACP session 下即便配了自定义 systemPromptPath，也不加载为 base（平台人设为主）", () => {
     const workspace = mkdtempSync(join(tmpdir(), "flow-prompt-custom-"));
     mkdirSync(join(workspace, "prompts"), { recursive: true });
     writeFileSync(
       join(workspace, "prompts/custom.md"),
-      "# Title\n\n自定义 Agent 身份\n",
+      "# Title\n\n本地脚手架身份\n",
       "utf-8"
     );
     const config = AppConfigSchema.parse({
@@ -72,12 +75,13 @@ describe("resolveSystemPromptMeta — ACP session append", () => {
 
     const meta = resolveSystemPromptMeta(
       config,
-      { systemPrompt: "ACP 追加" },
+      { systemPrompt: "平台人设" },
       workspace
     );
 
     expect(meta.source).toBe("acp-session");
-    expect(meta.prompt).toMatch(/^自定义 Agent 身份/);
-    expect(meta.prompt).toContain("ACP 追加");
+    // 本地文件不再被前置
+    expect(meta.prompt).not.toContain("本地脚手架身份");
+    expect(meta.prompt).toBe(`平台人设\n\n${PLATFORM_CONVENTIONS}`);
   });
 });

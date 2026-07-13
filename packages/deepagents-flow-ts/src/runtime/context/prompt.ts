@@ -44,15 +44,16 @@ export function resolveSystemPromptMeta(
   sessionConfig: ACPSessionConfig | undefined,
   workspaceRoot: string
 ): SystemPromptResolveMeta {
-  // ACP session prompt is supplementary — append it to the local prompt file,
-  // not replace it. The platform's `_meta.systemPrompt.append` semantically
-  // adds platform-level instructions on top of the agent's identity prompt.
-  // Loading the configured prompt path ensures agent identity is preserved.
+  // ACP session prompt is authoritative identity — when the platform delivers a
+  // session `systemPrompt` it IS the agent's business persona (configured on the
+  // platform). We do NOT prepend the local `prompts/flow.base.md`: that file is the
+  // template's generic scaffolding ("通用基座"), and prepending it pollutes the
+  // business identity and duplicates/conflicts with the tool-priority ordering in
+  // PLATFORM_CONVENTIONS. Only append the harness-level tool/secret conventions the
+  // model still needs. `flow.base.md` remains the identity for the no-session path
+  // (local CLI / config-file branch below).
   if (sessionConfig?.systemPrompt) {
-    const basePrompt = loadPromptFromFile(config, workspaceRoot);
-    const prompt = basePrompt
-      ? `${basePrompt}\n\n${sessionConfig.systemPrompt.trimEnd()}\n\n${PLATFORM_CONVENTIONS}`
-      : `${sessionConfig.systemPrompt.trimEnd()}\n\n${PLATFORM_CONVENTIONS}`;
+    const prompt = `${sessionConfig.systemPrompt.trimEnd()}\n\n${PLATFORM_CONVENTIONS}`;
     return {
       prompt,
       source: "acp-session",
@@ -114,15 +115,6 @@ export function resolveSystemPromptMeta(
   };
 }
 
-/** Load prompt from configured file path (strips H1 title line). Returns undefined if not found. */
-function loadPromptFromFile(config: AppConfig, workspaceRoot: string): string | undefined {
-  const promptPath = resolvePromptPath(config.agent.systemPromptPath, workspaceRoot);
-  if (existsSync(promptPath)) {
-    return readFileSync(promptPath, "utf-8").replace(/^# .*\r?\n/, "").trim();
-  }
-  return undefined;
-}
-
 export function resolveSystemPrompt(
   config: AppConfig,
   sessionConfig: ACPSessionConfig | undefined,
@@ -169,7 +161,7 @@ export function resolveCliSystemPrompt(options: {
   }
 
   const configuredPath = options.config?.agent.systemPromptPath;
-  const defaultPath = resolvePromptPath(configuredPath || "prompts/developer-agent.system.md", workspaceRoot);
+  const defaultPath = resolvePromptPath(configuredPath || "prompts/flow.base.md", workspaceRoot);
   if (existsSync(defaultPath)) {
     return readFileSync(defaultPath, "utf-8").replace(/^# .*\r?\n/, "").trim();
   }
