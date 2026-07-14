@@ -386,6 +386,10 @@ export interface FlowAcpOptions {
   createExecutor?: (args: {
     sessionConfig: ACPSessionConfig;
     workspaceRoot: string;
+    /** ACP sessionId（MCP 工具 schema 缓存主键）。 */
+    sessionId: string;
+    /** ACP 装配 phase：`new`（清缓存不读）/ `load`（读缓存）。 */
+    sessionPhase: string;
   }) => Promise<SessionExecutor>;
   /** throwaway agent 的身份/模型（agent 永不运行） */
   appConfig: AppConfig;
@@ -418,7 +422,7 @@ export function createFlowHooks(options: FlowAcpOptions): DeepAgentsServerHooks 
   // 后续懒建也必须沿用同一 session 配置，不能退回进程 cwd。
   const sessionConfigs = new Map<
     string,
-    { sessionConfig: ACPSessionConfig; workspaceRoot: string }
+    { sessionConfig: ACPSessionConfig; workspaceRoot: string; phase: string }
   >();
   const sessionFailures = new Map<string, string>();
   // 一个会话 = 一个主题：老式 flow（未实现 hasStarted）的「等回复」内存兜底，按 sessionId 跟踪。
@@ -446,6 +450,9 @@ export function createFlowHooks(options: FlowAcpOptions): DeepAgentsServerHooks 
       const built = await options.createExecutor({
         sessionConfig: configured?.sessionConfig ?? fallbackConfig,
         workspaceRoot: configured?.workspaceRoot ?? process.cwd(),
+        sessionId,
+        // 兜底懒建（configureSession 未触发）无缓存可写，按 load 尽力命中即可。
+        sessionPhase: configured?.phase ?? "load",
       });
       sessions.set(sessionId, built);
       return built.executor;
@@ -453,8 +460,15 @@ export function createFlowHooks(options: FlowAcpOptions): DeepAgentsServerHooks 
     return options.executor;
   }
 
-  /** dispose 旧 executor 并按 sessionConfigs 重建（configureSession / model 热切换共用）。 */
-  async function rebuildSessionExecutor(sessionId: string): Promise<void> {
+  /**
+   * dispose 旧 executor 并按 sessionConfigs 重建（configureSession / model 热切换共用）。
+   * phaseOverride：model 热切换等场景传 "load"，复用 MCP 工具缓存、避免误清；
+   * 省略则用 configureSession 记录的 phase（new/load）。
+   */
+  async function rebuildSessionExecutor(
+    sessionId: string,
+    phaseOverride?: string
+  ): Promise<void> {
     if (!options.createExecutor) return;
     const configured = sessionConfigs.get(sessionId);
     if (!configured) {
@@ -465,6 +479,8 @@ export function createFlowHooks(options: FlowAcpOptions): DeepAgentsServerHooks 
       const built = await options.createExecutor({
         sessionConfig: configured.sessionConfig,
         workspaceRoot: configured.workspaceRoot,
+        sessionId,
+        sessionPhase: phaseOverride ?? configured.phase,
       });
       try {
         await sessions.get(sessionId)?.dispose?.();
@@ -505,7 +521,7 @@ export function createFlowHooks(options: FlowAcpOptions): DeepAgentsServerHooks 
         merged: sessionConfig,
         workspaceRoot,
       });
-      sessionConfigs.set(ctx.sessionId, { sessionConfig, workspaceRoot });
+      sessionConfigs.set(ctx.sessionId, { sessionConfig, workspaceRoot, phase: ctx.phase });
       try {
         await rebuildSessionExecutor(ctx.sessionId);
         log.info("configureSession → per-session runtime", {
@@ -710,7 +726,8 @@ export function createFlowHooks(options: FlowAcpOptions): DeepAgentsServerHooks 
         model,
       };
       sessionConfigs.set(ctx.sessionId, configured);
-      await rebuildSessionExecutor(ctx.sessionId);
+      // model 热切换：MCP 配置未变，按 load 复用工具 schema 缓存（不清、可命中）。
+      await rebuildSessionExecutor(ctx.sessionId, "load");
     },
 
     // session 关闭：释放 per-session 资源（MCP stdio 子进程等）+ 清兜底状态。

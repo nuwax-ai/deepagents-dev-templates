@@ -18,10 +18,19 @@ import { readFileSync, existsSync } from "node:fs";
 import { type AppConfig, type ACPSessionConfig } from "../config/config-loader.js";
 import { resolvePath } from "../config/config-paths.js";
 import { resolvePackageRoot } from "../package-root.js";
-import { logger } from "../logger.js";
-import { timePhase } from "../perf-trace.js";
+import { logger, type Logger } from "../logger.js";
+import { timePhase, recordPhase } from "../perf-trace.js";
 import { inferMcpTransport } from "../mcp/infer-mcp-transport.js";
 import { verifyMcpServersWithToolList } from "../mcp/verify-mcp-tool-list.js";
+import {
+  computeMcpConfigFingerprint,
+  readToolSchemaCache,
+  writeToolSchemaCache,
+  clearToolSchemaCache,
+  extractCacheEntriesFromTools,
+  buildLazyToolsFromCache,
+  type CachedToolEntry,
+} from "../mcp/tool-schema-cache.js";
 import {
   sanitizeMcpServerRecord,
   sanitizeMcpToolName,
@@ -137,6 +146,13 @@ export interface RuntimeContext {
   mcpServerToolLists: Record<string, string[]>;
   /** @internal session MCP overrides（session-wins 最高优先级），hydrate 重新合并时用。 */
   sessionMcpServers: Record<string, McpServerEntry>;
+  /** @internal ACP sessionId（工具 schema 缓存主键）；CLI / 无 session 时 undefined。 */
+  sessionId?: string;
+  /**
+   * @internal ACP 装配 phase：`new`（新会话，先清缓存不读）/ `load`（同会话重启，读缓存）。
+   * 省略时按 `load` 处理（尽力命中缓存）。
+   */
+  sessionPhase?: string;
   /**
    * mcp-adapters 主 client（bulk 模式，session 内持久复用）；destroy 时 close。
    * hydrate 前或 bulk 失败走 per-server fallback 时为 null（此时用 mcpFallbackClients）。
@@ -400,7 +416,9 @@ function spawnShell(
 export function createRuntimeContext(
   config: AppConfig,
   sessionConfig?: ACPSessionConfig,
-  _workspaceRoot?: string
+  _workspaceRoot?: string,
+  sessionId?: string,
+  sessionPhase?: string
 ): RuntimeContext {
   const log = logger.child("runtime-context");
 
@@ -419,9 +437,77 @@ export function createRuntimeContext(
     mcpTools: [],
     mcpServerToolLists: {},
     sessionMcpServers: sessionServers,
+    sessionId,
+    sessionPhase,
     mcpClient: null,
     mcpFallbackClients: [],
   };
+}
+
+/**
+ * 读取并装配同一 ACP session 的 MCP 工具 schema 缓存。
+ * 返回指纹供未命中路径写缓存复用；命中时上下文已装配完成，可直接返回。
+ */
+function tryHydrateMcpToolsFromCache(
+  context: RuntimeContext,
+  connections: Record<string, McpConnection>,
+  connNames: string[],
+  log: Logger
+): { fingerprint: string; hit: boolean } {
+  // ── MCP 工具 schema 缓存（sessionId 失效）───────────────────────────────────
+  // phase=new：先清旧缓存、且不读（保证新会话必重建）；phase=load：尝试命中。
+  // 命中则用缓存 schema 重建懒工具桩，完全跳过 getTools()（冷启动大头），工具首调才懒连接。
+  const fingerprint = computeMcpConfigFingerprint(context.mcpServerConfigs);
+  let cached = null;
+  if (context.sessionId && context.sessionPhase === "new") {
+    clearToolSchemaCache(context.sessionId, "phase_new");
+    recordPhase("mcp.cache", 0, { result: "bypass", reason: "phase_new" });
+  } else if (context.sessionId) {
+    const read = readToolSchemaCache(context.sessionId, fingerprint);
+    cached = read.cached;
+    recordPhase("mcp.cache", 0, {
+      result: cached ? "hit" : "miss",
+      reason: read.reason,
+    });
+  } else {
+    recordPhase("mcp.cache", 0, { result: "bypass", reason: "no_session" });
+  }
+  if (cached && cached.tools.length > 0) {
+    const { tools, toolLists } = buildLazyToolsFromCache(
+      cached,
+      connections as Record<string, unknown>,
+      (client) => context.mcpFallbackClients!.push(client),
+      (server, rawName, reason) => {
+        log.warn("MCP 工具缓存已失效", {
+          sessionId: context.sessionId,
+          reason,
+          server,
+          rawName,
+        });
+        clearToolSchemaCache(context.sessionId!, reason);
+      }
+    );
+    context.mcpTools = tools;
+    // 缓存命中没有连接或执行 tools/list，不能把缓存条目当作已验证的可用服务。
+    // 工具仍会注入给模型；首次调用时再连接并校验工具 schema。
+    context.mcpServerToolLists = {};
+    context.mcpClient = null; // 懒连接：命中时不建持久 client，工具首调时按 server 懒建
+    recordPhase("mcp.getTools", 0, {
+      mode: "cache",
+      cache: "hit",
+      servers: connNames.length,
+      tools: tools.length,
+    });
+    log.info("Loaded MCP tools", {
+      total: tools.length,
+      cachedServers: Object.keys(toolLists),
+      cachedServerToolLists: toolLists,
+      verifiedServers: [],
+      mode: "cache-hit",
+    });
+    return { fingerprint, hit: true };
+  }
+  return { fingerprint, hit: false };
 }
 
 /**
@@ -456,6 +542,14 @@ export async function hydrateRuntimeContext(
     return context;
   }
 
+  const { fingerprint, hit: cacheHit } = tryHydrateMcpToolsFromCache(
+    context,
+    connections,
+    connNames,
+    log
+  );
+  if (cacheHit) return context;
+
   // per-server handler：单个 server 连不上记录原因并跳过（不 throw = ignore 该 server，其余继续）。
   const failed: Array<{ server: string; reason: string }> = [];
   const onConnectionError = ({
@@ -489,6 +583,7 @@ export async function hydrateRuntimeContext(
     }
   };
 
+  let cacheEntries: CachedToolEntry[] = [];
   try {
     const client = new MultiServerMCPClient({
       mcpServers: connections,
@@ -498,10 +593,14 @@ export async function hydrateRuntimeContext(
       prefixToolNameWithServerName: true,
     } as never);
     context.mcpClient = client;
-    context.mcpTools = sanitizeLoadedMcpTools(
-      await timePhase("mcp.getTools", () => client.getTools(), { mode: "bulk", servers: connNames.length }),
-      log
+    const loadedTools = await timePhase(
+      "mcp.getTools",
+      () => client.getTools(),
+      { mode: "bulk", cache: "miss", servers: connNames.length }
     );
+    // 必须在工具名规范化前提取 rawName；规范化后无法无损反推 MCP 原名。
+    cacheEntries = extractCacheEntriesFromTools(loadedTools, connNames);
+    context.mcpTools = sanitizeLoadedMcpTools(loadedTools, log);
   } catch (err) {
     // bulk 整体抛（如 Zod 校验失败）→ 逐 server 隔离重试，避免单个非法 server 连累全部。
     log.warn("MCP bulk load failed; retrying per-server", {
@@ -518,9 +617,9 @@ export async function hydrateRuntimeContext(
           onConnectionError,
           prefixToolNameWithServerName: true,
         } as never);
-        tools.push(
-          ...sanitizeLoadedMcpTools(await single.getTools(), log)
-        );
+        const loadedTools = await single.getTools();
+        cacheEntries.push(...extractCacheEntriesFromTools(loadedTools, [name]));
+        tools.push(...sanitizeLoadedMcpTools(loadedTools, log));
         fallbackClients.push(single); // 保留到 session 结束（工具持有其连接，close 会让工具失效）
         fallbackServerNames.push(name);
       } catch (e) {
@@ -567,15 +666,25 @@ export async function hydrateRuntimeContext(
     mode: context.mcpClient ? "bulk" : "per-server-fallback",
   });
 
+  // MISS 路径落盘：把本次枚举到的工具 schema 写入缓存，供同 sessionId 下次 phase=load 命中。
+  // 使用规范化前提取的条目，保证同时保留模型工具名与原始 MCP 调用名。
+  if (context.sessionId) {
+    writeToolSchemaCache(context.sessionId, fingerprint, cacheEntries);
+  }
+
   return context;
 }
 
 export async function createRuntimeContextAsync(
   config: AppConfig,
   sessionConfig?: ACPSessionConfig,
-  workspaceRoot?: string
+  workspaceRoot?: string,
+  sessionId?: string,
+  sessionPhase?: string
 ): Promise<RuntimeContext> {
-  return await hydrateRuntimeContext(createRuntimeContext(config, sessionConfig, workspaceRoot));
+  return await hydrateRuntimeContext(
+    createRuntimeContext(config, sessionConfig, workspaceRoot, sessionId, sessionPhase)
+  );
 }
 
 /**

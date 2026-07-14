@@ -19,3 +19,5 @@ export const FLOWAGENTS_HOME = `~/${FLOWAGENTS_DIRNAME}`;
 export const SESSIONS_SUBDIR = "sessions";
 export const ARTIFACTS_SUBDIR = "artifacts";
 export const LOGS_SUBDIR = "logs";
+/** 运行时缓存根（~/.flowagents/cache）；下再按用途分子目录（如 mcp-tools）。 */
+export const CACHE_SUBDIR = "cache";

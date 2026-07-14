@@ -70,15 +70,29 @@ import {
  */
 export async function createFlowRuntime(
   appConfig: AppConfig,
-  options: { sessionConfig?: ACPSessionConfig; workspaceRoot?: string; platformToolRefs?: PlatformToolRef[] } = {}
+  options: {
+    sessionConfig?: ACPSessionConfig;
+    workspaceRoot?: string;
+    platformToolRefs?: PlatformToolRef[];
+    /** ACP sessionId（MCP 工具 schema 缓存主键）；CLI 无 session 时省略。 */
+    sessionId?: string;
+    /** ACP 装配 phase：`new`（清缓存不读）/ `load`（读缓存）；省略按 load 处理。 */
+    sessionPhase?: string;
+  } = {}
 ): Promise<FlowRuntime> {
   const workspaceRoot = options.workspaceRoot ?? process.cwd();
   // 全流程加载耗时追踪（全局 env 开关 PERF_TRACE，默认开）：各阶段单独计时 + 收尾汇总，定位启动瓶颈。
   const perf = beginPerfSession("runtime.load");
 
-  // runtime.context 含 MCP 加载（getTools 通常是启动大头）。
+  // runtime.context 含 MCP 加载（getTools 通常是启动大头；命中工具 schema 缓存时近乎零）。
   const ctx = await timePhase("runtime.context", () =>
-    createRuntimeContextAsync(appConfig, options.sessionConfig, workspaceRoot)
+    createRuntimeContextAsync(
+      appConfig,
+      options.sessionConfig,
+      workspaceRoot,
+      options.sessionId,
+      options.sessionPhase
+    )
   );
   const sandbox = getFlowSandboxPolicy(appConfig);
 
@@ -367,7 +381,7 @@ async function main(): Promise<void> {
   await bootstrapFlowAcp({
     appConfig: baseConfig.appConfig,
     debug: args.debug,
-    createExecutor: async ({ sessionConfig, workspaceRoot }) => {
+    createExecutor: async ({ sessionConfig, workspaceRoot, sessionId, sessionPhase }) => {
       const { appConfig, raw } = loadFlowConfig({
         configPath: args.configPath,
         workspaceRoot,
@@ -381,6 +395,8 @@ async function main(): Promise<void> {
         sessionConfig,
         workspaceRoot,
         platformToolRefs: flowDef.platformToolRefs,
+        sessionId,
+        sessionPhase,
       });
       return {
         executor: materializeFlow(flowDef, runtime),

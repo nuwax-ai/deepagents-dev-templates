@@ -22,15 +22,17 @@ export async function verifyMcpServersWithToolList(
   serverNames: string[]
 ): Promise<Record<string, string[]>> {
   const out: Record<string, string[]> = {};
-  for (const name of serverNames) {
-    try {
-      const c = await client.getClient(name);
-      if (!c) continue;
-      const tools = parseToolNames(await c.listTools());
-      out[name] = tools;
-    } catch {
-      // listTools 失败视为未连接，不写入 out
-    }
-  }
+  // 并行对各 server 调 tools/list（彼此独立），降低多 server 时的串行等待。
+  await Promise.all(
+    serverNames.map(async (name) => {
+      try {
+        const c = await client.getClient(name);
+        if (!c) return;
+        out[name] = parseToolNames(await c.listTools());
+      } catch {
+        // listTools 失败视为未连接，不写入 out
+      }
+    })
+  );
   return out;
 }
