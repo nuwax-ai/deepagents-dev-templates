@@ -21,23 +21,9 @@
 
 ### 第 0 问：是否改图（先判定 default 是否够用）
 
-**铁律**：说不清「default 为什么不够」就不要改图。默认按**聊天助手型**交付；**勿把改图当菜单主动推销**。需求已命中下表「必须…」能力门槛时，再升级手写图（不必等用户念出「固定流程」四字）。
+**先读取当前工作目录 `docs/examples.md` 的“先判定”章节；它是唯一的图选型规则表。**本 Part 不复述该表。
 
-判定权威：当前工作目录 `docs/examples.md` § 先判定（与下表同构）。
-
-| 需求 | 形态 / 做法 | 改图？ |
-|------|-------------|--------|
-| 开放追问、客服、通用助手、搜索总结；模糊未指明形态 | **聊天助手型（default）**：`flow.active: "default"` + 平台能力登记 + Part 5 systemPrompt；**不写图、不设节点**（已含 ReAct + 多轮记忆） | 否 |
-| 按需调平台 / MCP 工具 | 登记后宿主注入或 get-config 固化；默认图可 `think.bindTools(runtime.allTools)` | 否 |
-| **必须**固定阶段顺序（先 A 再 B 再 C） | **固定流程型**：手写 `src/app/graph.ts`（Part 1 + Part 2） | 是 |
-| **必须** Send 并行、多源聚合、条件重试 | 手写图或子图（Part 2 + `docs/flow-patterns.md`） | 是 |
-| **必须** multi-turn HITL（人审 / 审批 / 定稿） | interrupt/resume（Part 1/2） | 是 |
-
-**聊天助手型默认路径（MVP 最快）**：`flow.active: "default"` + `dev-engineer-toolkit` 登记平台能力 + Part 5 systemPrompt ≈ 交付，**不写任何图代码**。
-
-> **反例（真实失败案例）**：「支持**追问和钻取**」被误判成 fanout 固定流程——每轮盲搜、无法真正追问。「追问」≠ 改图信号，正确落点：default ReAct + 平台能力登记 + Part 5 systemPrompt（业务提示词写 `prompts/<场景>.md` 同步平台，**勿覆盖** `prompts/flow.base.md` 通用基座）。
-
-**默认话术**（未命中「必须改图」行时）：`我先按“可追问的聊天助手”来做，这样交付最快、也最适合开放式需求。`
+记录选型理由后执行：权威文档判定为默认路径时，继续 Part 3 / Part 5；判定需要手写图时，继续 Part 1 / Part 2。说不清为什么需要改图时，回到权威文档与用户需求澄清，而不是自行扩大图的范围。
 
 1. **先查 runtime profile**：`pnpm flows -- --json`；推荐 `pnpm flows -- recommend --kind chat|pipeline`（注册表仅 `default`，用于确认交互形态而非选内置场景）
 2. **图选型**（已说明 default 不够、命中改图行）→ [part1-fixed-flow.md](part1-fixed-flow.md) § 图选型：对照节点 catalog 定 state/nodes/edges
@@ -61,21 +47,9 @@
 
 > **禁止**：未搜平台就写外部能力；为已登记能力手写 fetch 包装。联网搜索同样须先登记。
 
-### Factory 速查（手写路径）
+### Factory 与图规则
 
-| 需求 | Factory |
-|------|---------|
-| 用户可见大段 LLM 文本 | **`createLlmStreamNode`**（`write` 读 `r.text`） |
-| 中间 JSON / 结构化 | `createLlmNode`（`r.parsed` 时） |
-| LLM 裁决路由 | `createLlmRouterNode` |
-| tool_calls | `createToolExecNode` |
-| HITL interrupt（纯文本） | `createHumanApprovalNode` |
-| HITL **平台问答卡片**（interrupt 前展示表单） | present_review（节点内 direct-invoke 平台 ask-question MCP 工具）+ review（`createHumanApprovalNode` interrupt）两节点必拆，见 Part 2 § HITL |
-| HITL 后置定稿 | `createApprovalFinalizeNode` |
-| 同 turn 工具审批弹窗 | `createPermissionApprovalNode` |
-| input→HumanMessage | `createPrepareNode` |
-| Send 并行 | `createFanout` |
-| 子图 | `createSubgraphNode` |
+Factory 选型只读当前工作目录 `docs/node-catalog.md` 与 `docs/node-kit.md`；图规则只读 `docs/flow-graph-rules.md`。需要把规则落成节点、边、HITL 或流式实现时再打开 Part 2。
 
 ### 扩展范式参考
 

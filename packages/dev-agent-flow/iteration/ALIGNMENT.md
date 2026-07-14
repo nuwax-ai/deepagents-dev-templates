@@ -7,8 +7,9 @@
 
 | 层级 | 权威 |
 |------|------|
-| 可否报完成 | `orchestration/system-prompt.md` `<SESSION_CLOSE>` |
-| 是否改图 | L0 + 目标项目 `docs/examples.md` + flow-builder Part 0 |
+| 工程验证范围 | 目标项目 README 的工程验证矩阵 |
+| 平台回读 / 可否对外报完成 | `orchestration/system-prompt.md` `<SESSION_CLOSE>` |
+| 是否改图 | 目标项目 `docs/examples.md`；L0 与 flow-builder Part 0 只负责路由 |
 | 平台读写 / 登记 | `dev-engineer-toolkit` |
 | 操作步骤 | flow-builder Part* |
 | 收工证据 | `flow-debugger`（SSE + `.logs/`） |
@@ -34,6 +35,6 @@
 - manifest `requiredSections` 含 `MCP_USAGE`
 - 模板平台能力双路径表述已与 Part 3 一致（本轮未改模板文件）
 
-## 已知张力（未改模板）
+## 已知策略收窄
 
-- 无（本轮）
+- 模板运行时支持 `.agents/skills` / `.agents/agents` 工作区扩展；开发 Agent 为保证交付位置一致，统一使用 `builtin/` 或平台侧能力，并在 L0 明确标注为交付策略。

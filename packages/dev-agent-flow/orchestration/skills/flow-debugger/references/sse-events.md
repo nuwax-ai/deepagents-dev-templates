@@ -16,7 +16,7 @@
 
 > 调试会话 ID = `devConversationId`：`debug.sh` / `approve.sh` / `session.sh cancel` 默认 **GET `/{devAgentId}`** 取此字段；`CONVERSATION_ID` env 仅在与 API 一致或 API 不可用时兜底。`session.sh refresh` / `current` 显式拉取/打印该值。
 >
-> **新会话**：`session.sh new` 直接 `POST /conversation/create`（body `{agentId, devMode:true}`，响应 `data.id`）；后端 devMode 创建会回写 `agent.devConversationId`（`ConversationApplicationServiceImpl:317-322`），故 new 后无需额外 refresh——agent-dev 预览前端轮询该字段会自动切到新会话。备选：用户手动点「刷子」后 `wait --previous <旧ID>`/`refresh`。
+> **新会话**：`session.sh new` 直接 `POST /conversation/create`（body `{agentId, devMode:true}`，响应 `data.id`）；后端 devMode 创建会回写 `agent.devConversationId`（`ConversationApplicationServiceImpl:317-322`），故 new 后无需额外 refresh——平台调试预览前端轮询该字段会自动切到新会话。备选：用户手动点「刷子」后 `wait --previous <旧ID>`/`refresh`。
 
 ## SSE 事件（外层信封 ConversationChatResponse：`{eventType, data, error, requestId, completed}`）
 
@@ -77,6 +77,6 @@ skill 从中提取：文本回复 → `outputText`；工具调用 trace → `com
 
 1. **直接调 `conversationApplicationService.chat()`，勿走 `IAgentRpcService.executeAgent()`** —— 后者（`AgentApiServiceImpl.java:1369-1371`）把 FINAL_RESULT 映射成纯 `outputText`，丢弃 `componentExecuteResults`（为 MCP 设计），会让 skill 工具断言失效。参考 `ConversationController.java:256` / `ApiController.java:158`。
 2. **`devMode=true`**：`chat(req, headers, false, true)`（4 参重载，`ConversationApplicationService.java:134`）。
-3. **`conversationId` 挂用户预览会话**：用 `devConversationId`（`GET /{devAgentId}` 权威来源；勿盲信沙箱 `CONVERSATION_ID`）；devMode 下平台用之作 DevDebug 会话，执行消息写入 → 用户 agent-dev 预览面板可见。
+3. **`conversationId` 挂用户预览会话**：用 `devConversationId`（`GET /{devAgentId}` 权威来源；勿盲信沙箱 `CONVERSATION_ID`）；devMode 下平台用之作 DevDebug 会话，执行消息写入 → 用户平台调试预览面板可见。
 4. **认证复用 Sandbox AK**：`/api/v1/4sandbox/**` 在 JWT 白名单 + Sandbox AK 放行（`ApiKeyInterceptor.java:173` + `application.yml:70`），无需用户 JWT。
 5. **子路径镜像平台**：4sandbox 下的子路径与平台 `/api/agent/conversation/*` 一致（`chat` / `create` / `{id}` / `chat/stop/{id}` / `chat/permission-request/response`），仅前缀不同；`cancel` 路径参是 `conversationId` 不是 requestId。

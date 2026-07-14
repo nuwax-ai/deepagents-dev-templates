@@ -8,7 +8,7 @@
 
 与 `dev-agent`（面向 `deepagents-app-ts`，自由 tool loop）不同，本包面向 **`nuwax-flow-ts`** —— Agent 按 **LangGraph node + edge 图**跑（框架内置**默认 ReAct**，可手写扩展），而非自由 tool loop。
 
-**交付路径**：先判定 **default 是否够用**（权威：目标项目 `docs/examples.md` § 先判定）。说不清「为什么不够」→ `flow.active: "default"` + 平台能力登记 + systemPrompt，**不写图**（已含 ReAct + 多轮记忆）。**必须**固定阶段顺序、Send 并行/多源聚合/条件重试、或 multi-turn HITL 时，才加载 `flow-builder` Part 1/Part 2 手写 `src/app/graph.ts`（框架无脚手架、无 `src/libs/topologies/`、注册表仅 `default`）。**勿把改图当菜单推销**；命中能力门槛再升级。
+**交付路径**：先读取目标项目 `README.md` 与 `docs/examples.md`，按其权威判定选择默认图或手写图；再加载对应的 `flow-builder` Part 执行。
 
 ## 与 dev-agent 的关系
 
@@ -29,11 +29,11 @@
 
 | 层级 | 位置 | 职责 |
 |------|------|------|
-| **模板本体** | `deepagents-flow-ts/` 内 `README.md`、`docs/*`（含 **`docs/glossary.md` 术语表**）、`config/`、`prompts/` | 描述**本工作目录**内的能力、配置路径、图编排规则（`flow-graph-rules.md` R-G*）、排错索引；**不**承载开发 Agent 工作流 |
-| **开发 Agent 引导** | 本包 `orchestration/system-prompt.md`（**规则/约束**）+ `orchestration/skills/flow-builder/`（**实现步骤**）+ `orchestration/skills/dev-engineer-toolkit/` | `system-prompt` 定铁律；`flow-builder` Part 0–7 承载逐步流程（图选型落地、编排、提示词提炼、completion gate 等） |
+| **模板本体** | `deepagents-flow-ts/` 内 `README.md`、`docs/*`（含 **`docs/glossary.md` 术语表**）、`config/`、`prompts/` | 描述**本工作目录**内的技术事实、配置路径、图编排规则和工程验证；**不**承载开发 Agent 工作流 |
+| **开发 Agent 引导** | 本包 `orchestration/system-prompt.md`（**路由/平台门禁**）+ `orchestration/skills/`（**实现步骤**） | 系统提示词只定义开发 Agent 行为与平台边界；Skill Part 承载逐步流程 |
 | **能力与工具对照** | [../deepagents-flow-ts/docs/capabilities.md](../deepagents-flow-ts/docs/capabilities.md) | 平台工具 schema 来源、运行时装配、节点工具引用与 allTools 合并规则 |
 
-**单一权威原则**：图怎么写、规则 ID、factory API → 读目标项目 `docs/`；**可否报完成（completion gate normative）** → 本包 `orchestration/system-prompt.md` 的 `<SESSION_CLOSE>`；**操作细则**（命令、排错、证据怎么贴）→ `flow-builder` Part 0 § Phase 3–4 / Part 4。技能内 `references/flow-graph-rules-pointer.md` 仅为**路由页**，详表永远在目标项目 `docs/flow-graph-rules.md`。**术语**（聊天助手型 / 固定流程型、HITL 人审编排、flow profile、`flow.active`、durable stateful flow / topology / 护栏分语境 等）统一以目标项目 `docs/glossary.md` 为准。
+完整的单一权威源与去重规则见 [docs/documentation-ownership.md](docs/documentation-ownership.md)。技能内 `references/flow-graph-rules-pointer.md` 仅为**路由页**，详表永远在目标项目 `docs/flow-graph-rules.md`。
 
 **CLI 约定**（与模板 `package.json` scripts 对齐）：profile / graph / capabilities 用 `pnpm flows` / `pnpm graph` / `pnpm capabilities`，**禁止 `pnpm exec tsx`**（pnpm 10/11 沙箱预检问题见目标项目 `docs/troubleshooting.md`）。
 

@@ -1,216 +1,103 @@
 ---
 name: flow-debugger
-description: "当需要用平台真实链路端到端调试目标 Agent、验证 flow 真实跑通、断言平台能力真实调用、管理调试会话（拉取/等待新会话/取消）、处理权限审批与 ask-question、或分析 runtime 日志时使用。严格镜像平台 agent-dev 调试会话：发 prompt 驱动平台真实 agent 执行（非本地模拟），收 SSE 结构化结果（文本 + 工具调用 trace + 错误），自动判定通过/失败；执行出现在用户 agent-dev 预览会话。Keywords: 调试, debug, 真实执行, 端到端验证, 工具调用断言, 会话管理, 权限审批, ask-question, HITL, 多轮对话, SSE, outcome, 错误定位, 日志分析, 预览会话, flow-debugger"
+description: "当需要对目标 Agent 做平台侧真实调试运行时使用：端到端验证 flow 是否跑通、断言平台能力是否真实调用、管理调试会话、处理权限审批与 ask-question、用 runtime 日志佐证收工。非本地 pnpm flow；收工须 SSE + 日志双证。细节见正文与 references/operations.md。Keywords: 调试, 真实执行, 端到端验证, expect-tool, HITL, ask-question, 双证, flow-debugger"
 tags: [debug, verify, e2e, sse, outcome, tool-assertion, multi-turn, hitl, session, smoke-replacement]
-version: "1.5.2"
+version: "1.6.0"
 ---
 
 # 真实调试（flow-debugger）
 
-## 概述
+## 分层结构
 
-严格镜像平台 agent-dev 调试会话，提供平台真实链路的调试能力（非本地 rcoder-cli 模拟）。
-
-| 脚本 | 能力 | 对应 agent-dev 操作 |
-|------|------|---------------------|
-| `scripts/debug.sh` | 发 prompt 驱动真实 agent 执行（SSE）+ 通过/失败判定 + 工具断言 + HITL 处理 + 超时保护 | 预览面板发消息 |
-| `scripts/session.sh` | **新建会话（`new`）**/ 拉取会话 ID（`refresh`）/ 等待新 ID（`wait`）/ 查看配置（`current`）/ 取消（`cancel`，停止） | 刷子可脚本代建 / 手动点 / 停止按钮 |
-| `scripts/approve.sh` | 权限审批响应（批准/拒绝） | 权限弹窗批准/拒绝 |
-| `scripts/analyze-logs.sh` | 分析 `.logs/` runtime 日志（错误/工具调用/flow 状态/permission/模型问题） | — |
-
-> ask-question（`nuwax_ask_question` 工具）**无专用响应端点**——答案作为普通 chat 消息回流，用 `debug.sh --message "<答案>" --ask-marker <requestId>` 续接（见下）。
-
-所有脚本由平台沙箱运行时自动配置（`PLATFORM_BASE_URL` / `SANDBOX_ACCESS_KEY` / `DEV_AGENT_ID`）；`CONVERSATION_ID` env 仅作兜底。
-
-## 关键特性：用户预览会话可见
-
-`debug.sh` 默认 **GET `/{devAgentId}` 取 `devConversationId`**（权威调试会话 ID，如 `1555771`），作为 `conversationId` 传给后端。沙箱注入的 `CONVERSATION_ID` 若不一致会被忽略并打 `[DEBUG]` 提示。后端把执行挂到该会话 → **用户在 agent-dev 预览面板能实时看到调试输出**。
-
-## 会话安全策略（避免预览串位）
-
-`debug.sh` 发送前会查询当前 `devConversationId` 的 `taskStatus`。若会话仍为 `EXECUTING`，默认拒绝继续写入新 prompt，避免同一调试会话上一轮未结束时又追加用户消息，导致 agent-dev 预览 tab 在续流窗口出现两条 user 气泡连贴。
-
-推荐策略：
-
-- **收工/回归验证默认开新会话**：`./scripts/debug.sh --new-session --message "..." --with-logs`，或先 `./scripts/session.sh new`。
-- **需要上下文连续性才复用同一会话**：确保上一轮已终态，或使用 `./scripts/debug.sh --wait-idle --message "..."` 等待空闲后发送。
-- **stop/cancel 后复用同会话属于高风险路径**：先 `session.sh cancel`，再 `debug.sh --wait-idle --after-stop-wait 2 ...`；干净验证仍优先 `--new-session`。
-- **只在复现并发/冲突问题时强制发送**：显式加 `--allow-busy`。
-
-## 收工双证：平台 SSE + runtime 日志
-
-**成功与否必须以日志佐证**，不能只看 `[OUTCOME] PASS` 或 `debug.sh` exit 0：
-
-| 视角 | 脚本 | 佐证什么 |
-|------|------|----------|
-| 平台 SSE | `debug.sh` | 用户可见输出、工具 trace、`--expect-tool` 断言 |
-| runtime 内部 | `analyze-logs.sh` | 当前项目根 `.logs/` 下的错误、flowStatus、失败工具、模型/permission 问题 |
-
-**收工推荐**（一步完成双证）：
-
-```bash
-./scripts/debug.sh --message "…" --expect-tool Plugin_783 --with-logs --auto-approve
+```
+flow-debugger/
+├── SKILL.md                 ← L1 入口（本文件）：何时用 / 收工门禁 / HITL 摘要
+└── references/
+    ├── operations.md        ← 参数表 / 会话策略 / 脚本用法 / 退出码 / Windows
+    ├── sse-events.md        ← SSE 事件 + 平台端点契约
+    └── outcome-rules.md     ← 通过/失败判定 + 勿误报鉴权
 ```
 
-或分步：`debug.sh` 后紧接 `analyze-logs.sh --since 10`（有 `devConversationId` 时加 `--session <id>`）。**两者均 exit 0** 且 stderr 出现 `日志佐证通过` / `[结论] 日志正常` 方可报完成。SSE 绿但日志红 → **仍判失败**。
+**渐进加载**：`load_skill` 先读本文件；跑命令前再 `Read` [operations.md](references/operations.md)。判据 / 契约按需打开 outcome-rules、sse-events。
 
-**断言 / 日志工具失败不能人工绕过**：
+## 概述
 
-- `--expect-tool` 未命中，即使 agent 文本看起来用了工具，也不能报完成；先用 `--show-trace` 或 `get-config --key tools --full` 找到 runtime/SSE 英文工具名子串，修正 `--expect-tool` 后重跑同一主路径。
-- `analyze-logs` 找不到日志或文件名不匹配时，先扩大 `--since` / 指定 `--session`，或用 `analyze-logs.sh --file <实际日志文件>` 重跑；`cat` / 手工浏览日志只能辅助定位，不能替代 `[结论]` / `[flow 状态]` / `[工具调用]` 摘要。
-- 若脚本本身不支持当前日志格式，修脚本或明确报告调试工具阻塞；不得把“业务输出正确”写成 flow-debugger 通过。
-- **勿误报鉴权**：`debug.sh` exit 4(`--expect-tool` 未命中，常见中文登记名) / exit 5(HITL) 属断言 / 续接问题；工具 `done>0` 即最终有产出（个别 failed 会被 ReAct 重试消化），禁止写 Authorization 待办。判据与场景表 → [outcome-rules.md](references/outcome-rules.md) § 勿误报鉴权。
+做平台侧真实调试运行，提供真实链路的调试能力（非本地 `pnpm flow`）。执行挂到平台调试预览会话，用户可在预览面板看到输出。
 
-**日志目录约定**：开发阶段会话调试日志写入当前工作目录 / 目标项目根的 `.logs/`。`analyze-logs` 默认会找 `<cwd>/.logs` 并向上定位项目根；若从 skill 目录或其他目录执行导致误判，显式传 `--dir <项目根>/.logs` 或 `--file <实际日志文件>`。
+| 脚本 | 能力 | 对应平台调试操作 |
+|------|------|------------------|
+| `scripts/debug.sh` | 发 prompt 驱动真实执行（SSE）+ 判定 + 工具断言 + HITL + 超时 | 预览面板发消息 |
+| `scripts/session.sh` | `new` / `refresh` / `wait` / `current` / `cancel` | 刷子代建 / 手动点 / 停止 |
+| `scripts/approve.sh` | 权限审批响应（批准/拒绝） | 权限弹窗 |
+| `scripts/analyze-logs.sh` | 分析 `.logs/` runtime 日志佐证 | — |
 
 ## When to Use
 
-1. **收工验证 flow 端到端跑通** — `debug.sh --with-logs`（或 `debug.sh` + `analyze-logs.sh`）。
-2. **验证平台能力真实调用** — `debug.sh --expect-tool <工具名子串>`，断言工具被调用且成功。
-3. **管理调试会话** — 新会话用 `session.sh new` 直接代建（与 UI 刷子等价；改动 flow 代码后开干净会话验证最省事）；或让用户点「刷子」后 `refresh`/`wait --previous <旧ID>` 拉取；`current`/`cancel` 查看与停止。
-4. **处理权限审批** — `debug.sh --auto-approve` 自动批准；或遇 exit 5 用 `approve.sh` 响应。
-5. **回答 ask-question** — 遇 exit 5 用 `debug.sh --message "<答案>" --ask-marker <requestId>` 续接。
-6. **runtime 日志佐证** — 收工必经：`--with-logs` 或 `analyze-logs.sh`；报完成须贴 `[结论]` / `[flow 状态]` / `[工具调用]` 摘要。
+1. **收工验证 flow 端到端跑通** — `debug.sh --with-logs`
+2. **验证平台能力真实调用** — `--expect-tool <runtime/SSE 英文工具名子串>`
+3. **管理调试会话** — `session.sh new`（推荐）或刷子后 `refresh`/`wait`
+4. **处理权限审批** — `--auto-approve` 或 exit 5 后 `approve.sh`
+5. **回答 ask-question** — exit 5 后 `--message` + `--ask-marker`
+6. **runtime 日志佐证** — 收工必经；报完成须贴 `[结论]` / `[flow 状态]` / `[工具调用]`
 
-## 后端依赖
+## 收工双证：平台 SSE + runtime 日志
 
-后端会话接口已就绪：前缀 `/api/v1/4sandbox/agent`，会话接口（`/conversation/*`）经沙箱重写转发到内部 `/api/agent/conversation/*`，agent 配置（`GET /{devAgentId}`）直接暴露、返回 `devConversationId`（调试会话 ID）。新建会话（`session.sh new` → `POST /conversation/create {devMode:true}`）后端会回写 `devConversationId`，agent-dev 预览前端轮询该字段会自动切到新会话。契约集中在 `scripts/debug_http.py` 顶部常量。完整契约见 `references/sse-events.md`。
+不能只看 `[OUTCOME] PASS` 或 `debug.sh` exit 0：
 
-## 完整操作
+| 视角 | 脚本 | 佐证什么 |
+|------|------|----------|
+| 平台 SSE | `debug.sh` | 可见输出、工具 trace、`--expect-tool` |
+| runtime | `analyze-logs.sh` | `.logs/` 错误、flowStatus、失败工具、permission/模型 |
 
-### 1. 发消息真实执行 — `debug.sh`
+**默认收工命令**（一步双证；改过 flow 代码优先开新会话）：
 
 ```bash
-./scripts/debug.sh --message "你是谁？"                    # 执行出现在用户预览会话
-./scripts/debug.sh --new-session --message "干净验证"       # 先新建 dev 会话再发送（收工推荐）
-./scripts/debug.sh --wait-idle --message "同会话第二轮"      # 等当前会话终态后再发送
-./scripts/debug.sh --allow-busy --message "并发复现"        # 强制写入 busy 会话（仅用于冲突复现）
-./scripts/debug.sh --message-file prompts/test.md          # 中文/长 prompt 用 UTF-8 文件
-./scripts/debug.sh --message "搜索今天的AI新闻" --expect-tool search --with-logs   # 收工：SSE + 日志双证
-./scripts/debug.sh --message "测试" --auto-approve --with-logs
-./scripts/debug.sh --message "第二轮" --conversation <id>  # 多轮续接
-./scripts/debug.sh --message "答案" --ask-marker <requestId>          # 回答 ask-question
-./scripts/debug.sh --message "测试" --show-trace --max-time 900       # 完整 trace + 总时长上限
+./scripts/debug.sh --new-session --message "…" --expect-tool <子串> --with-logs --auto-approve
 ```
 
-| 参数 | 说明 |
+二者均 exit 0 且 stderr 有 `日志佐证通过` / `[结论] 日志正常` 方可报完成。SSE 绿但日志红 → **仍失败**。  
+断言未命中、日志找不到、勿误报鉴权等细则 → [operations.md](references/operations.md) + [outcome-rules.md](references/outcome-rules.md)。
+
+## 会话策略（摘要）
+
+- 收工/回归 → `--new-session` 或 `session.sh new`
+- 同会话续轮 → 先终态，或 `--wait-idle`
+- cancel 后复用 → 高风险；优先新会话
+- 强制 busy 写入 → 仅冲突复现时 `--allow-busy`
+
+完整说明 → [operations.md](references/operations.md) § 会话安全策略。
+
+## HITL 摘要
+
+| 类型 | 处理 |
 |------|------|
-| `--message` / `--message-file` | 调试 prompt（文本 / UTF-8 文件，二选一） |
-| `--conversation` | 会话 ID（覆盖自动解析；默认 GET agent → `devConversationId`） |
-| `--new-session` | 发送前新建 dev 调试会话（推荐用于干净验证；不可与 `--conversation` 同用） |
-| `--wait-idle` | 当前会话仍 `EXECUTING` 时轮询等待终态再发送 |
-| `--wait-idle-timeout` / `--wait-idle-interval` | `--wait-idle` 的等待超时/轮询间隔（默认 120s / 2s） |
-| `--after-stop-wait` | 发送前稳定等待 N 秒，适合刚 cancel/stop 后复用同会话 |
-| `--allow-busy` | 允许向 `EXECUTING` 会话继续发送（仅用于并发/冲突复现） |
-| `--expect-tool` | 期望被调用的**runtime/SSE 工具名子串**（断言 `componentExecuteResults` 命中且 success；禁止中文登记名，见 flow-builder Part 3 § 三层工具名；未命中时用 `--show-trace` / `get-config --key tools --full` 修正后重跑） |
-| `--auto-approve` | 自动批准权限审批（选首个 allow option） |
-| `--ask-marker` | 回答 ask-question：把 `<!--nuwax-mcp-ask-request-id:<requestId>-->` 追加到 message 末尾 |
-| `--variables` | 变量参数（JSON 字符串） |
-| `--timeout` / `--max-time` | SSE 单次读取超时（默认 180s）/ 总时长上限（默认 600s，0=不限） |
-| `--show-trace` / `--quiet` | 输出完整工具 trace / 不回显流式文本 |
-| `--with-logs` | 调试结束后自动跑 `analyze-logs` 佐证；SSE 绿但日志红 → exit 4 |
-| `--log-since` | `--with-logs` 时 analyze 窗口（分钟；0=按本次调试时长推算） |
+| 权限审批 | `--auto-approve`，或 exit 5 → `approve.sh` |
+| ask-question | exit 5 → `debug.sh --message "<答案>" --ask-marker <requestId>`（同 `conversationId` 续接） |
 
-**输出**：stdout = agent 文本（流式）；stderr = `[DEBUG]`/`[OUTCOME] PASS|FAIL`/`[进度]`/失败时 `[原因]`；`--with-logs` 时另有 `[日志佐证]`/`[结论]`。
-
-### 2. 会话管理 — `session.sh`
-
-> **新会话可直接代建**：`session.sh new` 调 `POST /conversation/create`（与 UI「刷子」等价），后端回写 `devConversationId`，agent-dev 预览前端轮询会自动切到新会话。改动 flow 代码后用 `new` 开干净会话验证最省事。备选：让用户手动点「刷子」后 `refresh`/`wait`。
-
-```bash
-./scripts/session.sh new                                    # 直接新建调试会话（推荐）
-./scripts/session.sh new -q                                 # 仅输出新会话 ID
-./scripts/session.sh refresh                                # 拉取当前 devConversationId
-./scripts/session.sh wait --previous "$OLD"                 # 备选：用户手动点刷子后轮询变化
-./scripts/session.sh current                                # agent 配置全文（含 devConversationId）
-./scripts/session.sh cancel                                 # 取消/停止（默认自动解析 devConversationId）
-./scripts/session.sh cancel --conversation <id>             # 取消指定会话
-```
-
-`session.sh cancel` 成功后，若继续同会话，请先用 `debug.sh --wait-idle` 等待后端终态稳定；若只是验证修复/收工，优先 `session.sh new` 或 `debug.sh --new-session`。
-
-### 3. 权限审批响应 — `approve.sh`
-
-`debug.sh` 遇 `ACP_REQUEST_PERMISSION` 未 `--auto-approve` 而 exit 5 时，用本脚本响应（option-id 来自 exit 5 列出的 options）：
-
-```bash
-./scripts/approve.sh --tool-id <toolCallId> --option-id <allow_option_id> --outcome selected    # 批准
-./scripts/approve.sh --tool-id <toolCallId> --option-id <reject_option_id> --outcome cancelled  # 拒绝
-```
-
-### 4. runtime 日志佐证 — `analyze-logs.sh`
-
-> **收工必经**：与 `debug.sh` 配对使用；单独 `[OUTCOME] PASS` 不算完成证据。
-
-```bash
-./scripts/analyze-logs.sh --since 10               # 调试后分析最近日志（推荐）
-./scripts/analyze-logs.sh --session <devConversationId>
-./scripts/analyze-logs.sh --dir <project-root>/.logs
-./scripts/analyze-logs.sh                # 分析最新 .logs/ 日志
-./scripts/analyze-logs.sh --file <path>  # 指定文件
-```
-
-stderr 须出现 **`[结论] 日志正常`**（exit 0）才可报通过；`[结论] 发现问题`（exit 4）即失败，即使 SSE 已通过。
-
-若默认查找不到日志但你已定位到实际日志文件，必须使用 `--file <path>` 让 `analyze-logs` 产出结论；直接 `cat` 日志不算收工证据。
-
-**`[性能]` 加载耗时**：日志含 runtime 装配各阶段计时时，会额外输出 `[性能] 加载总耗时≈<n>ms | <阶段>=<n>ms | ...`（按耗时降序）。用于定位启动瓶颈（常见大头：`mcp.getTools` / `runtime.context`）。该追踪由 flow-ts 侧全局 env 开关 `PERF_TRACE` 控制，**默认开启**（随时可排查性能问题）；无此段说明日志不含 perf 行（如已显式关闭），不影响成败判定。
-
-## HITL 处理流程
-
-`debug.sh` 执行时，SSE 流可能来两类人工介入事件：
-
-| 事件 | 触发 | `debug.sh` 行为 |
-|------|------|----------------|
-| **权限审批** `ACP_REQUEST_PERMISSION`（或 `PROCESSING`+`subEventType=REQUEST_PERMISSION`） | agent 要执行需审批的工具 | `--auto-approve` → 自动批准首个 allow option（调 `permission-request/response`），继续流；否则 exit 5 + 列出 options（用 `approve.sh` 响应） |
-| **ask-question** `PROCESSING`+`subEventType=ASK_QUESTION`（`nuwax_ask_question`） | agent 向用户提问 | exit 5 + 输出 question（requestId/title）；用 `debug.sh --message "<答案>" --ask-marker <requestId>` 续接（答案作为普通消息回流，带 marker） |
-
-> 响应 HITL 后用**同一 `conversationId`** 续接，上下文保持。
-
-## 退出码
-
-| 码 | 含义 |
-|----|------|
-| 0 | 成功（debug.sh 通过 / session/approve/analyze 成功且未发现问题） |
-| 1 | 参数错误 |
-| 2 | 平台运行时未就绪（沙箱 env 缺失） |
-| 3 | HTTP/SSE 失败（含后端端点未就绪 / 超时 / 流异常中断）；analyze-logs 找不到日志 |
-| 4 | 调试不通过（outcome 判定失败）；analyze-logs 发现问题 |
-| 5 | 遇 HITL（权限审批/ask-question）待人工响应（仅 debug.sh） |
-
-## Windows / 编码
-
-本地 Windows 命令走 Git Bash；`python3` 常为商店占位（不可用），统一执行 `./scripts/*.sh`（内部 `lib/ensure-python.sh` 自动探测 `python → python3 → py -3 → uv`），**禁止** `python3` 失败后改手写 `curl`。中文/长 prompt 用 `--message-file` 指向 UTF-8 文件，**禁止**命令行内联多行中文。
-
-```bash
-./scripts/check-python.sh --install   # Python 不可用时（需 PATH 中有 uv）
-```
-
-> 脚本内部 `.py` 走 `configure_stdio_utf8()` + 请求头 `charset=utf-8` + `ensure_ascii=False`，中文不会乱码（与 `dev-engineer-toolkit` 同机制）。
+细节与退出码表 → [operations.md](references/operations.md)。
 
 ## 关联技能
 
 | 技能 | 何时用 |
 |------|--------|
-| **flow-builder Part 4a** | 本地 `.logs/` runtime 日志六步排查（与 analyze-logs.sh 互补） |
-| **dev-engineer-toolkit** | 调试前确认配置/工具已登记：`get-config.sh --key tools` |
+| **flow-builder Part 4a** | 本地 `.logs/` 六步排查（与 `analyze-logs` 互补） |
+| **flow-builder Part 4b** | 收工必经路由到本技能（本 Skill 即证据源） |
+| **dev-engineer-toolkit** | 调试前确认工具已登记：`get-config.sh --key tools` |
 
 ## Anti-patterns
 
-- ❌ **只看 debug.sh exit 0 不报日志**：须 `--with-logs` 或贴 `analyze-logs` 的 `[结论]`/`[flow 状态]`/`[工具调用]` 摘要。
-- ❌ **用本地模拟冒充真实调试**：`pnpm flow` / rcoder smoke 不能替代 `debug.sh --with-logs`。
-- ❌ **工具登记了却不验证真实调用**：`--expect-tool` 断言 `componentExecuteResults` 命中且 success。
-- ❌ **HITL 不处理**：权限审批用 `--auto-approve` 或 `approve.sh`；ask-question 用 `--ask-marker` 续接，别让会话卡住。
-- ❌ **命令行内联多行中文 prompt**：用 `--message-file` 读 UTF-8 文件。
-- ❌ **绕过脚本手写 curl 调 4sandbox**：统一走 `./scripts/*.sh`。
-- ❌ **上一轮仍 EXECUTING 时继续普通发送**：默认会拒绝；上下文续接用 `--wait-idle`，干净验证用 `--new-session`，冲突复现才用 `--allow-busy`。
-- ❌ **stop 后马上复用旧会话**：先等终态稳定（`--wait-idle --after-stop-wait 2`），否则容易进入预览续流竞态。
-- ❌ **工具最终有产出却写 Authorization 待办**：`analyze-logs` 显示目标工具 `done>0` 时，断言失败 / HITL / 个别瞬态 failed 都不是鉴权故障（**勿误报鉴权**，见 § 勿误报鉴权）。
-- ✅ **需要新会话**：`session.sh new` 直接代建（与刷子等价，后端回写 devConversationId，前端自动切换）；手动点刷子 + `wait`/`refresh` 作备选。
-- ✅ **收工用 debug.sh --with-logs**：SSE + runtime 日志双证。
-- ✅ **平台能力用 --expect-tool 断言** + **HITL 用 --auto-approve/approve.sh/--ask-marker 处理**。
+- ❌ 只看 `debug.sh` exit 0、不跑 `--with-logs` / 不贴日志摘要
+- ❌ 用 `pnpm flow` 冒充真实调试
+- ❌ 登记了工具却不 `--expect-tool`
+- ❌ HITL 不处理导致会话卡住
+- ❌ 命令行内联多行中文（用 `--message-file`）
+- ❌ 手写 curl 调 4sandbox（统一 `./scripts/*.sh`）
+- ❌ `EXECUTING` 时普通连发；stop 后立刻复用旧会话
+- ❌ 工具已有产出却写 Authorization 待办（勿误报鉴权）
+- ✅ 收工：`debug.sh --new-session … --with-logs` + 需要时 `--expect-tool`
 
 ## 参考
 
-- `references/sse-events.md` — SSE 事件结构 + AgentExecuteResult + 严格平台端点契约 + 给后端约束
-- `references/outcome-rules.md` — 通过/失败判定规则 + 工具断言 + 错误聚合
+- [operations.md](references/operations.md) — 参数表 / 会话 / 脚本 / 退出码 / Windows
+- [sse-events.md](references/sse-events.md) — SSE + 端点契约
+- [outcome-rules.md](references/outcome-rules.md) — 判定规则 + 勿误报鉴权

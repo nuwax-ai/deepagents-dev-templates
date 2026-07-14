@@ -8,7 +8,7 @@
 
 1. **决策更少误触发**：先判定 `default` 是否够用；说不清为什么不够就不改图。
 2. **上下文更省**：L0 系统提示词管铁律，L1 `SKILL.md` 管路由，L2 `references/part*.md` 管步骤。
-3. **完成标准更硬**：按改动类型选择验证矩阵；`pnpm flow` 明确不能冒充端到端。
+3. **完成标准更硬**：工程验证范围由模板 README 矩阵确定，平台回读与对外完成门禁由 `<SESSION_CLOSE>` 确定；`pnpm flow` 明确不能冒充端到端。
 4. **平台边界更清**：平台配置、平台工具、技能登记都必须经 `dev-engineer-toolkit`，禁止手写等价替代。
 5. **调试证据更强**：平台真实链路由 `flow-debugger` 负责，要求 SSE 与 runtime 日志双证。
 6. **迭代更可审计**：`orchestration/` 是交付真源，`iteration/` 是台账、drift 与静态门禁。
@@ -19,11 +19,11 @@
 
 | 维度 | 好的标准 | 当前证据 | 分 |
 |------|----------|----------|----|
-| 任务判定 | 能阻止不必要改图，先走最低成本路径 | `system-prompt.md` 的 default-first；`flow-builder` Part0 路由 | 2 |
+| 任务判定 | 能阻止不必要改图，先走最低成本路径 | 目标项目 `docs/examples.md` 权威判定；L0 + `flow-builder` Part0 路由 | 2 |
 | 边界清晰 | 能区分开发 Agent / 目标 Agent / 平台配置 / 工作区文件 | `<TEMPLATE_IDENTITY>`、`<PLATFORM_CONFIG>`、`<AGENT_INTENT_DISAMBIGUATION>` | 2 |
 | 渐进披露 | 常驻上下文只放铁律，细节按需加载 | L0/L1/L2 分层；`flow-builder` 每次只开一个 Part | 2 |
 | 工具纪律 | 平台能力先搜索登记，再读取真实 schema / 工具名 | `dev-engineer-toolkit` + Part3 + `get-config --key tools --full` | 2 |
-| 完成门禁 | 不同改动有不同验证标准，不能偷换“完成” | `<SESSION_CLOSE>` 验证矩阵；`flow-debugger` 证据要求 | 2 |
+| 完成门禁 | 不同改动有不同验证标准，不能偷换“完成” | 模板 README 工程验证矩阵 + `<SESSION_CLOSE>` 平台门禁 + `flow-debugger` 证据要求 | 2 |
 | 可回朔 | 能说明某次改动目标、文件、验证、后台同步状态 | `ITERATION.md`、`VERSIONS.md`、`scoreboard.md` | 2 |
 | 防漂移 | 能校验仓内交付物和平台期望是否一致 | `agent.manifest.json` + `iteration/checks/*` + sample drift | 2 |
 | 术语一致 | 避免 persona / prompt / skill / subagent 混用 | 术语统一到 `docs/glossary.md`，系统提示词使用“目标 Agent 系统提示词” | 2 |

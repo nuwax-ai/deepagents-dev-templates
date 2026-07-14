@@ -51,30 +51,15 @@
 
 ### 工具登记与图内接线
 
-平台 `add-tool` 负责**登记/启用**；登记后工具进入运行时的方式有**两路来源**，图内用法有**三种接线**，不必全部塞进 `runtime.allTools`。
+平台 `add-tool` 只负责**登记/启用**。登记后的业务选型（宿主注入还是 `platformToolRefs` 固化、模型按需还是流程强制、`allTools` 还是局部集合）以当前工作目录 `docs/capabilities.md` 的“业务场景：平台能力如何进图”为准；本 Part 不复制该决策表。
 
-#### 来源（二选一或并用）
+执行选型时：
 
-| 来源 | 做法 | 产物 |
-|------|------|------|
-| **宿主注入** | 平台会话 / ACP / MCP 下发已登记能力 | `StructuredTool` 进入 `runtime.allTools`（或等价注入集合） |
-| **配置固化** | `get-config.sh --key tools --full` 拉真实 schema → 写入 `FlowDef.platformToolRefs`（或等价本地固化点）→ `createPlatformStructuredTool` | `StructuredTool`（由 runtime 按 schema 生成，**零包装代码**） |
+1. 用 `get-config.sh --key tools --full` 的真实 `toolName` / `targetType` / `targetId` / 完整 `schema`，不要手抄搜索结果。
+2. 需要版本化固化时，把完整配置写入 `FlowDef.platformToolRefs`；runtime 会生成 `StructuredTool`，不是让你再写 fetch / `tool()` 包装。
+3. 按权威表选择独立节点、局部集合或 `runtime.allTools`；调试时用 `flow-debugger` 确认本会话确实注入或装配了该工具。
 
-- `get-config` 返回的 `toolName` / `targetType` / `targetId` / 完整 `schema` 可固化到 `platformToolRefs`；`project.md` 只记决策摘要（targetId、真实工具名、接线方式、验证方式）。
-- **禁止**照 `search-apis.sh` 结果手抄半截 schema；**禁止**为已登记能力另写 fetch / `tool()` 包装（固化 schema ≠ 自写实现）。
-- 禁止硬编码 URL、密钥或鉴权值；schema 里的 `${...}` 占位符由运行环境解析。
-
-#### 用法（按图需要选一种或组合）
-
-| 用法 | 适用场景 | 接线方式 |
-|------|----------|----------|
-| **独立节点** | 固定管道点名调某一个 Plugin（如「每轮必搜」） | `createPlatformToolActionNode({ tools, toolName, args, write })` 或节点内对 `StructuredTool` 直接 `invoke` |
-| **局部工具集合** | 某段 ReAct / 子图只需部分平台工具 | `pickTools(tools, ["真实工具名"])` → `createToolExecNode({ tools: selected })`；或子图 `bindTools(selected)` |
-| **并入 allTools（可选）** | 默认 ReAct、聊天助手型、模型按需选工具 | 宿主注入或 `platformToolRefs` 装配进 `runtime.allTools` → `think.bindTools(runtime.allTools)` |
-
-- **默认 ReAct / 聊天助手型**：登记 + systemPrompt 点名即可，**不写图**；宿主注入或固化后并入 `allTools` 是便捷路径之一。
-- **固定管道 / 自建图**：优先按节点或局部集合接线；不必为了「能用平台工具」强行把所有工具挂进 `allTools`。
-- **调试确认**：若 `get-config` 能看到工具但运行未调用，先用 `flow-debugger` 查本次会话是否实际注入 / 固化工具（SSE/runtime 工具名、MCP server、日志中的 `Loaded MCP tools`）。
+禁止硬编码 URL、密钥或鉴权值；schema 里的 `${...}` 占位符由运行环境解析。
 
 > **示例免责**：下列 `targetId` / 工具名均为**结构占位**，非真实工具；真实值**必须**经 `search-apis.sh` → `add-tool.sh` → `get-config.sh --key tools --full` 获取，**禁止照抄本文数值 / 名称**。
 

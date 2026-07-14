@@ -1,8 +1,8 @@
 ---
 name: flow-builder
-description: "在当前工作目录开发 LangGraph Flow 时使用。覆盖：Part0 端到端流程与 completion gate；Part1 固定流程型的图选型与落地（part1-fixed-flow.md，手写 src/app/graph.ts，含 HITL 人审编排，无脚手架）；Part2 StateGraph 编排（HITL/流式/问答卡片）；Part3 工具与平台能力绑定（写图前须配合 dev-engineer-toolkit 搜索登记，含联网搜索）；Part4 验证调试与 flow-debugger 真实调试；Part5 系统提示词与用户输入提炼；Part6 子智能体委派；Part7 技能集成。适用于新建/修改 flow、聊天助手型默认路径、图规则 R-G001+、跑不通或平台真实执行排查。框架注册表仅 default，无 scaffold / 无 libs/topologies / 无内置场景 flow，扩展范式见 docs/examples.md。禁止写 .agents/；LangGraph TS API 查官方文档。Keywords: flow开发, StateGraph, LangGraph, HITL, flow-debugger, 工具绑定, subagent, systemPrompt, 平台能力, 联网搜索, flow-builder"
+description: "在当前工作目录开发或改造 LangGraph Flow 时使用。负责把目标项目 docs/ 里的技术事实落成施工步骤：Phase 0–4 总流程与收工清单（part0）；需求分类与图选型——先判定默认 ReAct 是否够用，固定阶段/Send 并行/HITL 人手写图（part1）；手写 StateGraph、流式输出 R-G009、HITL 选型（part2）；自写工具、平台能力登记、Plugin/技能登记、联网搜索、permissions 工具审批（part3）；验证排错与 HITL 卡死排查（part4a）；flow-debugger 真实执行/工具断言收工必经（part4b，pnpm flow 不能替代）；目标 Agent 系统提示词设计、用户输入提炼与平台同步（part5，禁止 AGENT.md）；子智能体/subagent 委派（part6，禁止 .agents/agents/）；Skill 集成（part7，禁止本地写 .agents/skills/）。图规则 R-G001+ / factory API / 术语分别读当前工作目录 docs/flow-graph-rules.md、node-kit.md、glossary.md；选型权威表读 docs/examples.md。本 Skill 只路由与步骤，不复制模板技术规则；平台在线配置读写交给 dev-engineer-toolkit；真实链路验证交给 flow-debugger。Keywords: flow开发, StateGraph, LangGraph, HITL, flow-debugger, 工具绑定, subagent, systemPrompt, 平台能力, 联网搜索, permissions, 流式输出, parseJson, 固定流程, ReAct, flow-builder, R-G009"
 tags: [flow, orchestration, tools, prompt, subagent, stategraph, hitl, debug]
-version: "3.4.0"
+version: "3.5.0"
 ---
 
 # Flow 开发（当前工作目录）
@@ -56,13 +56,9 @@ flow-builder/
 
 ```
 会话启动 → part0（依赖 / 系统提示词基线 / 读 docs）
-第 0 问（part0 § Phase 1）：先判定 default 是否够用 → 够用则聊天助手型（flow.active=default + 平台能力登记 + part5 systemPrompt，不写图）
-              └ 必须固定阶段 / Send 并行 / HITL？→ 继续 ↓
-需工作区外能力（Plugin/技能/外部 API；联网搜索较常见）？→ part3 § 平台能力登记（强制，写图前）→ dev-engineer-toolkit → add-tool 后加载 flow-debugger
-              └ 含联网？→ 追加 part3 § 联网搜索
-              └ 图选型（part1）→ 直接改 src/app/graph.ts（part2 编排）
-开发迭代快检：pnpm flow / pnpm flows / debug.sh 短 prompt（**非** completion gate；**禁止 pnpm exec tsx**）
-收工（顺序写死）：part0 § Phase 3 → 静态三连 → flow-debugger debug.sh --with-logs [--expect-tool] → part0 § Phase 4 报告（含「flow-debugger 证据」小节）
+图选型 → 先读目标项目 docs/examples.md，再按结论选择 Part 1 / Part 2 或默认路径
+平台能力 → Part 3 + dev-engineer-toolkit；真实链路验证 → Part 4 + flow-debugger
+收工 → 目标项目 README 工程验证矩阵 + Part 0 的执行步骤 + 系统提示词平台门禁
 系统提示词 / 用户输入提炼？→ part5（含平台同步）→ dev-engineer-toolkit
 跑不通 / HITL 卡住？→ part4a 排错（**不替代** part4b 收工）
 ```
@@ -90,15 +86,9 @@ flow-builder/
 | `dev-engineer-toolkit` | 平台在线配置读写；**写图前** search-apis / search-skills / get-config / add-tool；part5 保存与回读 |
 | `flow-debugger` | **收工必经**：`debug.sh --with-logs` + `--expect-tool`；**`pnpm flow` 不能替代** |
 
-## L1 铁律
+## L1 约束
 
-- **文档分工**：图规则 / factory API / 配置路径 / **术语** → 当前工作目录 `docs/`（**术语权威**：`docs/glossary.md`）；**可否报完成** → 系统提示词 `<SESSION_CLOSE>`（normative）；图选型 / 平台登记 / 收工**操作细则** → 本技能 Part*。
-- 图是契约；factory 优先；**Bespoke nodes** 不硬塞 factory；框架注册表仅 `default`（ReAct），**无 scaffold / 无 `src/libs/topologies/` / 无内置场景 flow**——固定流程型（含流程内 HITL 人审）直接改 `src/app/graph.ts`，扩展范式对照 `docs/examples.md` / `docs/flow-patterns.md`；保护区不改。
-- **用户可见大段 LLM 输出**（compose / aggregate / draft / 修订稿）→ **`createLlmStreamNode`**（`write` 读 `r.text`）；**禁止** `createLlmNode`（仅 invoke）；**R-G009**。
-- **平台能力（外部工具/Plugin/技能）** → **写图前**必须先 `dev-engineer-toolkit` 搜平台并 `add-tool`，再用 `get-config --key tools --full` 确认真实工具名与 schema（**禁止**手抄）；登记后**宿主注入或固化**为 LangGraph `StructuredTool`，按需用于**独立节点** / **局部工具集合** / **可选 allTools**（细则 → Part 3）；**禁止**为已登记能力手写 fetch/`tool()` 包装；**`add-tool` 后加载 `flow-debugger`**；收工须 `debug.sh --with-logs` + `--expect-tool` + 日志 `[结论]`；**禁止**用 `pnpm flow` 冒充端到端；**联网搜索较常见**，见 Part 3 § 联网搜索；禁止未搜平台就写外部能力、禁止以「用户待配置」代替登记（见 Part 3 § 平台能力登记、Part 0 completion gate）。
-- **禁止写 `.agents/`**：内置能力写 `builtin/`（Part 6、Part 7）；平台能力走平台。
-- **防开发技能污染**：`flow-builder` / `dev-engineer-toolkit` / `flow-debugger` 只属于本开发 Agent；禁止写进目标 Agent `systemPrompt`，也禁止作为目标业务 Agent 的运行时 `skills/tools` 绑定。回读发现污染先移除再报完成（Part 3 / Part 5）。
-- **Subagent `AGENT.md`**：默认不写 `tools` / `model`；禁止平台 Plugin 登记名进 `tools`；联网由主 Agent 搜后写入 `task.description`；多岗串行 `task`（Part 6）。
-- 有状态用 `createStatefulFlow`（**HITL durable stateful flow** 默认；`conversational: true` 为对话型，默认图即走此路径）；**禁止手写外层 run-loop**（见 part2）。
-- **系统提示词非空** — 用户输入提炼进 `systemPrompt`；Part 5 § 用户输入提炼；收工 Part 0 清单
-- **收工必经 Part 4b** — Phase 3：`pnpm typecheck && pnpm test && pnpm graph` → `flow-debugger --with-logs`；**`pnpm flow` = 开发快检，≠ completion gate**；**禁止 `pnpm exec tsx`**；未跑 part4b / 无「flow-debugger 证据」小节禁止报 done。
+- 模板技术事实只读当前工作目录 `README.md` 与 `docs/`；本 Skill 不复制图规则、factory API、目录结构或验证矩阵。
+- 图选型先读 `docs/examples.md`，图规则 / factory API / 术语分别读 `docs/flow-graph-rules.md`、`docs/node-kit.md`、`docs/glossary.md`。
+- 本 Skill 的职责是把这些事实落成步骤：按需读取一个 Part，平台操作交给 `dev-engineer-toolkit`，真实链路验证交给 `flow-debugger`。
+- 平台回读、防开发 Skill 污染和可否对外报完成遵守开发 Agent `system-prompt.md`；工程验证范围遵守目标项目 README。

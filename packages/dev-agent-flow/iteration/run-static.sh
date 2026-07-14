@@ -20,6 +20,7 @@ run check-prompts
 run check-skills
 run check-no-junk
 run check-mcp-usage
+run check-document-ownership
 run check-case-schema
 run check-platform-drift
 
