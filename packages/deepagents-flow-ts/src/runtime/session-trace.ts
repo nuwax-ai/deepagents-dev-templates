@@ -24,6 +24,11 @@ const log = logger.child("session-trace");
 export interface AcpPromptCycle {
   sessionId: string;
   startedAt: number;
+  /**
+   * `session/prompt` `_meta.requestId` 透传的业务请求 ID（一轮用户消息）。
+   * 与 JSON-RPC `/$/cancel_request` 的 requestId、ask-question 表单 requestId 不是同一概念。
+   */
+  requestId?: string;
   /** query | resume */
   mode?: string;
   query?: string;
@@ -64,6 +69,7 @@ export function acpPromptLogFields(extra?: Record<string, unknown>): Record<stri
   if (!cycle) return extra ?? {};
   return {
     sessionId: cycle.sessionId,
+    ...(cycle.requestId ? { requestId: cycle.requestId } : {}),
     promptMs: Date.now() - cycle.startedAt,
     ...(cycle.mode ? { mode: cycle.mode } : {}),
     ...extra,
@@ -275,6 +281,7 @@ export async function traceFlowRun<T extends {
 export function logAcpPromptStart(meta: {
   sessionId: string;
   query: string;
+  requestId?: string;
   mode?: string;
   resuming?: boolean;
   isStateful?: boolean;
@@ -283,6 +290,7 @@ export function logAcpPromptStart(meta: {
     getEffectiveLogLevel() === "debug" ? meta.query : truncateForLog(meta.query, 200);
   log.info("prompt_start", {
     sessionId: meta.sessionId,
+    ...(meta.requestId ? { requestId: meta.requestId } : {}),
     ...(meta.mode ? { mode: meta.mode } : {}),
     ...(meta.resuming != null ? { resuming: meta.resuming } : {}),
     ...(meta.isStateful != null ? { isStateful: meta.isStateful } : {}),
@@ -296,6 +304,7 @@ export function logAcpPromptStart(meta: {
 export function logAcpPromptEnd(meta: {
   sessionId: string;
   startedAt: number;
+  requestId?: string;
   /** ACP 协议返回给客户端的 stopReason（end_turn / cancelled / …）。 */
   stopReason: string;
   /** flow 内部状态（interrupted / done），与 stopReason 不同：HITL interrupt 仍返回 end_turn。 */
@@ -309,6 +318,7 @@ export function logAcpPromptEnd(meta: {
 }): void {
   const fields: Record<string, unknown> = {
     sessionId: meta.sessionId,
+    ...(meta.requestId ? { requestId: meta.requestId } : {}),
     promptMs: Date.now() - meta.startedAt,
     stopReason: meta.stopReason,
   };
@@ -328,9 +338,11 @@ export function logPromptComplete(meta: {
   sessionId: string;
   stopReason: string;
   promptMs: number;
+  requestId?: string;
 }): void {
   log.info(`prompt_complete ${meta.stopReason}`, {
     sessionId: meta.sessionId,
+    ...(meta.requestId ? { requestId: meta.requestId } : {}),
     stopReason: meta.stopReason,
     promptMs: meta.promptMs,
   });

@@ -31,6 +31,7 @@ import {
   loadSessionConfigFromEnv,
   mergeAcpSessionConfig,
   resolveAcpSessionConfig,
+  extractRequestIdFromAcpParams,
 } from "./session-config.js";
 import {
   logConfigureSessionDiagnostics,
@@ -401,6 +402,7 @@ export {
   sessionConfigFromParams,
   resolveAcpSessionConfig,
   extractSystemPromptFromParams,
+  extractRequestIdFromAcpParams,
   coalesceSystemPromptValue,
   loadSessionConfigFromEnv,
   mergeAcpSessionConfig,
@@ -429,7 +431,11 @@ export function createFlowHooks(options: FlowAcpOptions): DeepAgentsServerHooks 
   // 实现了 hasStarted 的 flow 优先从 checkpointer 推断续跑（跨进程/IDE 重启仍准）。
   const fallbackResume = new Set<string>();
   /** 记录每轮 onPrompt 起始时间，供 onPromptComplete 写 prompt_complete。 */
-  const promptTurnStartedAt = new Map<string, number>();
+  // 一轮 prompt 的起点 + NuwaClaw requestId（onPromptComplete 收尾时仍可用）。
+  const promptTurnMeta = new Map<
+    string,
+    { startedAt: number; requestId?: string }
+  >();
 
   /** 取该 session 的 executor：优先 per-session 缓存，回退单 executor；createExecutor 模式下缺失则懒建。 */
   async function resolveExecutor(
@@ -554,14 +560,16 @@ export function createFlowHooks(options: FlowAcpOptions): DeepAgentsServerHooks 
       // configureSession 未触发时（部分 host）仍保证 per-session log writer 就位。
       setLogSession(sessionId);
       const promptStartedAt = Date.now();
-      promptTurnStartedAt.set(sessionId, promptStartedAt);
+      // NuwaClaw 经 session/prompt `_meta.requestId` 透传；CLI / 无 meta 宿主则为 undefined。
+      const requestId = extractRequestIdFromAcpParams(ctx.params);
+      promptTurnMeta.set(sessionId, { startedAt: promptStartedAt, requestId });
       // ① 协议层：收到 session/prompt
-      logAcpPromptStart({ sessionId, query: text });
+      logAcpPromptStart({ sessionId, query: text, requestId });
 
       const executor = await resolveExecutor(sessionId);
       if (!executor) {
-        log.warn("onPrompt: no executor available for session", { sessionId });
-        promptTurnStartedAt.delete(sessionId);
+        log.warn("onPrompt: no executor available for session", { sessionId, requestId });
+        promptTurnMeta.delete(sessionId);
         return undefined;
       }
       const isStateful = typeof executor !== "function";
@@ -569,7 +577,7 @@ export function createFlowHooks(options: FlowAcpOptions): DeepAgentsServerHooks 
         isStateful && typeof (executor as StatefulFlow).hasStarted === "function";
 
       return runInAcpPromptCycle(
-        { sessionId, startedAt: promptStartedAt, query: text },
+        { sessionId, startedAt: promptStartedAt, query: text, requestId },
         async () => {
           const stats = createAcpStreamStats();
           const inflightTools = new Map<string, ToolCallEvent>();
@@ -594,10 +602,11 @@ export function createFlowHooks(options: FlowAcpOptions): DeepAgentsServerHooks 
             ctx.signal
           );
 
-          const endTurn = (meta: Omit<Parameters<typeof logAcpPromptEnd>[0], "sessionId" | "startedAt">) => {
+          const endTurn = (meta: Omit<Parameters<typeof logAcpPromptEnd>[0], "sessionId" | "startedAt" | "requestId">) => {
             logAcpPromptEnd({
               sessionId,
               startedAt: promptStartedAt,
+              requestId,
               streamed: stats.streamed,
               streamChars: stats.streamChars,
               tokenChunks: stats.tokenChunks,
@@ -694,13 +703,14 @@ export function createFlowHooks(options: FlowAcpOptions): DeepAgentsServerHooks 
 
     /** ③ 协议层：deepagents-acp 确认 turn 已结束（含 onPrompt 短路路径）。 */
     async onPromptComplete(ctx) {
-      const startedAt = promptTurnStartedAt.get(ctx.sessionId);
+      const turn = promptTurnMeta.get(ctx.sessionId);
       logPromptComplete({
         sessionId: ctx.sessionId,
         stopReason: ctx.stopReason,
-        promptMs: startedAt != null ? Date.now() - startedAt : 0,
+        promptMs: turn != null ? Date.now() - turn.startedAt : 0,
+        requestId: turn?.requestId,
       });
-      promptTurnStartedAt.delete(ctx.sessionId);
+      promptTurnMeta.delete(ctx.sessionId);
     },
 
     /** session/set_config_option(model)：更新 sessionConfig 并热重建 executor（think 节点闭包绑定新 model）。 */

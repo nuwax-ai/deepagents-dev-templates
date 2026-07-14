@@ -7,7 +7,12 @@
  */
 
 import { afterEach, describe, it, expect } from "vitest";
-import { acpMcpToRecord, resolveAcpSessionConfig, sessionConfigFromParams } from "../src/surfaces/acp/server.js";
+import {
+  acpMcpToRecord,
+  extractRequestIdFromAcpParams,
+  resolveAcpSessionConfig,
+  sessionConfigFromParams,
+} from "../src/surfaces/acp/server.js";
 
 describe("acpMcpToRecord（MCP 形态归一化）", () => {
   it("undefined / null / 非对象 → undefined", () => {
@@ -175,5 +180,27 @@ describe("resolveAcpSessionConfig（env + params 合并）", () => {
     });
     expect(sessionConfig.model).toBe("from-env");
     expect(sessionConfig.mcpServers).toEqual({ ctx: { command: "npx" } });
+  });
+});
+
+describe("extractRequestIdFromAcpParams（NuwaClaw _meta 透传）", () => {
+  it("优先读 _meta.requestId", () => {
+    expect(
+      extractRequestIdFromAcpParams({
+        _meta: { requestId: "rid-001", request_id: "rid-ignored" },
+      })
+    ).toBe("rid-001");
+  });
+
+  it("requestId 缺失时回退 request_id", () => {
+    expect(
+      extractRequestIdFromAcpParams({ _meta: { request_id: "rid-snake" } })
+    ).toBe("rid-snake");
+  });
+
+  it("无 _meta / 空串 → undefined", () => {
+    expect(extractRequestIdFromAcpParams(undefined)).toBeUndefined();
+    expect(extractRequestIdFromAcpParams({})).toBeUndefined();
+    expect(extractRequestIdFromAcpParams({ _meta: { requestId: "  " } })).toBeUndefined();
   });
 });

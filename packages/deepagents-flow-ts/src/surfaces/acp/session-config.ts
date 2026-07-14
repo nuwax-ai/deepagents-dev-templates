@@ -176,6 +176,21 @@ export function readAcpParamsMeta(
   return meta as Record<string, unknown>;
 }
 
+/**
+ * 从 ACP `session/prompt` params._meta 提取透传的业务 requestId。
+ * 宿主约定：`_meta.requestId` / `_meta.request_id`（见 nuwaclaw acpEngine.buildPromptMeta）。
+ * 非官方 PromptRequest 字段，缺省时返回 undefined（CLI / 其他宿主仍正常）。
+ */
+export function extractRequestIdFromAcpParams(
+  params: Record<string, unknown> | undefined
+): string | undefined {
+  if (!params) return undefined;
+  const meta = readAcpParamsMeta(params);
+  if (!meta) return undefined;
+  const id = meta.requestId ?? meta.request_id;
+  return typeof id === "string" && id.trim() ? id.trim() : undefined;
+}
+
 function extractFromMeta(meta: Record<string, unknown>): string | undefined {
   const direct =
     coalesceSystemPromptValue(meta.systemPrompt) ?? coalesceSystemPromptValue(meta.system_prompt);
