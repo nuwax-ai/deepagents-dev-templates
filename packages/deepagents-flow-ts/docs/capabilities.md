@@ -52,6 +52,23 @@ pnpm sessions       # 已持久化的会话
 - **换模型**：改 `config.model` 或设 `ANTHROPIC_MODEL` / `OPENAI_MODEL`（见 [`.env.example`](../.env.example)）。
 - **换协议**：设 `API_PROTOCOL=anthropic|openai`，或 `LLM_PROVIDER`（同义别名）。`loadConfig` 会打 `platformModelEnv` / `resolveModelProvider` 诊断日志（密钥脱敏）；未替换的 `{MODEL_PROVIDER_*}` 占位符会 `warn`。
 
+## 业务场景：平台能力如何进图
+
+这一节是平台能力接入的**选型权威**。先在平台登记并取得真实配置，再根据业务控制方式选择注入或固化、以及工具在图中的位置；不要因为“能调用”就一律塞进 `allTools`。
+
+| 业务场景 | 工具来源 | 图内接线 | 取舍 |
+|---|---|---|---|
+| 用户开放提问，模型自行决定是否查搜索、知识库或业务 API | 优先宿主注入；需要可复现配置时固化 `platformToolRefs` | 并入 `runtime.allTools`，`think.bindTools(...)` | 适合聊天助手；不改图即可让模型按需调用 |
+| 每次流程都必须调用某个能力，例如“先查额度再审批” | 固化 `platformToolRefs`，使用真实 `targetType` / `targetId` / `schema` | `createPlatformToolActionNode(...)` 或节点内 `StructuredTool.invoke(...)` | 调用顺序由图保证，不依赖模型是否产生 tool call |
+| 某个子图或 ReAct 阶段只能使用少量能力 | 宿主注入集合或固化产物的子集 | `pickTools(...)` → `createToolExecNode(...)`，或 `bindTools(selected)` | 缩小权限与模型选择空间，避免无关工具干扰 |
+| 不同租户、会话或平台环境决定可用能力，代码不应保存其 schema | 宿主会话注入 | 使用注入集合；运行时检查工具是否存在 | 保持动态性；不要把短期或环境专属 schema 写入项目 |
+| 平台能力需要随代码版本稳定复现，或固定管道必须依赖它 | `get-config --key tools --full` 返回的真实配置固化为 `FlowDef.platformToolRefs` | runtime 的 `createPlatformStructuredTool` 生成 `StructuredTool`，再按上述方式接线 | schema 声明即接入；不另写 HTTP / `tool()` 包装 |
+| 平台搜索和登记后确认没有能力可用 | 在 `src/app/` 自写业务工具 | 按 [node-kit.md](node-kit.md) 的 `tool()` + Zod 注册到 `createFlowTools()` | 这是最后手段；记录搜索依据，密钥只从环境读取 |
+
+选型顺序：先问“**调用由模型决定还是流程决定**”，再问“**是否只应暴露给局部节点**”，最后问“**配置需不需要随代码稳定复现**”。前两问决定 `allTools`、局部集合或独立节点；最后一问决定宿主注入还是 `platformToolRefs` 固化。纯 LLM 对话不需要为了预防性扩展而接入工具。
+
+固化时必须使用平台已登记工具的完整真实配置（包括 `toolName`、`targetType`、`targetId`、完整 `schema` 及运行所需字段），而不是搜索结果的片段。`FlowDef.platformToolRefs` 经 `createPlatformToolDescriptors` / `createPlatformStructuredTool` 生成的是 LangChain `StructuredTool`，供 LangGraph 节点和 `bindTools` 消费；它不是旧 `*.flow.json` 或 `spec.tools` 配置。
+
 ## 工具接入优先级
 
 在本仓库内扩展业务能力时，按下列顺序判断（扩展方式见上文 [扩展（不改 src/libs/ 保护区）](#扩展不改-srclibs-保护区)）：

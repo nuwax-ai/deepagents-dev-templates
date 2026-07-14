@@ -1,12 +1,25 @@
 # 通用工作流编排模板
 
-**通用工作流编排模板** —— Agent 按**显式设计的 node + edge 图**（LangGraph StateGraph）跑工作流，而不是自由的 tool loop。
+**通用工作流编排模板** —— 编排范式固定为 **LangGraph `StateGraph` + node/edge**（显式图编排）；禁止无图、模型自驱调工具的「自由 tool loop」。开箱 **default ReAct 图** 已覆盖多数对话与平台能力场景，通常只改 systemPrompt，不必另写图。
 
-本项目是 **工作流编排 Agent**（显式 LangGraph 图），与 Coding Agent（tool loop）产品形态不同；运行时基础能力由项目内置底层运行时（`src/runtime/`）承担，「大脑」是一张可设计的节点图。
+本项目是 **工作流编排 Agent**：「大脑」是可设计的节点图（默认 ReAct，可扩展为固定管道 / Send / multi-turn HITL）；checkpoint、MCP、压缩、流式等底座由 `src/runtime/` 承担。
 
-> **开发方式**：源码工作区直接改图、用 `tsx` 跑命令（**迭代期不要 `pnpm build`**，避免阻塞）。本地快检：`pnpm flow`；查 profile：`pnpm flows -- --json`。**勿用 `pnpm exec tsx`**（pnpm 10/11 混用易卡在 exec 前预检）。端到端在平台预览会话经 ACP surface 验证。
+> **开发方式**：**默认不改图**——优先改 `prompts/` + 平台配置；确需进阶形态时才改 `src/app/graph.ts`。用 `tsx` 跑命令（**迭代期不要 `pnpm build`**）。本地快检：`pnpm flow`；查 profile：`pnpm flows -- --json`。**勿用 `pnpm exec tsx`**（pnpm 10/11 混用易卡在 exec 前预检）。端到端须经平台预览会话（ACP surface），`pnpm flow` 不能代替。
 
-> **本文档**介绍当前工作目录的项目结构、分层规则、命令与检查清单；API 细节见源码与 [`docs/`](docs/README.md)。
+> **本文档与 `docs/` 是模板技术事实的权威来源**：项目结构、分层规则、配置路径、命令、图规则与工程验证都只在此维护。开发 Agent 的平台操作门禁与 Skill 路由属于 `packages/dev-agent-flow/`，不得把其提示词或 Skill 内容复制回模板文档。**改图判定**见 [docs/examples.md](docs/examples.md) § 先判定；术语见 [docs/glossary.md](docs/glossary.md)；API 细节见源码与 [`docs/`](docs/README.md)。
+
+## 工作方式
+
+先判定 **default ReAct 图是否已经够用**；说不清「为什么不够」就不要改图。
+
+| 路径 | 做法 | 改图？ |
+|------|------|--------|
+| **默认（多数需求）** | `flow.active: "default"`——开放追问 / 客服 / 通用助手 / 搜索总结，以及按需调平台。已内置 ReAct、多轮记忆（checkpointer）、压缩、流式与工具回路；主业是把用户需求提炼进 **systemPrompt**，并按需登记平台能力（宿主注入或 get-config 固化后按需接线；聊天助手捷径 → `think.bindTools(runtime.allTools)`） | 否 |
+| **固定阶段顺序**（先 A 再 B 再 C） | 手写 [src/app/graph.ts](src/app/graph.ts)（必要时 `state.ts` / `default-flow.ts`） | 是 |
+| **Send 并行 / 多源聚合 / 条件重试** | 手写图或子图；对照 [docs/flow-patterns.md](docs/flow-patterns.md) | 是 |
+| **multi-turn HITL**（人审 / 审批 / 定稿，interrupt/resume） | 节点优先用 [src/libs/nodes/](src/libs/nodes/) factory | 是 |
+
+节点优先 factory、bespoke 才手写；图是契约，质量优先于速度。不要主动建议改图——仅当需求明确命中上表「改图」行时才动 `graph.ts`。
 
 ## 快速开始
 
@@ -15,7 +28,7 @@ pnpm install
 pnpm flow "你好"          # 经 tsx 直跑；无凭证走 fallback 也能跑
 ```
 
-**拼你自己的 flow** = 组合 `src/libs/nodes/` 的节点 factory + 在 `src/app/graph.ts` 连线：
+**拼你自己的 flow**（仅当 default ReAct 图不够时）= 组合 `src/libs/nodes/` 的节点 factory + 在 `src/app/graph.ts` 连线：
 
 ```ts
 import { createLlmStreamNode, createHumanApprovalNode } from "./libs/nodes/index.js";
@@ -34,15 +47,21 @@ const graph = new StateGraph(S)
 ```
 
 - **节点选型**见 [docs/node-catalog.md](docs/node-catalog.md)；**factory API** 见 [docs/node-kit.md](docs/node-kit.md)
-- **多轮 chat / 检索 / 平台能力**：直接改 [src/app/graph.ts](src/app/graph.ts) 或对照 [docs/examples.md](docs/examples.md)（仅文档，无内置 demo）
+- **多轮 chat / 检索 / 平台能力**：保持 `flow.active: "default"`，改 [prompts/](prompts/) / systemPrompt / 平台能力登记；对照 [docs/examples.md](docs/examples.md)（仅文档，无内置 demo）
 - 进阶模式（Send / interrupt / subgraph / **durable stateful flow**）见 [docs/flow-patterns.md](docs/flow-patterns.md)
 
 ## 项目结构 + 分层
 
+| 区 | 路径 | 规则 |
+|----|------|------|
+| **保护区** | `src/core/` `src/runtime/` `src/libs/` `src/surfaces/` `src/index.ts` | 业务 Agent 开发**默认禁止改**；仅在用户明确要求、框架缺陷修复、或目标能力无法在 app/config 层完成时例外，且须说明原因并补验证 |
+| **可编辑** | `src/app/` `prompts/` `config/` `builtin/` | 自由改；**默认不改图**——优先只动 `prompts/` + 平台配置；改图才动 `graph.ts` / `state.ts` |
+| **只读参考** | `docs/examples.md` `docs/flow-patterns.md` `docs/node-catalog.md` | 先判定是否改图见 `examples.md`；按文档思路自行实现，**无内置 demo** |
+
 ```
 src/
   core/          纯类型契约（各层共享）
-  runtime/       底层运行时（config/model/logger/mcp/checkpoint/llm-resilience + flow-config/flow-runtime）
+  runtime/       底层运行时（config/model/logger/mcp/checkpoint/llm-resilience + flow-config/flow-runtime；`paths.ts` 统一 `~/.flowagents` 数据根；`mcp/tool-schema-cache.ts` 为 ACP 会话 MCP schema 磁盘缓存）
   libs/          ★ 可复用构建件（保护、消费不改）
     nodes/         节点 factory + 原语（建 flow 用，见 node-kit.md）+ model-resolver（凭证策略）
     tools/         内置通用工具（bash/fs/grep·glob/demo/http/json/skill；MCP 工具由 runtime 经 @langchain/mcp-adapters 原生注入，非 toolkit 静态导出）
@@ -54,7 +73,7 @@ src/
 config/ prompts/ skills/ scripts/ docs/ tests/
 ```
 
-**Layering** — imports only flow leftward: **`core → runtime → libs → app → surfaces → index.ts`**. Within `libs`, `nodes` / `tools` / `deepagents-acp` / `mcp` do not cross-import. `tests/layering.test.ts` enforces this (`layerOf` at libs top-level); **no exceptions**.
+**Layering** — 依赖方向只能是 **`core → runtime → libs → app → surfaces → index.ts`**（业务改动落在 `app`，勿随意改下层）。`libs` 内 `nodes` / `tools` / `deepagents-acp` / `mcp` 不交叉 import。`tests/layering.test.ts` 强制执行（`layerOf` at libs top-level）；**no exceptions**。
 
 ## 建 flow
 
@@ -62,11 +81,11 @@ config/ prompts/ skills/ scripts/ docs/ tests/
 
 `createLlmNode` · `createLlmStreamNode` · `createLlmRouterNode`（LLM 裁决 → Command goto）· `createToolExecNode` · `createHumanApprovalNode`（HITL 前置 interrupt）· `createApprovalFinalizeNode`（HITL 后置定稿）· `createMcpRetrievalNode`（主动 MCP 检索）· `createPrepareNode` · `createFanout` · `createSubgraphNode`
 
-> **Bespoke nodes** — do not force into a factory (multi-source retrieval merge, file delivery, converse routing, etc.); keep hand-written. See [node-catalog.md](docs/node-catalog.md) § BESPOKE。
+> **Bespoke nodes**（定制节点）— do not force into a factory（勿硬塞进 factory；如 multi-source retrieval merge / 多源检索合并、file delivery / 文件交付、converse routing / 对话路由等）；keep hand-written（保持手写）。See [node-catalog.md](docs/node-catalog.md) § BESPOKE。术语权威 → [glossary.md](docs/glossary.md)。
 
-落地方式：
+落地方式（与上文「工作方式」同构，细则见 [docs/examples.md](docs/examples.md)）：
 
-1. **默认多轮 chat**：保持 `flow.active: "default"`，改 [src/app/graph.ts](src/app/graph.ts) / systemPrompt / 平台能力登记
+1. **默认多轮 chat**：保持 `flow.active: "default"`，改 [prompts/flow.base.md](prompts/flow.base.md) / `config.agent.systemPrompt` / 平台能力登记——**不改** `graph.ts`
 2. **进阶形态**：组合 `libs/nodes` factory 在 `graph.ts` 连线；对照 [docs/examples.md](docs/examples.md) 与 [docs/flow-patterns.md](docs/flow-patterns.md)
 
 **选图**：`config/flow-agent.config.json` 的 `flow.active`（缺省 `default`；旧顶层 `activeFlow` 兼容读取）经 [src/app/flows/index.ts](src/app/flows/index.ts) 解析——注册表**仅 default**。`pnpm graph` 导出默认图 topology。
@@ -77,13 +96,26 @@ config/ prompts/ skills/ scripts/ docs/ tests/
 
 ## 开发规则
 
+- **default 优先** — 说不清「default 为什么不够」就不改图；开放追问 / 客服 / 平台工具对话走 default + systemPrompt。
 - **图是契约** — 连线/条件路由在 `graph.ts`；节点优先 factory、bespoke 才手写到 `nodes/`；决策逻辑抽纯函数 + 单测。
 - **先 factory 后手写** — 节点先查 [node-kit.md](docs/node-kit.md)；bespoke 保留并注释「为何不用 factory」。
-- **保护区** — `core`/`runtime`/`libs`/`surfaces` 默认不改；`src/app/` 可改。
-- **有状态用基座** — `createStatefulFlow`，不手写 run-loop。
+- **保护区** — `core`/`runtime`/`libs`/`surfaces` 默认不改；`src/app/`、`prompts/`、`config/` 可改。
+- **有状态用基座** — `createStatefulFlow`，禁止手写外层「模型↔工具」总循环。
+- **平台能力** — 写外部能力前先搜索并登记；禁止为已登记能力手写 fetch / `tool()` 包装（`get-config` 固化 `platformToolRefs` 允许）。
 - **工具顺序** — native MCP（`config/mcp.default.json` + ACP session 合并）→ `libs/tools` 内置（bash/fs/grep·glob/http/json）→ 自写代码。
 - **密钥** — 环境变量，禁止硬编码。
 - **依赖只在本仓库** — 缺能力 `pnpm install` / 在 `src/runtime/` 扩展 / copy-in，不引仓库外路径。
+
+## 平台配置与 systemPrompt
+
+| 概念 | 落点 |
+|------|------|
+| 目标 Agent 系统提示词 | `config.agent.systemPrompt` / `systemPromptPath`（默认 [prompts/flow.base.md](prompts/flow.base.md)）；ACP 会话时 host 补充指令**追加**其后，不覆盖本地身份提示词 |
+| 欢迎语 | 平台 `openingChatMsg`（经宿主配置） |
+| 运行时自动追加 | `createFlowRuntime` 装配后追加 **Available MCP Servers**（仅 tools/list 已验证）、**Available Skills**、**Subagents**——**禁止**手工复制进 `prompts/` 定稿源 |
+| 平台能力 | Plugin / Workflow / Knowledge 等在**平台侧**登记；宿主注入或 `FlowDef.platformToolRefs` 固化 |
+
+`systemPrompt` 须非空（业务 Agent 上线前）。定稿写在 `prompts/`，再同步平台并回读校验。
 
 ## 默认图（唯一产品入口）
 
@@ -106,11 +138,17 @@ START → prepare → think(model.bindTools) ──(toolsCondition)──┐
 状态用标准消息流（`MessagesAnnotation`），自动进 `FileCheckpointSaver`（跨重启恢复 + interrupt/resume）。
 **会话压缩**不在 `prepare` 内：由 `createStatefulFlow` 在每轮新 `query` 入口调用 `applyCompaction`（消费 `config.compaction`）。
 工具集来自 `FlowRuntime.allTools`（[src/app/flow-tools.ts](src/app/flow-tools.ts)）：bash / 文件读写 / grep·glob / http / json + **native MCP**（经 `@langchain/mcp-adapters` 加载；**开发期**平台 `mcpConfigs` 登记 + **运行期** ACP session `mcpServers` 合并 `config/mcp.default.json`，默认 session-wins；**内置 `ask-question`（结构化提问 fallback），不内置搜索/文档 server**）+ demo(echo/calculate/time) + 可选 `load_skill` / `task`（子智能体 subagent 委派，流式透出 token 与 `[subagent] tool` 调用）。
+
+**MCP 加载**（细节以实现为准：[runtime-context.ts](src/runtime/context/runtime-context.ts) / [tool-schema-cache.ts](src/runtime/mcp/tool-schema-cache.ts) / [verify-mcp-tool-list.ts](src/runtime/mcp/verify-mcp-tool-list.ts)）：
+运行时经 `@langchain/mcp-adapters` 枚举并注入工具；单 server 失败尽量不拖垮其余。ACP 会话可缓存工具 schema 以加快冷启动（命中时可跳过枚举，工具调用时再连）；仅对已连通 server 做 `tools/list` 验证后写入 system prompt 的 MCP 段（未验证不冒充已连接）。
+
 无模型凭证时 think 走 fallback（回显输入），图始终可跑、可测。见 [src/app/graph.ts](src/app/graph.ts)。
 
 能力分层与配置见 [docs/capabilities.md](docs/capabilities.md)。扩展思路见 [docs/examples.md](docs/examples.md)（仅文档）。
 
 **关键接入层（seam）**：surface 与具体图解耦。[src/surfaces/acp/server.ts](src/surfaces/acp/server.ts) 的 `bootstrapFlowAcp` 和 [src/surfaces/cli/run.ts](src/surfaces/cli/run.ts) 的 `runFlowCli` 按 `typeof executor` 自动分流 flow。ACP 路径用 deepagents-acp 的 `onPrompt` 钩子跑 executor、经 `conn` 流式回传、返回 `{ stopReason }` **绕过 deep agent 默认循环**。
+
+ACP **per-session 工厂**（[src/index.ts](src/index.ts) `createExecutor`）：`session/new` | `session/load` 的 `configureSession` 按 `cwd` / `mcpServers` / `model` 装配独立 runtime（可附带 session 身份供 MCP 加载策略使用，细节见源码）。`session/close` 时 `dispose` 释放该 session 的 MCP stdio 子进程；`set_model` 热切换按 load 语义重建 executor。CLI `flow` 无 ACP session。
 
 ## 运行
 
@@ -127,7 +165,9 @@ pnpm flow -- -i
 pnpm graph              # JSON；加 -- --mermaid 输出 Mermaid
 pnpm capabilities     # 无凭证
 pnpm flows -- --json
+pnpm flows recommend --kind chat   # 按交互形态推荐 flow
 pnpm sessions
+pnpm sessions delete <thread-id> # 删除已持久化会话
 
 # 静态检查（迭代友好，无 build）
 pnpm typecheck && pnpm test
@@ -139,14 +179,28 @@ pnpm typecheck && pnpm test
 
 | 目标 | 方式 |
 |---|---|
-| 本地快检 | `pnpm flow "..."` / `pnpm flow -- -i` |
-| 端到端（平台预览） | ACP surface + 平台预览会话（`config.flow.active`） |
-| 日志 | 读 `.logs/`（`LOG_DIR=<REPO>/.logs`，`LOG_LEVEL=debug`） |
+| 本地快检 | `pnpm flow "..."` / `pnpm flow -- -i`（**≠ 平台端到端**；未经 ACP 真实预览链路） |
+| 端到端（平台预览） | ACP surface + 平台预览会话（`config.flow.active`）；改过 flow 代码后**开新会话**再测，避免旧上下文污染 |
+| 日志 | 默认 `~/.flowagents/logs/<agent>-<sessionId>-<日期>.log`；`LOG_DIR` 可覆盖根目录；`LOG_LEVEL=debug` |
+| 启动耗时 | `PERF_TRACE` 默认开（`mcp.getTools` / `mcp.cache` 等阶段）；设 `PERF_TRACE=0` 关闭 |
+| MCP schema 缓存 | ACP 会话可选；排查见日志 `mcp.cache`（路径/失效策略以实现为准） |
 | Export graph topology | `pnpm graph`（`pnpm graph -- --mermaid`） |
 | 能力 / flow profile | `pnpm capabilities` / `pnpm flows -- --json` |
 | 类型检查 | `pnpm typecheck` |
 
-> 迭代期优先 `pnpm flow` 短 prompt；**不要**为日常调试跑 `pnpm build`。
+> 迭代期优先 `pnpm flow` 短 prompt；**不要**为日常调试跑 `pnpm build`。`pnpm flow` / `pnpm typecheck` / `pnpm test` 只能当开发自检，不能据此声称「平台预览已跑通」。
+
+## 工程验证矩阵（模板权威）
+
+按本轮实际改动选用；同时命中多行时取更严格的一行。
+
+| 改动类型 | 必须验证 |
+|----------|----------|
+| 仅本地文档 / 提示词草稿（未同步平台） | 格式检查；无脚本时检查 Markdown / 误改无关文件 |
+| 仅纯文本平台配置（`systemPrompt` / `openingChatMsg`） | 平台写入并回读校验 |
+| `src/app/` flow 代码 / 图结构 | `pnpm typecheck` + `pnpm test` + `pnpm graph` + 新会话 ACP 预览 |
+| 平台能力 / Plugin / Workflow / Knowledge | 登记并回读 + 新会话 ACP 预览（含工具调用路径） |
+| HITL / Send / 多分支 / resume | 静态三连 + 新会话 + 覆盖 interrupt/resume 或分支路径 |
 
 ## Export graph topology（可视化对接）
 
@@ -173,7 +227,13 @@ const { nodes, edges, mermaid } = await getFlowTopology();
 
 默认模型 `openai / deepseek-chat`（见 [config/flow-agent.config.json](config/flow-agent.config.json)，已对齐国内 OpenAI 兼容端点；切回 Anthropic 把 `model.provider` 设为 `anthropic`）。各端点配置见 [`.env.example`](.env.example)。
 
-> 升级提示：会话/checkpoint 默认目录已从项目内 `./.flow-sessions` 调整为用户目录 `~/.flowagents/<workspace 散列>/`。如果需要继续读取旧会话，把 `config.memory.dir` 显式设回 `./.flow-sessions`；新项目建议保留默认值，避免会话文件混进工作区。
+> **数据目录**（同源常量 [src/runtime/paths.ts](src/runtime/paths.ts)，默认根 `~/.flowagents`，可用 `config.memory.dir` 覆盖）：
+> - **会话/checkpoint**：`<根>/sessions/<workspace 12 位散列>/`（每 thread 一个 JSON）
+> - **日志**：`<根>/logs/`（per-session 文件；`LOG_DIR` 可覆盖）
+> - **MCP 工具 schema 缓存**（可选）：`<根>/cache/` 下按会话存放（以实现为准）
+> - **产物**：`<根>/artifacts/<workspace 散列>/`
+>
+> 升级提示：旧默认 `./.flow-sessions` 已迁出工作区。若要读旧会话，把 `config.memory.dir` 显式设回 `./.flow-sessions`（或指向原目录）；新项目建议保留 `~/.flowagents` 默认值。
 
 ## 测试
 
@@ -185,13 +245,16 @@ pnpm test
 
 ## 提交前检查
 
-- [ ] 无硬编码密钥 · 无 `any` · import 带 `.js` 后缀
-- [ ] 节点名不与 state channel 同名 · 决策函数（条件边路由）有单测
+- [ ] 无硬编码密钥 · 无 `any` · 业务源码不使用 CommonJS `require()` · import 带 `.js` 后缀
+- [ ] 节点名不与 state channel 同名 · 条件边路由有单测
 - [ ] 分层合规（`layering.test.ts` 绿）· runtime 自包含（无仓库外路径）
+- [ ] `systemPrompt` 非空 · `prompts/` 定稿未含运行时自动追加段（`Available Skills` / `Available MCP Servers` 等）
+- [ ] 默认路径未无谓改图 · 改图能说明 default 为何不够
+- [ ] 验证矩阵已满足（`pnpm flow` 不能代替平台预览）
 
 ## 流式输出检查清单
 
-用户可见的大段 LLM 输出（compose / aggregate / draft / finalize 修订等）需满足：
+用户可见的大段 LLM 输出（compose / aggregate / draft / finalize 修订等）需满足（规则 R-G009；细则见 [docs/flow-graph-rules.md](docs/flow-graph-rules.md)）：
 
 1. **选对 factory**：用 `createLlmStreamNode`（`write` 读 `r.text`），不要用 `createLlmNode`（仅 `invoke`，无逐 token）
 2. **Surface 注入 onToken**：经 `createStatefulFlow` / ACP / CLI 跑图时，`configurable.onToken` 已自动注入；自建 runner 需手动传入 `FlowCallbacks.onToken`
@@ -206,7 +269,7 @@ pnpm test
 | 能力 | 说明 |
 |------|------|
 | 工作区检索 | `grep` / `glob` 工具（`createSearchTools`）；**非**联网；ReAct 默认图经 `flow-tools.ts` 注册 |
-| **平台能力对话** | 改 default 图 systemPrompt + 平台登记搜索/知识工具；可并入 `allTools` 供 ReAct bind，或按节点/集合接线 |
+| **平台能力对话** | 改 systemPrompt + 平台登记搜索/知识工具（**不改图**）；可并入 `allTools` 供 ReAct bind，或按节点/集合接线 |
 | 固定管道工具节点 | `createPlatformToolActionNode` / `createToolExecNode` / `createMcpRetrievalNode` |
 | **运行时注入** | `src/runtime/` / `src/app/flow-tools.ts`；平台会话能力与项目配置汇总为 runtime 工具集 |
 
@@ -224,4 +287,4 @@ pnpm test
 - [docs/troubleshooting.md](docs/troubleshooting.md) — **排错索引**（`LLM 未返回 JSON` / Invalid edge / HITL / 图与文档漂移）
 - [docs/flow-patterns.md](docs/flow-patterns.md) — 进阶模式（Send/interrupt/Command/subgraph/checkpointer/durable stateful flow）
 - [docs/glossary.md](docs/glossary.md) — **术语对照表**
-- **API 细节看源码**：`FlowRuntime`（[src/runtime/flow-runtime.ts](src/runtime/flow-runtime.ts)）、`FlowCallbacks`（[src/core/flow-types.ts](src/core/flow-types.ts)）、`createFlowRuntime`（[src/index.ts](src/index.ts)）、Surface Seam（[src/surfaces/](src/surfaces/)）、ACP hooks（[src/libs/deepagents-acp/](src/libs/deepagents-acp/)）、`createFlowTools`（[src/app/flow-tools.ts](src/app/flow-tools.ts)）
+- **API 细节看源码**：`FlowRuntime`（[src/runtime/flow-runtime.ts](src/runtime/flow-runtime.ts)）、`FlowCallbacks`（[src/core/flow-types.ts](src/core/flow-types.ts)）、`createFlowRuntime`（[src/index.ts](src/index.ts)）、MCP schema 缓存（[src/runtime/mcp/tool-schema-cache.ts](src/runtime/mcp/tool-schema-cache.ts)）、Surface Seam（[src/surfaces/](src/surfaces/)）、ACP hooks（[src/libs/deepagents-acp/](src/libs/deepagents-acp/)）、`createFlowTools`（[src/app/flow-tools.ts](src/app/flow-tools.ts)）
