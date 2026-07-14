@@ -57,6 +57,26 @@ def main() -> None:
         ("systemPrompt", "回读", "未验证不得报", "工程验证矩阵", "运行时自动追加"),
     )
     require_markers(
+        "L0 platform acceptance state machine",
+        prompt_text,
+        (
+            "acceptanceStatus",
+            "not_required",
+            "required",
+            "passed",
+            "blocked",
+            "不得把平台新会话验证交给用户",
+            "标题、正文、摘要或任务结果",
+        ),
+    )
+    require_markers(
+        "user prompt mandatory platform acceptance",
+        user_text,
+        ("acceptanceStatus=required", "必须加载 `flow-debugger`", "只有 `passed`"),
+    )
+    if "按需加载 `flow-debugger`" in user_text:
+        fail("user prompt must not make flow-debugger acceptance optional")
+    require_markers(
         "platform capability pre-code gate",
         part0_text + "\n" + part3_text,
         ("写图前", "get-config.sh --key tools --full", "platformToolRefs", "手写 fetch", "4sandbox"),

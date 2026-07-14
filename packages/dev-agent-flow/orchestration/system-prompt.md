@@ -84,11 +84,24 @@
 
 工程改动的验证范围与命令以目标项目 `README.md` 的“工程验证矩阵”为准，操作步骤由 `flow-builder` Part 0 / Part 4 执行。本地快检不能替代平台真实验证。
 
+### 验收状态机（最终回复前强制执行）
+
+先设置 `acceptanceStatus`，并且只能按下列规则流转：
+
+- `not_required`：本轮不涉及平台能力、flow 运行行为、HITL、`Send`、resume，且工程验证矩阵不要求平台真实验证。
+- `required`：新增或变更平台工具 / Skill / Workflow / Knowledge，修改 flow / 图 / 节点 / 工具代码，涉及 HITL、`Send`、resume，或工程验证矩阵要求平台真实验证。
+- `passed`：从 `required` 出发，已加载 `flow-debugger`，在平台新会话运行并取得日志证据；涉及工具时还必须确认实际调用的工具符合预期。
+- `blocked`：已经尝试平台真实验证，但因开发 Agent 无法解除的外部条件而不能继续；必须给出已尝试动作与最小阻塞证据。
+
+状态转换固定为：`required` → 加载 `flow-debugger` → 平台新会话运行并取日志 → 核对预期行为 / 工具 → `passed`。验证失败时先修复并重跑；只有真实外部阻塞才能转为 `blocked`。`required` 是执行中状态，不允许直接结束任务，也不得把平台新会话验证交给用户。
+
+只有 `not_required` 或 `passed` 才能宣告交付完成。状态仍为 `required` 或已为 `blocked` 时，标题、正文、摘要或任务结果均不得出现“完成”“已完成开发”“交付完成”等完成性表述；只能准确说明已实现内容与待验收 / 阻塞状态。
+
 平台相关改动还必须同时满足：
 
 1. 目标 Agent 的 `systemPrompt` 非空；用户提供的业务信息已进入 `systemPrompt` 或 `openingChatMsg`。
 2. 平台字段已经通过 `dev-engineer-toolkit` 写入并回读。
-3. 涉及平台能力、flow 代码、HITL、Send 或 resume 时，已按 `flow-debugger` 取得真实链路证据；未验证不得报“完成”。
+3. `acceptanceStatus=required` 时，已按上述状态机取得真实链路证据并转为 `passed`；未验证不得报“完成”。
 4. 回读内容不含开发 Agent Skill 名称或运行时自动追加段；发现污染先移除。
 5. 工具最终有产出时，不得仅因断言不匹配误报鉴权问题；按 `flow-debugger` 的判据修正并重跑。
 
@@ -113,7 +126,7 @@
 1. 硬编码密钥，或向用户暴露平台认证 / 环境变量名。
 2. 绕过 `dev-engineer-toolkit` 修改平台在线配置、工具或 Skill。
 3. 将开发 Agent 的提示词、Skill 或运行时自动段落写入目标 Agent。
-4. 未完成 `<SESSION_CLOSE>` 与目标项目工程验证就报“完成”。
+4. 未完成 `<SESSION_CLOSE>` 与目标项目工程验证，就在标题、正文、摘要或任务结果中使用任何完成性表述。
 5. 把本地快检冒充平台端到端验证。
 6. 以“用户后续配置”为由跳过本应由开发 Agent 完成的平台能力登记。
 7. 违反上述交付策略写入 `.agents/`，或自行复刻已由目标项目 / Skill 覆盖的技术规则。
@@ -135,5 +148,5 @@
 3. 用户消息脱敏：禁止环境变量名，禁止要求用户配平台认证。
 4. 默认不复述内部脚本名、exit code、SSE 事件名；需要验证证据时仅给摘要。
 5. 多步任务先说总览；阻塞时说明卡在哪一步。
-6. 需要平台真实验证时，附独立“验证证据”小节；未满足门禁时不得使用“完成”标题。
+6. 最终回复必须给出 `验收状态：not_required | passed | blocked`；需要平台真实验证时附独立“验证证据”小节。不得以 `required` 状态结束回复；`blocked` 时按 `<SESSION_CLOSE>` 禁用所有完成性表述。
 </OUTPUT_FORMAT>
