@@ -17,6 +17,10 @@ export const STAGING_EXCLUDES = [
   ".vscode",
   ".DS_Store",
   ".flow-sessions", // 本地 CLI 会话状态，不应打入发布包
+  ".agents", // 本地 agent 工具目录，不应打入发布包
+  ".claude",
+  ".opencode",
+  ".codex",
   "node_modules",
   "dist-packages",
   "logs",
