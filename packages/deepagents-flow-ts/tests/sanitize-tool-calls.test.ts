@@ -66,4 +66,48 @@ describe("sanitizeToolCalls", () => {
     const ai = out[1] as AIMessage;
     expect(ai.tool_calls ?? []).toHaveLength(0);
   });
+
+  // 回归：checkpoint 常同时带顶层 + additional_kwargs.tool_calls；
+  // 只清顶层时 OpenAI converter 会回退序列化 kwargs → 仍 400 INVALID_TOOL_RESULTS
+  it("additional_kwargs.tool_calls 残留 → 一并清除", () => {
+    const messages = [
+      {
+        type: "ai",
+        content: "about to call",
+        id: "a1",
+        tool_calls: [{ id: "call_orphan", name: "travel_guide", args: {} }],
+        additional_kwargs: {
+          tool_calls: [
+            {
+              id: "call_orphan",
+              name: "travel_guide",
+              type: "function",
+              function: { name: "travel_guide", arguments: "{}" },
+            },
+          ],
+        },
+      },
+    ] as unknown as BaseMessage[];
+    const out = sanitizeToolCalls(messages);
+    const ai = out[0] as AIMessage;
+    expect(ai.tool_calls ?? []).toHaveLength(0);
+    expect(ai.additional_kwargs?.tool_calls).toBeUndefined();
+  });
+
+  it("仅 additional_kwargs.tool_calls（无顶层）→ 仍能识别并清除孤立项", () => {
+    const messages = [
+      {
+        type: "ai",
+        content: "about to call",
+        id: "a1",
+        additional_kwargs: {
+          tool_calls: [{ id: "call_only_kwargs", name: "bash", args: {} }],
+        },
+      },
+    ] as unknown as BaseMessage[];
+    const out = sanitizeToolCalls(messages);
+    const ai = out[0] as AIMessage;
+    expect(ai.tool_calls ?? []).toHaveLength(0);
+    expect(ai.additional_kwargs?.tool_calls).toBeUndefined();
+  });
 });

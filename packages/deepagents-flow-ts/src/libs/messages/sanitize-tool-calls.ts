@@ -22,9 +22,16 @@ export function msgType(msg: BaseMessage): string {
 export function msgToolCalls(
   msg: BaseMessage
 ): Array<{ id?: string; name: string; args: Record<string, unknown> }> {
-  const raw = (msg as unknown as Record<string, unknown>).tool_calls;
-  return Array.isArray(raw)
-    ? (raw as Array<{ id?: string; name: string; args: Record<string, unknown> }>)
+  const raw = msg as unknown as Record<string, unknown>;
+  const top = raw.tool_calls;
+  if (Array.isArray(top) && top.length > 0) {
+    return top as Array<{ id?: string; name: string; args: Record<string, unknown> }>;
+  }
+  // checkpoint 反序列化后可能只剩 additional_kwargs.tool_calls
+  const kwargs = raw.additional_kwargs as Record<string, unknown> | undefined;
+  const nested = kwargs?.tool_calls;
+  return Array.isArray(nested)
+    ? (nested as Array<{ id?: string; name: string; args: Record<string, unknown> }>)
     : [];
 }
 
@@ -61,6 +68,9 @@ export function findOrphanedToolCallIds(messages: BaseMessage[]): Set<string> {
 /**
  * 从 AIMessage 剥离孤立 tool_calls。
  * 无变更时返回原数组引用（便于调用方跳过写回）。
+ *
+ * 同时清除 additional_kwargs.tool_calls：OpenAI converter 会在顶层 tool_calls
+ * 为空时回退序列化 kwargs，否则仍会触发 INVALID_TOOL_RESULTS。
  */
 export function sanitizeToolCalls(messages: BaseMessage[]): BaseMessage[] {
   const orphaned = findOrphanedToolCallIds(messages);
@@ -72,10 +82,21 @@ export function sanitizeToolCalls(messages: BaseMessage[]): BaseMessage[] {
     const calls = msgToolCalls(msg);
     const valid = calls.filter((c) => !(c.id && orphaned.has(c.id)));
     if (valid.length === calls.length) return msg;
+    // 拷贝后删掉 tool_calls，避免把孤立 call 经 OpenAI fallback 再发出去
+    const additionalKwargs = raw.additional_kwargs
+      ? { ...(raw.additional_kwargs as Record<string, unknown>) }
+      : undefined;
+    if (additionalKwargs) {
+      delete additionalKwargs.tool_calls;
+    }
     return new AIMessage({
       content: (raw.content as string | undefined) ?? "",
-      additional_kwargs: raw.additional_kwargs as Record<string, unknown> | undefined,
-      tool_calls: valid.length > 0 ? (valid as AIMessage["tool_calls"]) : undefined,
+      additional_kwargs:
+        additionalKwargs && Object.keys(additionalKwargs).length > 0
+          ? additionalKwargs
+          : undefined,
+      // 显式 []：避免 undefined 时 AIMessage 从 additional_kwargs 再解析
+      tool_calls: valid as AIMessage["tool_calls"],
       id: typeof raw.id === "string" ? raw.id : undefined,
       name: typeof raw.name === "string" ? raw.name : undefined,
     });

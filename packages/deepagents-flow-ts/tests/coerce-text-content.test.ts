@@ -410,7 +410,7 @@ describe("createThinkNode content coerce + 自愈重试", () => {
     } as any);
 
     expect(calls).toBe(2);
-    expect(out.steps).toContain("think#coerce-writeback");
+    expect(out.steps).toContain("think#history-writeback");
     // RemoveMessage ×2 + coerced human/tool + AI
     expect((out.messages ?? []).length).toBeGreaterThan(1);
     const last = out.messages![out.messages!.length - 1] as AIMessage;
@@ -478,7 +478,7 @@ describe("createThinkNode content coerce + 自愈重试", () => {
     expect(calls).toBe(2);
     const last = out.messages![out.messages!.length - 1] as AIMessage;
     expect(last.content).toBe("vision fallback ok");
-    expect(out.steps).toContain("think#coerce-writeback");
+    expect(out.steps).toContain("think#history-writeback");
 
     // 首轮未 coerce：仍带 array content（含 image_url）
     const firstTm = seen[0]!.find((m) => m._getType?.() === "tool") as ToolMessage;
@@ -491,5 +491,52 @@ describe("createThinkNode content coerce + 自愈重试", () => {
     const secondTm = seen[1]!.find((m) => m._getType?.() === "tool") as ToolMessage;
     expect(typeof secondTm.content).toBe("string");
     expect(secondTm.content as string).toMatch(/image_url omitted|shot/);
+  });
+
+  it("孤立 tool_calls sanitize 后写回 checkpoint", async () => {
+    mockInvoke.mockResolvedValue(new AIMessage({ content: "继续规划" }));
+
+    const { createThinkNode } = await import("../src/app/nodes/think.js");
+    const { RemoveMessage } = await import("@langchain/core/messages");
+    const node = createThinkNode({
+      config: {
+        model: { provider: "openai", model: "gpt-test", settings: {} },
+      } as any,
+      allTools: [],
+    });
+
+    const poisoned = [
+      new HumanMessage({ id: "h1", content: "继续" }),
+      new AIMessage({
+        id: "a1",
+        content: "准备调工具",
+        tool_calls: [{ id: "call_orphan", name: "travel_guide", args: {} }],
+        additional_kwargs: {
+          tool_calls: [
+            {
+              id: "call_orphan",
+              name: "travel_guide",
+              type: "function",
+              function: { name: "travel_guide", arguments: "{}" },
+            },
+          ],
+        },
+      }),
+    ];
+
+    const out = await node({
+      messages: poisoned,
+      input: "继续",
+      steps: [],
+    } as any);
+
+    expect(out.steps).toContain("think#history-writeback");
+    const removals = (out.messages ?? []).filter((m) => m instanceof RemoveMessage);
+    expect(removals).toHaveLength(2);
+    const repairedAi = (out.messages ?? []).find(
+      (m) => m._getType?.() === "ai" && m !== out.messages!.at(-1)
+    ) as AIMessage | undefined;
+    expect(repairedAi?.tool_calls ?? []).toHaveLength(0);
+    expect(repairedAi?.additional_kwargs?.tool_calls).toBeUndefined();
   });
 });

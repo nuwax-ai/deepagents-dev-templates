@@ -114,8 +114,8 @@ export function createThinkNode(deps: ThinkNodeDeps) {
     // 孤立 tool_calls 清洗 +（默认）多模态 / 非字符串 content 压纯文本
     const sanitized = sanitizeToolCalls(state.messages);
     let forModel = sanitized;
-    /** 送入模型的历史是否相对 state.messages 有实质清洗（需写回 checkpoint） */
-    let historyDirty = false;
+    /** sanitize / coerce 相对 state.messages 有变更时需写回 checkpoint */
+    let historyDirty = sanitized !== state.messages;
     if (shouldCoerceToTextOnly(config)) {
       const coerced = coerceMessagesToTextContent(sanitized, {
         mode: resolveCoerceMode(config),
@@ -170,18 +170,19 @@ export function createThinkNode(deps: ThinkNodeDeps) {
       })) as AIMessage;
     }
 
-    // 清洗后的历史写回 checkpoint，避免同轮后续 think / 下轮 run 再踩毒 content
+    // 清洗后的历史写回 checkpoint，避免同轮后续 think / 下轮 run 再踩毒 content / 孤立 tool_calls
     const outMessages: BaseMessage[] = [];
     if (historyDirty) {
       const writeback = checkpointRepairUpdate(state.messages, forModel);
       if (writeback.length > 0) {
         outMessages.push(...writeback);
-        log.info("think 已将 coerce 后的历史写回 state", {
+        log.info("think 已将修复后的历史写回 state", {
           priorCount: state.messages.length,
-          coercedCount: forModel.length,
+          repairedCount: forModel.length,
+          sanitized: sanitized !== state.messages,
         });
       } else {
-        log.warn("think coerce 后无法写回（消息缺 id），仅依赖当次 LLM 入参", {
+        log.warn("think 修复后无法写回（消息缺 id），仅依赖当次 LLM 入参", {
           priorCount: state.messages.length,
         });
       }
@@ -192,7 +193,7 @@ export function createThinkNode(deps: ThinkNodeDeps) {
       messages: outMessages,
       steps: [
         `think: ${(ai.tool_calls ?? []).length} tool_calls`,
-        ...(historyDirty ? ["think#coerce-writeback"] : []),
+        ...(historyDirty ? ["think#history-writeback"] : []),
       ],
     };
   };
