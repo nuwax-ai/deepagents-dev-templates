@@ -16,7 +16,7 @@
 | 故障 | 典型症状 | 根因 |
 | --- | --- | --- |
 | **提示词被覆盖** | Agent 不像 `prompts/flow.base.md` 定义的角色；误调 `web_search_*` 等 | `resolveSystemPrompt` 曾把 ACP session 提示词**替换**本地文件 |
-| **checkpoint 损坏** | 「抱歉，处理您的问题时出现错误」；日志 `400 INVALID_TOOL_RESULTS`；`sessionId=pending` 反复失败 | `think` 后 `AIMessage(tool_calls)` 已落盘，`session/cancel` 在 tools 未完成时中断，无对应 `ToolMessage` |
+| **checkpoint 损坏** | 「抱歉，处理您的问题时出现错误」；日志 `400 INVALID_TOOL_RESULTS`；`sessionId=pending` 反复失败 | `think` 后 `AIMessage(tool_calls)` 已落盘，`session/cancel` 在 tools 未完成时中断；或 Anthropic `content[]` 残留孤立 `tool_use` 而 `tool_calls` 为空，误走 respond/END |
 
 两类问题症状相似，需分开排查（见包内 troubleshooting）。
 

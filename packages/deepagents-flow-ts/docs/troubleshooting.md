@@ -77,19 +77,24 @@
 
 ## `400 INVALID_TOOL_RESULTS` / checkpoint 损坏
 
-**症状**：ACP 或 CLI 报 `抱歉，处理您的问题时出现错误`；日志中 LLM 返回 `400 INVALID_TOOL_RESULTS`；`sessionId=pending` 的 checkpoint 反复失败。
+**症状**：ACP 或 CLI 报 `抱歉，处理您的问题时出现错误`；日志中 LLM 返回 `400 INVALID_TOOL_RESULTS` / `tool_use ids were found without tool_result blocks immediately after`；之后同会话任意新消息立刻失败。
 
-**根因**：会话在 `ToolNode` 执行中被取消/中断，checkpoint 留下带 `tool_calls` 的 `AIMessage` 但无对应 `ToolMessage`；此后每次 `think` 调模型都会 400。
+**根因**（两类）：
 
-**runtime 修复**（v1.9.4+，三层）：
+1. 会话在 `ToolNode` 执行中被取消/中断，checkpoint 留下带 `tool_calls` 的 `AIMessage` 但无对应 `ToolMessage`。
+2. DeepSeek 等走 Anthropic 协议时，模型把 `tool_use` **只写在 `content[]`**，`AIMessage.tool_calls` 为空 → `toolsCondition` 误走 respond/END，工具未执行却落盘，下一轮必 400。
+
+**runtime 修复**（多层）：
 
 | 层 | 时机 | 行为 |
 |----|------|------|
 | 1 | ACP `session/cancel` | `repairCheckpoint` 为 in-flight tool_call 补 `ToolMessage` 并写回 |
-| 2 | 每次 `flow.run` 入口 | 自动 `sanitize` 孤立 tool_calls 并写回 checkpoint |
+| 2 | 每次 `flow.run` 入口 | 自动 `sanitize` 孤立 tool_calls **与 content tool_use**（邻接校验）并写回 |
 | 3 | `think` 调 LLM 前 | 最后一道保险（含 plain object 反序列化） |
+| 4 | `think` 出口 | `content tool_use → tool_calls` 同步，保证走进 tools |
+| 5 | LLM 仍 400 | 捕获 `INVALID_TOOL_RESULTS`，强制 sanitize 后单次重试并写回 |
 
-**历史坏 checkpoint**：v1.9.4 首次 `run` 会尝试自动修复（消息须有 `id` 才能写回）；仍失败时可手动删 thread 文件或 `sessions delete <id>`。
+**历史坏 checkpoint**：首次 `run` 会尝试自动修复（消息须有 `id` 才能写回）；仍失败时可手动删 thread 文件或 `sessions delete <id>`。
 
 **平台约定**：避免在真实 `sessionId` 就绪前用 `pending` 作 `thread_id` 持久化 checkpoint。
 

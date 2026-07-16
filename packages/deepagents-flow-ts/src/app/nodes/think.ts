@@ -16,7 +16,11 @@ import {
   shouldCoerceToTextOnly,
 } from "../../libs/messages/coerce-text-content.js";
 import { checkpointRepairUpdate } from "../../libs/messages/repair-checkpoint.js";
-import { sanitizeToolCalls } from "../../libs/messages/sanitize-tool-calls.js";
+import {
+  isInvalidToolResultsError,
+  normalizeAiMessageToolCalls,
+  sanitizeToolCalls,
+} from "../../libs/messages/sanitize-tool-calls.js";
 import { resolveModel, logger, type AppConfig } from "../../runtime/index.js";
 import { hasModelCredentials } from "../../libs/compaction.js";
 import {
@@ -147,28 +151,52 @@ export function createThinkNode(deps: ThinkNodeDeps) {
     try {
       ai = (await invokeWithResilience(boundModel, promptForModel, invokeOpts)) as AIMessage;
     } catch (err) {
-      // 自愈：content.type 非法时强制 aggressive 压扁后单次重试，并写回历史。
-      if (!isIllegalContentTypeError(err)) {
+      // 自愈 A：content.type 非法 → aggressive 压扁后单次重试，并写回历史。
+      if (isIllegalContentTypeError(err)) {
+        log.warn("think LLM content.type 非法，强制 aggressive text coerce 后重试一次", {
+          error: String(err),
+          firstPassCoerced: shouldCoerceToTextOnly(config),
+        });
+        forModel = coerceMessagesToTextContent(sanitized, {
+          mode: "all-non-string",
+        });
+        historyDirty = forModel !== sanitized || historyDirty;
+        const retryPrompt = withSystemPrompt(
+          forModel,
+          systemPrompt ?? "",
+          config?.model.provider
+        );
+        ai = (await invokeWithResilience(boundModel, retryPrompt, {
+          ...invokeOpts,
+          attempts: 1,
+        })) as AIMessage;
+      } else if (isInvalidToolResultsError(err)) {
+        // 自愈 B：孤立 tool_use / INVALID_TOOL_RESULTS → 再 sanitize 一次后重试。
+        // 覆盖「content[] 残留 tool_use 而 tool_calls 为空」等入口 sanitize 曾漏掉的格式。
+        log.warn("think LLM INVALID_TOOL_RESULTS，强制 sanitize tool_use 后重试一次", {
+          error: String(err),
+        });
+        const repaired = sanitizeToolCalls(forModel);
+        forModel = repaired;
+        historyDirty = repaired !== state.messages || historyDirty;
+        const retryPrompt = withSystemPrompt(
+          forModel,
+          systemPrompt ?? "",
+          config?.model.provider
+        );
+        ai = (await invokeWithResilience(boundModel, retryPrompt, {
+          ...invokeOpts,
+          attempts: 1,
+        })) as AIMessage;
+      } else {
         throw err;
       }
-      log.warn("think LLM content.type 非法，强制 aggressive text coerce 后重试一次", {
-        error: String(err),
-        firstPassCoerced: shouldCoerceToTextOnly(config),
-      });
-      forModel = coerceMessagesToTextContent(sanitized, {
-        mode: "all-non-string",
-      });
-      historyDirty = forModel !== sanitized || historyDirty;
-      const retryPrompt = withSystemPrompt(
-        forModel,
-        systemPrompt ?? "",
-        config?.model.provider
-      );
-      ai = (await invokeWithResilience(boundModel, retryPrompt, {
-        ...invokeOpts,
-        attempts: 1,
-      })) as AIMessage;
     }
+
+    // 出口规范化：content 里的 tool_use → tool_calls，避免 toolsCondition 误走 respond/END
+    const normalized = normalizeAiMessageToolCalls(ai);
+    const toolCallsSynced = normalized !== ai;
+    ai = normalized;
 
     // 清洗后的历史写回 checkpoint，避免同轮后续 think / 下轮 run 再踩毒 content / 孤立 tool_calls
     const outMessages: BaseMessage[] = [];
@@ -194,6 +222,7 @@ export function createThinkNode(deps: ThinkNodeDeps) {
       steps: [
         `think: ${(ai.tool_calls ?? []).length} tool_calls`,
         ...(historyDirty ? ["think#history-writeback"] : []),
+        ...(toolCallsSynced ? ["think#tool_use→tool_calls"] : []),
       ],
     };
   };

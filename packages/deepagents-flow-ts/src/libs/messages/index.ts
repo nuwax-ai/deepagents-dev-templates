@@ -1,10 +1,15 @@
 export {
+  collectAiToolCallIds,
   findOrphanedToolCallIds,
+  isInvalidToolResultsError,
   messageId,
+  msgContentToolUses,
   msgToolCallId,
   msgToolCalls,
   msgType,
+  normalizeAiMessageToolCalls,
   sanitizeToolCalls,
+  type ContentToolUse,
 } from "./sanitize-tool-calls.js";
 export {
   coerceContentToText,
