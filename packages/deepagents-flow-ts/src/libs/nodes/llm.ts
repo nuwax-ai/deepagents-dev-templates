@@ -58,8 +58,9 @@ export function extractReasoningTextFromMessage(message: MessageLike | null | un
 /**
  * 抽取用户可见文本：优先 content；content 为空时兜底 reasoning_content。
  *
- * 部分 OpenAI 兼容 reasoning 模型偶发把用户可见回答写进 reasoning_content，
- * 同时令 content=""。respond / ACP messages 流若只读 content 会表现为「有 token 无回复」。
+ * 仅用于**终态**（respond / 空回复自愈），不要用于 messages 流式路径。
+ * 流式必须分流：content → text，reasoning_content → thought（见 mapStreamChunk）。
+ * 部分 OpenAI 兼容 reasoning 模型偶发把用户可见回答只写进 reasoning_content。
  */
 export function extractVisibleTextFromMessage(message: MessageLike | null | undefined): string {
   const content = extractText(message?.content);

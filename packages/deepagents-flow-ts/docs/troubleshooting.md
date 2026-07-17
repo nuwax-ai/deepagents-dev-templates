@@ -112,11 +112,11 @@
 
 | 层 | 时机 | 行为 |
 |----|------|------|
-| 1 | `think` 出口 | 当 `content` 为空、无 `tool_calls`、`reasoning_content` 有文本时，将其提升为 `content` 并记录 `think#reasoning_content→content` |
-| 2 | `respond` | 读取可见文本时优先 `content`，为空再兜底 `reasoning_content`（`extractVisibleTextFromMessage`） |
-| 3 | ACP `messages` 流 | `mapStreamChunk` 同样使用可见文本提取，避免流式事件因空 `content` 被丢弃 |
+| 1 | `think` 出口 | 当**最终** `content` 为空、无 `tool_calls`、`reasoning_content` 有文本时，将其提升为 `content` 并记录 `think#reasoning_content→content` |
+| 2 | `respond` | 终态读取可见文本时优先 `content`，为空再兜底 `reasoning_content`（`extractVisibleTextFromMessage`） |
+| 3 | ACP `messages` 流 | **分流**：`content` → `text`/`onToken`/`agent_message_chunk`；`reasoning_content` → `thought`/`onThought`/`agent_thought_chunk`。流式路径禁止把 reasoning 兜底进 text（否则会出现「思考+正文」拼进同一条消息） |
 
-**排查步骤**：打开对应 checkpoint，若 AIMessage/AIMessageChunk 显示 `content: ""` 且 `additional_kwargs.reasoning_content` 是完整用户回复，即命中此问题。
+**排查步骤**：打开对应 checkpoint，若 AIMessage/AIMessageChunk 显示 `content: ""` 且 `additional_kwargs.reasoning_content` 是完整用户回复，即命中空回复问题。若 UI 里英文思考贴在中文正文前，检查流式是否误把 reasoning 当 `agent_message_chunk`。
 
 ---
 

@@ -16,20 +16,20 @@ describe("mapStreamChunk", () => {
     expect(mapStreamChunk("messages", [{ content: "" }, {}])).toEqual([]);
   });
 
-  it("messages → text：content 空时兜底 reasoning_content", () => {
+  it("messages → text / thought 分流（reasoning 不得并入 text）", () => {
     expect(
       mapStreamChunk("messages", [
         {
           content: "",
           additional_kwargs: {
-            reasoning_content: "你好！我是旅行规划助手",
+            reasoning_content: "用户只是打招呼，先内部推理一下",
           },
         },
         {},
       ])
-    ).toEqual([{ type: "text", text: "你好！我是旅行规划助手" }]);
+    ).toEqual([{ type: "thought", text: "用户只是打招呼，先内部推理一下" }]);
 
-    // content 非空时优先 content，不误用 reasoning
+    // content + reasoning 同时存在：正文走 text，思考走 thought
     expect(
       mapStreamChunk("messages", [
         {
@@ -38,7 +38,10 @@ describe("mapStreamChunk", () => {
         },
         {},
       ])
-    ).toEqual([{ type: "text", text: "可见回复" }]);
+    ).toEqual([
+      { type: "text", text: "可见回复" },
+      { type: "thought", text: "内部推理" },
+    ]);
   });
 
   it("custom → stage / plan / tool 三态", () => {

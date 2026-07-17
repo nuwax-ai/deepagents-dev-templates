@@ -18,8 +18,9 @@
 import { INTERRUPT } from "@langchain/langgraph";
 import type { SurfaceStreamEvent } from "./stream-events.js";
 import {
+  extractReasoningTextFromMessage,
+  extractText,
   extractToolEndOutput,
-  extractVisibleTextFromMessage,
 } from "../libs/nodes/index.js";
 
 export function mapStreamChunk(mode: string, chunk: unknown): SurfaceStreamEvent[] {
@@ -29,11 +30,14 @@ export function mapStreamChunk(mode: string, chunk: unknown): SurfaceStreamEvent
     const pair = chunk as
       | [{ content?: unknown; additional_kwargs?: Record<string, unknown> }, unknown]
       | undefined;
-    // content 为空时仍可能有 reasoning_content（部分 OpenAI 兼容 reasoning 模型），
-    // 用可见文本提取兜底，避免用户侧完全无流式输出。
+    // 流式路径必须分流：content → text（可见回复），reasoning_content → thought（思考）。
+    // 禁止把 reasoning 兜底进 text，否则会出现「思考+正文」拼进同一条 agent_message。
+    // 终态空 content 的兜底留在 think 出口提升 / respond extractVisibleTextFromMessage。
     if (Array.isArray(pair) && pair[0]) {
-      const text = extractVisibleTextFromMessage(pair[0]);
+      const text = extractText(pair[0].content);
       if (text) events.push({ type: "text", text });
+      const thought = extractReasoningTextFromMessage(pair[0]);
+      if (thought) events.push({ type: "thought", text: thought });
     }
     return events;
   }

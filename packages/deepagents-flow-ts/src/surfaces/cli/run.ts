@@ -30,7 +30,7 @@ export interface FlowCliOptions {
 const DEFAULT_USAGE =
   '用法：\n  tsx src/index.ts flow "你的输入"\n  tsx src/index.ts flow --interactive\n';
 
-/** 工具调用 + 阶段进度打印（▶/✓/✗ 工具，▸ 阶段）。 */
+/** 工具调用 + 阶段进度打印（▶/✓/✗ 工具，▸ 阶段，💭 思考）。 */
 const toolCallbacks: FlowCallbacks = {
   onToolCall: (e) => {
     const tag =
@@ -43,6 +43,10 @@ const toolCallbacks: FlowCallbacks = {
     const pos = e.index && e.total ? ` [${e.index}/${e.total}]` : "";
     const detail = e.detail ? ` · ${e.detail}` : "";
     process.stdout.write(`▸${pos} ${e.stage}${detail}\n`);
+  },
+  // 思考与正文分流；CLI 单独前缀打印，避免拼进最终回答行。
+  onThought: (token) => {
+    process.stdout.write(`💭 ${token}`);
   },
 };
 

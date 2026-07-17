@@ -98,6 +98,11 @@ export interface FlowCallbacks {
    * @param toolCallId 父图 AIMessage.tool_calls[].id（并行 task 时区分同名校 subagent 流）
    */
   onToken?: (token: string, source?: string, toolCallId?: string) => void | Promise<void>;
+  /**
+   * 模型思考增量（可选）—— ACP 映射为 `agent_thought_chunk`，与 onToken 的可见回复分离。
+   * 不得把思考写入 onToken，否则会与正文拼成同一条用户可见消息。
+   */
+  onThought?: (token: string) => void | Promise<void>;
   onToolCall?: (e: ToolCallEvent) => void | Promise<void>;
   /** Stage progress for durable stateful flows（可选）。 */
   onStage?: (e: StageEvent) => void | Promise<void>;

@@ -28,6 +28,13 @@ export async function dispatchSurfaceEvent(
       await callbacks.onToken?.(event.text);
       break;
     }
+    case "thought": {
+      const node = metadata?.langgraph_node;
+      // 与 text 相同节点白名单：只透出 think/respond 等回答相关节点的 reasoning。
+      if (node && !STREAM_TEXT_NODES.has(node)) return;
+      await callbacks.onThought?.(event.text);
+      break;
+    }
     case "plan":
       await callbacks.onPlan?.({ entries: event.entries });
       break;

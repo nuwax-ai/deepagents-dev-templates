@@ -13,8 +13,13 @@ export interface SurfacePlanEntry {
 }
 
 export type SurfaceStreamEvent =
-  /** 模型文本增量（messages mode 或 custom writer）。 */
+  /** 模型可见回答增量（messages mode 的 content，或 custom writer）。 */
   | { type: "text"; text: string }
+  /**
+   * 模型思考增量（messages mode 的 additional_kwargs.reasoning_content）。
+   * 必须与 text 分流：ACP 走 agent_thought_chunk，不得并入 agent_message_chunk。
+   */
+  | { type: "thought"; text: string }
   /** 研究大纲 / 任务清单（custom writer → ACP sessionUpdate: plan）。 */
   | { type: "plan"; entries: SurfacePlanEntry[] }
   /** 工具开始（tools mode 的 ToolNode，或 custom mode 自定义检索）。 */

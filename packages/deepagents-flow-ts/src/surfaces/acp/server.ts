@@ -248,6 +248,9 @@ function buildAcpCallbacks(
           : undefined;
         return streamText(conn, sessionId, token, "agent", messageId);
       },
+      // 思考通道：走 agent_thought_chunk。故意不置 stats.streamed，
+      // 以便 content 为空、仅有 reasoning 时，回合结束仍可用 res.answer 兜底推送正文。
+      onThought: (token) => streamText(conn, sessionId, token, "thought"),
       onToolCall: async (e) => {
         await emitToolCall(conn, sessionId, e, {
           inflightTools,

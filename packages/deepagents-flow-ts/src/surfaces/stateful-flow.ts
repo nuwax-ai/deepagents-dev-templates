@@ -121,6 +121,8 @@ async function consumeStream(
   let multiMode = false;
   /** messages 模式文本折叠态（防御 provider 返回累积全文导致叠词）。 */
   let messagesTextFull = "";
+  /** messages 模式思考折叠态（reasoning_content 与 content 分开 fold）。 */
+  let messagesThoughtFull = "";
 
   for await (const raw of stream) {
     if (isModeChunk(raw)) {
@@ -142,6 +144,14 @@ async function consumeStream(
           messagesTextFull = folded.full;
           if (!folded.delta) continue;
           await dispatchSurfaceEvent({ type: "text", text: folded.delta }, callbacks, meta);
+          continue;
+        }
+        // reasoning_content 同样可能是累积全文，与 content 分开 fold 后走 thought 通道。
+        if (ev.type === "thought" && mode === "messages") {
+          const folded = foldStreamTextChunk(messagesThoughtFull, ev.text);
+          messagesThoughtFull = folded.full;
+          if (!folded.delta) continue;
+          await dispatchSurfaceEvent({ type: "thought", text: folded.delta }, callbacks, meta);
           continue;
         }
         await dispatchSurfaceEvent(ev, callbacks, meta);
@@ -182,6 +192,7 @@ export function createStatefulFlow<S = Record<string, unknown>>(
       onStage: callbacks?.onStage,
       onPlan: callbacks?.onPlan,
       onToken: callbacks?.onToken,
+      onThought: callbacks?.onThought,
       onPermissionRequest: callbacks?.onPermissionRequest,
       onApprovalRequest: callbacks?.onApprovalRequest,
     },
