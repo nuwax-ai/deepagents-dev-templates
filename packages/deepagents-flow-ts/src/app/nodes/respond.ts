@@ -9,7 +9,7 @@
  */
 
 import type { FlowState } from "../state.js";
-import { extractText } from "../../libs/nodes/index.js";
+import { extractVisibleTextFromMessage } from "../../libs/nodes/index.js";
 
 export interface RespondNodeDeps {
   /** 保留入参以兼容现有图装配；本节点不再消费 callbacks（流式走 think + messages 模式）。 */
@@ -20,9 +20,10 @@ export interface RespondNodeDeps {
 export function createRespondNode(_deps: RespondNodeDeps = {}) {
   return async (state: FlowState): Promise<Partial<FlowState>> => {
     const last = state.messages[state.messages.length - 1];
-    // content 可能是 string 或 content block 数组（Anthropic 协议 / 部分 provider），
-    // 统一经 extractText 抽纯文本，避免 array content 被当成空串导致无输出。
-    const text = last ? extractText(last.content) : "";
+    // content 可能是 string 或 content block 数组（Anthropic 协议 / 部分 provider）；
+    // 部分 reasoning 模型还会把可见回答写进 reasoning_content 且 content=""。
+    // 统一经 extractVisibleTextFromMessage 抽用户可见文本，避免空输出。
+    const text = last ? extractVisibleTextFromMessage(last) : "";
     return { output: text, steps: ["respond"] };
   };
 }

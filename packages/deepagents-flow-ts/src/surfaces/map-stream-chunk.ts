@@ -17,15 +17,22 @@
 
 import { INTERRUPT } from "@langchain/langgraph";
 import type { SurfaceStreamEvent } from "./stream-events.js";
-import { extractText, extractToolEndOutput } from "../libs/nodes/index.js";
+import {
+  extractToolEndOutput,
+  extractVisibleTextFromMessage,
+} from "../libs/nodes/index.js";
 
 export function mapStreamChunk(mode: string, chunk: unknown): SurfaceStreamEvent[] {
   const events: SurfaceStreamEvent[] = [];
 
   if (mode === "messages") {
-    const pair = chunk as [{ content?: unknown }, unknown] | undefined;
-    if (Array.isArray(pair) && pair[0]?.content) {
-      const text = extractText(pair[0].content);
+    const pair = chunk as
+      | [{ content?: unknown; additional_kwargs?: Record<string, unknown> }, unknown]
+      | undefined;
+    // content 为空时仍可能有 reasoning_content（部分 OpenAI 兼容 reasoning 模型），
+    // 用可见文本提取兜底，避免用户侧完全无流式输出。
+    if (Array.isArray(pair) && pair[0]) {
+      const text = extractVisibleTextFromMessage(pair[0]);
       if (text) events.push({ type: "text", text });
     }
     return events;

@@ -264,6 +264,7 @@ parentGraph.addNode("research", researcher);   // 编译后的子图直接当节
 | 原语 | 用途 |
 |---|---|
 | `extractText(content)` | LLM content(string 或 content block 数组)→ 纯文本 |
+| `extractVisibleTextFromMessage(message)` | 优先 `content`；为空时兜底 `additional_kwargs.reasoning_content`（reasoning 模型空 content 防护） |
 | `parseJson<T>(text)` | 从 LLM 文本抽第一段 JSON(容忍 ```json 围栏)；无 JSON 时抛 `LLM 未返回 JSON`（见 [troubleshooting.md](troubleshooting.md)） |
 | `emitStage(config, e)` / `emitPlan(config, entries)` / `emitTextToken(config, text)` | surface 事件生产端(writer + callback 双发) |
 | `runTool(name, args, fn, onToolCall?)` | 执行一个工具 fn + 三态透出(自定义工具节点用) |

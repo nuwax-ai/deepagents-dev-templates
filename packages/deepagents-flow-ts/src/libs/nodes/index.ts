@@ -47,6 +47,8 @@ export {
   createLlmNode,
   createLlmStreamNode,
   extractText,
+  extractReasoningTextFromMessage,
+  extractVisibleTextFromMessage,
   parseJson,
   streamLLMText,
   type LlmNodeOptions,

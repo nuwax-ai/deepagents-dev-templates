@@ -102,6 +102,24 @@
 
 ---
 
+## `outputTokens > 0` 但 `answerChars=0` / 新会话无消息
+
+**症状**：ACP 会话正常结束，日志中 `LLM usage` 有 `outputTokens`，但 `flow.run done outputChars=0`，随后 `prompt_end ... answerChars=0 streamed=false tokenChunks=0`，用户侧表现为新会话没有任何回复。
+
+**根因**：部分 OpenAI 兼容 reasoning 模型可能把用户可见回答写进 `AIMessage.additional_kwargs.reasoning_content`，同时令 `content=""`。默认 `respond` 与 ACP `messages` 流只读取 `content`，因此生成了 token 但没有可见输出。
+
+**runtime 修复**：
+
+| 层 | 时机 | 行为 |
+|----|------|------|
+| 1 | `think` 出口 | 当 `content` 为空、无 `tool_calls`、`reasoning_content` 有文本时，将其提升为 `content` 并记录 `think#reasoning_content→content` |
+| 2 | `respond` | 读取可见文本时优先 `content`，为空再兜底 `reasoning_content`（`extractVisibleTextFromMessage`） |
+| 3 | ACP `messages` 流 | `mapStreamChunk` 同样使用可见文本提取，避免流式事件因空 `content` 被丢弃 |
+
+**排查步骤**：打开对应 checkpoint，若 AIMessage/AIMessageChunk 显示 `content: ""` 且 `additional_kwargs.reasoning_content` 是完整用户回复，即命中此问题。
+
+---
+
 ## `400 messages.content.type 参数非法` / 截图后会话不可恢复
 
 **症状**：调用 `chrome-devtools__take_screenshot`（或其它返回图片的 MCP）后，ACP 报 `抱歉，处理您的问题时出现错误`；日志中 LLM 返回 `400 messages.content.type 参数非法，取值范围 ['text']`；之后同会话任意新消息立刻失败。

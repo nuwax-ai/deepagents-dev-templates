@@ -37,6 +37,36 @@ export function extractText(content: unknown): string {
   return "";
 }
 
+type MessageLike = {
+  content?: unknown;
+  additional_kwargs?: Record<string, unknown>;
+};
+
+/**
+ * 从消息的 additional_kwargs 抽 reasoning 文本。
+ * OpenAI 兼容 reasoning 模型常见字段：reasoning_content / reasoning。
+ */
+export function extractReasoningTextFromMessage(message: MessageLike | null | undefined): string {
+  const kwargs = message?.additional_kwargs;
+  if (!kwargs || typeof kwargs !== "object") return "";
+  const value = kwargs.reasoning_content ?? kwargs.reasoning;
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) return extractText(value);
+  return "";
+}
+
+/**
+ * 抽取用户可见文本：优先 content；content 为空时兜底 reasoning_content。
+ *
+ * 部分 OpenAI 兼容 reasoning 模型偶发把用户可见回答写进 reasoning_content，
+ * 同时令 content=""。respond / ACP messages 流若只读 content 会表现为「有 token 无回复」。
+ */
+export function extractVisibleTextFromMessage(message: MessageLike | null | undefined): string {
+  const content = extractText(message?.content);
+  if (content.trim()) return content;
+  return extractReasoningTextFromMessage(message);
+}
+
 /** 从 LLM 文本抽第一段 JSON（容忍 ```json 围栏与前后说明文字）。 */
 export function parseJson<T>(text: string): T {
   const cleaned = text.replace(/```(?:json)?/gi, "").trim();

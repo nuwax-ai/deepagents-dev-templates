@@ -24,6 +24,10 @@ import {
 import { resolveModel, logger, type AppConfig } from "../../runtime/index.js";
 import { hasModelCredentials } from "../../libs/compaction.js";
 import {
+  extractReasoningTextFromMessage,
+  extractText,
+} from "../../libs/nodes/llm.js";
+import {
   invokeWithResilience,
   resolveLlmResilience,
 } from "../../runtime/services/llm-resilience.js";
@@ -198,6 +202,27 @@ export function createThinkNode(deps: ThinkNodeDeps) {
     const toolCallsSynced = normalized !== ai;
     ai = normalized;
 
+    // 部分 OpenAI 兼容 reasoning 模型偶发把用户可见回答写进 reasoning_content，
+    // 同时 content=""、无 tool_calls。若不提升，respond / 流式路径会输出空回复。
+    let reasoningContentPromoted = false;
+    const hasToolCalls = (ai.tool_calls?.length ?? 0) > 0;
+    const reasoningFallback = extractReasoningTextFromMessage(ai);
+    if (!extractText(ai.content).trim() && !hasToolCalls && reasoningFallback.trim()) {
+      ai = new AIMessage({
+        content: reasoningFallback,
+        tool_calls: ai.tool_calls,
+        additional_kwargs: ai.additional_kwargs,
+        response_metadata: ai.response_metadata,
+        id: ai.id,
+        usage_metadata: ai.usage_metadata,
+        name: ai.name,
+      });
+      reasoningContentPromoted = true;
+      log.info("think promoted reasoning_content to content", {
+        reasoningChars: reasoningFallback.length,
+      });
+    }
+
     // 清洗后的历史写回 checkpoint，避免同轮后续 think / 下轮 run 再踩毒 content / 孤立 tool_calls
     const outMessages: BaseMessage[] = [];
     if (historyDirty) {
@@ -223,6 +248,7 @@ export function createThinkNode(deps: ThinkNodeDeps) {
         `think: ${(ai.tool_calls ?? []).length} tool_calls`,
         ...(historyDirty ? ["think#history-writeback"] : []),
         ...(toolCallsSynced ? ["think#tool_use→tool_calls"] : []),
+        ...(reasoningContentPromoted ? ["think#reasoning_content→content"] : []),
       ],
     };
   };

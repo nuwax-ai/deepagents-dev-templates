@@ -16,6 +16,31 @@ describe("mapStreamChunk", () => {
     expect(mapStreamChunk("messages", [{ content: "" }, {}])).toEqual([]);
   });
 
+  it("messages → text：content 空时兜底 reasoning_content", () => {
+    expect(
+      mapStreamChunk("messages", [
+        {
+          content: "",
+          additional_kwargs: {
+            reasoning_content: "你好！我是旅行规划助手",
+          },
+        },
+        {},
+      ])
+    ).toEqual([{ type: "text", text: "你好！我是旅行规划助手" }]);
+
+    // content 非空时优先 content，不误用 reasoning
+    expect(
+      mapStreamChunk("messages", [
+        {
+          content: "可见回复",
+          additional_kwargs: { reasoning_content: "内部推理" },
+        },
+        {},
+      ])
+    ).toEqual([{ type: "text", text: "可见回复" }]);
+  });
+
   it("custom → stage / plan / tool 三态", () => {
     expect(
       mapStreamChunk("custom", { type: "stage", stage: "调研", index: 1, total: 3 })

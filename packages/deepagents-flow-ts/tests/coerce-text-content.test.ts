@@ -539,4 +539,64 @@ describe("createThinkNode content coerce + 自愈重试", () => {
     expect(repairedAi?.tool_calls ?? []).toHaveLength(0);
     expect(repairedAi?.additional_kwargs?.tool_calls).toBeUndefined();
   });
+
+  it("content 空且 reasoning_content 有可见文本时提升到 content", async () => {
+    mockInvoke.mockResolvedValue(
+      new AIMessage({
+        content: "",
+        additional_kwargs: {
+          reasoning_content: "你好！我是旅行规划助手",
+        },
+      })
+    );
+
+    const { createThinkNode } = await import("../src/app/nodes/think.js");
+    const node = createThinkNode({
+      config: {
+        model: { provider: "openai", model: "deepseek-v4-flash", settings: {} },
+      } as any,
+      allTools: [],
+    });
+
+    const out = await node({
+      messages: [new HumanMessage({ content: "你好" })],
+      input: "你好",
+      steps: [],
+    } as any);
+
+    const last = out.messages![out.messages!.length - 1] as AIMessage;
+    expect(last.content).toBe("你好！我是旅行规划助手");
+    expect(out.steps).toContain("think#reasoning_content→content");
+  });
+
+  it("有 tool_calls 时不把 reasoning_content 提升为 content", async () => {
+    mockInvoke.mockResolvedValue(
+      new AIMessage({
+        content: "",
+        tool_calls: [{ id: "c1", name: "web_search_1", args: { q: "大理" } }],
+        additional_kwargs: {
+          reasoning_content: "先查一下目的地信息",
+        },
+      })
+    );
+
+    const { createThinkNode } = await import("../src/app/nodes/think.js");
+    const node = createThinkNode({
+      config: {
+        model: { provider: "openai", model: "deepseek-v4-flash", settings: {} },
+      } as any,
+      allTools: [],
+    });
+
+    const out = await node({
+      messages: [new HumanMessage({ content: "大理怎么玩" })],
+      input: "大理怎么玩",
+      steps: [],
+    } as any);
+
+    const last = out.messages![out.messages!.length - 1] as AIMessage;
+    expect(last.content).toBe("");
+    expect(out.steps).not.toContain("think#reasoning_content→content");
+    expect(last.tool_calls).toHaveLength(1);
+  });
 });
