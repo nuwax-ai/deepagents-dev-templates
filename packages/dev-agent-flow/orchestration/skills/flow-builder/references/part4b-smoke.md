@@ -107,7 +107,8 @@ HITL / approval flow：
 runtime 仍可用：
 
 - `SMOKE_TOOL_TRACE=1`：session-trace 输出工具调用摘要，供日志分析使用。
-- `AGENT_LIGHT=1`：跳过 MCP 加载，轻量验证；这不是 smoke 专属开关。
+- `DEEPAGENTS_DEFAULT_MCP=disabled`：跳过默认 MCP server 加载，轻量验证；亦兼容 `off`/`none`；不影响 ACP session 下发的 MCP。这不是 smoke 专属开关。
+- 旧文档中的 `AGENT_LIGHT=1` 已废弃，请改用 `DEEPAGENTS_DEFAULT_MCP=disabled`。
 
 ## Anti-patterns
 

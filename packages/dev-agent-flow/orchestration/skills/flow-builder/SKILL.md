@@ -2,7 +2,7 @@
 name: flow-builder
 description: "在当前工作目录开发或改造 LangGraph Flow 时使用。负责把目标项目 docs/ 里的技术事实落成施工步骤：Phase 0–4 总流程与收工清单（part0）；需求分类与图选型——先判定默认 ReAct 是否够用，固定阶段/Send 并行/HITL 人手写图（part1）；手写 StateGraph、流式输出 R-G009、HITL 选型（part2）；自写工具、平台能力登记、Plugin/技能登记、联网搜索、permissions 工具审批（part3）；验证排错与 HITL 卡死排查（part4a）；flow-debugger 真实执行/工具断言收工必经（part4b，pnpm flow 不能替代）；目标 Agent 系统提示词设计、用户输入提炼与平台同步（part5，禁止 AGENT.md）；子智能体/subagent 委派（part6，禁止 .agents/agents/）；Skill 集成（part7，禁止本地写 .agents/skills/）。图规则 R-G001+ / factory API / 术语分别读当前工作目录 docs/flow-graph-rules.md、node-kit.md、glossary.md；选型权威表读 docs/examples.md。本 Skill 只路由与步骤，不复制模板技术规则；平台在线配置读写交给 dev-engineer-toolkit；真实链路验证交给 flow-debugger。Keywords: flow开发, StateGraph, LangGraph, HITL, flow-debugger, 工具绑定, subagent, systemPrompt, 平台能力, 联网搜索, permissions, 流式输出, parseJson, 固定流程, ReAct, flow-builder, R-G009"
 tags: [flow, orchestration, tools, prompt, subagent, stategraph, hitl, debug]
-version: "3.5.0"
+version: "3.5.1"
 ---
 
 # Flow 开发（当前工作目录）
