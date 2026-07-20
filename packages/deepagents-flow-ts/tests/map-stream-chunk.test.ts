@@ -44,6 +44,23 @@ describe("mapStreamChunk", () => {
     ]);
   });
 
+  it("messages → Anthropic thinking content block 走 thought 通道", () => {
+    expect(
+      mapStreamChunk("messages", [
+        {
+          content: [
+            { type: "thinking", thinking: "先分析问题" },
+            { type: "text", text: "可见回复" },
+          ],
+        },
+        {},
+      ])
+    ).toEqual([
+      { type: "text", text: "可见回复" },
+      { type: "thought", text: "先分析问题" },
+    ]);
+  });
+
   it("custom → stage / plan / tool 三态", () => {
     expect(
       mapStreamChunk("custom", { type: "stage", stage: "调研", index: 1, total: 3 })

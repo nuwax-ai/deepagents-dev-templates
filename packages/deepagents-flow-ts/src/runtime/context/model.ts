@@ -59,6 +59,17 @@ function normalizeAnthropicBaseUrl(baseUrl?: string): string | undefined {
   return baseUrl.replace(/\/+$/, "").replace(/\/v\d+$/, "");
 }
 
+/**
+ * Anthropic 协议默认开启思考。
+ * Opus 4.7 只接受 adaptive；其他官方 Claude 与三方兼容端点使用兼容面更广的固定预算形态。
+ */
+function resolveAnthropicThinking(model: string):
+  | { type: "adaptive" }
+  | { type: "enabled"; budget_tokens: number } {
+  if (model.startsWith("claude-opus-4-7")) return { type: "adaptive" };
+  return { type: "enabled", budget_tokens: 1024 };
+}
+
 /** Build the model instance/string accepted by deepagents. */
 export function resolveModel(config: AppConfig): CreateDeepAgentParams["model"] {
   const cacheKey = `${config.model.provider}:${config.model.name}|${config.model.baseUrl ?? ""}|${config.model.settings.temperature}|${config.model.settings.maxTokens ?? ""}|${resolveApiKey(config)}`;
@@ -84,12 +95,15 @@ export function resolveModel(config: AppConfig): CreateDeepAgentParams["model"] 
       streaming: true,
     }) as unknown as CreateDeepAgentParams["model"];
   } else {
+    const thinking = resolveAnthropicThinking(config.model.name);
     instance = new ChatAnthropic({
       model: config.model.name,
       apiKey,
       anthropicApiUrl: normalizeAnthropicBaseUrl(config.model.baseUrl),
-      temperature: config.model.settings.temperature,
+      // Anthropic extended thinking 与自定义 temperature 互斥；开启后交由 SDK 省略采样参数。
+      temperature: undefined,
       maxTokens: config.model.settings.maxTokens,
+      thinking,
       // Anthropic SDK 对非流式请求有 10 分钟硬上限（long-running/慢模型如经 anthropic 协议代理的 glm 会触发
       // "Streaming is required for operations that may take longer than 10 minutes"）。
       // 开启 streaming 后 invoke 仍返回聚合 AIMessage（LangChain 内部聚合 stream），但底层以流式发出，绕过该限制。

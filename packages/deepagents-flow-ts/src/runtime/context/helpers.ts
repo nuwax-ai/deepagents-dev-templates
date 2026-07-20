@@ -12,6 +12,7 @@ export {
   createRuntimeContextAsync,
   hydrateRuntimeContext,
   destroyRuntimeContext,
+  isDefaultMcpEnabled,
   type RuntimeContext,
 } from "./runtime-context.js";
 export { resolveModelString, resolveModel, resolveApiKey } from "./model.js";

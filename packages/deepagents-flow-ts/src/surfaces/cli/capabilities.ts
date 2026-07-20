@@ -11,6 +11,7 @@ import { loadFlowConfig } from "../../runtime/flow-config.js";
 import {
   discoverSkills,
   discoverSubAgents,
+  isDefaultMcpEnabled,
   resolveSystemPrompt,
 } from "../../runtime/index.js";
 import { resolveFlowHome } from "../../runtime/services/file-checkpoint-saver.js";
@@ -44,9 +45,13 @@ export async function runCapabilities(): Promise<void> {
   const { appConfig, configPath } = loadFlowConfig();
   const pkgRoot = dirname(dirname(configPath));
 
-  const mcpPath = resolve(pkgRoot, appConfig.mcp.configPath);
-  const mcpDefault = readJson<{ servers?: Record<string, unknown> }>(mcpPath);
-  const mcpServers = mcpDefault?.servers ?? {};
+  // 与 runtime-context 一致：DEEPAGENTS_DEFAULT_MCP=disabled 时不展示默认 MCP。
+  let mcpServers: Record<string, unknown> = {};
+  if (isDefaultMcpEnabled()) {
+    const mcpPath = resolve(pkgRoot, appConfig.mcp.configPath);
+    const mcpDefault = readJson<{ servers?: Record<string, unknown> }>(mcpPath);
+    mcpServers = mcpDefault?.servers ?? {};
+  }
 
   const capabilitySources = readJson<unknown>(
     join(pkgRoot, ".nuwax-agent", "capability-sources.json")

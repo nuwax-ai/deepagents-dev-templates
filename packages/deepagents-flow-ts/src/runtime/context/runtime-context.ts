@@ -214,6 +214,17 @@ function sanitizeLoadedMcpTools(
 }
 
 /**
+ * 默认 MCP 加载开关（全局 env，默认开）。
+ * `DEEPAGENTS_DEFAULT_MCP=disabled`（大小写不敏感，兼容 `off`/`none`）时跳过
+ * 模板/配置自带的 default MCP server 加载与连接——模板照常运行但无默认 MCP 工具，
+ * 供本地轻量验证/调试；ACP session 下发的 mcpServers 属平台层，不受此开关影响。
+ */
+export function isDefaultMcpEnabled(): boolean {
+  const v = process.env.DEEPAGENTS_DEFAULT_MCP?.trim().toLowerCase();
+  return v !== "disabled" && v !== "off" && v !== "none";
+}
+
+/**
  * 从 config.mcp.servers + configPath/configPaths 指向的文件加载 default MCP servers。
  * 注意:不读 configPath 会丢失 mcp.default.json
  * 里的默认 server（`mcp.default.json` 默认含 `ask-question` fallback）。
@@ -222,6 +233,10 @@ function sanitizeLoadedMcpTools(
  */
 function resolveDefaultMcpServers(config: AppConfig): Record<string, McpServerEntry> {
   const log = logger.child("mcp-default");
+  if (!isDefaultMcpEnabled()) {
+    log.info("DEEPAGENTS_DEFAULT_MCP=disabled：跳过默认 MCP server 加载");
+    return {};
+  }
   const servers: Record<string, McpServerEntry> = {
     ...((config.mcp.servers as Record<string, McpServerEntry> | undefined) ?? {}),
   };

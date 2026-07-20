@@ -18,7 +18,7 @@
 import { INTERRUPT } from "@langchain/langgraph";
 import type { SurfaceStreamEvent } from "./stream-events.js";
 import {
-  extractReasoningTextFromMessage,
+  extractThoughtTextFromMessage,
   extractText,
   extractToolEndOutput,
 } from "../libs/nodes/index.js";
@@ -36,7 +36,7 @@ export function mapStreamChunk(mode: string, chunk: unknown): SurfaceStreamEvent
     if (Array.isArray(pair) && pair[0]) {
       const text = extractText(pair[0].content);
       if (text) events.push({ type: "text", text });
-      const thought = extractReasoningTextFromMessage(pair[0]);
+      const thought = extractThoughtTextFromMessage(pair[0]);
       if (thought) events.push({ type: "thought", text: thought });
     }
     return events;

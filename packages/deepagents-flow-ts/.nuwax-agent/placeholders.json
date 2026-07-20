@@ -77,7 +77,7 @@
     },
     {
       "name": "DEEPAGENTS_DEFAULT_MCP",
-      "description": "Set to \"disabled\" to turn off MCP loading.",
+      "description": "Set to \"disabled\" (or \"off\"/\"none\", case-insensitive) to skip default MCP server loading; ACP session mcpServers are unaffected.",
       "requiredAt": "runtime"
     },
     {

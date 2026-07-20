@@ -27,7 +27,8 @@
 
 > runtime 提供两个 env 开关（运行时读取，与构建脚本无关）：
 > - `SMOKE_TOOL_TRACE=1`（session-trace 输出 `tool invoke start/done/failed` 工具调用摘要到日志）
-> - `AGENT_LIGHT=1`（跳过 MCP 加载，轻量验证）
+> - `DEEPAGENTS_DEFAULT_MCP=disabled`（跳过默认 MCP server 加载，轻量验证；亦兼容 `off`/`none`；不影响 ACP session 下发的 MCP）
+> - 旧文档中的 `AGENT_LIGHT=1` 已废弃，请改用 `DEEPAGENTS_DEFAULT_MCP=disabled`
 
 ## Windows 打包工具（可选）
 

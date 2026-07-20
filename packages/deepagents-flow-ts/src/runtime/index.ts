@@ -20,6 +20,7 @@ export {
   createRuntimeContextAsync,
   hydrateRuntimeContext,
   destroyRuntimeContext,
+  isDefaultMcpEnabled,
   resolveModelString,
   resolveModel,
   resolveApiKey,

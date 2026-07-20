@@ -42,6 +42,20 @@ type MessageLike = {
   additional_kwargs?: Record<string, unknown>;
 };
 
+/** 从 Anthropic content blocks 抽取原生 extended thinking 文本。 */
+export function extractAnthropicThinkingText(content: unknown): string {
+  if (!Array.isArray(content)) return "";
+  return content
+    .map((block) => {
+      if (!block || typeof block !== "object") return "";
+      const value = block as { type?: unknown; thinking?: unknown };
+      return value.type === "thinking" && typeof value.thinking === "string"
+        ? value.thinking
+        : "";
+    })
+    .join("");
+}
+
 /**
  * 从消息的 additional_kwargs 抽 reasoning 文本。
  * OpenAI 兼容 reasoning 模型常见字段：reasoning_content / reasoning。
@@ -53,6 +67,16 @@ export function extractReasoningTextFromMessage(message: MessageLike | null | un
   if (typeof value === "string") return value;
   if (Array.isArray(value)) return extractText(value);
   return "";
+}
+
+/**
+ * 抽取流式思考文本：Anthropic 原生 thinking block 优先，兼容代理的 reasoning 字段兜底。
+ * 仅用于 thought 通道，不用于终态可见正文兜底。
+ */
+export function extractThoughtTextFromMessage(message: MessageLike | null | undefined): string {
+  const anthropicThinking = extractAnthropicThinkingText(message?.content);
+  if (anthropicThinking) return anthropicThinking;
+  return extractReasoningTextFromMessage(message);
 }
 
 /**
