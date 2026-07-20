@@ -31,6 +31,7 @@ import { FileCheckpointSaver } from "../src/runtime/services/file-checkpoint-sav
 import { createFlowHooks } from "../src/surfaces/acp/server.js";
 import type { AppConfig } from "../src/runtime/index.js";
 import type { SessionExecutor } from "../src/surfaces/acp/server.js";
+import type { FlowCallbacks } from "../src/core/flow-types.js";
 
 // ── 玩具图：ask(interrupt 暂停) → finish(定稿) ──────────────
 const ToyState = Annotation.Root({
@@ -78,6 +79,7 @@ function makeFakeConn() {
     text?: string;
     status?: string;
     toolCallId?: string;
+    messageId?: string;
   }> = [];
   const conn = {
     async sessionUpdate(params: {
@@ -87,6 +89,7 @@ function makeFakeConn() {
         content?: unknown;
         status?: string;
         toolCallId?: string;
+        messageId?: string;
       };
     }) {
       const u = params.update;
@@ -95,6 +98,7 @@ function makeFakeConn() {
         text: extractText(u.content),
         status: u.status,
         toolCallId: u.toolCallId,
+        messageId: u.messageId,
       });
     },
   };
@@ -219,6 +223,33 @@ describe("A. load_session / 上下文恢复", () => {
     // onPrompt 仍能直接用单 executor 跑
     const r = await hooks.onPrompt!({ sessionId, promptText: "hi", params: {}, conn });
     expect(r).toEqual({ stopReason: "end_turn" });
+  });
+
+  it("并行 subagent thought 按 source + toolCallId 使用独立 messageId", async () => {
+    const executor = async (_query: string, callbacks: FlowCallbacks) => {
+      await callbacks.onThought?.("A 思考", "analyst", "task-a");
+      await callbacks.onThought?.("B 思考", "analyst", "task-b");
+      return { answer: "" };
+    };
+    const hooks = createFlowHooks({ executor, appConfig: fakeAppConfig });
+    const { conn, updates } = makeFakeConn();
+
+    const result = await hooks.onPrompt!({
+      sessionId: "sess-subagent-thoughts",
+      promptText: "并行分析",
+      params: {},
+      conn,
+    });
+
+    expect(result).toEqual({ stopReason: "end_turn" });
+    expect(
+      updates
+        .filter((update) => update.kind === "agent_thought_chunk")
+        .map(({ text, messageId }) => ({ text, messageId }))
+    ).toEqual([
+      { text: "A 思考", messageId: "subagent-thought:analyst:task-a" },
+      { text: "B 思考", messageId: "subagent-thought:analyst:task-b" },
+    ]);
   });
 });
 

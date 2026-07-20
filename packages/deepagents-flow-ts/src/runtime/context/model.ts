@@ -63,16 +63,16 @@ function normalizeAnthropicBaseUrl(baseUrl?: string): string | undefined {
  * Anthropic 协议默认开启思考。
  * Opus 4.7 只接受 adaptive；其他官方 Claude 与三方兼容端点使用兼容面更广的固定预算形态。
  */
-function resolveAnthropicThinking(model: string):
+function resolveAnthropicThinking(model: string, budgetTokens: number):
   | { type: "adaptive" }
   | { type: "enabled"; budget_tokens: number } {
   if (model.startsWith("claude-opus-4-7")) return { type: "adaptive" };
-  return { type: "enabled", budget_tokens: 1024 };
+  return { type: "enabled", budget_tokens: budgetTokens };
 }
 
 /** Build the model instance/string accepted by deepagents. */
 export function resolveModel(config: AppConfig): CreateDeepAgentParams["model"] {
-  const cacheKey = `${config.model.provider}:${config.model.name}|${config.model.baseUrl ?? ""}|${config.model.settings.temperature}|${config.model.settings.maxTokens ?? ""}|${resolveApiKey(config)}`;
+  const cacheKey = `${config.model.provider}:${config.model.name}|${config.model.baseUrl ?? ""}|${config.model.settings.temperature}|${config.model.settings.maxTokens ?? ""}|${config.model.settings.thinkingBudgetTokens}|${resolveApiKey(config)}`;
   if (cachedModel && cachedModel.key === cacheKey) {
     return cachedModel.instance;
   }
@@ -95,7 +95,10 @@ export function resolveModel(config: AppConfig): CreateDeepAgentParams["model"] 
       streaming: true,
     }) as unknown as CreateDeepAgentParams["model"];
   } else {
-    const thinking = resolveAnthropicThinking(config.model.name);
+    const thinking = resolveAnthropicThinking(
+      config.model.name,
+      config.model.settings.thinkingBudgetTokens
+    );
     instance = new ChatAnthropic({
       model: config.model.name,
       apiKey,

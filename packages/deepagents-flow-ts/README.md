@@ -225,7 +225,7 @@ const { nodes, edges, mermaid } = await getFlowTopology();
 
 **能力分层**（工作区配置 / 内置 / 环境 / 文件持久化）见 [docs/capabilities.md](docs/capabilities.md) 与 [.nuwax-agent/capability-sources.json](.nuwax-agent/capability-sources.json)——`capabilities` 命令查询当前可用工具/MCP/skills/子智能体（subagents）。
 
-默认模型 `openai / deepseek-chat`（见 [config/flow-agent.config.json](config/flow-agent.config.json)，已对齐国内 OpenAI 兼容端点；切回 Anthropic 把 `model.provider` 设为 `anthropic`）。各端点配置见 [`.env.example`](.env.example)。
+默认模型 `openai / deepseek-v4-flash`（见 [config/flow-agent.config.json](config/flow-agent.config.json)，已对齐国内 OpenAI 兼容端点；切回 Anthropic 把 `model.provider` 设为 `anthropic`）。Anthropic 协议默认开启 thinking，固定预算默认 `model.settings.thinkingBudgetTokens: 1024`（须严格小于 `maxTokens`；Claude Opus 4.7 自动使用 adaptive thinking）。各端点配置见 [`.env.example`](.env.example)。
 
 > **数据目录**（同源常量 [src/runtime/paths.ts](src/runtime/paths.ts)，默认根 `~/.flowagents`，可用 `config.memory.dir` 覆盖）：
 > - **会话/checkpoint**：`<根>/sessions/<workspace 12 位散列>/`（每 thread 一个 JSON）

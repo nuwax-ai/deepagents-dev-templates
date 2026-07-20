@@ -29,27 +29,44 @@ export const DEFAULT_BUILTIN_TEMPLATE_CONFIG: BuiltinTemplateConfigName = "flowA
 
 // ─── Config Schema ──────────────────────────────────────
 
-export const ModelConfigSchema = z.object({
-  provider: z.enum(["anthropic", "openai"]).default("anthropic"),
-  name: z.string().default("claude-sonnet-4-6"),
-  baseUrl: z.string().url().optional(),
-  apiKeyEnv: z.string().default("ANTHROPIC_API_KEY"),
-  authTokenEnv: z.string().default("ANTHROPIC_AUTH_TOKEN"),
-  settings: z
-    .object({
-      temperature: z.number().min(0).max(2).default(0),
-      maxTokens: z.number().optional(),
-      /** 短 LLM 调用超时（毫秒）。可被 LLM_TIMEOUT_MS 覆盖。 */
-      invokeTimeoutMs: z.number().min(1000).optional(),
-      /** 长 LLM 调用超时（毫秒）。可被 LLM_LONG_TIMEOUT_MS 覆盖。 */
-      invokeLongTimeoutMs: z.number().min(1000).optional(),
-      /** 并行/Send 扇出时 LLM 最大并发。可被 LLM_MAX_CONCURRENT 覆盖。 */
-      maxConcurrentInvokes: z.number().min(1).optional(),
-      /** 模型是否支持 vision content blocks；开启后保留 image_url 等多模态消息。 */
-      supportsVision: z.boolean().optional(),
-    })
-    .default({}),
-});
+export const ModelConfigSchema = z
+  .object({
+    provider: z.enum(["anthropic", "openai"]).default("anthropic"),
+    name: z.string().default("claude-sonnet-4-6"),
+    baseUrl: z.string().url().optional(),
+    apiKeyEnv: z.string().default("ANTHROPIC_API_KEY"),
+    authTokenEnv: z.string().default("ANTHROPIC_AUTH_TOKEN"),
+    settings: z
+      .object({
+        temperature: z.number().min(0).max(2).default(0),
+        maxTokens: z.number().optional(),
+        /** Anthropic extended thinking token 预算；必须严格小于 maxTokens。 */
+        thinkingBudgetTokens: z.number().int().min(1024).default(1024),
+        /** 短 LLM 调用超时（毫秒）。可被 LLM_TIMEOUT_MS 覆盖。 */
+        invokeTimeoutMs: z.number().min(1000).optional(),
+        /** 长 LLM 调用超时（毫秒）。可被 LLM_LONG_TIMEOUT_MS 覆盖。 */
+        invokeLongTimeoutMs: z.number().min(1000).optional(),
+        /** 并行/Send 扇出时 LLM 最大并发。可被 LLM_MAX_CONCURRENT 覆盖。 */
+        maxConcurrentInvokes: z.number().min(1).optional(),
+        /** 模型是否支持 vision content blocks；开启后保留 image_url 等多模态消息。 */
+        supportsVision: z.boolean().optional(),
+      })
+      .default({}),
+  })
+  .superRefine((model, ctx) => {
+    if (
+      model.provider === "anthropic" &&
+      !model.name.startsWith("claude-opus-4-7") &&
+      model.settings.maxTokens !== undefined &&
+      model.settings.maxTokens <= model.settings.thinkingBudgetTokens
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["settings", "maxTokens"],
+        message: `Anthropic maxTokens 必须大于 thinkingBudgetTokens (${model.settings.thinkingBudgetTokens})`,
+      });
+    }
+  });
 
 export const MCPConfigSchema = z.object({
   configPath: z.string().default("./config/mcp.default.json"),

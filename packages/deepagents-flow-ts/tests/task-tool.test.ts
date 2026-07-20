@@ -582,4 +582,66 @@ describe("createTaskTool", () => {
 
     expect(tokens).toEqual(["你", "好", "世界"]);
   });
+
+  it("Anthropic thinking 走 onThought 并透传 subagent 来源与父 task id", async () => {
+    const childGraph = {
+      stream: async function* () {
+        yield [
+          "messages",
+          [
+            { content: [{ type: "thinking", thinking: "先" }] },
+            { langgraph_node: "think" },
+          ],
+        ];
+        yield [
+          "messages",
+          [
+            { content: [{ type: "thinking", thinking: "先分析" }] },
+            { langgraph_node: "think" },
+          ],
+        ];
+        yield ["messages", [{ content: "完成" }, { langgraph_node: "think" }]];
+      },
+      getState: async () => ({
+        values: {
+          messages: [new AIMessage({ content: "完成" })],
+          output: "完成",
+        },
+      }),
+    };
+    vi.mocked(createFlowGraph).mockReturnValueOnce(
+      childGraph as ReturnType<typeof createFlowGraph>
+    );
+
+    const task = createTaskTool({
+      config: baseConfig,
+      parentWorkspaceRoot: process.cwd(),
+      buildTools: () => [],
+      subAgents: [
+        {
+          name: "analyst",
+          description: "分析",
+          systemPrompt: "分析。",
+        },
+      ],
+    });
+    const thoughts: Array<{ text: string; source?: string; toolCallId?: string }> = [];
+
+    await task.invoke(
+      { subagent_type: "analyst", description: "分析数据" },
+      {
+        configurable: {
+          langgraph_tool_call_id: "task-thought-1",
+          onThought: (text: string, source?: string, toolCallId?: string) => {
+            thoughts.push({ text, source, toolCallId });
+          },
+        },
+      }
+    );
+
+    expect(thoughts).toEqual([
+      { text: "先", source: "analyst", toolCallId: "task-thought-1" },
+      { text: "分析", source: "analyst", toolCallId: "task-thought-1" },
+    ]);
+  });
 });

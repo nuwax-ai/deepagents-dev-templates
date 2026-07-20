@@ -19,7 +19,12 @@ import type { StructuredTool } from "@langchain/core/tools";
 import type { AppConfig, DiscoveredSubAgent } from "../runtime/index.js";
 import { createFlowGraph } from "./graph.js";
 import type { FlowState } from "./state.js";
-import { extractText, STREAM_TEXT_NODES, foldStreamTextChunk } from "../libs/nodes/index.js";
+import {
+  extractText,
+  extractThoughtTextFromMessage,
+  STREAM_TEXT_NODES,
+  foldStreamTextChunk,
+} from "../libs/nodes/index.js";
 import type { FlowCallbacks } from "../core/flow-types.js";
 
 /** 兼容 LangChain 实例与 checkpoint 反序列化后的 plain object。 */
@@ -213,6 +218,7 @@ export function createTaskTool(deps: TaskToolDeps) {
           detail: description.slice(0, 100),
         });
         let streamBuffer = "";
+        let thoughtStreamBuffer = "";
         const stream = await graph.stream(
           { input: description, messages: [] } as unknown as FlowState,
           {
@@ -239,6 +245,18 @@ export function createTaskTool(deps: TaskToolDeps) {
           const [msg, meta] = pair;
           const node = meta?.langgraph_node;
           if (node && STREAM_TEXT_NODES.has(node)) {
+            const thought = extractThoughtTextFromMessage(msg);
+            if (thought) {
+              const folded = foldStreamTextChunk(thoughtStreamBuffer, thought);
+              thoughtStreamBuffer = folded.full;
+              if (folded.delta) {
+                await parentCallbacks.onThought?.(
+                  folded.delta,
+                  subagent_type,
+                  toolCallId
+                );
+              }
+            }
             const text = extractText(msg?.content);
             if (text) {
               const folded = foldStreamTextChunk(streamBuffer, text);

@@ -114,4 +114,51 @@ describe("resolveModel anthropic baseUrl", () => {
     }
     expect(requestBodies.at(-1)?.thinking).toEqual({ type: "adaptive" });
   });
+
+  it("Anthropic 固定 thinking budget 必须严格小于 maxTokens", () => {
+    const invalid = AppConfigSchema.safeParse({
+      model: {
+        provider: "anthropic",
+        name: "glm-5.1",
+        settings: { maxTokens: 1024 },
+      },
+    });
+    expect(invalid.success).toBe(false);
+    if (!invalid.success) {
+      expect(invalid.error.issues[0]?.path).toEqual(["model", "settings", "maxTokens"]);
+      expect(invalid.error.issues[0]?.message).toContain("thinkingBudgetTokens");
+    }
+
+    expect(
+      AppConfigSchema.safeParse({
+        model: {
+          provider: "openai",
+          name: "gpt-test",
+          settings: { maxTokens: 1024 },
+        },
+      }).success
+    ).toBe(true);
+  });
+
+  it("Anthropic thinking budget 可配置并写入请求体", async () => {
+    const config = AppConfigSchema.parse({
+      model: {
+        provider: "anthropic",
+        name: "glm-5.1",
+        baseUrl: "https://test-llm-proxy.nuwax.com/api/proxy/model",
+        settings: { maxTokens: 8192, thinkingBudgetTokens: 2048 },
+      },
+    });
+    const model = resolveModel(config);
+    if (!model || typeof model === "string") throw new Error("expected instance");
+    try {
+      await model.invoke([{ role: "user", content: "hi" }]);
+    } catch {
+      /* 探针请求 */
+    }
+    expect(requestBodies.at(-1)?.thinking).toEqual({
+      type: "enabled",
+      budget_tokens: 2048,
+    });
+  });
 });
