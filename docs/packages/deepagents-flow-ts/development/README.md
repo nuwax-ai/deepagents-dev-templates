@@ -3,7 +3,7 @@
 > **受众**：Monorepo 维护者（改 `packages/deepagents-flow-ts` 源码、surface、拓扑、ACP 对齐时查阅）。  
 > **不是**模板使用者文档。终端用户 / 在模板内建 flow 请看包内 [README.md](../../../../packages/deepagents-flow-ts/README.md) 与 [docs/](../../../../packages/deepagents-flow-ts/docs/)。
 
-本目录收录 **维护方案、架构决策、协议对齐、重构计划** 等开发向文档。包内的 `node-kit.md`、`flow-patterns.md`、`troubleshooting.md` 等属于**使用者参考**，留在 `packages/deepagents-flow-ts/docs/`。
+本目录收录 **维护方案、架构决策、协议对齐、重构计划** 等开发向文档。包内的 `node-kit.md`、`troubleshooting.md` 等属于**使用者参考**，留在 `packages/deepagents-flow-ts/docs/`。
 
 ---
 
@@ -125,7 +125,6 @@ development/
 | [docs/node-catalog.md](../../../../packages/deepagents-flow-ts/docs/node-catalog.md) | 节点选型 |
 | [docs/node-kit.md](../../../../packages/deepagents-flow-ts/docs/node-kit.md) | Factory API |
 | [docs/flow-orchestration.md](../../../../packages/deepagents-flow-ts/docs/flow-orchestration.md) | 编排速查 |
-| [docs/flow-patterns.md](../../../../packages/deepagents-flow-ts/docs/flow-patterns.md) | 进阶 LangGraph 模式 |
 | [docs/capabilities.md](../../../../packages/deepagents-flow-ts/docs/capabilities.md) | 能力分层与 builtin / `.agents` 契约 |
 | [docs/troubleshooting.md](../../../../packages/deepagents-flow-ts/docs/troubleshooting.md) | 排错索引（日志、HITL、ACP） |
 

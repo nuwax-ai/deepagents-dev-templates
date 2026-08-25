@@ -6,7 +6,7 @@
 
 > **开发方式**：**不改图**——只改 `prompts/` + 平台配置；所有需求（含固定阶段顺序、人审确认话术）一律以 default ReAct + 平台工具 + systemPrompt 落地。用 `tsx` 跑命令（**迭代期不要 `pnpm build`**）。本地快检：`pnpm flow`；查 profile：`pnpm flows -- --json`。**勿用 `pnpm exec tsx`**（pnpm 10/11 混用易卡在 exec 前预检）。端到端须经平台预览会话（ACP surface），`pnpm flow` 不能代替。
 
-> **本文档与 `docs/` 是模板技术事实的权威来源**：项目结构、分层规则、配置路径、命令、图规则与工程验证都只在此维护。开发 Agent 的平台操作门禁与 Skill 路由属于 `packages/dev-agent-flow/`，不得把其提示词或 Skill 内容复制回模板文档。**改图判定**见 [docs/examples.md](docs/examples.md) § 先判定；术语见 [docs/glossary.md](docs/glossary.md)；API 细节见源码与 [`docs/`](docs/README.md)。
+> **本文档与 `docs/` 是模板技术事实的权威来源**：项目结构、分层规则、配置路径、命令、图规则与工程验证都只在此维护。开发 Agent 的平台操作门禁与 Skill 路由属于 `packages/dev-agent-flow/`，不得把其提示词或 Skill 内容复制回模板文档。**默认开发路径**见 [docs/examples.md](docs/examples.md) § 先判定；术语见 [docs/glossary.md](docs/glossary.md)；API 细节见源码与 [`docs/`](docs/README.md)。
 
 ## 工作方式
 
@@ -33,7 +33,7 @@ pnpm flow "你好"          # 经 tsx 直跑；无凭证走 fallback 也能跑
 | 区 | 路径 | 规则 |
 |----|------|------|
 | **保护区** | `src/core/` `src/runtime/` `src/libs/` `src/surfaces/` `src/index.ts` | 业务 Agent 开发**默认禁止改**；仅在用户明确要求、框架缺陷修复、或目标能力无法在 app/config 层完成时例外，且须说明原因并补验证 |
-| **可编辑** | `src/app/` `prompts/` `config/` `builtin/` | 自由改；**默认不改图**——优先只动 `prompts/` + 平台配置；改图才动 `graph.ts` / `state.ts` |
+| **可编辑** | `src/app/` `prompts/` `config/` `builtin/` | 自由改；优先只动 `prompts/` + 平台配置；`graph.ts` / `state.ts` 仅作默认 ReAct 图维护 |
 | **只读参考** | `docs/examples.md` `docs/node-catalog.md` | 默认路径与交付底座见 `examples.md`；**无内置 demo** |
 
 ```
@@ -59,7 +59,7 @@ config/ prompts/ skills/ scripts/ docs/ tests/
 
 `createLlmNode` · `createLlmStreamNode` · `createLlmRouterNode`（LLM 裁决 → Command goto）· `createToolExecNode` · `createHumanApprovalNode`（HITL 前置 interrupt）· `createApprovalFinalizeNode`（HITL 后置定稿）· `createMcpRetrievalNode`（主动 MCP 检索）· `createPrepareNode` · `createFanout` · `createSubgraphNode`
 
-> **Bespoke nodes**（定制节点）— do not force into a factory（勿硬塞进 factory；如 multi-source retrieval merge / 多源检索合并、file delivery / 文件交付、converse routing / 对话路由等）；keep hand-written（保持手写）。See [node-catalog.md](docs/node-catalog.md) § BESPOKE。术语权威 → [glossary.md](docs/glossary.md)。
+> **Bespoke nodes**（定制节点）— do not force into a factory（勿硬塞进 factory；如自定义聚合 reducer、节点内 emitPlan/emitStage 事件等）；keep hand-written（保持手写并注释原因）。See [node-catalog.md](docs/node-catalog.md) § BESPOKE。术语权威 → [glossary.md](docs/glossary.md)。
 
 落地方式（与上文「工作方式」同构，细则见 [docs/examples.md](docs/examples.md)）：
 
@@ -73,7 +73,7 @@ config/ prompts/ skills/ scripts/ docs/ tests/
 
 ## 开发规则
 
-- **default 优先** — 说不清「default 为什么不够」就不改图；开放追问 / 客服 / 平台工具对话走 default + systemPrompt。
+- **default 唯一路径** — 所有需求（开放追问 / 客服 / 平台工具对话 / 固定流程话术）一律走 default + systemPrompt；`graph.ts` 仅作默认图维护。
 - **图是契约** — 连线/条件路由在 `graph.ts`；节点优先 factory、bespoke 才手写到 `nodes/`；决策逻辑抽纯函数 + 单测。
 - **先 factory 后手写** — 节点先查 [node-kit.md](docs/node-kit.md)；bespoke 保留并注释「为何不用 factory」。
 - **保护区** — `core`/`runtime`/`libs`/`surfaces` 默认不改；`src/app/`、`prompts/`、`config/` 可改。
@@ -226,7 +226,7 @@ pnpm test
 - [ ] 节点名不与 state channel 同名 · 条件边路由有单测
 - [ ] 分层合规（`layering.test.ts` 绿）· runtime 自包含（无仓库外路径）
 - [ ] `systemPrompt` 非空 · `prompts/` 定稿未含运行时自动追加段（`Available Skills` / `Available MCP Servers` 等）
-- [ ] 默认路径未无谓改图 · 改图能说明 default 为何不够
+- [ ] 默认路径未被改写（`flow.active: "default"`，未动 `graph.ts` 图结构）
 - [ ] 验证矩阵已满足（`pnpm flow` 不能代替平台预览）
 
 ## 流式输出检查清单

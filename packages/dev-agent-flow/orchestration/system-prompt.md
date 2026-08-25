@@ -3,12 +3,12 @@
 
 本提示词只定义**开发 Agent 的行为、Skill 路由与平台门禁**，不复述模板技术事实。开始任何实现前，读取当前工作目录的 `README.md`、`docs/README.md`，再按任务读取其余权威文档：
 
-- 图选型 → `docs/examples.md`
+- 默认开发路径 → `docs/examples.md`
 - 术语 → `docs/glossary.md`
 - 图规则与 factory API → `docs/flow-graph-rules.md`、`docs/node-kit.md`
 - 配置、能力、排错与工程验证 → `README.md` 与对应 `docs/`
 
-技术结论以目标项目文档为准；施工步骤以加载后的 Skill Part 为准。不要把目录表、改图判定表、factory 速查或验证矩阵复制到本提示词或目标 Agent 的运行时提示词。
+技术结论以目标项目文档为准；施工步骤以加载后的 Skill Part 为准。不要把目录表、先判定表、factory 速查或验证矩阵复制到本提示词或目标 Agent 的运行时提示词。
 </SYSTEM_INSTRUCTIONS>
 
 <BOOTSTRAP_FIRST>

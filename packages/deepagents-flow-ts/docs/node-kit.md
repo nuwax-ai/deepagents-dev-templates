@@ -25,7 +25,7 @@ import {
 | **流式**调 LLM,逐 token 给用户 | `createLlmStreamNode` | compose/aggregate/draft/finalize 修订 |
 | LLM 裁决 → **Command goto** 路由 | `createLlmRouterNode` | 节点内 Command 路由 |
 | 执行模型 `tool_calls`(ReAct 工具步) | `createToolExecNode` | 默认图 tools |
-| **主动 MCP 检索**(节点自选 server+tool) | `createMcpRetrievalNode` | RAG retrieve（见 [examples.md](examples.md)） |
+| **主动 MCP 检索**(节点自选 server+tool) | `createMcpRetrievalNode` | 检索节点（接外部知识源） |
 | 人审门(前置):`interrupt` 暂停 → 通过/打回 | `createHumanApprovalNode` | review/approve/confirm |
 | 人审门(同步弹窗):同 turn `onApprovalRequest` | `createPermissionApprovalNode` | 确认发布? / 秒级 yes-no |
 | HITL 后置定稿:按 feedback 短路/LLM 修订 | `createApprovalFinalizeNode` | HITL finalize |
@@ -33,7 +33,7 @@ import {
 | 并行扇出(Send map-reduce) | `createFanout` | 多路并行扇出 |
 | 把一张小图当节点用 | `createSubgraphNode` | 子任务封装 |
 
-> **定制节点（bespoke）不要硬塞**：定稿短路、LLM 路由、MCP 检索**已有 factory**。剩余真正 bespoke（多源检索取优、文件交付等）才手写，并注释「为何不用 factory」；**无**内置场景 topology。
+> **定制节点（bespoke）不要硬塞**：定稿短路、LLM 路由、MCP 检索**已有 factory**。剩余真正 bespoke（自定义聚合 reducer、节点内事件透出等）才手写，并注释「为何不用 factory」；**无**内置场景 topology。
 
 ---
 
@@ -58,7 +58,7 @@ graph.addNode("compose", compose);
 - `r.content` 已是 `extractText` 后的纯文本;`parse` 提供时 `r.parsed = parse(content)`。
 - **结构化**:加 `parse`(常用 `parseJson`),`write` 里读 `r.parsed`。PM 的 plan/evaluate、rag 的 rewrite 都用这个。
 - **`write` 可收第三参 `config?`**(LangGraphRunnableConfig)——供 write 内发 `emitPlan(config,…)`/`emitStage(config,…)` 副作用;不用就忽略(默认两参 `(r, s)`)。
-- 例：自建评估循环图 plan/estimate/evaluate；RAG rewrite；路由节点 `createLlmNode({ parse })`。
+- 例：默认图维护中的裁决/前置节点 `createLlmNode({ parse })`；路由节点配 `fallback`。
 - **用户可见初稿/汇总**见 [`createLlmStreamNode`](#createllmstreamnode--流式-llm)。
 
 ### parse 使用契约（必读）

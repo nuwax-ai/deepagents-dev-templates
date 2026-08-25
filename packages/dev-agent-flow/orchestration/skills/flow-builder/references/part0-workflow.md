@@ -1,7 +1,7 @@
 # Part 0：端到端开发流程
 
 > 所属：`flow-builder` L2-A（总流程）。入口路由见 [SKILL.md](../SKILL.md)。
-> 本技能承载会话启动、交互形态选型、图选型落地、completion gate 等**逐步实现**流程；各 Part 分工见 [SKILL.md](../SKILL.md) 路由表。
+> 本技能承载会话启动、形态确认（一律 default ReAct）、completion gate 等**逐步实现**流程；各 Part 分工见 [SKILL.md](../SKILL.md) 路由表。
 
 ## 会话启动（先于一切开发）
 

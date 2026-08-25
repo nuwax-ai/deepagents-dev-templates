@@ -68,7 +68,7 @@ START → prepare → think(model.bindTools) ──(toolsCondition)──┐
 | - | **接入层**（seam） | surface 与图解耦接缝 |
 | - | **surface seam** | surface 侧 seam |
 | - | **可运行 flow 挂载点**（app/flows） | app 层注册入口；**仅 default**；图逻辑在 `graph.ts` |
-| 硬塞进 factory、强行 factory 化 | **Bespoke nodes**（定制节点） | 不宜塞进 `src/libs/nodes/` factory 的手写节点（如多源检索合并、文件交付、对话路由等）；保持手写；见 `docs/node-catalog.md` § BESPOKE |
+| 硬塞进 factory、强行 factory 化 | **Bespoke nodes**（定制节点） | 不宜塞进 `src/libs/nodes/` factory 的手写节点（如自定义聚合 reducer、节点内 emitPlan/emitStage 事件等）；保持手写；见 `docs/node-catalog.md` § BESPOKE |
 
 ## 平台侧
 

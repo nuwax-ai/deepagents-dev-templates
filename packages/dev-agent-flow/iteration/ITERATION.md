@@ -68,7 +68,7 @@
 #### 本轮优化目标
 - 运行时：`flow.active` 非 default 启动直接报错（删除 `unknownActivePolicy` 静默回落）。
 - 提示词/Skill：删除 part1/part2 手写图路由，收敛为 default ReAct 唯一路径。
-- 资料：删除 flow-patterns、examples/ 演示、手写图章节；文档不留"已屏蔽"标注，相关内容直接删除。
+- 资料：删除 flow-patterns（含工作区未跟踪的 `examples/` 演示目录）；文档不留"已屏蔽"标注，相关内容直接删除。
 
 #### 方案（改哪些交付文件）
 - [x] orchestration/system-prompt.md（DEVELOPMENT_CONSTRAINTS 第 8 条等）
@@ -81,6 +81,8 @@
 - [ ] `pnpm iteration:drift -- --platform <导出.json>`（同步后台后）
 - [ ] 人工已把 orchestration/ 同步到编排后台
 - [x] 模板 `pnpm typecheck && pnpm test && pnpm graph`（391 tests 全过）
+- [ ] ACP 新会话平台预览（工程验证矩阵 `src/app/` flow 代码行要求；`pnpm flow` 不能替代）
+- [ ] 真实会话抽测打中「本轮目标句」的 Y（static 绿 ≠ 方向对）
 
 #### 结论
 - 非 ReAct 路径在运行时（抛错不回落）与提示词（路由删除）双层收敛；文档以"仅 default ReAct"正面表述，无墓碑标注。
