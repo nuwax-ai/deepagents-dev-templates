@@ -91,7 +91,7 @@ export const flows: Record<string, FlowDef> = {
 export function resolveFlow(name?: string): FlowDef {
   if (name && !flows[name]) {
     throw new Error(
-      `flow.active="${name}" 未注册且不受支持，仅允许 "default"（ReAct）。已注册: ${Object.keys(flows).join(", ")}`
+      `active flow "${name}" 未注册且不受支持，仅允许 "default"（ReAct）；请检查 flow.active（或旧顶层 activeFlow）。已注册: ${Object.keys(flows).join(", ")}`
     );
   }
   return (name ? flows[name] : undefined) ?? flows.default!;

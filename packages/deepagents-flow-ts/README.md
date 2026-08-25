@@ -68,6 +68,8 @@ config/ prompts/ skills/ scripts/ docs/ tests/
 
 **选图**：`config/flow-agent.config.json` 的 `flow.active`（缺省 `default`；旧顶层 `activeFlow` 仍会读取，非 default 值同样报错）经 [src/app/flows/index.ts](src/app/flows/index.ts) 解析——注册表**仅 default**。`pnpm graph` 导出默认图 topology。
 
+> 升级提示（2.2.0）：`flow.active`（及旧顶层 `activeFlow`）配置非 `"default"` 值，行为由“警告并回落 default”改为**启动直接报错**（`unknownActivePolicy` 已移除）；升级前请把这些配置改为 `"default"`。
+
 **StatefulFlow**（[src/core/flow-types.ts](src/core/flow-types.ts)）：`run({query|resume}, threadId, cb) => {done|interrupted}`。**别手写 run-loop**——用 `createStatefulFlow`（[src/surfaces/stateful-flow.ts](src/surfaces/stateful-flow.ts)）：
   - **conversational 对话**（default）：不暴露 `hasStarted`，surface 每轮走 query + 稳定 threadId + checkpointer → 多轮记忆 + 入口自动压缩；图层 `graph.stream` 真流式。物化开关：`FlowDef.conversational` 优先，未设则 `profile.interaction === "chat"`。
 

@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Changed
+- deepagents-flow-ts 2.2.0：`flow.active`（及旧顶层 `activeFlow`）非 `default` 值从"警告并回落 default"改为**启动直接报错**；移除 `unknownActivePolicy` 配置项。升级前请把非 default 的 flow 配置改为 `"default"`
+- deepagents-flow-ts 2.2.0：仅保留默认 ReAct 路径——删除 `docs/flow-patterns.md`、dev-agent-flow `part1/part2` 手写图指引及相关词条；固定阶段 / 人审确认 / 多源汇总一律以 default ReAct + 平台工具 + systemPrompt 落地
 - deepagents-flow-ts：移除 duckduckgo-mcp-server 残留引用；联网搜索统一走平台 MCP 登记
 - deepagents-flow-ts：精选 5 个面向 AI Agent 的可运行 seam 范例，移除误导性的 `dev-agent` 重复示例，并明确 topology 单一权威
 
