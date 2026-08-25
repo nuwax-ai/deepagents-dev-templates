@@ -116,7 +116,7 @@
 | **反例** | `findings: Annotation<string>()` + Send×N 同写 `findings` |
 | **正例** | `findings: Annotation<T[]>({ reducer: (a,b) => [...a,...b], default: () => [] })` |
 | **验证** | 并行路径集成测 |
-| **关联** | [flow-patterns.md § Send](flow-patterns.md) |
+| **关联** | [node-kit.md](node-kit.md) |
 
 ---
 
@@ -161,7 +161,7 @@
 | **反例** | `state.items.push(x); return {}` |
 | **正例** | `return { items: [x] }`（append channel 用 reducer） |
 | **验证** | 代码审阅 |
-| **关联** | [flow-patterns.md](flow-patterns.md)；[node-kit.md](node-kit.md) |
+| **关联** | [node-kit.md](node-kit.md) |
 
 ---
 
@@ -194,5 +194,4 @@
 - [node-catalog.md](node-catalog.md) — 选型
 - [node-kit.md](node-kit.md) — factory API
 - [troubleshooting.md](troubleshooting.md) — 症状 → 步骤
-- [flow-patterns.md](flow-patterns.md) — Send / interrupt / checkpoint
 - [scripts/README.md](../scripts/README.md) — 打包 / 调试命令

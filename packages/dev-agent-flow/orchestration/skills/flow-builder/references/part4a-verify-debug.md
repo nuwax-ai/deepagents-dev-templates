@@ -18,11 +18,11 @@ flow-debugger/scripts/debug.sh --message "..." --with-logs [--expect-tool <工�
 
 **真实运行门**：flow-debugger 用平台真实会话端到端复现完整运行路径，是生产路径的质量门；静态三连不能替代。执行应出现在用户 agent-dev 预览会话。
 
-手写图后静态快检：`pnpm typecheck && pnpm graph`；开发中可追加 flow-debugger 短 prompt，**全量 completion gate 仍须三连 + `debug.sh --with-logs`**（平台能力加 `--expect-tool`）。
+改动后静态快检：`pnpm typecheck && pnpm graph`；开发中可追加 flow-debugger 短 prompt，**全量 completion gate 仍须三连 + `debug.sh --with-logs`**（平台能力加 `--expect-tool`）。
 
-**收尾清单**（系统提示词非空、R-G009、**平台能力搜索证据**等）→ [part0-workflow.md](part0-workflow.md) § completion gate 收尾清单。
+**收尾清单**（系统提示词非空、**平台能力搜索证据**等）→ [part0-workflow.md](part0-workflow.md) § completion gate 收尾清单。
 
-**flow-debugger 细则**（真实执行、工具断言、HITL、会话管理、日志分析）→ [part4b-smoke.md](part4b-smoke.md)。
+**flow-debugger 细则**（真实执行、工具断言、会话管理、日志分析）→ [part4b-smoke.md](part4b-smoke.md)。
 
 ---
 
@@ -57,14 +57,14 @@ pnpm graph
 
 ---
 
-## 读日志六步（编排 / 客户端 / HITL）
+## 读日志六步（编排 / 客户端）
 
-图跑不通、节点未执行、条件边走错、HITL 不 resume、工具 `Permission denied` / 客户端卡转圈、客户端无响应时：
+flow 跑不通、工具 `Permission denied` / 客户端卡转圈、客户端无响应时：
 
-1. **确认** — env 含 `LOG_DIR`、`LOG_LEVEL`（HITL 用 `debug`）
+1. **确认** — env 含 `LOG_DIR`、`LOG_LEVEL`（排查用 `debug`）
 2. **复现** — flow-debugger `debug.sh` / `pnpm flow` / CLI（迭代期勿 `pnpm build`）
 3. **定位** — `.logs/` 最新 `.log` 或按 sessionId
-4. **过滤** — 对照 graph 顺序、节点名、tool 名、HITL 轮次
+4. **过滤** — 对照 graph 顺序、节点名、tool 名
 5. **修复验证** — 改后重跑，新日志确认错误消失
 6. **记录** — 根因摘要写入 `project.md`（不粘贴整段 log）
 
@@ -77,11 +77,11 @@ pnpm graph
 | 步 | 动作 |
 |----|------|
 | 1 | 日志搜 `LLM 未返回 JSON` 或节点 `label`（如 `prepare`） |
-| 2 | 打开 `src/app/graph.ts`（或自建 flow 的 `src/app/flows/<name>/graph.ts`）对应节点，查是否有 `parse: parseJson` |
+| 2 | 打开 `src/app/graph.ts` 对应节点，查是否有 `parse: parseJson` |
 | 3 | 查 `write` 是否使用 `r.parsed` — **未使用则删 `parse`** |
 | 4 | 若必须结构化：加强 prompt JSON schema / 加 `fallback` 或换 `createLlmRouterNode` + `routeFallback` |
 | 5 | 若入口节点：改 prompt 支持非预期输入（打招呼、格式错误），不强求 JSON |
-| 6 | 改图后同步 `docs/` 相关范式说明（**R-G003**，SHOULD） |
+| 6 | 改默认图后同步 `docs/` 相关范式说明（**R-G003**，SHOULD） |
 
 详表见当前工作目录 `docs/troubleshooting.md` § `LLM 未返回 JSON`。
 
@@ -89,15 +89,15 @@ pnpm graph
 
 ## 典型错误：无流式 / 回答一次性整段出现
 
-**规则**：[flow-graph-rules-pointer.md](flow-graph-rules-pointer.md) → 当前工作目录 **R-G009**；Part 2 § 流式输出。
+**规则**：[flow-graph-rules-pointer.md](flow-graph-rules-pointer.md) → 当前工作目录 **R-G009**。
 
 | 步 | 动作 |
 |----|------|
 | 1 | 确认症状：客户端长时间无字，最后一次性出全文（`streamed=false` 兜底） |
-| 2 | 打开 `src/app/graph.ts`（或自建 flow 的 `src/app/flows/<name>/graph.ts`），查用户可见节点（compose / aggregate / draft / finalize 修订） |
+| 2 | 打开 `src/app/graph.ts`，查用户可见节点（compose / aggregate / draft / finalize 修订） |
 | 3 | 若用 `createLlmNode` → 改为 **`createLlmStreamNode`**，`write` 从 `r.content` 改为 **`r.text`**，补 `timeoutMs: resolveLlmResilience(appConfig).longTimeoutMs` |
 | 4 | 确认该节点 `write` 用 `r.text`（**R-G009**），非 `r.content` |
-| 5 | 改图后同步 `docs/` 相关说明（**R-G003**，SHOULD）；用 flow-debugger 重跑并观察流式输出 |
+| 5 | 改默认图后同步 `docs/` 相关说明（**R-G003**，SHOULD）；用 flow-debugger 重跑并观察流式输出 |
 | 6 | 仍不流式：确认模型支持 `.stream()`；查当前工作目录 README § 流式输出检查清单 L2/L3 降级 |
 
 **与工具 EXECUTING 的关系**：图在 LLM 节点抛错未走完时，并行调试命令可能长时间显示 EXECUTING；先修图错误再判工具层。
@@ -112,8 +112,8 @@ pnpm graph
 
 | 条件 | 结果 |
 |------|------|
-| 已贴 `search-apis` / `search-skills` / `get-config` 输出，平台无命中 | 可完成；可自写 app 工具或图内降级（须记录关键词） |
-| 平台有命中，已 `add-tool`，并按需对齐节点或接入 `flow-tools.ts` | 可完成 |
+| 已贴 `search-apis` / `search-skills` / `get-config` 输出，平台无命中 | 可完成；可自写 app 工具（须记录关键词） |
+| 平台有命中，已 `add-tool`，并经宿主注入或固化进入 `allTools` / 接入 `flow-tools.ts` | 可完成 |
 | **未执行**平台搜索就写外部能力 | **不可报完成**（即使真实调试绿） |
 | 平台有命中但未 `add-tool` / 未接线 | **不可报完成** |
 | 以「用户待配置」代替开发期登记 | **不可报完成** |
@@ -122,7 +122,7 @@ pnpm graph
 
 | 条件 | 结果 |
 |------|------|
-| 已贴搜索关键词 + `tools` 输出，平台无搜索能力 | 可完成；图内可写降级文案 |
+| 已贴搜索关键词 + `tools` 输出，平台无搜索能力 | 可完成；可写降级文案 |
 | 平台有搜索工具/API 且已接线 | 可完成 |
 | 未执行 `search-apis --kw 搜索` 或未查 `tools` | **不可报完成** |
 | 平台有命中但仍留搜索占位配置 | **不可报完成** |
@@ -131,7 +131,7 @@ pnpm graph
 |----|------|
 | 1 | 确认需**工作区外**能力（非仅 `grep`/`glob`） |
 | 2 | 是否已 `search-apis.sh --kw "<能力词>"` / `search-skills.sh` / `get-config.sh --key tools|skills`？ |
-| 3 | 命中是否已 `add-tool.sh`，并按需在节点 `params` 指定 `toolName` / `tools` 或接入 `flow-tools.ts`？ |
+| 3 | 命中是否已 `add-tool.sh`，并经宿主注入或固化进入 `allTools` / 接入 `flow-tools.ts`？ |
 | 4 | **联网**：另查 `tools` 与平台搜索工具登记状态；禁止 bash+curl 自写搜索 API；禁止把搜索能力硬编码进当前项目默认配置 |
 | 5 | `pnpm capabilities` 核对工具列表 |
 | 6 | 仍不生效：查工具名、`.logs/` 中 `onToolCall` |
@@ -156,7 +156,7 @@ pnpm graph
 ## Anti-patterns
 
 - ❌ 未跑通就声称完成
-- ❌ 不看 `.logs/` 就猜客户端/HITL 行为
+- ❌ 不看 `.logs/` 就猜客户端行为
 - ❌ 把 `.log` 全文贴进对话或提交 git
 - ❌ 见 JSON 解析错就加更严 prompt，不检查 `write` 是否真需要 `r.parsed`
 - ❌ 用户反馈「不流式」却只改客户端，不检查节点是否误用 `createLlmNode`

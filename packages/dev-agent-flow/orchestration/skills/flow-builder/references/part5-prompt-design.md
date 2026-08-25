@@ -32,7 +32,7 @@
 - 用户首条或任意消息描述要什么 Agent / 对谁说话 / 什么风格
 - 新建、命名、定制主 Agent / 通用智能体（非 subagent，见 Part 6）
 - 调整 `systemPrompt` / `openingChatMsg`
-- 固定流程型自建图需注入节点 `systemPrompt`（part1 / part2）
+- 流程约束类提示（固定顺序 / 确认话术）——由默认 ReAct 的 `systemPrompt` 承接
 - Phase 0 发现平台 `systemPrompt` 为空但用户已描述需求（[part0-workflow.md](part0-workflow.md)）
 
 ### 定稿步骤
@@ -100,7 +100,7 @@
 | 4 | 过 checklist |
 | 5 | 按 § 用户输入提炼与平台同步 +「保存与同步」上传 |
 
-与图落地衔接：写好后经 `createFlowGraph({ systemPrompt })` 注入自建图（见 [part1-fixed-flow.md](part1-fixed-flow.md) § systemPrompt 注入 / `src/app/default-flow.ts`）。
+与图落地衔接：写好后经 `createFlowGraph({ systemPrompt })` 注入默认图（见 `src/app/default-flow.ts`；默认 ReAct 已内置注入）。
 
 ## 节点 prompt vs 主 Agent systemPrompt
 

@@ -79,7 +79,7 @@ def main() -> None:
     require_markers(
         "platform capability pre-code gate",
         part0_text + "\n" + part3_text,
-        ("写图前", "get-config.sh --key tools --full", "platformToolRefs", "手写 fetch", "4sandbox"),
+        ("施工前", "get-config.sh --key tools --full", "platformToolRefs", "手写 fetch", "4sandbox"),
     )
     require_markers(
         "delivery policy narrowing",

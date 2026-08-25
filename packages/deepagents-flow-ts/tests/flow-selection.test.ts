@@ -12,7 +12,6 @@ describe("flow selection", () => {
       active: "default",
       source: "default",
       defaultInteraction: "chat",
-      unknownActivePolicy: "warn-default",
     });
   });
 
@@ -35,8 +34,8 @@ describe("flow selection", () => {
     });
   });
 
-  it("resolveFlow falls back to default for unknown names", () => {
-    expect(resolveFlow("not-registered").name).toBe("default");
+  it("resolveFlow throws for unknown names (non-ReAct blocked)", () => {
+    expect(() => resolveFlow("not-registered")).toThrow(/非 ReAct flow 已屏蔽/);
   });
 });
 

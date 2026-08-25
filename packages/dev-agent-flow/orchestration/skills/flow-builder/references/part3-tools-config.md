@@ -33,8 +33,8 @@
 ### 自动触发
 
 - 用户要：调 API、接第三方、用知识库、平台技能、发通知、存取业务数据、或联网搜索
-- 代码信号：新增 `tool()`、改 `flow-tools.ts`、图内用 `createToolExecNode` / 主动调用平台工具的节点、需要外部数据
-- 场景信号：默认 ReAct 需业务工具、检索增强问答、多源搜索聚合、深度研究等（照 `docs/examples.md` 自建时同样先登记）
+- 代码信号：新增 `tool()`、改 `flow-tools.ts`、默认 ReAct 需要业务工具、需要外部数据
+- 场景信号：默认 ReAct 需业务工具、检索问答、多源搜索聚合、深度研究等
 
 **豁免**：纯 LLM 对话；仅工作区内 `grep` / `glob` / `read_file`。
 
@@ -49,15 +49,15 @@
 7. 记入 `project.md`（targetId、真实工具名、验证方式）
 8. 平台**确无**命中 → 记录搜索输出 → **然后**方可走优先级 3 自写 app 工具
 
-### 工具登记与图内接线
+### 工具登记与默认 ReAct 接线
 
-平台 `add-tool` 只负责**登记/启用**。登记后的业务选型（宿主注入还是 `platformToolRefs` 固化、模型按需还是流程强制、`allTools` 还是局部集合）以当前工作目录 `docs/capabilities.md` 的“业务场景：平台能力如何进图”为准；本 Part 不复制该决策表。
+平台 `add-tool` 只负责**登记/启用**。登记后的接线只有两条路径（细则见当前工作目录 `docs/capabilities.md`）：**宿主注入**会话，或版本化**固化**为 `FlowDef.platformToolRefs`——runtime 生成 `StructuredTool` 后并入 `runtime.allTools`，默认 ReAct 的 `think` 节点 `bindTools` 按需调用。
 
 执行选型时：
 
 1. 用 `get-config.sh --key tools --full` 的真实 `toolName` / `targetType` / `targetId` / 完整 `schema`，不要手抄搜索结果。
 2. 需要版本化固化时，把完整配置写入 `FlowDef.platformToolRefs`；runtime 会生成 `StructuredTool`，不是让你再写 fetch / `tool()` 包装。
-3. 按权威表选择独立节点、局部集合或 `runtime.allTools`；调试时用 `flow-debugger` 确认本会话确实注入或装配了该工具。
+3. 调试时用 `flow-debugger` 确认本会话确实注入或装配了该工具。
 
 禁止硬编码 URL、密钥或鉴权值；schema 里的 `${...}` 占位符由运行环境解析。
 
@@ -81,53 +81,26 @@
 - 提示词里可写中文登记名引导模型；flow-debugger 断言用 runtime 子串
 - 若业务输出看似已调用工具但 `--expect-tool` 未命中，不算通过；用 flow-debugger `--show-trace` 或重新 `get-config --key tools --full` 确认 runtime/SSE 名称，修正断言后重跑同一主路径
 
-### 固定管道与工具集合示例
+### 默认 ReAct 接线示例
 
-**独立节点**（`createPlatformToolActionNode`）：从固化或注入得到的 `StructuredTool[]` 中点名调用。
-
-```typescript
-// src/app/graph.ts：固定管道里主动调用平台工具（toolName 占位，真实值以 get-config 为准）
-import { createPlatformToolActionNode } from "../libs/nodes/index.js";
-import type { StructuredTool } from "@langchain/core/tools";
-
-// platformTools：来自 platformToolRefs 固化或 runtime.allTools / 宿主注入子集
-function buildSearchNode(platformTools: StructuredTool[]) {
-  return createPlatformToolActionNode<MyStateType>({
-    tools: platformTools,
-    toolName: "Plugin_<id>",
-    args: (s) => ({ query: s.query, freshness: "noLimit" }),
-    write: ({ raw }, _s) => ({ searchResult: raw }),
-  });
-}
-```
-
-**局部工具集合**（`createToolExecNode` + `pickTools`）：ReAct 子回路只暴露部分平台工具。
+默认图 `think` 节点 `bindTools(runtime.allTools)`，模型按需调用；无需手写 HTTP，也无需建固定管道节点：
 
 ```typescript
-import { pickTools } from "./tool-bindings.js";
-import { createToolExecNode } from "../libs/nodes/index.js";
-import type { StructuredTool } from "@langchain/core/tools";
-
-// availableTools：固化产物、allTools 子集或宿主注入集合均可
-function buildToolsNode(availableTools: StructuredTool[]) {
-  const selectedTools = pickTools(availableTools, ["Plugin_<id>"]);
-  if (selectedTools.length === 0) {
-    throw new Error("平台工具未就绪：Plugin_<id>");
-  }
-  return createToolExecNode<MyStateType>({ tools: selectedTools });
-}
+// src/app/graph.ts（默认图已内置，通常无需改动）：
+// think = model.bindTools(runtime.allTools) —— 平台工具经宿主注入或 platformToolRefs
+// 固化后自动进入 allTools。
 ```
 
-- **独立节点**：节点自行从 state 构造参数并 `invoke`，适合固定步骤（每轮必搜等）。
-- **`createToolExecNode`**：只执行上一条 `AIMessage.tool_calls`；用 `pickTools(...)` 限定局部集合（名字写错得空数组，须显式报错）。
-- **默认 ReAct**：宿主注入或固化后并入 `allTools` → `bindTools`，模型按需调用；无需手写 HTTP。
+- **宿主注入**：平台登记后宿主把工具注入会话，`allTools` 自动可见。
+- **固化**：把 `get-config --key tools --full` 的真实配置写入 `FlowDef.platformToolRefs`，runtime 生成 `StructuredTool` 并入 `allTools`。
+- 固定流程顺序、人审确认等约束写进 systemPrompt，由默认 ReAct 承接（非 ReAct 图已屏蔽）。
 
 ### 完成闸门
 
 | 场景 | 可否报「完成」 |
 |------|----------------|
-| 已执行平台搜索 + `get-config`，确无对应能力，已记录关键词与输出 | ✅ 可自写 app 工具或图内降级 |
-| 平台有命中，已 `add-tool`，且已固化或可被节点/集合引用（独立节点 / 局部集合 / 可选 allTools） | ✅ |
+| 已执行平台搜索 + `get-config`，确无对应能力，已记录关键词与输出 | ✅ 可自写 app 工具 |
+| 平台有命中，已 `add-tool`，且已固化或可被宿主注入（进入 `allTools` 供默认 ReAct 调用） | ✅ |
 | 未执行平台搜索就写外部能力 / 占位未接线 | ❌ 不得报完成 |
 | 平台有命中但未 `add-tool` | ❌ 不得报完成 |
 | 以「用户待配置」代替开发期登记 | ❌ 不得报完成 |
@@ -145,7 +118,7 @@ function buildToolsNode(availableTools: StructuredTool[]) {
 
 1. 完成 § 平台能力登记 步骤 1–4
 2. 追加关键词：`搜索` / `联网` / `web` / 业务领域词
-3. 命中 → `add-tool.sh`；固定管道需要时按真实工具名接线（独立节点 / 局部集合 / 可选 allTools）
+3. 命中 → `add-tool.sh`；经宿主注入或固化进入 `allTools`，默认 ReAct 按需调用
 4. 记入 `project.md`
 
 ### 禁止

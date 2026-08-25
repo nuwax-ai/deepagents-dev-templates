@@ -1,8 +1,8 @@
 /**
  * Flow 注册表 —— 选图入口（app 层）。
  *
- * 产品工作区仅保留默认 ReAct（default）；图逻辑在 `graph.ts` / `default-flow.ts`。
- * 多轮 chat、检索增强等场景请直接改默认图或对照 `docs/` 自建，勿依赖内置 demo 选图。
+ * 仅保留默认 ReAct（default）；图逻辑在 `graph.ts` / `default-flow.ts`。
+ * 非 ReAct 开发模式已屏蔽：`flow.active` 非 "default" 时 `resolveFlow` 直接抛错，不回落。
  *
  * 选图：配置 `flow.active`（缺省 "default"）。
  * 组合根 index.ts 按 `resolveFlowSelection(raw)` + `resolveFlow(...)` 取 executor / topology。
@@ -46,15 +46,10 @@ export interface FlowSelection {
   active: string;
   source: "flow.active" | "activeFlow" | "default";
   defaultInteraction: FlowInteractionKind;
-  unknownActivePolicy: "warn-default" | "default";
 }
 
 function normalizeInteraction(value: unknown): FlowInteractionKind {
   return value === "pipeline" || value === "approval" ? value : "chat";
-}
-
-function normalizeUnknownPolicy(value: unknown): "warn-default" | "default" {
-  return value === "default" ? "default" : "warn-default";
 }
 
 /** 从 flow 配置解析 active flow，同时兼容旧顶层 activeFlow。 */
@@ -71,7 +66,6 @@ export function resolveFlowSelection(raw: Record<string, unknown> = {}): FlowSel
     active: activeFromFlow ?? activeFromLegacy ?? "default",
     source: activeFromFlow ? "flow.active" : activeFromLegacy ? "activeFlow" : "default",
     defaultInteraction: normalizeInteraction(flow.defaultInteraction),
-    unknownActivePolicy: normalizeUnknownPolicy(flow.unknownActivePolicy),
   };
 }
 
@@ -93,11 +87,11 @@ export const flows: Record<string, FlowDef> = {
   },
 };
 
-/** 按名取 flow，未命中或未指定回落到 default。 */
-export function resolveFlow(name?: string, opts: { unknownActivePolicy?: "warn-default" | "default" } = {}): FlowDef {
-  if (name && !flows[name] && opts.unknownActivePolicy !== "default") {
-    logger.warn(
-      `active flow "${name}" 未在 flow 注册表，回落 default。已注册: ${Object.keys(flows).join(", ")}`
+/** 按名取 flow；非 ReAct 开发模式已屏蔽，未注册（非 default）直接抛错，不回落。 */
+export function resolveFlow(name?: string): FlowDef {
+  if (name && !flows[name]) {
+    throw new Error(
+      `非 ReAct flow 已屏蔽：flow.active="${name}" 未注册且不受支持，仅允许 "default"（ReAct）。已注册: ${Object.keys(flows).join(", ")}`
     );
   }
   return (name ? flows[name] : undefined) ?? flows.default!;

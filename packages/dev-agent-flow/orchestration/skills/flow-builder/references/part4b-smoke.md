@@ -10,7 +10,7 @@
 | 平台真实 agent 会话端到端跑通，输出出现在用户 agent-dev 预览会话 | `parse` 与 `write` 语义的静态正确性（仍需 R-G001/R-G009） |
 | 当前 `flow.active` 所选 flow 的真实执行行为 | 与本地 `.env`/rcoder 模拟一致性 |
 | 平台能力真实调用：`--expect-tool` 命中且 success | 工具返回内容的业务正确性（仍需人工抽查） |
-| 权限审批、ask-question、HITL 续接路径 | 后端 4sandbox 调试端点未 ready 时的最终生产质量 |
+| 权限审批、ask-question 续接路径 | 后端 4sandbox 调试端点未 ready 时的最终生产质量 |
 | `.logs/` runtime 错误、工具 trace、permission/模型问题 | 只靠 CLI 退出码替代日志分析 |
 
 ## 常用命令
@@ -60,7 +60,7 @@ pnpm typecheck && pnpm test && pnpm graph
   --with-logs
 ```
 
-HITL / approval flow：
+权限审批 / ask-question 续接：
 
 ```bash
 ./scripts/debug.sh --message "生成一段发布文案" --auto-approve
@@ -74,7 +74,7 @@ HITL / approval flow：
 
 - `debug.sh` exit 0（推荐 `--with-logs` 一步完成）。
 - `analyze-logs.sh` exit 0，stderr 含 `[结论] 日志正常`（或 `--with-logs` 时 `[结论] SSE PASS + 日志佐证通过`）。
-- 有用户可见输出，或预期的 HITL / ask-question 事件已产生并被正确续接。
+- 有用户可见输出，或预期的 ask-question 事件已产生并被正确续接。
 - 若设置 `--expect-tool`，工具 trace 命中且 success。
 - 日志侧：`[flow 状态]` 无异常、`[错误]` 无未解释项、`[工具调用]` 无 failed。
 
@@ -114,6 +114,6 @@ runtime 仍可用：
 
 - ❌ 用本地模拟、`pnpm flow` 或旧 rcoder smoke 冒充真实调试。
 - ❌ 已登记平台能力但不加 `--expect-tool`。
-- ❌ 遇 exit 5 不处理 HITL，就说验证失败或完成。
+- ❌ 遇 exit 5 不处理审批 / ask-question 续接，就说验证失败或完成。
 - ❌ 后端端点未 ready 时改业务代码绕过调试脚本。
 - ✅ 静态三连 + flow-debugger（`--with-logs` 或 analyze-logs 佐证）+ 必要工具断言一起作为完成证据。

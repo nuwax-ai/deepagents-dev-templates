@@ -6,16 +6,16 @@
 
 本包包含 **开发 Agent（Flow 版）** 的系统提示词和 Skills 配置。开发 Agent 运行在云端开发环境，职责是帮开发者基于 `nuwax-flow-ts` 工作流编排模板创建场景 Agent。
 
-与 `dev-agent`（面向 `deepagents-app-ts`，自由 tool loop）不同，本包面向 **`nuwax-flow-ts`** —— Agent 按 **LangGraph node + edge 图**跑（框架内置**默认 ReAct**，可手写扩展），而非自由 tool loop。
+与 `dev-agent`（面向 `deepagents-app-ts`，自由 tool loop）不同，本包面向 **`nuwax-flow-ts`** —— Agent 按 **LangGraph node + edge 图**跑（**仅默认 ReAct**，非 ReAct 开发模式已屏蔽），而非自由 tool loop。
 
-**交付路径**：先读取目标项目 `README.md` 与 `docs/examples.md`，按其权威判定选择默认图或手写图；再加载对应的 `flow-builder` Part 执行。
+**交付路径**：先读取目标项目 `README.md` 与 `docs/examples.md`；一律按 default ReAct 路径开发（平台工具 + systemPrompt 承接所有需求形态），再加载对应的 `flow-builder` Part 执行。
 
 ## 与 dev-agent 的关系
 
 | | dev-agent | dev-agent-flow |
 |--|-----------|----------------|
 | 面向模板 | `deepagents-app-ts` | `nuwax-flow-ts` |
-| 运行范式 | 自由 tool loop（`createDeepAgent()`） | **LangGraph node + edge 图**（默认 ReAct + 手写扩展） |
+| 运行范式 | 自由 tool loop（`createDeepAgent()`） | **LangGraph node + edge 图**（仅默认 ReAct） |
 | 核心抽象 | 工具注册（`createTools()`） | 图编排（graph + nodes + **surface seam（接入层）**） |
 | 目标 Agent 提示词基准 | `target-agent.base.md` | `flow.base.md`（经 `dev-engineer-toolkit` 同步 `<PLATFORM_CONFIG>`，定义见 `orchestration/system-prompt.md`） |
 | 配置文件 | `app-agent.config.json` | `flow-agent.config.json` |
@@ -81,7 +81,7 @@ packages/dev-agent-flow/
 
 | 保留 | 职责 |
 |------|------|
-| `flow-builder` | Part 0 总流程；Part 1–4 图选型落地/编排/工具/验证；Part 5 系统提示词；Part 6–7 子智能体/技能 |
+| `flow-builder` | Part 0 总流程（default ReAct 唯一路径）；Part 3–4 工具/验证；Part 5 系统提示词；Part 6–7 子智能体/技能 |
 | `dev-engineer-toolkit` | `<PLATFORM_CONFIG>` 读写；工具/技能搜索注册与下载 |
 
 已并入 `flow-builder`、可解绑：`flow-scaffold`、`flow-tools-config`、`flow-prompt-designer`。

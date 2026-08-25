@@ -186,7 +186,6 @@
 
 ## 相关文档
 
-- [flow-graph-rules.md](flow-graph-rules.md) — **图编排规则（R-G001+，可持续追加）**
+- [flow-graph-rules.md](flow-graph-rules.md) — **图编排规则（R-G001+，默认图维护参考）**
 - [node-kit.md](node-kit.md) — factory API + parse 契约摘要
 - [node-catalog.md](node-catalog.md) — 选型决策树
-- [flow-patterns.md](flow-patterns.md) — Send / interrupt / checkpoint
