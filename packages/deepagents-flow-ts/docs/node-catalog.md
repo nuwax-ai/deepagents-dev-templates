@@ -23,7 +23,7 @@
 |---|---|---|---|
 | `llm` | `createLlmNode` | 一次调 LLM,写回**纯文本**（默认）或结构化（`write` 读 `r.parsed` 时才加 `parse`） | plan / rewrite / grade / 路由裁决；**非**用户可见大段终稿 |
 | `llm-stream` | `createLlmStreamNode` | **流式**调 LLM,逐 token 给用户 | compose / aggregate / generate / draft / respond(用户可见大段输出) |
-| `llm-router` | `createLlmRouterNode` | LLM 裁决后**返回 Command goto**(节点内路由) | reflection / evaluator:评审 → 重做或放行 |
+| `llm-router` | `createLlmRouterNode` | LLM 裁决后**返回 Command goto**(节点内路由) | 节点内路由裁决 |
 
 ### HITL(人审)类
 
@@ -41,8 +41,8 @@
 | 惯用名 | factory | 语义 | 何时用 |
 |---|---|---|---|
 | `tool-exec` | `createToolExecNode` | 执行模型 `tool_calls`(ReAct 工具步)+ 三态透出 | 默认图 tools 节点 |
-| `platform-tool` | `createPlatformToolActionNode` | 主动调用已注入的平台/工具集合 | 存量参考；新开发并入 `allTools` |
-| `mcp-retrieval` | `createMcpRetrievalNode` | 调真实 MCP 检索(rateLimited + 三态) | RAG retrieve（接外部知识源） |
+| `platform-tool` | `createPlatformToolActionNode` | 主动调用已注入的平台/工具集合 | 新开发统一并入 `allTools` |
+| `mcp-retrieval` | `createMcpRetrievalNode` | 调真实 MCP 检索(rateLimited + 三态) | 检索节点（接外部知识源） |
 
 ### 结构类
 
@@ -59,12 +59,10 @@
 | 模式 | 为何定制 | 出路 |
 |---|---|---|
 | **bindTools 的 ReAct think** | think↔tools 循环与 ToolNode 耦合 | 用默认 ReAct 图,不手写 |
-| **文件交付** | interrupt 收路径 + 写文件 | 手写节点 |
-| **多源检索取优** | 多 MCP 源启发式合并 | 手写 subgraph（`createMcpRetrievalNode` 仅单源/简单多源） |
 | **自定义 reducer** | 业务特定聚合 | Annotation reducer 手写 |
 | **含 emitPlan/emitStage** | 节点内发结构化事件 | `createLlmNode`/`Stream` 的 `write` 内 `emit*` |
 
-> 「图是契约」：bespoke 保留手写是设计选择（注释「为何不用 factory」），不是遗漏。范式名（RAG / HITL / Send）见 [examples.md](examples.md)，**不是**可切换内置场景。
+> 「图是契约」：bespoke 保留手写是设计选择（注释「为何不用 factory」），不是遗漏；**无**可切换内置场景。
 
 ---
 

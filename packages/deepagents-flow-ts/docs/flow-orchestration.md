@@ -1,6 +1,6 @@
 # Flow 编排速查（默认 ReAct）
 
-本仓库**仅保留默认 ReAct 图**（`prepare → think ↔ tools → respond`，见 `src/app/graph.ts`）。非 ReAct 编排模式（手写固定管道、HITL interrupt/resume、Send 并行、自建子图等）已屏蔽，不用于开发。节点选型见 [node-catalog.md](node-catalog.md)，factory API 见 [node-kit.md](node-kit.md)。
+本仓库**仅保留默认 ReAct 图**（`prepare → think ↔ tools → respond`，见 `src/app/graph.ts`）。节点选型见 [node-catalog.md](node-catalog.md)，factory API 见 [node-kit.md](node-kit.md)。
 
 ## 框架优先（强制）
 

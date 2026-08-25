@@ -2,7 +2,7 @@
  * Flow 注册表 —— 选图入口（app 层）。
  *
  * 仅保留默认 ReAct（default）；图逻辑在 `graph.ts` / `default-flow.ts`。
- * 非 ReAct 开发模式已屏蔽：`flow.active` 非 "default" 时 `resolveFlow` 直接抛错，不回落。
+ * `flow.active` 非 "default" 时 `resolveFlow` 直接抛错，不回落。
  *
  * 选图：配置 `flow.active`（缺省 "default"）。
  * 组合根 index.ts 按 `resolveFlowSelection(raw)` + `resolveFlow(...)` 取 executor / topology。
@@ -87,11 +87,11 @@ export const flows: Record<string, FlowDef> = {
   },
 };
 
-/** 按名取 flow；非 ReAct 开发模式已屏蔽，未注册（非 default）直接抛错，不回落。 */
+/** 按名取 flow；未注册（非 default）直接抛错，不回落。 */
 export function resolveFlow(name?: string): FlowDef {
   if (name && !flows[name]) {
     throw new Error(
-      `非 ReAct flow 已屏蔽：flow.active="${name}" 未注册且不受支持，仅允许 "default"（ReAct）。已注册: ${Object.keys(flows).join(", ")}`
+      `flow.active="${name}" 未注册且不受支持，仅允许 "default"（ReAct）。已注册: ${Object.keys(flows).join(", ")}`
     );
   }
   return (name ? flows[name] : undefined) ?? flows.default!;

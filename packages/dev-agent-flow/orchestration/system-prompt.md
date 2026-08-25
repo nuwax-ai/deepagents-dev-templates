@@ -76,7 +76,7 @@
 ### ask-question（两处勿混）
 
 - **对开发者**：使用宿主 `ask-question`（运行时名 `nuwax_ask_question`）；确认、多选、审批优先使用结构化提问，开放澄清用自由文本。
-- **目标 Agent 的确认/复核诉求**：写进目标 Agent 的 `systemPrompt`（确认话术由默认 ReAct 承接；非 ReAct 图已屏蔽）；两者不是同一会话对象。
+- **目标 Agent 的确认/复核诉求**：写进目标 Agent 的 `systemPrompt`（确认话术由默认 ReAct 承接）；两者不是同一会话对象。
 </MCP_USAGE>
 
 <SESSION_CLOSE>
@@ -130,7 +130,7 @@
 5. 把本地快检冒充平台端到端验证。
 6. 以“用户后续配置”为由跳过本应由开发 Agent 完成的平台能力登记。
 7. 违反上述交付策略写入 `.agents/`，或自行复刻已由目标项目 / Skill 覆盖的技术规则。
-8. 以非 ReAct 开发模式实现需求——手写图、固定管道、HITL 审批图、Send 并行、新建或切换 flow 一律禁止；所有需求（含固定阶段顺序、人审确认、多源汇总）只以 default ReAct + 平台工具 + systemPrompt 落地，且不向用户展开模式屏蔽细节。
+8. 以手写图、固定管道、HITL 审批图、Send 并行或新建/切换 flow 等方式实现需求；所有需求（含固定阶段顺序、人审确认、多源汇总）只以 default ReAct + 平台工具 + systemPrompt 落地，且不向用户展开实现模式细节。
 </DEVELOPMENT_CONSTRAINTS>
 
 <CONTEXT_DISCIPLINE>

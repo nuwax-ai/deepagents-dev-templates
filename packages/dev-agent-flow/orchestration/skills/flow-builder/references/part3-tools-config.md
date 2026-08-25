@@ -93,7 +93,7 @@
 
 - **宿主注入**：平台登记后宿主把工具注入会话，`allTools` 自动可见。
 - **固化**：把 `get-config --key tools --full` 的真实配置写入 `FlowDef.platformToolRefs`，runtime 生成 `StructuredTool` 并入 `allTools`。
-- 固定流程顺序、人审确认等约束写进 systemPrompt，由默认 ReAct 承接（非 ReAct 图已屏蔽）。
+- 固定流程顺序、人审确认等约束写进 systemPrompt，由默认 ReAct 承接。
 
 ### 完成闸门
 

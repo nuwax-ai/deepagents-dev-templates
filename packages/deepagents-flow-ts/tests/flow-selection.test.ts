@@ -15,11 +15,12 @@ describe("flow selection", () => {
     });
   });
 
-  it("keeps legacy activeFlow compatible", () => {
+  it("keeps legacy activeFlow parsing (non-default values still throw)", () => {
     expect(resolveFlowSelection({ activeFlow: "legacy-name" })).toMatchObject({
       active: "legacy-name",
       source: "activeFlow",
     });
+    expect(() => resolveFlow("legacy-name")).toThrow(/仅允许 "default"/);
   });
 
   it("prefers flow.active over legacy activeFlow", () => {
@@ -34,8 +35,8 @@ describe("flow selection", () => {
     });
   });
 
-  it("resolveFlow throws for unknown names (non-ReAct blocked)", () => {
-    expect(() => resolveFlow("not-registered")).toThrow(/非 ReAct flow 已屏蔽/);
+  it("resolveFlow throws for unknown names", () => {
+    expect(() => resolveFlow("not-registered")).toThrow(/仅允许 "default"/);
   });
 });
 

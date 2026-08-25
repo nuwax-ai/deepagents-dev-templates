@@ -83,7 +83,7 @@ flow-builder/
 ## L1 约束
 
 - 模板技术事实只读当前工作目录 `README.md` 与 `docs/`；本 Skill 不复制图规则、factory API、目录结构或验证矩阵。
-- **仅启用默认 ReAct（default flow）**：固定阶段顺序、人审确认、多源汇总等需求一律以 default ReAct + 平台工具 + systemPrompt 落地；禁止手写图、固定管道、HITL 图、Send 并行或新建/切换 flow，也不向用户展开屏蔽细节。
+- **仅启用默认 ReAct（default flow）**：固定阶段顺序、人审确认、多源汇总等需求一律以 default ReAct + 平台工具 + systemPrompt 落地；禁止手写图、固定管道、HITL 图、Send 并行或新建/切换 flow，也不向用户展开实现模式细节。
 - 术语读 `docs/glossary.md`，默认路径与交付底座读 `docs/examples.md`，factory API 读 `docs/node-kit.md`（默认图维护参考）。
 - 本 Skill 的职责是把这些事实落成步骤：按需读取一个 Part，平台操作交给 `dev-engineer-toolkit`，真实链路验证交给 `flow-debugger`。
 - 平台回读、防开发 Skill 污染和可否对外报完成遵守开发 Agent `system-prompt.md`；工程验证范围遵守目标项目 README。

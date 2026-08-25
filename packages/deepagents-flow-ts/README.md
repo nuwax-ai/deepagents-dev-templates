@@ -2,7 +2,7 @@
 
 **通用工作流编排模板** —— 编排范式固定为 **LangGraph `StateGraph` + node/edge**（显式图编排）；禁止无图、模型自驱调工具的「自由 tool loop」。开箱 **default ReAct 图** 已覆盖多数对话与平台能力场景，通常只改 systemPrompt，不必另写图。
 
-本项目是 **工作流编排 Agent**：「大脑」是节点图（**仅默认 ReAct**；固定管道 / Send / multi-turn HITL 等**非 ReAct 开发模式已屏蔽**）；checkpoint、MCP、压缩、流式等底座由 `src/runtime/` 承担。
+本项目是 **工作流编排 Agent**：「大脑」是节点图（**仅默认 ReAct**）；checkpoint、MCP、压缩、流式等底座由 `src/runtime/` 承担。
 
 > **开发方式**：**不改图**——只改 `prompts/` + 平台配置；所有需求（含固定阶段顺序、人审确认话术）一律以 default ReAct + 平台工具 + systemPrompt 落地。用 `tsx` 跑命令（**迭代期不要 `pnpm build`**）。本地快检：`pnpm flow`；查 profile：`pnpm flows -- --json`。**勿用 `pnpm exec tsx`**（pnpm 10/11 混用易卡在 exec 前预检）。端到端须经平台预览会话（ACP surface），`pnpm flow` 不能代替。
 
@@ -16,7 +16,7 @@
 |------|------|--------|
 | **全部需求** | `flow.active: "default"`——开放追问 / 客服 / 通用助手 / 搜索总结，以及固定阶段顺序、人审确认话术、多源汇总（工具承接固定步骤，systemPrompt 约束流程与确认话术）。已内置 ReAct、多轮记忆（checkpointer）、压缩、流式与工具回路；主业是把用户需求提炼进 **systemPrompt**，并按需登记平台能力（宿主注入或 get-config 固化后 `think.bindTools(runtime.allTools)`） | 否 |
 
-> **非 ReAct 开发模式已屏蔽**：不要手写固定管道 / Send 并行 / HITL 图，不要注册新 `FlowDef`；`flow.active` 仅允许 `"default"`，配置其他值启动直接报错（不回落）。
+> `flow.active` 仅允许 `"default"`（注册表仅 default，配置其他值启动直接报错、不回落）；不要注册新 `FlowDef`，不要改写默认图结构。
 
 ## 快速开始
 
@@ -64,13 +64,12 @@ config/ prompts/ skills/ scripts/ docs/ tests/
 落地方式（与上文「工作方式」同构，细则见 [docs/examples.md](docs/examples.md)）：
 
 1. **默认多轮 chat**：保持 `flow.active: "default"`，改 [prompts/flow.base.md](prompts/flow.base.md) / `config.agent.systemPrompt` / 平台能力登记——**不改** `graph.ts`
-2. **固定阶段 / 人审确认 / 多源汇总**：同样保持 default——工具承接固定步骤，systemPrompt 约束流程顺序与确认话术（非 ReAct 图已屏蔽）
+2. **固定阶段 / 人审确认 / 多源汇总**：同样保持 default——工具承接固定步骤，systemPrompt 约束流程顺序与确认话术
 
-**选图**：`config/flow-agent.config.json` 的 `flow.active`（缺省 `default`；旧顶层 `activeFlow` 兼容读取）经 [src/app/flows/index.ts](src/app/flows/index.ts) 解析——注册表**仅 default**，配置其他值启动直接报错（不回落）。`pnpm graph` 导出默认图 topology。
+**选图**：`config/flow-agent.config.json` 的 `flow.active`（缺省 `default`；旧顶层 `activeFlow` 仍会读取，非 default 值同样报错）经 [src/app/flows/index.ts](src/app/flows/index.ts) 解析——注册表**仅 default**。`pnpm graph` 导出默认图 topology。
 
-**StatefulFlow**（[src/core/flow-types.ts](src/core/flow-types.ts)）：支持 human-in-the-loop，`run({query|resume}, threadId, cb) => {done|interrupted}`。**别手写 run-loop**——用 `createStatefulFlow`（[src/surfaces/stateful-flow.ts](src/surfaces/stateful-flow.ts)）：
+**StatefulFlow**（[src/core/flow-types.ts](src/core/flow-types.ts)）：`run({query|resume}, threadId, cb) => {done|interrupted}`。**别手写 run-loop**——用 `createStatefulFlow`（[src/surfaces/stateful-flow.ts](src/surfaces/stateful-flow.ts)）：
   - **conversational 对话**（default）：不暴露 `hasStarted`，surface 每轮走 query + 稳定 threadId + checkpointer → 多轮记忆 + 入口自动压缩；图层 `graph.stream` 真流式。物化开关：`FlowDef.conversational` 优先，未设则 `profile.interaction === "chat"`。
-  - **HITL durable**（暴露 `hasStarted`、interrupt/resume 续跑）属非 ReAct 编排，已屏蔽，不用于新开发。
 
 ## 开发规则
 
@@ -242,7 +241,7 @@ pnpm test
 
 ## 联网 / 外部检索
 
-> **需要联网搜索时**：当前项目**不提供**开箱即用的网页搜索。须在**平台侧**登记搜索能力（Plugin / Workflow / Knowledge 等）。已登记工具可经宿主注入，或把真实 schema 固化为 **`FlowDef.platformToolRefs`** 再经 `createFlowRuntime` 装配为 `StructuredTool`，统一并入 `allTools` 后 `think ↔ tools` 零代码使用（非 ReAct 独立节点式接线已屏蔽）。禁止为已登记能力手写 fetch / `tool()` 包装；禁止用 `bash`+curl / `http_request` 替代；禁止在项目配置内硬编码搜索服务。
+> **需要联网搜索时**：当前项目**不提供**开箱即用的网页搜索。须在**平台侧**登记搜索能力（Plugin / Workflow / Knowledge 等）。已登记工具可经宿主注入，或把真实 schema 固化为 **`FlowDef.platformToolRefs`** 再经 `createFlowRuntime` 装配为 `StructuredTool`，统一并入 `allTools` 后 `think ↔ tools` 零代码使用。禁止为已登记能力手写 fetch / `tool()` 包装；禁止用 `bash`+curl / `http_request` 替代；禁止在项目配置内硬编码搜索服务。
 
 | 能力 | 说明 |
 |------|------|
@@ -261,6 +260,6 @@ pnpm test
 - [docs/node-catalog.md](docs/node-catalog.md) — **节点选型入口**（type 目录 + 何时用哪个）
 - [docs/flow-graph-rules.md](docs/flow-graph-rules.md) — **图编排规则**（R-G001+，默认图维护参考）
 - [docs/node-kit.md](docs/node-kit.md) — **factory catalog（默认图维护必读）**
-- [docs/troubleshooting.md](docs/troubleshooting.md) — **排错索引**（`LLM 未返回 JSON` / Invalid edge / HITL / 图与文档漂移）
+- [docs/troubleshooting.md](docs/troubleshooting.md) — **排错索引**（`LLM 未返回 JSON` / Invalid edge / 图与文档漂移）
 - [docs/glossary.md](docs/glossary.md) — **术语对照表**
 - **API 细节看源码**：`FlowRuntime`（[src/runtime/flow-runtime.ts](src/runtime/flow-runtime.ts)）、`FlowCallbacks`（[src/core/flow-types.ts](src/core/flow-types.ts)）、`createFlowRuntime`（[src/index.ts](src/index.ts)）、MCP schema 缓存（[src/runtime/mcp/tool-schema-cache.ts](src/runtime/mcp/tool-schema-cache.ts)）、Surface Seam（[src/surfaces/](src/surfaces/)）、ACP hooks（[src/libs/deepagents-acp/](src/libs/deepagents-acp/)）、`createFlowTools`（[src/app/flow-tools.ts](src/app/flow-tools.ts)）

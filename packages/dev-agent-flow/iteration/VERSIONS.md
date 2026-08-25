@@ -25,6 +25,27 @@
 
 ---
 
+## iter-0.4.0 — 2026-08-25
+
+- **摘要**：非 ReAct 开发模式收敛删除 — 仅保留 default ReAct 路径：运行时 `flow.active` 非 default 直接报错（不回落）；手写图 / 固定管道 / HITL 图 / Send 并行指引与资料删除，相关需求一律以 default ReAct + 平台工具 + systemPrompt 落地（不向用户展开实现模式细节）
+- **交付变更**：
+  - `orchestration/system-prompt.md` — `<DEVELOPMENT_CONSTRAINTS>` 第 8 条（禁止手写图 / 固定管道 / HITL 图 / Send 并行 / 新建切换 flow）；`<MCP_USAGE>` / `<OUTPUT_FORMAT>` / `<SESSION_CLOSE>` 同步收敛
+  - `orchestration/user-prompt.md` — 第 2 步改为一律 default ReAct 路径
+  - `orchestration/skills/flow-builder/SKILL.md` — 删除 part1/part2 路由，When to Use / 推荐路径 / L1 约束收敛为 default ReAct 唯一路径（版本 3.5.1 → 3.6.0）
+  - `orchestration/skills/flow-builder/references/` — 删除 `part1-fixed-flow.md`、`part2-orchestration.md`；part0 / part3 / part4a / part4b / part5 / flow-graph-rules-pointer 同步改写
+  - `iteration/checks/check-document-ownership.py` — pre-code gate 标记 `写图前` → `施工前`
+- **模板变更**（`packages/deepagents-flow-ts`，2.1.7 → 2.2.0）：
+  - `src/app/flows/index.ts` — `resolveFlow` 未注册直接抛错（不回落）；删除 `unknownActivePolicy`
+  - `src/runtime/config/config-schema.ts` / `src/index.ts` / `config/flow-agent.config.json` — 同步删除 `unknownActivePolicy`
+  - 删除 `docs/flow-patterns.md`、`examples/` 演示目录；`docs/*` 与 `README.md` 收敛为 ReAct-only（不留"已屏蔽"标注）
+  - `tests/flow-registry.test.ts` / `tests/flow-selection.test.ts` — 抛错断言
+- **约束/规则对齐要点**：注册表仅 `default`；`flow.active` 其他值启动报错；固定阶段 / 人审确认 / 多源汇总以 systemPrompt + 工具承接；平台工具统一并入 `allTools` 供默认 ReAct `bindTools`
+- **验证**：模板 `pnpm typecheck && pnpm test && pnpm graph` 全过（391 tests）；`pnpm iteration:static` 全绿
+- **回朔**：`git checkout 92c51bfe -- packages/dev-agent-flow/orchestration packages/dev-agent-flow/iteration packages/deepagents-flow-ts`
+- **后台**：否（待人工同步 system-prompt / user-prompt / flow-builder）
+
+---
+
 ## iter-0.2.2 — 2026-07-12
 
 - **摘要**：勿误报鉴权 — 平台工具最终有产出（`done>0`，个别 failed 被 ReAct 重试消化）时，`debug.sh` 断言未命中 / HITL 失败禁止写成 Authorization 待办。收敛到 flow-debugger 单一权威 + L0 一句铁律 + analyze-logs 自动提示

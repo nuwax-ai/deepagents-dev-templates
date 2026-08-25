@@ -1,6 +1,6 @@
 # Glossary
 
-> 术语权威源。写文档/注释只查「用」列。实现细节 → `node-kit.md`；systemPrompt 解析 → `src/runtime/context/prompt.ts`。改图判定 → `docs/examples.md` § 先判定。
+> 术语权威源。写文档/注释只查「用」列。实现细节 → `node-kit.md`；systemPrompt 解析 → `src/runtime/context/prompt.ts`。默认开发路径 → `docs/examples.md` § 先判定。
 
 ## 编排范式（强制 / 禁止）
 
@@ -16,14 +16,10 @@
 | 长任务（耗时/token 义） | **long-running** | 仅运行耗时长；无跨重启持久化语义 |
 | 跨重启续跑 | **cross-restart resume** | checkpointer 落盘；进程/IDE 重启后续跑 |
 | 阶段进度 | **stage progress** | `emitStage` → `onStage` |
-| 单步护栏、递归护栏（非 recursion 语境） | **recursion guard** | 仅指 `recursionLimit` 防 reflection 回边死循环 |
+| 单步护栏、递归护栏（非 recursion 语境） | **recursion guard** | 仅指 `recursionLimit` 防回边死循环 |
 | 一个会话一个主题 | **one session, one topic** | `hasStarted` 推断续跑 vs 新开 |
 | 多模式 stream | **multi-mode stream** | `streamMode: ["messages","tools","custom","updates"]` + `mapStreamChunk` |
 | 上下文压缩 | **context compaction** | `compactHistory` + `RemoveMessage` |
-| 跨 turn 人审、多轮人审 | **multi-turn HITL** | 已屏蔽：跨用户回合的人审循环（interrupt → 用户回复 → resume）；确认话术改由 systemPrompt 承接 |
-| interrupt+resume、人审断点 | **interrupt / resume** | 已屏蔽：LangGraph `interrupt()` 暂停 + `Command({ resume })` 续跑；不用于新开发 |
-| Send 并行、fan-out、多源聚合 | **Send / fan-out** | 已屏蔽：`Send` 并行派发多份子 state；多源汇总改由默认 ReAct 工具调用承接 |
-| 条件重试、自纠正回边 | **条件重试** | 已屏蔽：`addConditionalEdges` 回边自纠正属非 ReAct 结构，不再开发 |
 | 工具回路 | **ReAct** | 默认图标准回路：`START → prepare → think(bindTools) ⇄ tools(ToolNode) → respond → END`；`toolsCondition` 有 tool_calls 回 think，否则进 respond；**不是**自由 tool loop |
 | 完成闸门 | **completion gate**（完成闸门） | 强制验证门；按模板 README 的工程验证矩阵选择与改动范围匹配的验证项 |
 
@@ -49,19 +45,16 @@ START → prepare → think(model.bindTools) ──(toolsCondition)──┐
 
 ## Flow 交互形态
 
-**非 ReAct 开发模式已屏蔽**：面向用户仅保留**聊天助手型**（机器值 `chat`）。`pipeline` / `approval`（固定流程型及其人审编排）不再用于开发；固定阶段顺序、人审确认等需求一律以默认 ReAct + 工具 + systemPrompt 落地（判定表见 `docs/examples.md` § 先判定）。
+面向用户仅一类形态：**聊天助手型**（机器值 `chat`）。固定阶段顺序、人审确认等诉求以默认 ReAct + 工具 + systemPrompt 落地（判定表见 `docs/examples.md` § 先判定）。
 
 | 弃用 | 用 | 定义 |
 |---|---|---|
 | 无须写图的聊天模式名 | **聊天助手型** / **default flow** | `flow.active: "default"`；标准 **ReAct** + StatefulFlow conversational；**唯一路径**；开放追问 / 客服 / 通用助手等场景只改 systemPrompt + 按需登记平台能力 |
-| 管线、pipeline（对用户） | **固定流程型** | 机器值 `pipeline`；**已屏蔽**：不手写 `src/app/graph.ts`、不注册新 flow；固定阶段需求以 systemPrompt + 工具约束落地 |
-| ~~人工确认型~~（已并入固定流程型） | **HITL / 人审编排** | 机器值 `approval`；**已屏蔽**：interrupt/resume 人审图不再开发；确认/复核话术由默认 ReAct 的 systemPrompt 承接 |
 | flow 类型、图类型 | **flow profile** | `flows --json`；含 `interaction` / `implementation` / `userLabel` |
 
 | 用户中文 | 机器值 | 默认落点 |
 |---|---|---|
 | 聊天助手型 | `chat` | **`default`（唯一）**；追问/客服/问答/搜索总结/模糊未指明形态 → 不写图 |
-| ~~固定流程型~~ | `pipeline`（人审 `approval`） | 已屏蔽；一律按 `default`（ReAct）落地 |
 
 | 弃用 | 用 | 定义 |
 |---|---|---|
@@ -74,7 +67,7 @@ START → prepare → think(model.bindTools) ──(toolsCondition)──┐
 | 运行时胶水代码 | **接入逻辑**（plumbing） | surface 侧 ACP/CLI 复用连接代码 |
 | - | **接入层**（seam） | surface 与图解耦接缝 |
 | - | **surface seam** | surface 侧 seam |
-| - | **可运行 flow 挂载点**（app/flows） | app 层注册入口；**仅 default**（非 ReAct 已屏蔽）；图逻辑在 `graph.ts` |
+| - | **可运行 flow 挂载点**（app/flows） | app 层注册入口；**仅 default**；图逻辑在 `graph.ts` |
 | 硬塞进 factory、强行 factory 化 | **Bespoke nodes**（定制节点） | 不宜塞进 `src/libs/nodes/` factory 的手写节点（如多源检索合并、文件交付、对话路由等）；保持手写；见 `docs/node-catalog.md` § BESPOKE |
 
 ## 平台侧
@@ -82,7 +75,7 @@ START → prepare → think(model.bindTools) ──(toolsCondition)──┐
 | 弃用 | 用 | 定义 |
 |---|---|---|
 | 平台面、厂商产品名指主平台 | **平台侧** | 主平台元数据/接口：部署、在线配置、`mcpServers`、能力登记 |
-| dockpanel、结构化审阅卡片 | **平台问答卡片** | 主平台 ACP 侧 `nuwax_ask_question` + `rawInput.ui` 问答 UI；展示层，不替代 interrupt/resume |
+| dockpanel、结构化审阅卡片 | **平台问答卡片** | 主平台 ACP 侧 `nuwax_ask_question` + `rawInput.ui` 问答 UI；展示层 |
 | 模版 | **模板** | 错别字订正 |
 
 ## 保留中文（勿机械英文化）
@@ -91,7 +84,6 @@ START → prepare → think(model.bindTools) ──(toolsCondition)──┐
 |---|---|---|
 | topology（对用户分类） | **拓扑** | 内部图实现；用户分类见 §Flow 交互形态；本包无内置拓扑库 |
 | guard（统称，无语境） | **护栏** | recursion → recursion guard；超时 → timeout guard（`withTimeout`）；校验 → input-validation guard |
-| - | **流水线** | pipeline；多阶段编排 |
 
 ## systemPrompt
 

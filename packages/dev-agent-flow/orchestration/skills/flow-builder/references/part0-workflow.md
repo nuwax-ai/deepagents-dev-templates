@@ -9,7 +9,7 @@
 |----|------|------|
 | 0 | 装依赖 | 缺少 `node_modules`，或 lock 有变更 → `pnpm install` |
 | 1 | 读上下文 | `README.md`；`project.md` 存在则读、无则创建（只记录项目记忆、关键决策、已登记工具名、验证方式） |
-| 2 | 系统提示词基线 | `dev-engineer-toolkit` → `get-config.sh --key systemPrompt`（及 `openingChatMsg`）。若平台 **空/占位** 且用户已描述 Agent → **先于写图**走 [part5-prompt-design.md](part5-prompt-design.md) § 用户输入提炼 |
+| 2 | 系统提示词基线 | `dev-engineer-toolkit` → `get-config.sh --key systemPrompt`（及 `openingChatMsg`）。若平台 **空/占位** 且用户已描述 Agent → **先于施工**走 [part5-prompt-design.md](part5-prompt-design.md) § 用户输入提炼 |
 | 3 | 读当前项目文档 | `docs/README.md`（索引）→ `glossary.md` → `flow-graph-rules.md` → `node-catalog.md` → `node-kit.md` → `config/flow-agent.config.json` |
 | 4 | 简报 | 项目状态 + 待办，再处理用户指令 |
 

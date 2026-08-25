@@ -1,8 +1,6 @@
 # 默认 ReAct 路径与交付底座
 
-本包**只提供默认 ReAct flow**（`flow.active: "default"`，见 [`src/app/graph.ts`](../src/app/graph.ts)）：`prepare → think ↔ tools → respond`。**非 ReAct 开发模式已屏蔽**：注册表仅 `default`，`flow.active` 配置其他值启动直接报错（不回落）；不要手写固定管道、HITL 审批图、Send 并行等非 ReAct 结构，也不要注册新 `FlowDef`。
-
-所有需求（含固定阶段顺序、人审确认话术、多源检索等）一律以默认 ReAct + 平台能力 + systemPrompt 落地。Factory API 详见 [node-kit.md](./node-kit.md)，节点选型见 [node-catalog.md](./node-catalog.md)。
+本包**只提供默认 ReAct flow**（`flow.active: "default"`，见 [`src/app/graph.ts`](../src/app/graph.ts)）：`prepare → think ↔ tools → respond`。注册表仅 `default`，`flow.active` 配置其他值启动直接报错（不回落）。所有需求（含固定阶段顺序、人审确认话术、多源检索等）一律以默认 ReAct + 平台能力 + systemPrompt 落地。Factory API 详见 [node-kit.md](./node-kit.md)，节点选型见 [node-catalog.md](./node-catalog.md)。
 
 ## 先判定：default 已经够用
 
@@ -12,7 +10,7 @@
 | 让模型按需调用平台工具 / MCP 工具 | 平台登记后由宿主注入会话，默认图 `think.bindTools(runtime.allTools)` | 否 |
 | 固定阶段顺序、人审确认、多源汇总 | 以默认 ReAct 落地：工具承接固定步骤，systemPrompt 约束流程顺序与确认话术 | 否 |
 
-> 非 ReAct flow 已屏蔽：`flow.active` 仅允许 `"default"`，配置其他值启动报错；默认图已具备多轮记忆、checkpoint、自动压缩、流式响应和工具调用回路。
+> `flow.active` 仅允许 `"default"`，配置其他值启动报错；默认图已具备多轮记忆、checkpoint、自动压缩、流式响应和工具调用回路。
 
 ## 交付底座：默认路径全部内置
 
@@ -38,8 +36,7 @@
 
 ## 不要做的事
 
-- 不要在 `src/app/flows/` 注册或启用非 ReAct flow；`flow.active` 仅允许 `"default"`（其他值启动报错）。
-- 不要把默认图重写为固定管道 / HITL / Send 并行等非 ReAct 结构。
+- 不要在 `src/app/flows/` 注册新 flow；`flow.active` 仅允许 `"default"`（其他值启动报错）。
 - 不要恢复 `scripts/scaffold/` 或 `libs/topologies/` 作为入口。
 - 不要手写外层 run-loop；走 `createStatefulFlow`。
 - 不要把平台工具名字符串直接传给 `createToolExecNode.tools`。

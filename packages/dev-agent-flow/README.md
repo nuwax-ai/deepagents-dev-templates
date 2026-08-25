@@ -6,7 +6,7 @@
 
 本包包含 **开发 Agent（Flow 版）** 的系统提示词和 Skills 配置。开发 Agent 运行在云端开发环境，职责是帮开发者基于 `nuwax-flow-ts` 工作流编排模板创建场景 Agent。
 
-与 `dev-agent`（面向 `deepagents-app-ts`，自由 tool loop）不同，本包面向 **`nuwax-flow-ts`** —— Agent 按 **LangGraph node + edge 图**跑（**仅默认 ReAct**，非 ReAct 开发模式已屏蔽），而非自由 tool loop。
+与 `dev-agent`（面向 `deepagents-app-ts`，自由 tool loop）不同，本包面向 **`nuwax-flow-ts`** —— Agent 按 **LangGraph node + edge 图**跑（**仅默认 ReAct**），而非自由 tool loop。
 
 **交付路径**：先读取目标项目 `README.md` 与 `docs/examples.md`；一律按 default ReAct 路径开发（平台工具 + systemPrompt 承接所有需求形态），再加载对应的 `flow-builder` Part 执行。
 

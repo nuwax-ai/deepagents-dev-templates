@@ -34,7 +34,7 @@ pnpm sessions       # 已持久化的会话
 - **skills** — `discoverSkills` 发现 `agentsDirectories` 下各 `<root>/skills/`（默认含 `builtin/skills/`、`.agents/skills/`）及 `config.skills.directories` 的 SKILL.md；经 `renderSkillsSection` 注入清单，模型用 `load_skill(name)` 渐进式读正文。
 - **subagents** — `discoverSubAgents` 发现 `agentsDirectories` 下各 `<root>/agents/`；默认 ReAct 图经 `task({ subagent_type, description })` 委派（复用默认 ReAct，非自定义图）。
 - **builtInTools** — `createFlowTools(ctx)`（[src/app/flow-tools.ts](../src/app/flow-tools.ts)）组装 http/json + bash/fs/grep·glob + `load_skill`/`task` + native MCP + demo，`bindTools` 绑给模型、`ToolNode` 执行。`http_request` 默认拦截私有/loopback/链路本地/云元数据端点（防 SSRF）+ 响应字节上限（防 OOM）；需访问内网改用 `createHttpRequestTool({ allowPrivateNetwork: true })`。
-- **platformToolRefs** — `FlowDef.platformToolRefs`（或 `createFlowRuntime({ platformToolRefs })`）传入的平台 Plugin / Workflow / Knowledge 引用；经 `createPlatformToolDescriptors` + `createPlatformStructuredTool` 生成 `StructuredTool`。schema **不是** `*.flow.json` / 旧 scaffold `spec.tools`；须用平台已登记工具的真实配置固化（`targetType` / `targetId` / `schema` 等）。运行期也可由宿主直接注入等价工具。二者可并用，统一并入 `allTools` 供默认 ReAct `bindTools`（独立节点 / 局部集合式接线已屏蔽）。
+- **platformToolRefs** — `FlowDef.platformToolRefs`（或 `createFlowRuntime({ platformToolRefs })`）传入的平台 Plugin / Workflow / Knowledge 引用；经 `createPlatformToolDescriptors` + `createPlatformStructuredTool` 生成 `StructuredTool`。schema **不是** `*.flow.json` / 旧 scaffold `spec.tools`；须用平台已登记工具的真实配置固化（`targetType` / `targetId` / `schema` 等）。运行期也可由宿主直接注入等价工具。二者可并用，统一并入 `allTools` 供默认 ReAct `bindTools`。
 - **compaction** — [src/libs/compaction.ts](../src/libs/compaction.ts)，消费 `config.compaction`。
 - **sessionStore** — `FileCheckpointSaver`（继承 `MemorySaver`），默认持久化到 `~/.flowagents/<workspace 散列>/`（`resolveSessionDir` 按 workspace 隔离）；设 `config.memory.dir` 为相对路径可 opt-out 回项目内。CLI：`sessions` 列出、`sessions delete <id>` 删除。
 
@@ -47,7 +47,7 @@ pnpm sessions       # 已持久化的会话
 - **加 Subagent**：
   - **项目内置**：`builtin/agents/<name>/AGENT.md`。
   - **工作区扩展**：`.agents/agents/<name>/AGENT.md`。
-  - 调用走默认 ReAct 的 `task` 工具委派；非 ReAct 编排（subgraph 等）已屏蔽。
+  - 调用走默认 ReAct 的 `task` 工具委派。
 - **改系统提示词**：编辑 `prompts/flow.base.md`，或设 `config.agent.systemPrompt` / `config.agent.systemPromptPath`。
 - **换模型**：改 `config.model` 或设 `ANTHROPIC_MODEL` / `OPENAI_MODEL`（见 [`.env.example`](../.env.example)）。
 - **换协议**：设 `API_PROTOCOL=anthropic|openai`，或 `LLM_PROVIDER`（同义别名）。`loadConfig` 会打 `platformModelEnv` / `resolveModelProvider` 诊断日志（密钥脱敏）；未替换的 `{MODEL_PROVIDER_*}` 占位符会 `warn`。
@@ -59,7 +59,7 @@ pnpm sessions       # 已持久化的会话
 | 业务场景 | 工具来源 | 接线 | 取舍 |
 |---|---|---|---|
 | 用户开放提问，模型自行决定是否查搜索、知识库或业务 API | 优先宿主注入；需要可复现配置时固化 `platformToolRefs` | 并入 `runtime.allTools`，`think.bindTools(...)` | 唯一路径；不改图即可让模型按需调用 |
-| 每次流程都应先调用某个能力（如“先查额度再审批”） | 同上 | 同上进入 `allTools`；调用顺序由 systemPrompt 约束（“先调用 X 再回答”） | 独立节点式固定管道已屏蔽，靠提示词约束模型行为 |
+| 每次流程都应先调用某个能力（如“先查额度再审批”） | 同上 | 同上进入 `allTools`；调用顺序由 systemPrompt 约束（“先调用 X 再回答”） | 调用顺序靠提示词约束，模型按约执行 |
 | 不同租户、会话或平台环境决定可用能力，代码不应保存其 schema | 宿主会话注入 | 使用注入集合；运行时检查工具是否存在 | 保持动态性；不要把短期或环境专属 schema 写入项目 |
 | 平台能力需要随代码版本稳定复现 | `get-config --key tools --full` 返回的真实配置固化为 `FlowDef.platformToolRefs` | runtime 的 `createPlatformStructuredTool` 生成后并入 `allTools` | schema 声明即接入；不另写 HTTP / `tool()` 包装 |
 | 平台搜索和登记后确认没有能力可用 | 在 `src/app/` 自写业务工具 | 按 [node-kit.md](node-kit.md) 的 `tool()` + Zod 注册到 `createFlowTools()` | 这是最后手段；记录搜索依据，密钥只从环境读取 |
