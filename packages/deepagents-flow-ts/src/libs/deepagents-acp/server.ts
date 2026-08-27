@@ -778,6 +778,21 @@ export class DeepAgentsServer {
     session.mode = mode;
     this.log("Set mode for session:", sessionId, "to:", mode);
 
+    // 宿主 hook：让 mode 真正生效（flow surface 的门控 / 提示注入）。
+    await this.hooks?.onSessionMode?.({ sessionId, modeId: mode });
+
+    // 广播 current_mode_update：客户端据此刷新本地镜像，避免重复下发 set_mode。
+    if (this.connection) {
+      await this.connection
+        .sessionUpdate({
+          sessionId,
+          update: { sessionUpdate: "current_mode_update", currentModeId: mode },
+        })
+        .catch(() => {
+          // best-effort：通知失败不影响 set_mode 响应
+        });
+    }
+
     return;
   }
 
