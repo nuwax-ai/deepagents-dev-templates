@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Unified package manager to pnpm (added pnpm-lock.yaml, updated CI)
 
 ### Added
+- deepagents-flow-ts 2.3.0：`session/set_mode` 真正生效——vendored ACP 新增 `onSessionMode` hook 并广播 `current_mode_update`；plan 档把 `interruptOn` 扩至 write_file/edit_file/bash/http_request 并注入规划指令，ask 档强制 ask 门控，agent / 未知 mode 保持 appConfig 默认
 - deepagents-flow-ts：builtin `ask-question` MCP in `config/mcp.default.json` for default flow（平台同名 session-wins 覆盖）
 - docs：`docs/packages/deepagents-flow-ts/development/ask-question-mcp-hitl.md`（HITL 选型、平台合并、code-review 处理记录）
 - `scripts/pack-template.js` for TS/Python zip packaging

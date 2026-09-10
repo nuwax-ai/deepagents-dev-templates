@@ -48,6 +48,41 @@
 
 ---
 
+## 2026-08-27 · set_mode 经 onSessionMode hook 生效 iter-0.4.1
+
+#### 版本号
+- iter-0.4.1（已写 [`VERSIONS.md`](VERSIONS.md)；模板 npm 版本同步 2.2.0 → 2.3.0）
+
+#### 方向三问（全过再动手）
+- [x] 打中的是开发者痛点（平台侧 ask/plan 模式切换在 flow 模板只写 state、不生效）？
+- [x] 改完后人工同步编排后台，开发 Agent 能立刻用上？（本轮不改 orchestration，无后台同步项）
+- [x] 回朔路径写得清（VERSIONS 文件清单 / git `20f73320`）？
+
+#### 本轮目标句
+- 平台下发 `session/set_mode` 时，flow 模板应把 mode 折算进权限门控与输入指令（plan 真正禁写、输出规划），用 `tests/acp-session-mode.test.ts` + 模板三连验证。
+
+#### 需求确认
+- 已确认：plan 档 interruptOn 扩至写四件套并注入规划指令；ask 档强制 ask 门控；agent / 未知 mode 保持 appConfig 默认；`current_mode_update` best-effort 广播。
+- 待确认：无。
+
+#### 本轮优化目标
+- vendored ACP server 新增 `onSessionMode` hook；surfaces 层在 onPrompt 折算权限与输入指令。
+
+#### 方案（改哪些交付文件）
+- [ ] orchestration/*（本轮不改交付层）
+- [x] packages/deepagents-flow-ts — libs/deepagents-acp（types/server）、surfaces/acp/server.ts、tests/acp-session-mode.test.ts、版本号 2.3.0
+
+#### 验证
+- [x] `pnpm iteration:static`（契约自洽）
+- [ ] `pnpm iteration:drift -- --platform <导出.json>`（本轮不改 orchestration，可跳过）
+- [x] 模板 `pnpm typecheck && pnpm test && pnpm graph`（398 tests 全过）
+- [ ] ACP 真机会话 set_mode 抽测（plan 下 write_file 应弹审批、回复为规划而非施工）
+
+#### 结论
+- set_mode 从「只写 session state」变为真正生效；补记台账与版本号（2.3.0），真机抽测待补。
+
+---
+
 ## 2026-08-25 · 非 ReAct 开发模式收敛删除 iter-0.4.0
 
 #### 版本号

@@ -25,6 +25,23 @@
 
 ---
 
+## iter-0.4.1 — 2026-08-27
+
+- **摘要**：set_mode 经 onSessionMode hook 真正生效 — plan 档把 `interruptOn` 扩至写四件套（write_file/edit_file/bash/http_request）并注入规划指令，ask 档强制 ask 门控；vendored ACP 广播 `current_mode_update`
+- **交付变更**：无（本轮不改 orchestration，无后台同步项）
+- **模板变更**（`packages/deepagents-flow-ts`，2.2.0 → 2.3.0）：
+  - `src/libs/deepagents-acp/types.ts` — 新增可选 hook `DeepAgentsServerHooks.onSessionMode`
+  - `src/libs/deepagents-acp/server.ts` — `handleSetSessionMode` 调 hook + 广播 `current_mode_update`（best-effort，失败不影响 set_mode 响应）
+  - `src/surfaces/acp/server.ts` — `applySessionModeToPermissions` / `applySessionModeToQuery`（导出供单测）+ `PLAN_MODE_WRITE_TOOLS` / `PLAN_MODE_DIRECTIVE`；onPrompt 折算权限门控与输入指令
+  - `tests/acp-session-mode.test.ts` — 新增 7 tests
+  - `package.json` / `config/flow-agent.config.json` — 2.2.0 → 2.3.0
+- **约束/规则对齐要点**：session mode 是运行时权限门控来源之一（session/set_mode 优先于 appConfig）；agent / 未知 mode 保持 appConfig 默认（放行不收紧）；plan 指令仅加在首轮输入（resume 续跑保持原输入）
+- **验证**：模板 `pnpm typecheck && pnpm test && pnpm graph` 全过（398 tests）；`pnpm iteration:static` 全绿；真机 `session/set_mode` 抽测待补（plan 下写操作应弹审批）
+- **回朔**：`git checkout 20f73320 -- packages/deepagents-flow-ts`
+- **后台**：不适用（本轮不改 orchestration）
+
+---
+
 ## iter-0.4.0 — 2026-08-25
 
 - **摘要**：非 ReAct 开发模式收敛删除 — 仅保留 default ReAct 路径：运行时 `flow.active` 非 default 直接报错（不回落）；手写图 / 固定管道 / HITL 图 / Send 并行指引与资料删除，相关需求一律以 default ReAct + 平台工具 + systemPrompt 落地（不向用户展开实现模式细节）
