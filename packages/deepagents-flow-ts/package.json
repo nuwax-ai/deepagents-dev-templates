@@ -1,6 +1,6 @@
 {
   "name": "nuwax-flow-ts",
-  "version": "2.3.0",
+  "version": "2.3.2",
   "description": "Flow / workflow-orchestration agent template — explicit LangGraph ReAct default graph over ACP. Self-contained runtime; MCP via @langchain/mcp-adapters. App layer is a pure default ReAct workspace (flow.active: default only); customize via prompts + platform config.",
   "type": "module",
   "packageManager": "pnpm@10.18.2",

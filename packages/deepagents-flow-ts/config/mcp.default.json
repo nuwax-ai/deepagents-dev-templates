@@ -1,9 +1,9 @@
 {
-  "_comment": "包内默认 MCP（fallback）。内置 ask-question；与平台 ACP mcpServers 合并，同名冲突时 session-wins（平台优先）。搜索/文档检索仍须平台登记 + ACP 下发。",
+  "_comment": "包内默认 MCP（fallback）。内置 ask-question；与平台 ACP mcpServers 合并，同名冲突时 session-wins（平台优先）。搜索/文档检索仍须平台登记 + ACP 下发。npx 参数说明：--prefer-offline 优先用本地缓存（镜像预热后离线也能用）；--fetch-retries=0 与 --fetch-timeout=8000 让拉不到包时秒级失败——npm 默认会退避重试到约 70 秒，而 MCP 连接 60 秒就超时，离线时每个新会话都要白等 60 秒。",
   "servers": {
     "ask-question": {
       "command": "npx",
-      "args": ["-y", "nuwax-ask-question-mcp@latest"]
+      "args": ["-y", "--prefer-offline", "--fetch-retries=0", "--fetch-timeout=8000", "nuwax-ask-question-mcp@latest"]
     }
   }
 }

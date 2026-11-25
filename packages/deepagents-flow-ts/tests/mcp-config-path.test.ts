@@ -39,7 +39,9 @@ describe("createRuntimeContext 默认 MCP servers", () => {
     expect(Object.keys(ctx.mcpServerConfigs)).toEqual(["ask-question"]);
     expect(ctx.mcpServerConfigs["ask-question"]).toMatchObject({
       command: "npx",
-      args: ["-y", "nuwax-ask-question-mcp@latest"],
+      // 参数原样进入运行时：快速失败（--fetch-retries / --fetch-timeout）不能被清洗掉，
+      // 否则离线时每个新会话都要等满 60 秒的 MCP 连接超时
+      args: ["-y", "--prefer-offline", "--fetch-retries=0", "--fetch-timeout=8000", "nuwax-ask-question-mcp@latest"],
     });
   });
 

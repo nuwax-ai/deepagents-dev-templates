@@ -160,9 +160,10 @@ pnpm typecheck && pnpm test
 |---|---|
 | 本地快检 | `pnpm flow "..."` / `pnpm flow -- -i`（**≠ 平台端到端**；未经 ACP 真实预览链路） |
 | 端到端（平台预览） | ACP surface + 平台预览会话（`config.flow.active`）；改过 flow 代码后**开新会话**再测，避免旧上下文污染 |
-| 日志 | 默认 `~/.flowagents/logs/<agent>-<sessionId>-<日期>.log`；`LOG_DIR` 可覆盖根目录；`LOG_LEVEL=debug` |
+| 日志 | 默认 `~/.flowagents/logs/<agent>-<sessionId>-<日期>.log`；`LOG_DIR` 可覆盖根目录；`LOG_LEVEL=debug`。`LOG_DIR` 不可用时自动停用文件日志（stderr 报一次 `file logging disabled`），不影响启动与对话；单步 I/O 超时 `LOG_IO_TIMEOUT_MS`（默认 2000） |
 | 启动耗时 | `PERF_TRACE` 默认开（`mcp.getTools` / `mcp.cache` 等阶段）；设 `PERF_TRACE=0` 关闭 |
 | MCP schema 缓存 | ACP 会话可选；排查见日志 `mcp.cache`（路径/失效策略以实现为准） |
+| 离线 / 访问不到 npm | 默认 MCP（`npx`）拉不到包时约 1 秒内跳过；镜像构建时预热过 `npx` 缓存则离线也能用；完全不需要时设 `DEEPAGENTS_DEFAULT_MCP=disabled` |
 | Export graph topology | `pnpm graph`（`pnpm graph -- --mermaid`） |
 | 能力 / flow profile | `pnpm capabilities` / `pnpm flows -- --json` |
 | 类型检查 | `pnpm typecheck` |
@@ -207,7 +208,7 @@ const { nodes, edges, mermaid } = await getFlowTopology();
 默认模型 `openai / deepseek-v4-flash`（见 [config/flow-agent.config.json](config/flow-agent.config.json)，已对齐国内 OpenAI 兼容端点；切回 Anthropic 把 `model.provider` 设为 `anthropic`）。Anthropic 协议默认开启 thinking，固定预算默认 `model.settings.thinkingBudgetTokens: 1024`（须严格小于 `maxTokens`；Claude Opus 4.7 自动使用 adaptive thinking）。各端点配置见 [`.env.example`](.env.example)。
 
 > **数据目录**（同源常量 [src/runtime/paths.ts](src/runtime/paths.ts)，默认根 `~/.flowagents`，可用 `config.memory.dir` 覆盖）：
-> - **会话/checkpoint**：`<根>/sessions/<workspace 12 位散列>/`（每 thread 一个 JSON）
+> - **会话/checkpoint**：`<根>/sessions/<workspace 12 位散列>/`（每 thread 一个 JSON）；目录不可用时自动降级为仅内存（stderr 报一次 `checkpoint persistence disabled`），会话不受影响，目录恢复后自动恢复落盘
 > - **日志**：`<根>/logs/`（per-session 文件；`LOG_DIR` 可覆盖）
 > - **MCP 工具 schema 缓存**（可选）：`<根>/cache/` 下按会话存放（以实现为准）
 > - **产物**：`<根>/artifacts/<workspace 散列>/`

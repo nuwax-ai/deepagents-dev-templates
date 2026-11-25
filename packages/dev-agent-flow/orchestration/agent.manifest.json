@@ -98,7 +98,7 @@
         "path": "../deepagents-flow-ts/config/mcp.default.json",
         "serverConfig": {
           "command": "npx",
-          "args": ["-y", "nuwax-ask-question-mcp@latest"]
+          "args": ["-y", "--prefer-offline", "--fetch-retries=0", "--fetch-timeout=8000", "nuwax-ask-question-mcp@latest"]
         },
         "note": "与宿主并存；session-wins 常见；不作 iteration 挂载 drift 项"
       }

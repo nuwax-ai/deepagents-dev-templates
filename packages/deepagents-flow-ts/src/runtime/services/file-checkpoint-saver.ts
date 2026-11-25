@@ -14,13 +14,14 @@
  * （接口已对齐 BaseCheckpointSaver）。
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, unlinkSync, renameSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, readdirSync, unlinkSync, renameSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { homedir } from "node:os";
 import { createHash } from "node:crypto";
 import { MemorySaver, type BaseCheckpointSaver } from "@langchain/langgraph";
 import type { RunnableConfig } from "@langchain/core/runnables";
 import { logger, type AppConfig } from "../index.js";
+import { mkdirLevelsSync } from "../fs/mkdir-levels.js";
 
 const log = logger.child("file-checkpoint");
 
@@ -140,12 +141,38 @@ export class FileCheckpointSaver extends MemorySaver {
   private loaded = new Set<string>();
   /** 加载失败（文件损坏）的 thread：标记后短路，避免每个 graph step 重读 + 刷 warn。 */
   private corrupted = new Set<string>();
+  /**
+   * 落盘是否可用。目录建不出来或写入失败时为 false：会话照常进行（等同纯 MemorySaver），
+   * 只是不落盘、跨重启不恢复；每次 persist 前重试建目录，目录恢复后自动恢复落盘。
+   */
+  private persistenceEnabled = true;
 
   constructor(opts: FileCheckpointOptions) {
     super();
     this.dir = resolve(opts.dir);
-    if (!existsSync(this.dir)) mkdirSync(this.dir, { recursive: true });
-    log.info("FileCheckpointSaver ready", { dir: this.dir });
+    try {
+      // 逐级、非递归：上级目录失效（如源目录被删的 bind mount）时立即失败，而不是永久卡死。
+      mkdirLevelsSync(this.dir);
+    } catch (err) {
+      this.enterDegraded("cannot create checkpoint dir", err);
+    }
+    log.info("FileCheckpointSaver ready", { dir: this.dir, persistent: this.persistenceEnabled });
+  }
+
+  /** 是否落盘。false = 仅内存（会话可用，但重启后不恢复）。 */
+  get isPersistent(): boolean {
+    return this.persistenceEnabled;
+  }
+
+  /** 进入降级：只在状态切换时告警一次，不每个 step 刷屏。 */
+  private enterDegraded(reason: string, err: unknown): void {
+    if (!this.persistenceEnabled) return;
+    this.persistenceEnabled = false;
+    log.warn("checkpoint persistence disabled (in-memory only; not restored after restart)", {
+      dir: this.dir,
+      reason,
+      error: String(err),
+    });
   }
 
   /** thread_id → 安全文件名（防路径穿越；非安全字符加 __hex__ 前缀编码，保证可逆）。 */
@@ -202,6 +229,8 @@ export class FileCheckpointSaver extends MemorySaver {
     const final = this.threadFile(threadId);
     const tmp = `${final}.tmp`;
     try {
+      // 降级期间先重试建目录（逐级非递归，失效时立即失败）：目录恢复后自动恢复落盘。
+      if (!this.persistenceEnabled) mkdirLevelsSync(this.dir);
       writeFileSync(
         tmp,
         JSON.stringify(
@@ -211,8 +240,12 @@ export class FileCheckpointSaver extends MemorySaver {
         )
       );
       renameSync(tmp, final);
+      if (!this.persistenceEnabled) {
+        this.persistenceEnabled = true;
+        log.info("checkpoint persistence restored", { dir: this.dir });
+      }
     } catch (err) {
-      log.warn("failed to persist checkpoint", { threadId, error: String(err) });
+      this.enterDegraded("write failed", err);
       try {
         if (existsSync(tmp)) unlinkSync(tmp);
       } catch {

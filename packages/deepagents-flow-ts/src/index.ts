@@ -17,8 +17,8 @@
  */
 
 import { config as loadDotenv } from "dotenv";
-import { basename, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { basename } from "node:path";
+import { isMainModule } from "./runtime/main-module.js";
 import { loadFlowConfig } from "./runtime/flow-config.js";
 import { destroyRuntimeContext, setLogAgent } from "./runtime/index.js";
 import {
@@ -404,11 +404,9 @@ async function main(): Promise<void> {
   });
 }
 
-const isMainModule =
-  typeof process.argv[1] === "string" &&
-  import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
-
-if (isMainModule) {
+// 两边取真实路径再比较：经软链接 / bin shim 启动时 argv[1] 是链接路径，直接比字符串会判否，
+// 导致 main() 不执行、进程静默退出且退出码为 0。
+if (isMainModule(process.argv[1], import.meta.url)) {
   main().catch((err) => {
     console.error(err);
     process.exit(1);

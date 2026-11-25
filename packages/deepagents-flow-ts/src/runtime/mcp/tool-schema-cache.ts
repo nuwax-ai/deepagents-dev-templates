@@ -22,7 +22,6 @@
 
 import { createHash } from "node:crypto";
 import {
-  mkdirSync,
   existsSync,
   readFileSync,
   writeFileSync,
@@ -37,6 +36,7 @@ import { DynamicStructuredTool, type StructuredTool } from "@langchain/core/tool
 import { MultiServerMCPClient } from "@langchain/mcp-adapters";
 import { FLOWAGENTS_DIRNAME, CACHE_SUBDIR } from "../paths.js";
 import { logger } from "../logger.js";
+import { mkdirLevelsSync } from "../fs/mkdir-levels.js";
 import { sanitizeMcpToolName } from "./sanitize-mcp-name.js";
 
 const log = logger.child("mcp-tool-cache");
@@ -209,7 +209,8 @@ export function writeToolSchemaCache(
 ): void {
   try {
     if (tools.length === 0) return;
-    mkdirSync(cacheDir(), { recursive: true });
+    // 逐级、非递归：目录失效时立即失败并走下面的 catch，而不是永久卡死。
+    mkdirLevelsSync(cacheDir());
     const payload: CachedToolSchemas = {
       version: CACHE_VERSION,
       sessionId,
