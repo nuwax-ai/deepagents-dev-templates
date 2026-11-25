@@ -160,7 +160,7 @@ pnpm typecheck && pnpm test
 |---|---|
 | 本地快检 | `pnpm flow "..."` / `pnpm flow -- -i`（**≠ 平台端到端**；未经 ACP 真实预览链路） |
 | 端到端（平台预览） | ACP surface + 平台预览会话（`config.flow.active`）；改过 flow 代码后**开新会话**再测，避免旧上下文污染 |
-| 日志 | 默认 `~/.flowagents/logs/<agent>-<sessionId>-<日期>.log`；`LOG_DIR` 可覆盖根目录；`LOG_LEVEL=debug` |
+| 日志 | 默认 `~/.flowagents/logs/<agent>-<sessionId>-<日期>.log`；`LOG_DIR` 可覆盖根目录；`LOG_LEVEL=debug`。`LOG_DIR` 不可用时自动停用文件日志（stderr 报一次 `file logging disabled`），不影响启动与对话；单步 I/O 超时 `LOG_IO_TIMEOUT_MS`（默认 2000） |
 | 启动耗时 | `PERF_TRACE` 默认开（`mcp.getTools` / `mcp.cache` 等阶段）；设 `PERF_TRACE=0` 关闭 |
 | MCP schema 缓存 | ACP 会话可选；排查见日志 `mcp.cache`（路径/失效策略以实现为准） |
 | Export graph topology | `pnpm graph`（`pnpm graph -- --mermaid`） |

@@ -44,12 +44,16 @@ export {
   setLogAgent,
   setLogSession,
   getSessionLogPath,
+  getFileLoggingStatus,
+  flushFileLogging,
   getEffectiveLogLevel,
   truncateForLog,
   formatMessagesForLog,
   formatPayloadForLog,
   resolveTraceMaxChars,
   type LogLevel,
+  type FileLoggingState,
+  type FileLoggingStatus,
 } from "./logger.js";
 export { traceFlowCallbacks, traceFlowRun, type SessionTraceContext, type TraceFlowRunMeta } from "./session-trace.js";
 export {

@@ -46,6 +46,29 @@ const LOG_LEVELS: Record<LogLevel, number> = {
 };
 
 /**
+ * 逐级建目录，不传 recursive：Node 的递归 mkdir 在上级目录失效（如源目录被删的 bind mount）时
+ * 会无界重试（nodejs/node#66268）并卡死主线程；非递归形式对失效目录立即返回错误。
+ * EEXIST 视为成功；ENOENT 先补父目录再重试一次——每一级最多两次，调用次数随路径深度有界。
+ */
+function mkdirLevelsSync(dir: string): void {
+  try {
+    fs.mkdirSync(dir);
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === "EEXIST") return;
+    if (code !== "ENOENT") throw err;
+    const parent = path.dirname(dir);
+    if (parent === dir) throw err;
+    mkdirLevelsSync(parent);
+    try {
+      fs.mkdirSync(dir);
+    } catch (retryErr) {
+      if ((retryErr as NodeJS.ErrnoException).code !== "EEXIST") throw retryErr;
+    }
+  }
+}
+
+/**
  * Logger class for DeepAgents ACP Server
  */
 export class Logger {
@@ -88,7 +111,7 @@ export class Logger {
       // Ensure the directory exists
       const dir = path.dirname(resolvedPath);
       if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
+        mkdirLevelsSync(dir);
       }
 
       // Open file stream in append mode

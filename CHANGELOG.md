@@ -14,10 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - deepagents-flow-ts：精选 5 个面向 AI Agent 的可运行 seam 范例，移除误导性的 `dev-agent` 重复示例，并明确 topology 单一权威
 
 ### Fixed
+- deepagents-flow-ts 2.3.1：`LOG_DIR` 不可用（建不出来 / 只读 / 磁盘满 / 文件系统卡住 / 运行中被删）时不再阻塞 agent 启动。`ACP InitializeRequest timeout` 的根因是日志模块在主线程同步递归建目录，触发 Node v22 递归 mkdir 的无界重试（[nodejs/node#66268](https://github.com/nodejs/node/issues/66268)）；现改为逐级非递归建目录 + 文件写入移出主线程（串行异步队列），失败只降级为仅 stderr 并输出一次 `file logging disabled`
+- deepagents-flow-ts 2.3.1：启动路径里有软链接时 `main()` 不执行、进程静默退出且退出码为 0——入口判定改为比较真实路径
 - CI workflow references `packages/template` → `packages/deepagents-app-ts`
 - Unified package manager to pnpm (added pnpm-lock.yaml, updated CI)
 
 ### Added
+- deepagents-flow-ts：`LOG_IO_TIMEOUT_MS`——单步日志文件 I/O 的超时（毫秒，默认 2000），超时即停用文件日志
 - deepagents-flow-ts 2.3.0：`session/set_mode` 真正生效——vendored ACP 新增 `onSessionMode` hook 并广播 `current_mode_update`；plan 档把 `interruptOn` 扩至 write_file/edit_file/bash/http_request 并注入规划指令，ask 档强制 ask 门控，agent / 未知 mode 保持 appConfig 默认
 - deepagents-flow-ts：builtin `ask-question` MCP in `config/mcp.default.json` for default flow（平台同名 session-wins 覆盖）
 - docs：`docs/packages/deepagents-flow-ts/development/ask-question-mcp-hitl.md`（HITL 选型、平台合并、code-review 处理记录）

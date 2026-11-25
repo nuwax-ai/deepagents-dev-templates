@@ -1,7 +1,7 @@
 # 排错索引
 
 > **范围**：本工作目录内 flow 的运行时排错。
-> 先查 `.logs/`（`LOG_DIR=<REPO>/.logs`，`LOG_LEVEL=debug`）。
+> 先查 `.logs/`（`LOG_DIR=<REPO>/.logs`，`LOG_LEVEL=debug`）。stderr 若出现 `[logger] file logging disabled`，先看[对应条目](#logger-file-logging-disabled)。
 > **图编排硬规则**（按 ID 追加）：[flow-graph-rules.md](flow-graph-rules.md)。
 
 ## `LLM 未返回 JSON`
@@ -44,12 +44,30 @@ flow 跑不通、工具审批异常、ACP 无响应时：
 
 | 步 | 动作 |
 |----|------|
-| 1 | 确认 env 含 `LOG_DIR`、`LOG_LEVEL`（排查建议 `debug`） |
+| 1 | 确认 env 含 `LOG_DIR`、`LOG_LEVEL`（排查建议 `debug`）；stderr 若有 `[logger] file logging disabled`，按[下文条目](#logger-file-logging-disabled)处理 |
 | 2 | 复现：本地 `pnpm flow` 快检，或经 ACP surface 在平台预览会话复现 |
 | 3 | 打开 `.logs/` 最新 `.log` 或按 `sessionId` 定位 |
 | 4 | 过滤：`runtime:flow-graph`、`onPrompt`、`permission 门控` 等 |
 | 5 | 修复后重跑，确认新日志无同类 error |
 | 6 | 记录根因摘要（勿把整段 log 提交 git） |
+
+---
+
+## `[logger] file logging disabled`
+
+**症状**：stderr 出现一行 `[logger] file logging disabled — LOG_DIR "…" is unusable (<原因>). Logs continue on stderr only.`，`LOG_DIR` 下没有日志文件。agent 本身照常启动、对话不受影响——日志行仍完整输出到 stderr。
+
+**根因**：日志目录不可用——建不出来（上级目录失效，如源目录已被删除的 bind mount）、只读、无权限、磁盘满、文件系统卡住，或运行中被删除。目录准备是进程内一次性的，失败后不再重试，也不会自动恢复。
+
+**修复**：
+
+| 步 | 动作 |
+|----|------|
+| 1 | 看提示里的原因：`ENOENT` 多为上级目录失效；`EACCES` / `EROFS` 为权限或只读挂载；`ENOSPC` 为磁盘满；`timed out` 为文件系统卡住 |
+| 2 | 修正 `LOG_DIR`（或挂载 / 权限 / 磁盘）后**重启 agent** |
+| 3 | 文件系统确实慢：调大 `LOG_IO_TIMEOUT_MS`（单步 I/O 超时，默认 2000 毫秒） |
+
+**排查步骤**：平台容器里 `LOG_DIR` 为 `/app/container-logs/<会话ID>/logs`，先确认对应的挂载源目录在宿主机上存在。
 
 ---
 
