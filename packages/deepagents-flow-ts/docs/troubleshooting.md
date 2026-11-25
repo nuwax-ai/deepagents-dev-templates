@@ -86,6 +86,23 @@ flow 跑不通、工具审批异常、ACP 无响应时：
 
 ---
 
+## 每个新会话都要等约 60 秒
+
+**症状**：`session/new` 约 60 秒才返回，之后对话正常。stderr 在 60 秒后才出现 `MCP server 连接失败，已跳过  server=ask-question`，原因是 `Request timed out`。离线或访问不到 npm registry 的环境里，每个新会话都会重复一次。
+
+**根因**：默认 MCP `ask-question` 由 `npx -y nuwax-ask-question-mcp@latest` 启动。拉不到包时 npm 默认会退避重试，约 70 秒才放弃；而 MCP SDK 的连接超时是 60 秒，于是每次建会话都等满 60 秒。
+
+**修复**：
+
+| 步 | 动作 |
+|----|------|
+| 1 | 确认 `config/mcp.default.json` 里 `ask-question` 的参数带 `--fetch-retries=0` 和 `--fetch-timeout=8000`（2.3.2 起默认带，拉不到包时约 1 秒内跳过） |
+| 2 | 平台会话如果下发同名 `ask-question`（会覆盖默认配置），平台侧的配置要带同样的参数 |
+| 3 | 希望离线也能用上这个工具：镜像构建时联网跑一次该 `npx` 命令预热缓存，`--prefer-offline` 会直接用缓存 |
+| 4 | 完全用不到默认 MCP：设 `DEEPAGENTS_DEFAULT_MCP=disabled` |
+
+---
+
 ## 工具 `Permission denied` / 客户端卡转圈
 
 - `config/flow-agent.config.json` → `permissions.mode` / `interruptOn`（见 [capabilities.md](capabilities.md)）

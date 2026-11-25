@@ -1,6 +1,6 @@
 {
   "name": "nuwax-flow-ts",
-  "version": "2.3.1",
+  "version": "2.3.2",
   "description": "Workflow-orchestration agent template — explicit LangGraph ReAct default graph over ACP. App layer is a pure default ReAct workspace (flow.active: default only); customize via prompts + platform config.",
   "engine": "nuwax-flow-ts",
   "source": {
@@ -8,8 +8,8 @@
     "endpoint": "https://s3.nuwax.com:9443",
     "bucket": "nuwax-packages",
     "region": "us-east-1",
-    "prefix": "agent-engines/nuwax-flow-ts/versions/2.3.1",
-    "version": "2.3.1",
+    "prefix": "agent-engines/nuwax-flow-ts/versions/2.3.2",
+    "version": "2.3.2",
     "forcePathStyle": true
   },
   "alternativeSources": [
@@ -17,17 +17,17 @@
       "type": "npm",
       "package": "nuwax-flow-ts",
       "registry": "https://registry.npmjs.org",
-      "version": "2.3.1"
+      "version": "2.3.2"
     },
     {
       "type": "tgz",
-      "path": "./nuwax-flow-ts-2.3.1.tgz",
-      "version": "2.3.1"
+      "path": "./nuwax-flow-ts-2.3.2.tgz",
+      "version": "2.3.2"
     },
     {
       "type": "git",
       "url": "https://github.com/nuwax-ai/deepagents-dev-templates.git",
-      "ref": "v2.3.1"
+      "ref": "v2.3.2"
     },
     {
       "type": "s3-channel",

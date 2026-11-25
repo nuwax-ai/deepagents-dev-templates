@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - deepagents-flow-ts：精选 5 个面向 AI Agent 的可运行 seam 范例，移除误导性的 `dev-agent` 重复示例，并明确 topology 单一权威
 
 ### Fixed
+- deepagents-flow-ts 2.3.2：离线或访问不到 npm registry 时，每个新会话都要等满 60 秒才返回——默认 MCP `ask-question` 的 `npx` 参数加上 `--prefer-offline --fetch-retries=0 --fetch-timeout=8000`，拉不到包时秒级失败（Docker 实测 `session/new` 60 秒 → 0.5 秒）；镜像构建时预热过缓存则离线也能用上该工具。平台会话若下发同名 `ask-question`，平台侧配置需带同样参数
 - deepagents-flow-ts 2.3.2：会话目录不可用时不再卡死、也不再让会话失去运行时——`FileCheckpointSaver` 与 MCP 工具缓存的递归 mkdir 改为逐级非递归（[nodejs/node#66268](https://github.com/nodejs/node/issues/66268)）；checkpoint 目录建不出来或写入失败时降级为仅内存，只在状态切换时告警一次（`checkpoint persistence disabled`），目录恢复后自动恢复落盘
 - deepagents-flow-ts 2.3.1：`LOG_DIR` 不可用（建不出来 / 只读 / 磁盘满 / 文件系统卡住 / 运行中被删）时不再阻塞 agent 启动。`ACP InitializeRequest timeout` 的根因是日志模块在主线程同步递归建目录，触发 Node v22 递归 mkdir 的无界重试（[nodejs/node#66268](https://github.com/nodejs/node/issues/66268)）；现改为逐级非递归建目录 + 文件写入移出主线程（串行异步队列），失败只降级为仅 stderr 并输出一次 `file logging disabled`
 - deepagents-flow-ts 2.3.1：启动路径里有软链接时 `main()` 不执行、进程静默退出且退出码为 0——入口判定改为比较真实路径

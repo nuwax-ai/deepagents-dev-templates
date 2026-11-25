@@ -163,6 +163,7 @@ pnpm typecheck && pnpm test
 | 日志 | 默认 `~/.flowagents/logs/<agent>-<sessionId>-<日期>.log`；`LOG_DIR` 可覆盖根目录；`LOG_LEVEL=debug`。`LOG_DIR` 不可用时自动停用文件日志（stderr 报一次 `file logging disabled`），不影响启动与对话；单步 I/O 超时 `LOG_IO_TIMEOUT_MS`（默认 2000） |
 | 启动耗时 | `PERF_TRACE` 默认开（`mcp.getTools` / `mcp.cache` 等阶段）；设 `PERF_TRACE=0` 关闭 |
 | MCP schema 缓存 | ACP 会话可选；排查见日志 `mcp.cache`（路径/失效策略以实现为准） |
+| 离线 / 访问不到 npm | 默认 MCP（`npx`）拉不到包时约 1 秒内跳过；镜像构建时预热过 `npx` 缓存则离线也能用；完全不需要时设 `DEEPAGENTS_DEFAULT_MCP=disabled` |
 | Export graph topology | `pnpm graph`（`pnpm graph -- --mermaid`） |
 | 能力 / flow profile | `pnpm capabilities` / `pnpm flows -- --json` |
 | 类型检查 | `pnpm typecheck` |

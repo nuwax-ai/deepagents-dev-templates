@@ -29,11 +29,19 @@
   "servers": {
     "ask-question": {
       "command": "npx",
-      "args": ["-y", "nuwax-ask-question-mcp@latest"]
+      "args": ["-y", "--prefer-offline", "--fetch-retries=0", "--fetch-timeout=8000", "nuwax-ask-question-mcp@latest"]
     }
   }
 }
 ```
+
+**`npx` 参数（2.3.2 起默认带）**：拉不到包时 npm 默认会退避重试到约 70 秒，而 MCP SDK 的连接超时是 60 秒，离线环境里**每个新会话**都要白等 60 秒。
+
+| 参数 | 作用 | 代价 |
+| --- | --- | --- |
+| `--fetch-retries=0` | 不重试，DNS / 网络失败立即退出（实测 `session/new` 60 秒 → 0.5 秒） | 瞬时网络错误时不重试，该会话跳过此工具，下一个会话再试 |
+| `--fetch-timeout=8000` | 单次请求 8 秒超时，防 registry 连接挂起 | — |
+| `--prefer-offline` | 优先用本地缓存；镜像构建时预热过的话离线也能用上该工具 | 新版本不会立刻被拉到 |
 
 | 层级 | 来源 | 优先级 |
 | --- | --- | --- |
@@ -98,7 +106,7 @@ START → compose → present_review → review(interrupt) → finalize → END
 | `mergeStrategy` 未接线 | 📋 本文 §1 标明现状；实现待办 |
 | Flow 注册表删减（breaking） | 📋 见 §5 |
 | HITL 集成测试未走 runtime MCP 路径 | ✅ `review.test.ts` 增加 mock `askQuestionTool` 图编译用例 |
-| 离线环境 npx 启动失败 | 接受：per-server 隔离，不拖垮其他工具；日志见 hydrate |
+| 离线环境 npx 启动失败 | ✅ 2.3.2：`npx` 参数加快速失败（见 §1），拉不到包时秒级跳过；此前每个新会话都要等满 60 秒的 MCP 连接超时。仍是 per-server 隔离，不拖垮其他工具 |
 
 ---
 
