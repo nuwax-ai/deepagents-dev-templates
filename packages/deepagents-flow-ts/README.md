@@ -207,7 +207,7 @@ const { nodes, edges, mermaid } = await getFlowTopology();
 默认模型 `openai / deepseek-v4-flash`（见 [config/flow-agent.config.json](config/flow-agent.config.json)，已对齐国内 OpenAI 兼容端点；切回 Anthropic 把 `model.provider` 设为 `anthropic`）。Anthropic 协议默认开启 thinking，固定预算默认 `model.settings.thinkingBudgetTokens: 1024`（须严格小于 `maxTokens`；Claude Opus 4.7 自动使用 adaptive thinking）。各端点配置见 [`.env.example`](.env.example)。
 
 > **数据目录**（同源常量 [src/runtime/paths.ts](src/runtime/paths.ts)，默认根 `~/.flowagents`，可用 `config.memory.dir` 覆盖）：
-> - **会话/checkpoint**：`<根>/sessions/<workspace 12 位散列>/`（每 thread 一个 JSON）
+> - **会话/checkpoint**：`<根>/sessions/<workspace 12 位散列>/`（每 thread 一个 JSON）；目录不可用时自动降级为仅内存（stderr 报一次 `checkpoint persistence disabled`），会话不受影响，目录恢复后自动恢复落盘
 > - **日志**：`<根>/logs/`（per-session 文件；`LOG_DIR` 可覆盖）
 > - **MCP 工具 schema 缓存**（可选）：`<根>/cache/` 下按会话存放（以实现为准）
 > - **产物**：`<根>/artifacts/<workspace 散列>/`

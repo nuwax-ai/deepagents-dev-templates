@@ -71,6 +71,21 @@ flow 跑不通、工具审批异常、ACP 无响应时：
 
 ---
 
+## `checkpoint persistence disabled`
+
+**症状**：stderr 出现 `checkpoint persistence disabled (in-memory only; not restored after restart)`。会话照常进行，但状态只在内存里，进程重启后无法恢复之前的会话。
+
+**根因**：会话目录（`config.memory.dir` 下的 `sessions/<workspace 散列>/`）不可用——上级目录失效、只读、无权限、磁盘满，或运行中被删除。
+
+**修复**：
+
+| 步 | 动作 |
+|----|------|
+| 1 | 看告警里的 `reason`：`cannot create checkpoint dir` 是建不出目录，`write failed` 是写入失败；`error` 是底层错误码 |
+| 2 | 修正 `config.memory.dir`（或挂载 / 权限 / 磁盘），**不用重启**：每次落盘前都会重试，恢复后日志出现 `checkpoint persistence restored` |
+
+---
+
 ## 工具 `Permission denied` / 客户端卡转圈
 
 - `config/flow-agent.config.json` → `permissions.mode` / `interruptOn`（见 [capabilities.md](capabilities.md)）

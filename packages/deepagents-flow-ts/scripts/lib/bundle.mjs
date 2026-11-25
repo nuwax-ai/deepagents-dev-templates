@@ -3,9 +3,10 @@
  * 将可运行入口及其生产依赖打成单一自包含 ESM 文件。
  */
 import * as esbuild from "esbuild";
-import { mkdir, stat } from "node:fs/promises";
+import { mkdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { assertBundleGuarded } from "./bundle-guard.mjs";
 
 // bundled CJS 依赖（如 dotenv）会调用 require("fs")，ESM bundle 需此 banner。
 const BANNER =
@@ -35,6 +36,10 @@ export async function bundleAgent({
   });
 
   const { size } = await stat(absOut);
+  // 产物守卫：发布的是 bundle 而不是 src/，所以在这里再验一次（pnpm bundle / package*.mjs 都经此处）。
+  assertBundleGuarded(await readFile(absOut, "utf8"), { source: absOut });
+  log(`Bundle guard passed`);
+
   const kb = (size / 1024).toFixed(1);
   log(`Bundle written: ${absOut} (${kb} KB)`);
 }

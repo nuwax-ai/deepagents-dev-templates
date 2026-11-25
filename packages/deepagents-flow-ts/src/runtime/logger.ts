@@ -18,16 +18,17 @@
  *     fs/promises（libuv 线程池），由一条串行队列按入队顺序执行（同文件连续行合并成一次 append）。
  *   - 绝不使用递归 mkdir（任何形式）：Node 的递归 mkdir 在上级目录失效时会无界重试
  *     （nodejs/node#66268）——同步形式占满一个核并卡死主线程，异步形式占死一个线程池线程。
- *     这里按路径分量逐级调用非递归 mkdir，每一级最多试两次。
+ *     建目录统一经 fs/mkdir-levels.ts：按路径分量逐级、非递归，每一步带超时。
  *   - 每一步文件 I/O 都带超时；超时或出错即进入 disabled，之后不再发任何文件 I/O。
  *   - 唯一的同步文件写是进程退出兜底（flushPendingSync），见其注释。
  */
 
 import { appendFileSync } from "node:fs";
 import { appendFile, mkdir, readFile, rename, stat, unlink } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { homedir } from "node:os";
 import { FLOWAGENTS_NAME, FLOWAGENTS_DIRNAME, LOGS_SUBDIR } from "./paths.js";
+import { mkdirLevels } from "./fs/mkdir-levels.js";
 
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
@@ -165,12 +166,6 @@ export function setLogAgent(name: string): void {
 
 // ── 文件写路径：状态机 + 串行异步队列 ─────────────────────────────────────
 
-function errnoCode(err: unknown): string | undefined {
-  return typeof err === "object" && err !== null && "code" in err
-    ? String((err as { code?: unknown }).code)
-    : undefined;
-}
-
 function describeError(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
@@ -199,27 +194,9 @@ async function ioWithTimeout<T>(op: Promise<T>, step: string): Promise<T> {
   }
 }
 
-/**
- * 逐级、非递归建目录（不传 recursive，见文件头注释）。
- * EEXIST 视为成功；ENOENT 先补父目录再重试一次——每一级最多两次，调用次数随路径深度有界。
- * 上级目录已失效（如源目录被删的 bind mount）时，补父目录得到 EEXIST/ENOENT，重试仍是 ENOENT → 立即失败。
- */
-async function mkdirLevels(dir: string): Promise<void> {
-  try {
-    await ioWithTimeout(mkdir(dir), "mkdir");
-  } catch (err) {
-    const code = errnoCode(err);
-    if (code === "EEXIST") return;
-    if (code !== "ENOENT") throw err;
-    const parent = dirname(dir);
-    if (parent === dir) throw err;
-    await mkdirLevels(parent);
-    try {
-      await ioWithTimeout(mkdir(dir), "mkdir");
-    } catch (retryErr) {
-      if (errnoCode(retryErr) !== "EEXIST") throw retryErr;
-    }
-  }
+/** 日志目录：逐级、非递归创建（fs/mkdir-levels.ts），每一步带超时。上级目录失效时立即失败。 */
+async function prepareLogDir(dir: string): Promise<void> {
+  await mkdirLevels(dir, (d) => ioWithTimeout(mkdir(d), "mkdir"));
 }
 
 /**
@@ -256,7 +233,7 @@ async function prepare(): Promise<boolean> {
     ioTimeoutMs = parsePositiveInt(process.env.LOG_IO_TIMEOUT_MS) ?? LOG_IO_TIMEOUT_DEFAULT_MS;
     const dir = logDir();
     attemptedDir = dir;
-    await mkdirLevels(dir);
+    await prepareLogDir(dir);
     logRoot = dir;
     fileState = "enabled";
     return true;
