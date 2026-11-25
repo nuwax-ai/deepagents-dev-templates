@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Changed
+- deepagents-flow-ts 2.2.0：`flow.active`（及旧顶层 `activeFlow`）非 `default` 值从"警告并回落 default"改为**启动直接报错**；移除 `unknownActivePolicy` 配置项。升级前请把非 default 的 flow 配置改为 `"default"`
+- deepagents-flow-ts 2.2.0：仅保留默认 ReAct 路径——删除 `docs/flow-patterns.md`、dev-agent-flow `part1/part2` 手写图指引及相关词条；固定阶段 / 人审确认 / 多源汇总一律以 default ReAct + 平台工具 + systemPrompt 落地
 - deepagents-flow-ts：移除 duckduckgo-mcp-server 残留引用；联网搜索统一走平台 MCP 登记
 - deepagents-flow-ts：精选 5 个面向 AI Agent 的可运行 seam 范例，移除误导性的 `dev-agent` 重复示例，并明确 topology 单一权威
 
@@ -16,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Unified package manager to pnpm (added pnpm-lock.yaml, updated CI)
 
 ### Added
+- deepagents-flow-ts 2.3.0：`session/set_mode` 真正生效——vendored ACP 新增 `onSessionMode` hook 并广播 `current_mode_update`；plan 档把 `interruptOn` 扩至 write_file/edit_file/bash/http_request 并注入规划指令，ask 档强制 ask 门控，agent / 未知 mode 保持 appConfig 默认
 - deepagents-flow-ts：builtin `ask-question` MCP in `config/mcp.default.json` for default flow（平台同名 session-wins 覆盖）
 - docs：`docs/packages/deepagents-flow-ts/development/ask-question-mcp-hitl.md`（HITL 选型、平台合并、code-review 处理记录）
 - `scripts/pack-template.js` for TS/Python zip packaging

@@ -12,15 +12,15 @@ describe("flow selection", () => {
       active: "default",
       source: "default",
       defaultInteraction: "chat",
-      unknownActivePolicy: "warn-default",
     });
   });
 
-  it("keeps legacy activeFlow compatible", () => {
+  it("keeps legacy activeFlow parsing (non-default values still throw)", () => {
     expect(resolveFlowSelection({ activeFlow: "legacy-name" })).toMatchObject({
       active: "legacy-name",
       source: "activeFlow",
     });
+    expect(() => resolveFlow("legacy-name")).toThrow(/仅允许 "default"/);
   });
 
   it("prefers flow.active over legacy activeFlow", () => {
@@ -35,8 +35,8 @@ describe("flow selection", () => {
     });
   });
 
-  it("resolveFlow falls back to default for unknown names", () => {
-    expect(resolveFlow("not-registered").name).toBe("default");
+  it("resolveFlow throws for unknown names", () => {
+    expect(() => resolveFlow("not-registered")).toThrow(/仅允许 "default"/);
   });
 });
 

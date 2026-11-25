@@ -53,3 +53,6 @@ logs/
 
 # superpowers brainstorm mockups
 .superpowers/
+
+# ZCode session workspace
+.zcode/

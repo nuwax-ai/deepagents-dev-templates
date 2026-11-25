@@ -17,7 +17,7 @@
 | 步 | 动作 |
 |----|------|
 | 1 | `.logs/` 搜 `LLM 未返回 JSON` 或节点 `label` |
-| 2 | 打开 `src/app/graph.ts` 或自建图文件对应 `addNode` |
+| 2 | 打开 `src/app/graph.ts` 对应 `addNode` |
 | 3 | `write` 是否用 `r.parsed`？**否 → 删 `parse`** |
 | 4 | 必须结构化？加强 prompt JSON schema；加 `fallback` 或 `createLlmRouterNode` + `routeFallback` |
 | 5 | 入口节点？prompt 加非预期输入兜底（引导正确格式，不强求 JSON） |
@@ -34,30 +34,22 @@
 
 **根因**：`addConditionalEdges` 的 `condition` 返回值 ∉ `targets`。
 
-**注意**：`pnpm graph` 静态反射**不执行** condition，检不出此错——生成 custom 图时人工核对；见 [node-catalog.md § edge 约束](node-catalog.md#edge-约束custom-dsl)。
+**注意**：`pnpm graph` 静态反射**不执行** condition，检不出此错——需人工核对；见 [node-catalog.md § 边约束](node-catalog.md)。
 
 ---
 
-## 读日志六步（编排 / ACP / HITL）
+## 读日志六步（编排 / ACP）
 
-图跑不通、节点未执行、条件边走错、HITL 不 resume、工具审批异常、ACP 无响应时：
+flow 跑不通、工具审批异常、ACP 无响应时：
 
 | 步 | 动作 |
 |----|------|
-| 1 | 确认 env 含 `LOG_DIR`、`LOG_LEVEL`（HITL 建议 `debug`） |
+| 1 | 确认 env 含 `LOG_DIR`、`LOG_LEVEL`（排查建议 `debug`） |
 | 2 | 复现：本地 `pnpm flow` 快检，或经 ACP surface 在平台预览会话复现 |
 | 3 | 打开 `.logs/` 最新 `.log` 或按 `sessionId` 定位 |
-| 4 | 过滤：`runtime:flow-graph`、`interrupt`、`onPrompt`、`permission 门控` 等 |
+| 4 | 过滤：`runtime:flow-graph`、`onPrompt`、`permission 门控` 等 |
 | 5 | 修复后重跑，确认新日志无同类 error |
 | 6 | 记录根因摘要（勿把整段 log 提交 git） |
-
----
-
-## HITL 不 resume / interrupt 无响应
-
-- 确认 checkpointer 已配置（`createStatefulFlow` / stateful-recipe）
-- `.logs/` 过滤 `interrupt` / `onPrompt`
-- 按上文 [读日志六步](#读日志六步编排--acp--hitl)
 
 ---
 
@@ -65,7 +57,7 @@
 
 - `config/flow-agent.config.json` → `permissions.mode` / `interruptOn`（见 [capabilities.md](capabilities.md)）
 - `.logs/` 过滤 `permission 门控` / `requestPermission`
-- 按上文 [读日志六步](#读日志六步编排--acp--hitl)
+- 按上文 [读日志六步](#读日志六步编排--acp)
 
 ---
 
@@ -186,7 +178,6 @@
 
 ## 相关文档
 
-- [flow-graph-rules.md](flow-graph-rules.md) — **图编排规则（R-G001+，可持续追加）**
+- [flow-graph-rules.md](flow-graph-rules.md) — **图编排规则（R-G001+，默认图维护参考）**
 - [node-kit.md](node-kit.md) — factory API + parse 契约摘要
 - [node-catalog.md](node-catalog.md) — 选型决策树
-- [flow-patterns.md](flow-patterns.md) — Send / interrupt / checkpoint

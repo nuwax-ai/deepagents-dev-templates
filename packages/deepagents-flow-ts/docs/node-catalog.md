@@ -23,7 +23,7 @@
 |---|---|---|---|
 | `llm` | `createLlmNode` | 一次调 LLM,写回**纯文本**（默认）或结构化（`write` 读 `r.parsed` 时才加 `parse`） | plan / rewrite / grade / 路由裁决；**非**用户可见大段终稿 |
 | `llm-stream` | `createLlmStreamNode` | **流式**调 LLM,逐 token 给用户 | compose / aggregate / generate / draft / respond(用户可见大段输出) |
-| `llm-router` | `createLlmRouterNode` | LLM 裁决后**返回 Command goto**(节点内路由) | reflection / evaluator:评审 → 重做或放行 |
+| `llm-router` | `createLlmRouterNode` | LLM 裁决后**返回 Command goto**(节点内路由) | 节点内路由裁决 |
 
 ### HITL(人审)类
 
@@ -41,8 +41,8 @@
 | 惯用名 | factory | 语义 | 何时用 |
 |---|---|---|---|
 | `tool-exec` | `createToolExecNode` | 执行模型 `tool_calls`(ReAct 工具步)+ 三态透出 | 默认图 tools 节点 |
-| `platform-tool` | `createPlatformToolActionNode` | 主动调用已注入的平台/工具集合 | 固定管道里点名调 Plugin |
-| `mcp-retrieval` | `createMcpRetrievalNode` | 调真实 MCP 检索(rateLimited + 三态) | RAG retrieve（接外部知识源） |
+| `platform-tool` | `createPlatformToolActionNode` | 主动调用已注入的平台/工具集合 | 新开发统一并入 `allTools` |
+| `mcp-retrieval` | `createMcpRetrievalNode` | 调真实 MCP 检索(rateLimited + 三态) | 检索节点（接外部知识源） |
 
 ### 结构类
 
@@ -59,12 +59,10 @@
 | 模式 | 为何定制 | 出路 |
 |---|---|---|
 | **bindTools 的 ReAct think** | think↔tools 循环与 ToolNode 耦合 | 用默认 ReAct 图,不手写 |
-| **文件交付** | interrupt 收路径 + 写文件 | 手写节点 |
-| **多源检索取优** | 多 MCP 源启发式合并 | 手写 subgraph（`createMcpRetrievalNode` 仅单源/简单多源） |
 | **自定义 reducer** | 业务特定聚合 | Annotation reducer 手写 |
 | **含 emitPlan/emitStage** | 节点内发结构化事件 | `createLlmNode`/`Stream` 的 `write` 内 `emit*` |
 
-> 「图是契约」：bespoke 保留手写是设计选择（注释「为何不用 factory」），不是遗漏。范式名（RAG / HITL / Send）见 [examples.md](examples.md)，**不是**可切换内置场景。
+> 「图是契约」：bespoke 保留手写是设计选择（注释「为何不用 factory」），不是遗漏；**无**可切换内置场景。
 
 ---
 
@@ -132,7 +130,7 @@ Q4 结构类?
 
 ## factory 惯用名一览
 
-手写图对照用（`tests/node-catalog.test.ts` 断言下列名出现在本文）：
+factory 目录对照用（`tests/node-catalog.test.ts` 断言下列名出现在本文）：
 
 ```
 llm | llm-stream | llm-router | approval | approval-finalize | platform-tool | tool-exec | mcp-retrieval | prepare | passthrough
@@ -146,7 +144,7 @@ llm | llm-stream | llm-router | approval | approval-finalize | platform-tool | t
 
 ---
 
-## 边约束（手写图）
+## 边约束（默认图维护）
 
 - **conditional 边**：`condition` 的返回值必须 ∈ 其 `targets`，否则运行时 LangGraph 抛 `Invalid edge`（**R-G004**）。`pnpm graph` 静态反射**不执行** condition，需人工核对。
 - **llm-router**：`route` 的 `goto` 目标须在 `addNode(..., { ends: [...] })` 声明，否则反射会丢掉 Command 路由边。
@@ -158,5 +156,4 @@ llm | llm-stream | llm-router | approval | approval-finalize | platform-tool | t
 - **[flow-graph-rules.md](flow-graph-rules.md)**:图编排硬性规则（R-G001+，**新增约定优先落此**）。
 - **[node-kit.md](node-kit.md)**:各 factory 的完整 API + 用法 snippet(本文件只管选型/分类)；parse 摘要链到 R-G001。
 - **[troubleshooting.md](troubleshooting.md)**:常见运行时错误索引（含 `LLM 未返回 JSON`）。
-- **[flow-patterns.md](flow-patterns.md)**:Send/interrupt/Command/subgraph/checkpointer 的原生细节。
-- **[examples.md](examples.md)**：扩展范式 + 会话底座（仅文档，无内置 demo）。
+- **[examples.md](examples.md)**：默认路径 + 会话底座（仅文档，无内置 demo）。

@@ -1,7 +1,7 @@
 # Part 0：端到端开发流程
 
 > 所属：`flow-builder` L2-A（总流程）。入口路由见 [SKILL.md](../SKILL.md)。
-> 本技能承载会话启动、交互形态选型、图选型落地、completion gate 等**逐步实现**流程；各 Part 分工见 [SKILL.md](../SKILL.md) 路由表。
+> 本技能承载会话启动、形态确认（一律 default ReAct）、completion gate 等**逐步实现**流程；各 Part 分工见 [SKILL.md](../SKILL.md) 路由表。
 
 ## 会话启动（先于一切开发）
 
@@ -9,7 +9,7 @@
 |----|------|------|
 | 0 | 装依赖 | 缺少 `node_modules`，或 lock 有变更 → `pnpm install` |
 | 1 | 读上下文 | `README.md`；`project.md` 存在则读、无则创建（只记录项目记忆、关键决策、已登记工具名、验证方式） |
-| 2 | 系统提示词基线 | `dev-engineer-toolkit` → `get-config.sh --key systemPrompt`（及 `openingChatMsg`）。若平台 **空/占位** 且用户已描述 Agent → **先于写图**走 [part5-prompt-design.md](part5-prompt-design.md) § 用户输入提炼 |
+| 2 | 系统提示词基线 | `dev-engineer-toolkit` → `get-config.sh --key systemPrompt`（及 `openingChatMsg`）。若平台 **空/占位** 且用户已描述 Agent → **先于施工**走 [part5-prompt-design.md](part5-prompt-design.md) § 用户输入提炼 |
 | 3 | 读当前项目文档 | `docs/README.md`（索引）→ `glossary.md` → `flow-graph-rules.md` → `node-catalog.md` → `node-kit.md` → `config/flow-agent.config.json` |
 | 4 | 简报 | 项目状态 + 待办，再处理用户指令 |
 
@@ -17,76 +17,41 @@
 
 ---
 
-## Phase 1：需求分析与交互形态选型
+## Phase 1：需求分析与形态确认
 
-### 第 0 问：是否改图（先判定 default 是否够用）
+### 第 0 问：形态确认（一律 default ReAct）
 
-**先读取当前工作目录 `docs/examples.md` 的“先判定”章节；它是唯一的图选型规则表。**本 Part 不复述该表。
+**先读取当前工作目录 `docs/examples.md`**：唯一开发路径是 **default ReAct flow**（`flow.active: "default"`）。固定阶段顺序、人审确认、多源汇总等需求不改图——以平台工具承接固定步骤、systemPrompt 约束流程顺序与确认话术落地；不向用户展开模式细节，直接按 ReAct 路径施工。
 
-记录选型理由后执行：权威文档判定为默认路径时，继续 Part 3 / Part 5；判定需要手写图时，继续 Part 1 / Part 2。说不清为什么需要改图时，回到权威文档与用户需求澄清，而不是自行扩大图的范围。
+1. **确认 runtime profile**：`pnpm flows -- --json`；`pnpm flows -- recommend --kind chat`（注册表仅 `default`，用于确认形态）
+2. **系统提示词并行** → 用户 Agent 描述按 [part5](part5-prompt-design.md) § 用户输入提炼 **持续合并**；定稿后尽早同步平台，禁止收工仍空 `systemPrompt`
+3. **落地** → `flow.active: "default"`（不改图、不设节点）+ 平台能力登记（[part3-tools-config.md](part3-tools-config.md)）→ 进 Phase 2
+4. **流程顺序 / 确认话术约束** → 写进 systemPrompt（如「先调用 X 工具获取数据，再总结输出；产出前先复述要点」），由默认 ReAct 承接
 
-1. **先查 runtime profile**：`pnpm flows -- --json`；推荐 `pnpm flows -- recommend --kind chat|pipeline`（注册表仅 `default`，用于确认交互形态而非选内置场景）
-2. **图选型**（已说明 default 不够、命中改图行）→ [part1-fixed-flow.md](part1-fixed-flow.md) § 图选型：对照节点 catalog 定 state/nodes/edges
-3. **系统提示词并行** → 用户 Agent 描述按 [part5](part5-prompt-design.md) § 用户输入提炼 **持续合并**；定稿后尽早同步平台，禁止收工仍空 `systemPrompt`
-4. **落地** → 直接改 `src/app/graph.ts`（Part 2 编排：`Annotation.Root` 定 state、factory 建节点、连线）→ 改 `flow.active`（自建独立 flow 时）或复用默认图 → 进 Phase 2
-5. **拿不准结构** → 对照 [part2-orchestration.md](part2-orchestration.md) 编排模式速查 + `docs/examples.md` / `docs/flow-patterns.md`
+### 平台能力门禁（Phase 1 必做 · 施工前）
 
-### 平台能力门禁（Phase 1 必做 · 写图前）
+凡依赖**工作区以外**的能力，**必须先**完成 [part3-tools-config.md](part3-tools-config.md) § 平台能力登记，**再**写业务代码。
 
-凡依赖**工作区以外**的能力，**必须先**完成 [part3-tools-config.md](part3-tools-config.md) § 平台能力登记，**再**写 `src/app/graph.ts`。
-
-触发：外部 API / 联网搜索 / `createToolExecNode` / ReAct 业务工具 / 平台 Plugin 等。豁免：纯 LLM 对话、仅内置 bash/grep（工作区内）。
+触发：外部 API / 联网搜索 / ReAct 业务工具 / 平台 Plugin 等。豁免：纯 LLM 对话、仅内置 bash/grep（工作区内）。
 
 | 步 | 动作 |
 |----|------|
 | 1 | 加载 `dev-engineer-toolkit` + Part 3 § 平台能力登记 |
 | 2 | `search-apis.sh` / `search-skills.sh`（按关键词拆词） |
-| 3 | 命中 → `add-tool.sh` → `get-config --key tools --full` 确认真实工具名与 schema；按需固化或宿主注入后接线（独立节点 / 局部集合 / 可选 allTools） |
+| 3 | 命中 → `add-tool.sh` → `get-config --key tools --full` 确认真实工具名与 schema；经宿主注入或固化进入 `allTools` 供默认 ReAct `bindTools` |
 | 4 | 无命中 → 记录关键词与输出，方可自写 app 工具 |
 | 5 | **`add-tool` 完成后 → 加载 `flow-debugger`**（收工前必跑 `debug.sh --with-logs`） |
 
 > **禁止**：未搜平台就写外部能力；为已登记能力手写 fetch 包装。联网搜索同样须先登记。
 
-### Factory 与图规则
-
-Factory 选型只读当前工作目录 `docs/node-catalog.md` 与 `docs/node-kit.md`；图规则只读 `docs/flow-graph-rules.md`。需要把规则落成节点、边、HITL 或流式实现时再打开 Part 2。
-
-### 扩展范式参考
-
-框架**不再内置**场景 topology / scaffold 生成物，注册表仅 `default`（ReAct）。要做检索增强问答、多源搜索、人工确认、固定管道等，照下列文字范式在 `src/app/graph.ts` **自建**：
-
-- `docs/examples.md`：多轮 chat（开箱）、平台能力对话、检索增强问答（`rewrite → retrieve → grade → prepare → generate`）、人工确认思路
-- `docs/flow-patterns.md`：条件重试 / Send 并行 / reflection / HITL interrupt-resume 等编排范式
-- `docs/node-catalog.md` + `docs/node-kit.md`：节点 `type` 词表与 factory API
-
-> 勿指望 `flow.active` 切到某个内置 demo，也勿恢复 `scripts/scaffold/` 或 `src/libs/topologies/` 作为入口。
-
 ---
 
-## Phase 2：开发实现
+## Phase 2：开发实现（default flow · 复用默认图）
 
-### 聊天助手型（default flow）· 复用默认图
-
-1. `flow.active: "default"`，**不写图、不设置节点**（已内置 ReAct + 多轮对话上下文记忆）
-2. **需平台能力** → 须已完成上文「平台能力门禁」；宿主注入或固化后按需接线（默认 ReAct 可 `bindTools(allTools)`）
-3. Part 5 提炼 `systemPrompt`（理解用户消息）→ 平台同步 → Phase 3
-
-### 固定流程型 · 手写 `src/app/graph.ts`（含流程内 HITL 人审）
-
-| 步 | 动作 |
-|----|------|
-| 1 | 对照 `docs/examples.md` / `docs/flow-patterns.md` 最接近的范式定 state/nodes/edges |
-| 2 | `src/app/`：`graph.ts` 连线、`nodes/`、`flow-tools.ts` |
-| 3 | 节点优先 `src/libs/nodes/` factory；bespoke 须说明原因 |
-| 4 | `Annotation.Root`；Send 并行加 reducer |
-| 5 | 节点返回 Partial；禁止 mutate state |
-| 6 | 图规则 → 当前工作目录 `docs/flow-graph-rules.md`（**R-G001+**） |
-| 7 | 用户可见输出 → **R-G009** `createLlmStreamNode` + `r.text`；改图后同步 `docs/` 相关说明（**R-G003**，SHOULD） |
-| 8 | 工具 → [part3-tools-config.md](part3-tools-config.md) → `src/app/` → `createFlowTools()` |
-| 9 | 系统提示词 → [part5](part5-prompt-design.md) 提炼并平台同步 |
-| 10 | 更新 `project.md` |
-
-编排细节 → [part2-orchestration.md](part2-orchestration.md)
+1. `flow.active: "default"`，**不写图、不设置节点**（已内置 ReAct + 多轮对话上下文记忆；用户可见输出经 `respond` 节点流式透出）
+2. **需平台能力** → 须已完成上文「平台能力门禁」；宿主注入或固化后进入 `allTools`，默认 ReAct `think.bindTools(runtime.allTools)` 按需调用
+3. 固定流程顺序 / 人审确认 / 多源汇总等约束 → 写进 systemPrompt（Part 5 提炼）→ 平台同步 → Phase 3
+4. 确需新工具且平台确无命中 → [part3-tools-config.md](part3-tools-config.md) § 创建自定义工具（`src/app/` + `createFlowTools()`）
 
 ---
 
@@ -132,10 +97,10 @@ pnpm typecheck && pnpm test && pnpm graph
 
 > **门禁**：仅当 Phase 3 静态三连 + flow-debugger 双证（SSE + 日志）**均已通过**后，方可撰写本 Phase 并以「完成」收束。
 
-1. 完成了什么（交互形态 / 节点 / 关键图能力）
+1. 完成了什么（形态 / 工具接线 / systemPrompt 要点）
 2. **flow-debugger 证据**（**必填**）：贴 `debug.sh --with-logs` 的 `[OUTCOME]`、`[结论]`、`[flow 状态]`、`[工具调用]` 原始摘要；平台能力 flow 须含 `--expect-tool` 命中。**无本节不得标题写「完成」。**
 3. **用户待操作事项、风险与后续**（见下表；**无真待办则整段省略**）
-4. `project.md` 已更新（含已登记 targetId、工具名；固定管道含节点工具名引用）
+4. `project.md` 已更新（含已登记 targetId、工具名）
 5. **平台 `systemPrompt` 非空且已回读**（`openingChatMsg` 若涉及）
 6. 提示词提炼来源（用户哪些输入 → 哪一字段）
 7. **需平台能力时**：`search-apis` / `search-skills` / `get-config` 结果摘要（或「已搜索、无命中」+ 关键词）；自写工具须说明平台无命中依据（**联网搜索较常见**，须单独列出搜索关键词）
@@ -163,7 +128,7 @@ pnpm typecheck && pnpm test && pnpm graph
 - [ ] 声称改动文件经 `read_file` / `ls` 实证
 - [ ] `.logs/` 无未预期 `error`（**已跑 analyze-logs 并贴 `[结论]` 摘要**）
 - [ ] `get-config.sh --key systemPrompt` 回读**非空**；用户发过 Agent 描述 → 已按 part5 提炼并同步
-- [ ] 用户可见 LLM 节点 → `createLlmStreamNode` + `r.text`（**R-G009**）
+- [ ] 未改 `src/app/graph.ts` / 未注册新 flow（一律 default ReAct；`flow.active` 保持 `"default"`）
 - [ ] **需平台能力** → 已贴 search / get-config **原始输出**；有命中 → `add-tool.sh`；无命中 → 报告写明关键词后方可自写工具
 - [ ] **平台能力真实调用** → `debug.sh --expect-tool` 通过，已贴工具调用轨迹
 

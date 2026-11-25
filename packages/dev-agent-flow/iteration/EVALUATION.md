@@ -6,7 +6,7 @@
 
 当前版本的主要进步不是“文案更顺”，而是把开发 Agent 的行为从提示建议变成了可路由、可验证、可回朔的工作系统：
 
-1. **决策更少误触发**：先判定 `default` 是否够用；说不清为什么不够就不改图。
+1. **决策更少误触发**：一律走 default ReAct 路径，平台工具 + systemPrompt 承接所有需求形态。
 2. **上下文更省**：L0 系统提示词管铁律，L1 `SKILL.md` 管路由，L2 `references/part*.md` 管步骤。
 3. **完成标准更硬**：工程验证范围由模板 README 矩阵确定，平台回读与对外完成门禁由 `<SESSION_CLOSE>` 确定；`pnpm flow` 明确不能冒充端到端。
 4. **平台边界更清**：平台配置、平台工具、技能登记都必须经 `dev-engineer-toolkit`，禁止手写等价替代。
@@ -19,7 +19,7 @@
 
 | 维度 | 好的标准 | 当前证据 | 分 |
 |------|----------|----------|----|
-| 任务判定 | 能阻止不必要改图，先走最低成本路径 | 目标项目 `docs/examples.md` 权威判定；L0 + `flow-builder` Part0 路由 | 2 |
+| 任务判定 | 一律走最低成本 default ReAct 路径 | 目标项目 `docs/examples.md` 权威路径；L0 + `flow-builder` Part0 路由 | 2 |
 | 边界清晰 | 能区分开发 Agent / 目标 Agent / 平台配置 / 工作区文件 | `<TEMPLATE_IDENTITY>`、`<PLATFORM_CONFIG>`、`<AGENT_INTENT_DISAMBIGUATION>` | 2 |
 | 渐进披露 | 常驻上下文只放铁律，细节按需加载 | L0/L1/L2 分层；`flow-builder` 每次只开一个 Part | 2 |
 | 工具纪律 | 平台能力先搜索登记，再读取真实 schema / 工具名 | `dev-engineer-toolkit` + Part3 + `get-config --key tools --full` | 2 |
@@ -42,12 +42,11 @@
 
 评价意义：上下文预算更稳定，模型更容易先选对路径，再加载正确细节。
 
-### 2. 从“先搭脚手架”变成“先判定 default 是否够用”
+### 2. 从“先搭脚手架”变成“default ReAct 唯一路径”
 
-旧版有明显 scaffold-first / preset topology 倾向；当前版本把“默认不改图”前置成第一决策：
+旧版有明显 scaffold-first / preset topology 倾向；当前版本收敛为 default ReAct 唯一路径：
 
-- 开放追问、客服、通用助手、搜索总结优先 `flow.active: "default"`。
-- 只有固定阶段、Send 并行、多源聚合、条件重试、multi-turn HITL 才改图。
+- 所有需求（含固定阶段顺序、人审确认、多源汇总）一律 `flow.active: "default"`，以平台工具 + systemPrompt 承接。
 
 评价意义：减少过度工程，开发 Agent 更像一个会判断成本的工程师，而不是遇事就生成图。
 

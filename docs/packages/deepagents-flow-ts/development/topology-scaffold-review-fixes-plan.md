@@ -162,6 +162,6 @@ Tier 3（12 先做，最小且解锁 reflect 验收；13 MCP 合并独立；14 �
 
 - **#10（细化）**：rewrite 改 `requireModel` 后**保留 fallback**——无凭证经 requireModel 在 createLlmNode 的 try 外抛错（→ executeRAG 顶层 catch 兜底），调用失败（瞬态 429/超时）仍由 fallback 降级（用原 query 继续）。即「配置错误响亮失败、瞬态错误优雅降级」，优于一刀切去掉 fallback。RAG 测试相应 mock `resolveApiKey`（表达测试视为有凭证），非污染全局 env。
 - **#15（关键发现）**：`emitTextToken`（emit.ts）原**缺 `configurable.onToken` 退路**（emitStage/emitPlan 都有双发，它只认 writer），故 RAG 经 invoke（无 streamMode writer）时即便接线 onToken 仍不 emit。落地补齐该退路（writer 优先 → 不影响现有 streamMode:"custom"），连带 `emitTextToken` 改 async + llm.ts 处 `await`。createLlmStreamNode 重构 generate 后经 inline tsx 验证逐 token emit（`["你好","，","世界"]`）。
-- **#14**：约束落在三处——custom.mjs `renderEdge` 注释 + `generate` 运行时提醒 + 文档（node-catalog.md「edge 约束」节 + flow-builder `part2-orchestration.md` 条件边节）。
+- **#14**：约束落在三处——custom.mjs `renderEdge` 注释 + `generate` 运行时提醒 + 文档（node-catalog.md「edge 约束」节 + flow-builder `part2-orchestration.md` 条件边节；后者已删除）。
 - **#12**：router-gate gate 补 `ends:["draft","__end__"]` 后反射出 `gate→draft (cond)` 与 `gate→__end__ (cond)`；grade-redo 经 `generate` 重新生成（verdict fail-closed + `attempts<3`）。
 - **#13**：`runtime/services/mcp-stdio.ts` 删除（全仓唯一引用方 mcp-bridge 已改），mcp-bridge 改用 `libs/mcp/stdio-client` 的 `listMcpToolsRaw`（保留含 schema 的原始响应）。

@@ -375,5 +375,5 @@ pnpm exec tsx src/index.ts flow -i
 
 - `README.md`：删除 `FlowExecutor` / callbacks 叙述，改为 direct graph stream。
 - `CLAUDE.md`：更新保护区规则；本次重构获得授权后 `src/surfaces/` 可改。
-- `packages/deepagents-flow-ts/docs/flow-patterns.md`：把 `onStage` / `withTimeout` 描述改成 `config.writer` / node policy。
+- ~~`packages/deepagents-flow-ts/docs/flow-patterns.md`：把 `onStage` / `withTimeout` 描述改成 `config.writer` / node policy。~~（该文件已删除，无需同步）
 - examples README：更新运行与事件展示说明。

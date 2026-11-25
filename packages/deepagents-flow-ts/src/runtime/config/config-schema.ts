@@ -177,9 +177,9 @@ export const PluginsConfigSchema = z.object({
 });
 
 export const FlowSelectionConfigSchema = z.object({
+  /** 仅允许 "default"（ReAct）；配置其他值在 resolveFlow 处直接抛错。 */
   active: z.string().default("default"),
   defaultInteraction: z.enum(["chat", "pipeline", "approval"]).default("chat"),
-  unknownActivePolicy: z.enum(["warn-default", "default"]).default("warn-default"),
 });
 
 export const LoggingConfigSchema = z.object({

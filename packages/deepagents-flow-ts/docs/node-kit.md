@@ -23,17 +23,17 @@ import {
 | 一次调 LLM,写回文本（**中间步骤 / 结构化前置**） | `createLlmNode` | plan/rewrite/grade |
 | 一次调 LLM,写回**结构化** JSON | `createLlmNode({ parse })` | plan/rewrite |
 | **流式**调 LLM,逐 token 给用户 | `createLlmStreamNode` | compose/aggregate/draft/finalize 修订 |
-| LLM 裁决 → **Command goto** 路由(reflection/evaluator) | `createLlmRouterNode` | 评审重做环（见 [examples.md](examples.md)） |
+| LLM 裁决 → **Command goto** 路由 | `createLlmRouterNode` | 节点内 Command 路由 |
 | 执行模型 `tool_calls`(ReAct 工具步) | `createToolExecNode` | 默认图 tools |
-| **主动 MCP 检索**(节点自选 server+tool) | `createMcpRetrievalNode` | RAG retrieve（见 [examples.md](examples.md)） |
+| **主动 MCP 检索**(节点自选 server+tool) | `createMcpRetrievalNode` | 检索节点（接外部知识源） |
 | 人审门(前置):`interrupt` 暂停 → 通过/打回 | `createHumanApprovalNode` | review/approve/confirm |
 | 人审门(同步弹窗):同 turn `onApprovalRequest` | `createPermissionApprovalNode` | 确认发布? / 秒级 yes-no |
 | HITL 后置定稿:按 feedback 短路/LLM 修订 | `createApprovalFinalizeNode` | HITL finalize |
 | input → 首条 HumanMessage | `createPrepareNode` | 默认图 prepare |
-| 并行扇出(Send map-reduce) | `createFanout` | 多源并行（见 [flow-patterns.md](flow-patterns.md)） |
+| 并行扇出(Send map-reduce) | `createFanout` | 多路并行扇出 |
 | 把一张小图当节点用 | `createSubgraphNode` | 子任务封装 |
 
-> **定制节点（bespoke）不要硬塞**：定稿短路、LLM 路由、MCP 检索**已有 factory**。剩余真正 bespoke（多源检索取优、文件交付等）才手写，并注释「为何不用 factory」。范式骨架见 [examples.md](examples.md)，**无**内置场景 topology。
+> **定制节点（bespoke）不要硬塞**：定稿短路、LLM 路由、MCP 检索**已有 factory**。剩余真正 bespoke（自定义聚合 reducer、节点内事件透出等）才手写，并注释「为何不用 factory」；**无**内置场景 topology。
 
 ---
 
@@ -58,7 +58,7 @@ graph.addNode("compose", compose);
 - `r.content` 已是 `extractText` 后的纯文本;`parse` 提供时 `r.parsed = parse(content)`。
 - **结构化**:加 `parse`(常用 `parseJson`),`write` 里读 `r.parsed`。PM 的 plan/evaluate、rag 的 rewrite 都用这个。
 - **`write` 可收第三参 `config?`**(LangGraphRunnableConfig)——供 write 内发 `emitPlan(config,…)`/`emitStage(config,…)` 副作用;不用就忽略(默认两参 `(r, s)`)。
-- 例：自建评估循环图 plan/estimate/evaluate；RAG rewrite；路由节点 `createLlmNode({ parse })`。
+- 例：默认图维护中的裁决/前置节点 `createLlmNode({ parse })`；路由节点配 `fallback`。
 - **用户可见初稿/汇总**见 [`createLlmStreamNode`](#createllmstreamnode--流式-llm)。
 
 ### parse 使用契约（必读）
@@ -156,7 +156,6 @@ const research = createMcpRetrievalNode<MyState>({
 ```
 
 - 与 createToolExecNode 互补:后者执行模型 tool_calls(ToolNode 模式);本 factory 是**主动检索**——节点自己决定调哪个 MCP server 的哪个 tool(RAG/调研)。内部 `rateLimited` 节流 + `runTool` 三态透出。
-- 多源并行取优**不收口**——保留 bespoke subgraph（见 [flow-patterns.md](flow-patterns.md) § Send）。
 - 例：并行调研子节点（`createMcpRetrievalNode` + `onToolCall`）。
 
 ## createHumanApprovalNode —— HITL 人审
@@ -180,7 +179,6 @@ const gate = createHumanApprovalNode<MyState>({
 
 - `interrupt` 暂停、`isApproval(feedback)` 判定(默认中英文通过词;`regex` 可覆盖)。空回复视为通过。
 - `write`(简单写回)或 `route`(Command 路由)二选一。
-- **结构化表单（平台问答卡片）**：审阅定稿等多字段场景在 interrupt **之前**用节点 **direct-invoke** 平台 ask-question MCP（展示表单），再用 `createHumanApprovalNode` 收回复——**两节点必拆**。本 kit **不**导出专用 presentation factory；骨架见 [examples.md](examples.md) § HITL / [flow-patterns.md](flow-patterns.md) § interrupt。
 - 术语口径：**平台问答卡片** = **主平台的问答卡片**（定义见 [glossary.md](./glossary.md)）；文档/注释勿用产品口语问答卡片、dockpanel 等指代该 UI。
 - 例：HITL review / confirm / approve 节点。
 
@@ -293,6 +291,4 @@ parentGraph.addNode("research", researcher);   // 编译后的子图直接当节
 
 ## 自建 custom 图
 
-在 `src/app/graph.ts`（或新文件）直接用本目录 factory 编排 nodes+edges+state。节点 `type` 词表见 [node-catalog.md](node-catalog.md)。
-
-进阶模式(Send/interrupt/Command/subgraph/checkpointer 的原生细节)见 [flow-patterns.md](flow-patterns.md)。扩展思路见 [examples.md](examples.md)（仅文档）。
+本目录 factory 用于维护默认 ReAct 图（`src/app/graph.ts`）。节点 `type` 词表见 [node-catalog.md](node-catalog.md)；默认路径与交付底座见 [examples.md](examples.md)。

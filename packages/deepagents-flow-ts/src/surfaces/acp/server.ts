@@ -220,6 +220,45 @@ export function createAcpApprovalHandler(
  * 组装 ACP onPrompt 的 callbacks：流式推送 + tool trace。
  * 所有调试日志在此层注入，flow 图本身无感知。
  */
+export const PLAN_MODE_WRITE_TOOLS = [
+  "write_file",
+  "edit_file",
+  "bash",
+  "http_request",
+] as const;
+
+export const PLAN_MODE_DIRECTIVE =
+  "[Plan mode] Gather information and produce a step-by-step implementation plan first. " +
+  "Do NOT call write_file/edit_file/bash/http_request or any other mutating tool until the " +
+  "user approves the plan via the permission dialog.";
+
+/** session mode → 有效权限门控（plan 扩大 interruptOn 到全部写操作）。export 供单测。 */
+export function applySessionModeToPermissions(
+  base: { mode: string; interruptOn: string[] },
+  sessionMode: string | undefined,
+): { mode: string; interruptOn: string[] } {
+  if (!sessionMode) return base;
+  if (sessionMode === "ask") return { ...base, mode: "ask" };
+  if (sessionMode === "plan") {
+    return {
+      mode: "plan",
+      interruptOn: Array.from(
+        new Set([...base.interruptOn, ...PLAN_MODE_WRITE_TOOLS]),
+      ),
+    };
+  }
+  // agent / 未知 mode：保持 appConfig 默认
+  return base;
+}
+
+/** session mode → 输入指令注入（仅 plan 追加规划指令）。export 供单测。 */
+export function applySessionModeToQuery(
+  text: string,
+  sessionMode: string | undefined,
+): string {
+  return sessionMode === "plan" ? `${text}\n\n${PLAN_MODE_DIRECTIVE}` : text;
+}
+
 function buildAcpCallbacks(
   conn: AcpConnection,
   sessionId: string,
@@ -436,6 +475,8 @@ export function createFlowHooks(options: FlowAcpOptions): DeepAgentsServerHooks 
     { sessionConfig: ACPSessionConfig; workspaceRoot: string; phase: string }
   >();
   const sessionFailures = new Map<string, string>();
+  /** session/set_mode 记录的 ACP session mode（onPrompt 时折算进权限门控与输入指令）。 */
+  const sessionModes = new Map<string, string>();
   // 一个会话 = 一个主题：老式 flow（未实现 hasStarted）的「等回复」内存兜底，按 sessionId 跟踪。
   // 实现了 hasStarted 的 flow 优先从 checkpointer 推断续跑（跨进程/IDE 重启仍准）。
   const fallbackResume = new Set<string>();
@@ -559,6 +600,14 @@ export function createFlowHooks(options: FlowAcpOptions): DeepAgentsServerHooks 
       return { workspaceRoot };
     },
 
+    async onSessionMode(ctx) {
+      sessionModes.set(ctx.sessionId, ctx.modeId);
+      log.info("session mode applied", {
+        sessionId: ctx.sessionId,
+        modeId: ctx.modeId,
+      });
+    },
+
     async onPrompt(ctx) {
       const text = ctx.promptText?.trim();
       if (!text) {
@@ -584,6 +633,11 @@ export function createFlowHooks(options: FlowAcpOptions): DeepAgentsServerHooks 
       const isStateful = typeof executor !== "function";
       const durableResume =
         isStateful && typeof (executor as StatefulFlow).hasStarted === "function";
+      // plan 模式追加规划指令（resume 分支不加：续跑语义保持原输入）
+      const effectiveQuery = applySessionModeToQuery(
+        text,
+        sessionModes.get(sessionId),
+      );
 
       return runInAcpPromptCycle(
         { sessionId, startedAt: promptStartedAt, query: text, requestId },
@@ -602,12 +656,17 @@ export function createFlowHooks(options: FlowAcpOptions): DeepAgentsServerHooks 
             emittedToolCallIds,
             completedToolCallIds,
             workspaceRoot,
-            {
-              // 防御：手构 appConfig（测试 / 非 loadConfig 路径）可能无 permissions；
-              // 缺失 → 空名单 = 不审批（放行），不破坏未配审批的调用方。
-              mode: options.appConfig.permissions?.mode ?? "ask",
-              interruptOn: options.appConfig.permissions?.interruptOn ?? [],
-            },
+            // session/set_mode 的 mode 在此生效：plan/ask 折算门控，plan 扩大
+            // interruptOn 至全部写操作；agent / 未设置保持 appConfig 默认。
+            applySessionModeToPermissions(
+              {
+                // 防御：手构 appConfig（测试 / 非 loadConfig 路径）可能无 permissions；
+                // 缺失 → 空名单 = 不审批（放行），不破坏未配审批的调用方。
+                mode: options.appConfig.permissions?.mode ?? "ask",
+                interruptOn: options.appConfig.permissions?.interruptOn ?? [],
+              },
+              sessionModes.get(sessionId),
+            ),
             ctx.signal
           );
 
@@ -637,13 +696,13 @@ export function createFlowHooks(options: FlowAcpOptions): DeepAgentsServerHooks 
                   sessionId,
                   threadId: sessionId,
                   mode,
-                  input: text,
+                  input: resuming ? text : effectiveQuery,
                   resuming,
                   isStateful: true,
                 },
                 () =>
                   flow.run(
-                    resuming ? { resume: text } : { query: text },
+                    resuming ? { resume: text } : { query: effectiveQuery },
                     sessionId,
                     callbacks
                   )
@@ -676,10 +735,10 @@ export function createFlowHooks(options: FlowAcpOptions): DeepAgentsServerHooks 
               {
                 sessionId,
                 mode: "query",
-                input: text,
+                input: effectiveQuery,
                 isStateful: false,
               },
-              () => (executor as FlowExecutor)(text, callbacks)
+              () => (executor as FlowExecutor)(effectiveQuery, callbacks)
             );
             if (!stats.streamed && result.answer) await streamText(conn, sessionId, result.answer);
             if (result.footer) await streamText(conn, sessionId, result.footer);

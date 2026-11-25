@@ -32,7 +32,7 @@
 - 用户首条或任意消息描述要什么 Agent / 对谁说话 / 什么风格
 - 新建、命名、定制主 Agent / 通用智能体（非 subagent，见 Part 6）
 - 调整 `systemPrompt` / `openingChatMsg`
-- 固定流程型自建图需注入节点 `systemPrompt`（part1 / part2）
+- 流程约束类提示（固定顺序 / 确认话术）——由默认 ReAct 的 `systemPrompt` 承接
 - Phase 0 发现平台 `systemPrompt` 为空但用户已描述需求（[part0-workflow.md](part0-workflow.md)）
 
 ### 定稿步骤
@@ -44,7 +44,7 @@
 | 3 | 按下方「设计流程」+ 七要素 + ≥1 few-shot（有固定格式时） |
 | 4 | 名称 → 更新 `config.agent.name` / `agent.description` |
 | 5 | 写入 `prompts/<场景>.md`（业务 Agent 底稿，**经第 7 步同步为平台 `systemPrompt` 生效**；**勿覆盖** `prompts/flow.base.md` 通用基座） |
-| 6 | 自建图时经 `createFlowGraph({ systemPrompt })` 注入（见 `src/app/default-flow.ts`）；摘要写入 `project.md` |
+| 6 | 经 `createFlowGraph({ systemPrompt })` 注入默认图（见 `src/app/default-flow.ts`；默认 ReAct 已内置注入）；摘要写入 `project.md` |
 | 7 | **有定稿即同步** — 同轮或下轮执行「平台同步」，勿拖到收工 |
 
 ### 平台同步（报「完成」前强制）
@@ -100,7 +100,7 @@
 | 4 | 过 checklist |
 | 5 | 按 § 用户输入提炼与平台同步 +「保存与同步」上传 |
 
-与图落地衔接：写好后经 `createFlowGraph({ systemPrompt })` 注入自建图（见 [part1-fixed-flow.md](part1-fixed-flow.md) § systemPrompt 注入 / `src/app/default-flow.ts`）。
+与图落地衔接：写好后经 `createFlowGraph({ systemPrompt })` 注入默认图（见 `src/app/default-flow.ts`；默认 ReAct 已内置注入）。
 
 ## 节点 prompt vs 主 Agent systemPrompt
 
@@ -122,7 +122,7 @@
 1. **落盘** — 定稿写入本地 UTF-8 源文件（业务 Agent 用 `prompts/<场景>.md`；`flow.base.md` 保留通用基座；开场白单独文件）
 2. **上传** — `update-config.sh --system-prompt-file` / `--opening-msg-file`（含中文必须用文件，禁止命令行内联）
 3. **单字段更新** — 只改系统提示词或开场白之一时，勿传空值覆盖另一字段
-4. **图落地衔接** — 自建图时经 `createFlowGraph({ systemPrompt })` 注入（part1 § systemPrompt 注入）
+4. **图落地衔接** — 经 `createFlowGraph({ systemPrompt })` 注入默认图（见 `src/app/default-flow.ts`）
 
 回读校验见 § 用户输入提炼与平台同步 · 平台同步。
 
@@ -183,4 +183,4 @@
 - ❌ 把 `Available Skills` / `Available MCP Servers` / `Tool Selection Priority` 复制进目标 Agent `systemPrompt`
 - ❌ 硬编码进代码；只改本地不同步平台
 - ❌ 所有 LLM 节点 prompt 都写「只输出 JSON」（应仅用于 `write` 读 `r.parsed` 的节点）
-- ✅ 七要素 + few-shot → `dev-engineer-toolkit` 保存 → § 平台同步 →（自建图时）`createFlowGraph({ systemPrompt })` 注入
+- ✅ 七要素 + few-shot → `dev-engineer-toolkit` 保存 → § 平台同步 → `createFlowGraph({ systemPrompt })` 注入默认图

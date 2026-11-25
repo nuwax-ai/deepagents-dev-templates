@@ -302,9 +302,7 @@ async function main(): Promise<void> {
   if (args.command === "graph") {
     const { raw } = loadFlowConfig({ configPath: args.configPath });
     const selection = resolveFlowSelection(raw);
-    const { nodes, edges, mermaid } = await resolveFlow(selection.active, {
-      unknownActivePolicy: selection.unknownActivePolicy,
-    }).getTopology();
+    const { nodes, edges, mermaid } = await resolveFlow(selection.active).getTopology();
     process.stdout.write(
       args.mermaid ? mermaid + "\n" : JSON.stringify({ nodes, edges }, null, 2) + "\n"
     );
@@ -358,9 +356,7 @@ async function main(): Promise<void> {
       sessionConfig,
     });
     const selection = resolveFlowSelection(raw);
-    const flowDef = resolveFlow(selection.active, {
-      unknownActivePolicy: selection.unknownActivePolicy,
-    });
+    const flowDef = resolveFlow(selection.active);
     const runtime = await createFlowRuntime(appConfig, {
       sessionConfig,
       workspaceRoot,
@@ -388,9 +384,7 @@ async function main(): Promise<void> {
         sessionConfig,
       });
       const selection = resolveFlowSelection(raw);
-      const flowDef = resolveFlow(selection.active, {
-        unknownActivePolicy: selection.unknownActivePolicy,
-      });
+      const flowDef = resolveFlow(selection.active);
       const runtime = await createFlowRuntime(appConfig, {
         sessionConfig,
         workspaceRoot,

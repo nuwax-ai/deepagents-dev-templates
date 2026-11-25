@@ -1,5 +1,5 @@
 /**
- * Flow 注册表回归 —— 内置仅 default；未知 active 回落 default。
+ * Flow 注册表回归 —— 内置仅 default；未知 active 直接抛错。
  */
 import { describe, expect, it } from "vitest";
 import { flows, resolveFlow } from "../src/app/flows/index.js";
@@ -12,8 +12,7 @@ describe("flow registry", () => {
     expect(flows.default?.profile.interaction).toBe("chat");
   });
 
-  it("未知 flow.active 回落 default（不抛错）", () => {
-    const def = resolveFlow("no-such-flow");
-    expect(def.name).toBe("default");
+  it("未知 flow.active 直接抛错（不回落 default）", () => {
+    expect(() => resolveFlow("no-such-flow")).toThrow(/仅允许 "default"/);
   });
 });

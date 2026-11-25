@@ -190,6 +190,12 @@ export interface DeepAgentsServerHooks {
   }): void | Promise<void>;
 
   /**
+   * `session/set_mode` 之后调用（mode 已写入 session state）。宿主可据此让
+   * mode 真正生效——如 flow surface 的权限门控与 plan 模式提示注入。
+   */
+  onSessionMode?(ctx: { sessionId: string; modeId: string }): void | Promise<void>;
+
+  /**
    * `session/set_config_option` 之后调用。Flow surface 可在此热切换 per-session runtime
    *（如 `configId=model` 时重建 executor）。
    */

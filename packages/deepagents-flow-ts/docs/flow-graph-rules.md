@@ -1,7 +1,7 @@
 # Flow 图编排规则（Flow Graph Rules）
 
 > **单一权威**：凡「图怎么写才对 / 常见坑怎么避」的硬性约定，**优先落本文件**，按规则 ID 追加。
-> **范围**：本工作目录内手写 `src/app/graph.ts`（及自建 TS 图）的开发与验证。**无** scaffold / `*.flow.json` 产品入口。
+> **范围**：本工作目录内默认 ReAct 图 `src/app/graph.ts` 的维护与验证。**无** scaffold / `*.flow.json` 产品入口。
 > 其他**本包**文档（[node-kit](node-kit.md)、[troubleshooting](troubleshooting.md)、[node-catalog](node-catalog.md) 等）只摘要 + 链到对应规则，避免多处漂移。
 >
 > **受众**：在本仓库内维护 `graph.ts` 或运行 `pnpm graph` / `pnpm test` 验证的读者。
@@ -84,8 +84,8 @@
 | 项 | 内容 |
 |----|------|
 | **级别** | **SHOULD** |
-| **适用** | `src/app/graph.ts` 及自建图文件 |
-| **规则** | 手改图后同步更新相关 `docs/` 说明（如 [examples.md](examples.md)、[node-kit.md](node-kit.md)）。 |
+| **适用** | `src/app/graph.ts`（默认图维护） |
+| **规则** | 改默认图后同步更新相关 `docs/` 说明（如 [examples.md](examples.md)、[node-kit.md](node-kit.md)）。 |
 | **验证** | 文档中引用的节点/边与 `pnpm graph` 导出一致 |
 
 ---
@@ -116,7 +116,7 @@
 | **反例** | `findings: Annotation<string>()` + Send×N 同写 `findings` |
 | **正例** | `findings: Annotation<T[]>({ reducer: (a,b) => [...a,...b], default: () => [] })` |
 | **验证** | 并行路径集成测 |
-| **关联** | [flow-patterns.md § Send](flow-patterns.md) |
+| **关联** | [node-kit.md](node-kit.md) |
 
 ---
 
@@ -161,7 +161,7 @@
 | **反例** | `state.items.push(x); return {}` |
 | **正例** | `return { items: [x] }`（append channel 用 reducer） |
 | **验证** | 代码审阅 |
-| **关联** | [flow-patterns.md](flow-patterns.md)；[node-kit.md](node-kit.md) |
+| **关联** | [node-kit.md](node-kit.md) |
 
 ---
 
@@ -194,5 +194,4 @@
 - [node-catalog.md](node-catalog.md) — 选型
 - [node-kit.md](node-kit.md) — factory API
 - [troubleshooting.md](troubleshooting.md) — 症状 → 步骤
-- [flow-patterns.md](flow-patterns.md) — Send / interrupt / checkpoint
 - [scripts/README.md](../scripts/README.md) — 打包 / 调试命令
